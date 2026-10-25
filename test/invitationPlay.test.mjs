@@ -25,6 +25,7 @@ import {
   createBody,
   createMix,
   lookAim,
+  lookFront,
   lookShare,
   mixStep,
   twinWeights,
@@ -147,6 +148,29 @@ test('the body: thrown at a screen edge he bounces off it, and a still release d
   assert.ok(still.vel.y <= 0 && still.vel.y > -CARRY.fallGravity * 2 * DT, 'just gravity');
 });
 
+test('the body: held, falling and landing he keeps the yaw he had when grabbed, however he’s dragged and tossed, and steers on from it', () => {
+  for (const yaw of [0, 2, -2.6]) {
+    const s = createBody({ x: 0, z: 0, yaw });
+    let t = 0;
+    const collar = { x: 0, y: 0.59, z: 0 };
+    // Dragged round in a loop, quickly, then let go mid-swing.
+    for (let i = 0; i < 90; i++) {
+      const a = (i / 30) * Math.PI;
+      const target = { x: Math.sin(a) * 0.8, y: 1.1 + 0.2 * Math.cos(2 * a), z: Math.cos(a) * 0.5 - 0.5 };
+      bodyStep(s, { state: 'held', move: stay, pointer: null, bounds: BOUNDS, dt: DT, t: (t += DT), collar, target });
+      assert.equal(s.body.yaw, yaw, 'held');
+    }
+    s.root = { x: s.carry.anchor.x, y: 0.5, z: s.carry.anchor.z };
+    for (let i = 0; i < 200 && s.mode !== 'ground'; i++) {
+      bodyStep(s, { state: 'fall', move: stay, pointer: null, bounds: BOUNDS, dt: DT, t: (t += DT), footOffset: 0.03 });
+      assert.equal(s.body.yaw, yaw, 'falling');
+    }
+    assert.equal(s.mode, 'ground');
+    bodyStep(s, { state: 'land', move: stay, pointer: null, bounds: BOUNDS, dt: DT, t: t + DT });
+    close(s.body.yaw, yaw, 1e-9, 'landed, the way he faced when grabbed:');
+  }
+});
+
 test('the mix: weights move toward the brain’s clip at clips.js’s fades and stay normalised; the gait phase advances by stride', () => {
   const m = createMix();
   assert.deepEqual(m.weights, { Idle: 1 });
@@ -242,6 +266,30 @@ test('where he looks: the camera when asked or when the pointer is on him, the p
   close(ahead.yaw, 0);
   close(ahead.pitch, Math.min(LIMIT.pitchMax, Math.atan2(16.2, 23)), 1e-9);
   assert.ok(ahead.pitch > 25 * D, 'up toward the camera, so his face shows');
+});
+
+test('ahead, held: his own front with his head hung (no turn to the camera), coming round and up toward the viewer as he glances up (BrainOut.look.up)', () => {
+  const ahead = { yaw: 0.6, pitch: 0.4 };
+  // No pitch asked for: the viewer.
+  assert.deepEqual(lookFront(ahead, { mode: 'forward', weight: 1 }), ahead);
+  // A pitch without a glance: that pitch, toward the viewer as before.
+  assert.deepEqual(lookFront(ahead, { mode: 'forward', weight: 0.2, pitch: -0.5 }), { yaw: 0.6, pitch: -0.5 });
+  // Held: straight ahead of himself, hung; at the glance's top, the viewer; between, in step.
+  assert.deepEqual(lookFront(ahead, { mode: 'forward', weight: 0.15, pitch: -0.5, up: 0 }), { yaw: 0, pitch: -0.5 });
+  assert.deepEqual(lookFront(ahead, { mode: 'forward', weight: 0.85, pitch: -0.5, up: 1 }), ahead);
+  const half = lookFront(ahead, { mode: 'forward', weight: 0.5, pitch: -0.5, up: 0.5 });
+  close(half.yaw, 0.3);
+  close(half.pitch, -0.05);
+  // With a lift (making up for the clip's own droop, which the look is applied over): that much higher at the top.
+  const lifted = lookFront(ahead, { mode: 'forward', weight: 1, pitch: -0.5, up: 1, lift: 0.5 });
+  close(lifted.yaw, 0.6);
+  close(lifted.pitch, 0.9);
+  close(
+    lookFront(ahead, { mode: 'forward', weight: 0.15, pitch: -0.5, up: 0, lift: 0.5 }).pitch,
+    -0.5,
+    1e-9,
+    'none hung:',
+  );
 });
 
 // ---- the look over the whole screen ---------------------------------------------------------

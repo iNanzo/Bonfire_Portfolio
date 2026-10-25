@@ -116,7 +116,7 @@ import { createGesture, pickScreen, rayPlaneY } from './gesture.js';
 import { clearInsets, newtShare, newtTexels, pixelSteps, resolutionOf, stepFor } from './pixels.js';
 import { animFps, installDefaults, isCustom, loadLook, lookPreset, motionStep, saveLook, shaderOf } from './look.js';
 import { createLook, lookStep, torsoStep } from './lookAt.js';
-import { bodyStep, createBody, createMix, lookAim, lookShare, mixStep, twinWeights } from './play.js';
+import { bodyStep, createBody, createMix, lookAim, lookFront, lookShare, mixStep, twinWeights } from './play.js';
 import { burstAt, hoverEase } from './retro.js';
 import { createRng } from './rng.js';
 import { createTalk } from './speech.js';
@@ -817,6 +817,8 @@ function start(s) {
       ease: o.look.ease,
       at: o.look.at ?? null,
       pitch: o.look.pitch,
+      up: o.look.up,
+      lift: o.look.lift,
     };
     finish(c, intro ? null : ptr, pose, dt, want, o.face, o.blink, moved);
     toolbar(o);
@@ -1268,8 +1270,9 @@ function start(s) {
    * @param {ReturnType<typeof pointerNow>} ptr
    * @param {{position: import('./types.js').XYZ}} pose
    * @param {number} dt
-   * @param {{mode: 'pointer'|'camera'|'forward'|'back', weight: number, ease?: number, at?: import('./types.js').XZ|null, pitch?: number}} want
-   *   at: who he runs from ('back'); pitch: 'ahead' at this pitch (held: his head hangs)
+   * @param {{mode: 'pointer'|'camera'|'forward'|'back', weight: number, ease?: number, at?: import('./types.js').XZ|null, pitch?: number, up?: number, lift?: number}} want
+   *   at: who he runs from ('back'); pitch: 'ahead' at this pitch (held: his head hangs); up:
+   *   held, his glance up toward the viewer (play.js lookFront)
    * @param {import('./clips.js').FaceName} face
    * @param {import('./clips.js').BlinkMode} blink
    * @param {boolean} moved  his pose stepped this frame (the look goes on with it)
@@ -1288,7 +1291,7 @@ function start(s) {
     // (Talking, a little sway on his look at the camera, so it's never a fixed stare.)
     const sway = intro && aim ? lookSway(t) : null;
     const at = sway && aim ? { yaw: aim.yaw + sway.yaw, pitch: aim.pitch + sway.pitch } : aim;
-    const front = want.pitch === undefined ? ahead : { yaw: ahead.yaw, pitch: want.pitch };
+    const front = lookFront(ahead, want);
     lookStep(gaze, want.mode, at, dt, t, rng, want.weight, front, want.ease);
     // (His chest joins in on his feet only: held, his collar hangs from the cursor.)
     torso = torsoStep(torso, body.mode === 'ground', dt);
@@ -1445,6 +1448,8 @@ function start(s) {
         heading: body.body.yaw,
         headYaw: gaze.yaw * gaze.weight,
         headPitch: gaze.pitch * gaze.weight,
+        // (Held: how far up his glance at you is, 0 hung to 1 up: brain.js BrainOut.look.up.)
+        lookUp: out?.look.up ?? 0,
         held: body.mode === 'held',
         stress: out?.stress ?? 0,
         states: [...states],

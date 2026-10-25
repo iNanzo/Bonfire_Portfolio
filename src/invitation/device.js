@@ -6,7 +6,8 @@
 // nearest-filtered so it stays pixels, both marked as his (retro.js markId) so the retro pass
 // outlines them with him. character.js places it each frame at his palms' midpoint (less the
 // clip's lift along its screen's normal), its width along the line from palm to palm, at the
-// clips' tilt by their weights, and shows it while DeviceSit and DeviceLie weigh 0.5 or more.
+// clips' tilt by their weights, and shows it while DeviceSit, LieDown and DeviceLie weigh 0.5 or
+// more (it stays in his hands as he lies down), until he starts to get up (StandUp or GetUp).
 // deviceFrame, deviceShown, deviceTilt and gameFrame are pure; createTablet builds the meshes.
 
 import * as THREE from 'three';
@@ -28,19 +29,25 @@ export const DEVICE_CLIPS = Object.keys(DEVICE.clips);
 export const DEVICE_TILT = Object.fromEntries(DEVICE_CLIPS.map((k) => [k, DEVICE.clips[k].tilt * DEG]));
 /** Each clip's palms off the pad's mid-plane along its screen's normal, model units. */
 export const DEVICE_LIFT = Object.fromEntries(DEVICE_CLIPS.map((k) => [k, DEVICE.clips[k].lift]));
-/** It shows once its clips weigh this much between them. */
+/** It shows once the clips he holds it in (HOLDING) weigh this much between them. */
 export const SHOW_AT = 0.5;
+/** The clips he holds it in: sitting with it, lying down with it, lying with it. */
+export const HOLDING = [...DEVICE_CLIPS, 'LieDown'];
+/** The clips that get him up: from their first frame it's put away. */
+export const RISING = ['StandUp', 'GetUp'];
 /** The bezel's cream. */
 const CREAM = 0xf6ecd2;
 /** The game's frames a second. */
 const GAME_FPS = 8;
 
 /**
- * Whether the tablet shows: DeviceSit and DeviceLie weigh SHOW_AT or more between them.
+ * Whether the tablet shows: the clips he holds it in (HOLDING) weigh SHOW_AT or more between
+ * them, and he isn't getting up (RISING: none of their weight).
  * @param {(clip: string) => number} weightOf
  */
 export function deviceShown(weightOf) {
-  return DEVICE_CLIPS.reduce((s, k) => s + weightOf(k), 0) >= SHOW_AT - 1e-9;
+  const sum = (/** @type {string[]} */ ks) => ks.reduce((s, k) => s + Math.max(0, weightOf(k)), 0);
+  return sum(HOLDING) >= SHOW_AT - 1e-9 && sum(RISING) <= 1e-6;
 }
 
 /**

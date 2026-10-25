@@ -93,8 +93,8 @@ drawn in the toy's own pixel look, and it's the loading screen too: NEWT loads b
   turned, so a tap anywhere across the middle of the screen reaches it turned too. It's as big
   as the view fully zoomed out shows him whole in: on a phone it's narrower than the screen is
   deep, so tapping near the top walks him to its back edge.
-- **Leave him alone** for about 20 seconds and he turns to face you and sits down (the Sit
-  button turns him to you first too, so you see his happy face).
+- **Leave him alone** for about 20 seconds and he sits down where he is, facing the way he was
+  (the Sit button too: no turn to the camera).
 - **The toolbar:** Replay Intro (below), Wave, Sit (Stand once he's sitting), Give Device (Lie
   Down while he sits with the tablet, Get Up while he lies), Run (he runs off for a few seconds,
   across the screen to one side or the other, or away from the cursor), Camera (the pad above)
@@ -106,13 +106,13 @@ drawn in the toy's own pixel look, and it's the loading screen too: NEWT loads b
 - **The cursor** is pixel art too: an open hand over NEWT, a closed hand while you hold him or
   slide the view, a turning arrow while you turn it, and a pointing hand on the buttons.
 - **Give Device** hands him a tablet with a tiny pixel game on it. Each press does the next
-  thing: he turns to you and sits down with it in both hands, playing (the button then says Lie
-  Down); he lies down on his stomach with it, turned most of the way side-on so you see his
-  profile and the screen past his cap, feet kicking behind him (the button says Get Up); he gets
-  up and puts it away. Anything else you do (a tap, the floor, another button) gets him up
+  thing: he sits down with it in both hands, playing (the button then says Lie Down); he lies
+  down on his stomach with it, feet kicking behind him (the button says Get Up); he gets up and
+  puts it away. He keeps the way he was facing throughout: no turn to the camera. Anything else you do (a tap, the floor, another button) gets him up
   first, then does it; picking him up takes him straight off the floor.
-- **His earrings:** a black stud on each earlobe with a thin black line and a little black
-  cross hanging from it, swinging as he walks, turns, is carried or thrashes.
+- **His earrings:** a black stud on each earlobe and a little Latin cross hanging from it on a
+  thin chain, drawn as pixel art (one-pixel lines with square ends, crisp at every Pixel Size),
+  swinging as he walks, turns, is carried or thrashes.
 
 ## Settings
 
@@ -182,8 +182,8 @@ Now and then NEWT says something in a speech bubble over his head, in the page's
 
 Each moment speaks at its own chance, once its cooldown is over, with one of its lines at
 random, never the line he just said. There's one bubble at a time: while a line is up, only a
-moment that matters more replaces it (being caught or shaken first, idle time last). A line
-types out at about 30 characters a second, stays long enough to read, then fades; with
+moment that matters more replaces it (a thrash first, then being caught or shaken, idle time
+last). A line types out at about 30 characters a second, stays long enough to read, then fades; with
 reduced motion it shows all at once. The bubble follows him and stays on screen, clear of the
 toolbar, the open Camera pad and the open Settings sheet (near the top it goes beside his head, on a phone narrowed to
 fit there with the line on more rows, or else under his feet, never over his face or body), and
@@ -254,18 +254,25 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     floor as the swing tips him, restored before the mixer like the look's bones so it never
     adds up, never his chest, neck or head, only on frames his pose stepped (Motion Choppy), eased
     out over 0.2 s once he's down, run between the animation and the hang; his earrings,
-    `EARLOBES` measured from the glb's head mesh and `EARRING`'s stud, line and Latin cross 2.5
-    times the stud's width, toon and marked as his, each swinging on the same spring about
-    straight down; and Give Device's tablet, `device.js`: 1.6 × 1.2 × 0.08 model units, a cream
+    `earrings.js`: at `EARLOBES` (the lobe's lowest edge on the glb's head mesh, against its
+    skin) a stud and, on a chain `EARRING.line` long (a GL line, one texel), a Latin cross, the
+    two as camera-facing sprites of pixel art (`STUD_ART` 2×2, `CROSS_ART` 7×7 of one-pixel
+    bars), nearest-filtered, `earScale` texels to an art pixel (the cross's world height,
+    `EARRING.cross.h`, over its seven rows, rounded, at least 1, held near a step), each anchor
+    snapped to a texel's centre after his head's texel snap (`spriteShift` keeps them on whole
+    texels), marked as his trim (retro.js `ID.trim`: drawn as he is, no outline round it), each
+    chain swinging on the same spring about straight down; and Give Device's tablet, `device.js`: 1.6 × 1.2 × 0.08 model units, a cream
     bezel and an unlit 16×12 game, nearest-filtered, placed at his palms from clips.js `DEVICE`,
-    shown while DeviceSit and DeviceLie weigh half or more; `accessories` swings the earrings and
-    places the tablet after the look),
+    shown while DeviceSit, LieDown and DeviceLie weigh half or more (in his hands as he lies
+    down) until StandUp or GetUp has any weight (put away as he starts to get up); `accessories`
+    swings the earrings and places the tablet after the look),
     `retro.js` (the pixel pass; `warm` compiles the path not showing once NEWT is in, so the
     first switch to Off or back doesn't stall; `subjectBoxes`: outside the area round NEWT, his
     shadow and the decals every texel is the paper, so the canvas is only cleared there and both
     passes draw inside it alone, and the neighbour loops (the outer ring, the soft shadow) run
     only in the boxes where they can find something: the same picture for a share of the
-    texels), `ui.js` (the toolbar, the Camera pad and the Settings sheet as
+    texels; `ID.trim`, his earrings' pixel art, is graded and quantized as he is but takes no
+    lines, hover or ring and doesn't count as outside him), `ui.js` (the toolbar, the Camera pad and the Settings sheet as
     markup, plus a thin binding: the labels as the buttons' own text, `setSitLabel` and
     `setDeviceLabel` changing only a label and its icon, `deviceLabelOf` reading the brain's
     `deviceLabel`; `createHold`, a touch held still `HOLD_MS` (450 ms) showing a label and
@@ -358,7 +365,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     5), the anchor the pointer's spot with no lag, kept inside the play area along the drag
     plane's line across the floor (`lineSpan`: at an edge he stops, on a rounded square's
     corner arcs too, never sliding along it in depth), and the swing driven by a smoothed follow of
-    it, past `CARRY.tiltSoft` (0.6 rad) a stiff spring easing him back instead of a hard stop;
+    it, past `CARRY.tiltSoft` (0.5 rad) a stiff spring easing him back instead of a hard stop;
+    let go, `fallStep` drops him with soft bounces off the edges (a rounded square's corner
+    arcs as arcs, not the box round them, so a drop in a corner lands inside the arc);
     `limbStep` is the spring his limp limbs and his earrings hang on (character.js); `lookAt.js` `screenAim` aims his look camera-relative (performative gaze): seen from
     the camera the cursor lies some heads (`LOOK.headSize`, 0.53) from his head in some
     direction on screen, and his face turns from the line to the camera toward that direction,
@@ -388,12 +397,19 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     seen; either side with none); with it straight behind him (past `backSide`, 150°), which
     shoulder is a toss-up, so `play.js` `lookAim` takes it round the side nearer the camera,
     and you see his face look back. Held, his head hangs: a light look (`TUNE.heldLook`, 0.15)
-    aimed down (`heldPitch`, `BrainOut.look.pitch`) over the Held clip's drooped head, the sad
-    face (surprised while he's shaken hard), and Thrash once every `thrashMin`–`thrashMax`
-    s (3–7; within `thrashShaken` of a hard shake, never before he's hung `thrashRest`, 1.5 s),
-    then Held again on its own clock. Give Device (`ButtonName` 'Device') goes sitDown →
-    deviceSit, lieDown → deviceLie (turned `lieTurnMin`–`lieTurnMax`, 62–73°, off the camera),
-    getUp; `BrainOut.device` and `deviceLabel` say which, for the toolbar. The Run button with no pointer runs him from a spot beside him square to the
+    aimed down (`heldPitch`, `BrainOut.look.pitch`) over his own front (`play.js`
+    `lookFront`: no turn to the camera) on the Held clip's drooped head, the sad face (surprised
+    while he's shaken hard). Every `lookUpMin`–`lookUpMax` s (3–6) he glances up at you for
+    `lookUpForMin`–`lookUpForMax` s (0.8–1.2): `BrainOut.look.up` eases 0 → 1 → 0 over
+    `lookUpEase` (0.25 s) each way, the look's weight with it up to `lookUpWeight` (1), its
+    aim coming round and up to the viewer and `lookUpLift` (0.5 rad) past it, since the look goes
+    on over the Held clip's own droop of about 25°; never while he thrashes (one due meanwhile comes
+    `lookUpRest`, 1 s, after the Thrash). Thrash comes once every
+    `thrashMin`–`thrashMax` s (3–7; within `thrashShaken` of a hard shake, never before he's
+    hung `thrashRest`, 1.5 s), then Held again on its own clock. Held, falling and landing he
+    keeps the yaw he had when grabbed (`move` 'stay'; `play.js` `bodyStep` never turns him
+    off the ground), and carries on from there. Give Device (`ButtonName` 'Device') goes sitDown →
+    deviceSit, lieDown → deviceLie, getUp, each the way he faced (`move` 'stay', as a sit); `BrainOut.device` and `deviceLabel` say which, for the toolbar. The Run button with no pointer runs him from a spot beside him square to the
     camera (`TUNE.runFromGap`), across the view. `floor.js` `fitShadow(…, at)` moves the
     shadow camera to wherever he is, by whole shadow texels.
 - **Speech and content:** `speech.js` (pure: `createTalk({lines, speech, rng}).step(...)` reads

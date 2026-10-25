@@ -6,8 +6,9 @@
 // is a tap, a drag a grab, a cancel a drop), a release going fall → land → idle or flee, a
 // grab working in every state, sitting after 20 s alone and getting up before obeying, floor
 // taps, the buttons (and their being off while he's held or falling), the Sit/Stand label,
-// faces from FACE_TRACK with blinks from faces.js, no reaction three times running, and the
-// turn to the camera before a reaction or a sit. The seeded rng (rng.js) is checked here too.
+// faces from FACE_TRACK with blinks from faces.js, no reaction three times running, the turn
+// to the camera before a reaction (a sit, the tablet's sit and lie and a carry keep the way he
+// faces) and, held, his head hung with a glance up every few seconds. The seeded rng (rng.js) is checked here too.
 // The intro's dialogue mode: he gets up if he's sitting, walks in toward the middle when he's
 // far out, turns to the camera, then plays each box's animation (a gesture once, then Talk while
 // the line types and Idle after; a loop holds; none keeps what he does; Sit sits him down and the
@@ -520,6 +521,110 @@ test('held, he thrashes every 3–7 s (sooner when he’s shaken): Thrash once f
   assert.equal(out.clip, 'Fall');
 });
 
+test('held, his head hangs (a light look aimed down) and every 3–6 s he glances up at you for 0.8–1.2 s, eased up and back down; never during a Thrash', () => {
+  for (const seed of [1, 2, 3, 4, 5]) {
+    const s = sim({ seed, tune: { thrashMin: 99, thrashMax: 99 } });
+    let out = s.grab();
+    assert.deepEqual(
+      out.look,
+      { mode: 'forward', weight: TUNE.heldLook, pitch: TUNE.heldPitch, up: 0, lift: TUNE.lookUpLift },
+      'hanging his head',
+    );
+    let last = s.w.t;
+    let prev = 0;
+    /** @type {{from: number, to: number, most: number, weight: number}|null} */
+    let on = null;
+    const glances = [];
+    for (let i = 0; i < Math.round(20 / DT); i++) {
+      out = s.frame();
+      const up = out.look.up;
+      assert.ok(up >= 0 && up <= 1, `up ${up}`);
+      assert.ok(Math.abs(up - prev) <= (DT / TUNE.lookUpEase) * 1.6 + 1e-9, `eased: ${prev} → ${up}`);
+      const weight = TUNE.heldLook + (TUNE.lookUpWeight - TUNE.heldLook) * up;
+      assert.ok(Math.abs(out.look.weight - weight) < 1e-9, 'its weight with it');
+      assert.equal(out.look.pitch, TUNE.heldPitch);
+      if (up > 0 && !on) on = { from: s.w.t - DT, to: 0, most: 0, weight: 0 };
+      if (on) {
+        on.most = Math.max(on.most, up);
+        on.weight = Math.max(on.weight, out.look.weight);
+      }
+      if (on && up === 0) {
+        on.to = s.w.t;
+        glances.push({ ...on, after: on.from - last });
+        last = s.w.t;
+        on = null;
+      }
+      prev = up;
+    }
+    assert.ok(glances.length >= 2, `seed ${seed}: ${glances.length} glances up in 20 s`);
+    for (const g of glances) {
+      assert.ok(
+        g.after >= TUNE.lookUpMin - DT && g.after <= TUNE.lookUpMax + DT,
+        `seed ${seed}: up after ${g.after.toFixed(2)} s`,
+      );
+      const long = g.to - g.from;
+      assert.ok(
+        long >= TUNE.lookUpForMin - DT && long <= TUNE.lookUpForMax + 2 * DT,
+        `seed ${seed}: up for ${long.toFixed(2)} s`,
+      );
+      assert.equal(g.most, 1, 'all the way up');
+      assert.ok(Math.abs(g.weight - TUNE.lookUpWeight) < 1e-9);
+    }
+  }
+  // With his thrashes as ever: never up while he thrashes, and it still comes between them.
+  let ups = 0;
+  for (const seed of [1, 2, 3, 4, 5, 6]) {
+    const s = sim({ seed });
+    s.grab();
+    for (let i = 0; i < Math.round(20 / DT); i++) {
+      const out = s.frame();
+      if (out.clip === 'Thrash') assert.equal(out.look.up, 0, `seed ${seed}: not up while he thrashes`);
+      else if (out.look.up === 1) ups++;
+    }
+  }
+  assert.ok(ups > 0, 'he still looks up between thrashes');
+  // Let go, the look-up is over.
+  const s = sim({ seed: 1, tune: { thrashMin: 99, thrashMax: 99 } });
+  s.grab();
+  s.until((o) => o.look.up === 1, 8);
+  const out = s.release();
+  assert.equal(out.state, 'fall');
+  assert.equal(out.look.up, undefined);
+});
+
+test('held, a glance up that came due while he thrashed comes TUNE.lookUpRest s after the Thrash, not a whole wait later', () => {
+  const s = sim({ tune: { thrashMin: 3.5, thrashMax: 3.5, lookUpMin: 4, lookUpMax: 4 } });
+  s.grab();
+  s.until((o) => o.clip === 'Thrash', 5);
+  const out = s.until((o) => o.clip !== 'Thrash', 3);
+  assert.equal(out.look.up, 0);
+  const ended = s.w.t;
+  s.until((o) => o.look.up > 0, 3);
+  const after = s.w.t - DT - ended;
+  assert.ok(Math.abs(after - TUNE.lookUpRest) <= 2 * DT, `up ${after.toFixed(2)} s after the Thrash`);
+});
+
+test('held, falling and landing he keeps the way he faced when grabbed (no turn to the camera), and carries on from there', () => {
+  for (const yaw of [2, -1.3, Math.PI]) {
+    const s = sim({ yaw, camera: { x: 0, z: 6 } });
+    s.grab();
+    const seen = [];
+    s.run(1.5);
+    s.release();
+    s.until(
+      (o) => o.state === 'idle',
+      5,
+      (o) => seen.push(o),
+    );
+    for (const o of seen) {
+      assert.equal(o.faceCamera, false, `${o.state}: no turn`);
+      assert.equal(o.move.mode, 'stay', `${o.state}: staying put`);
+    }
+    assert.ok(seen.some((o) => o.state === 'land'));
+    assert.ok(Math.abs(wrapAngle(s.w.body.yaw - yaw)) < 1e-9, `yaw ${yaw}: as grabbed`);
+  }
+});
+
 test('in fall and land taps are ignored, but a grab still works', () => {
   const s = sim();
   s.grab();
@@ -579,31 +684,31 @@ test('after 20 s alone he sits by himself, and gets up before obeying a tap or a
   assert.equal(d.tap().state, 'standUp');
 });
 
-test('sitting down, by the button or by himself, he turns to face the camera first, then sits facing it with his happy face', () => {
+test('sitting down, by the button or by himself, he keeps the way he faces: SitDown at once (no turn to the camera), then sits there with his happy face', () => {
   const alone = { calm: false, x: 1.5, yaw: 2.5, tune: { sitAfter: 2, idleMin: 99, idleMax: 99 } };
   const cases = { 'the button': [{ yaw: 2 }, null], 'by himself': [alone, { x: 0, z: 6 }] };
-  // Facing away: the Sit button with no camera spot (+z), and by himself with one off to the side.
+  // Facing away from the camera: the Sit button with no camera spot (+z), and by himself with one off to the side.
   for (const [how, [opts, camera]] of Object.entries(cases)) {
     const s = sim({ ...opts, camera });
-    const off = () => Math.abs(wrapAngle(s.w.body.yaw - (camera ? Math.atan2(-1.5, 6) : 0)));
+    const yaw = s.w.body.yaw;
     let out = camera ? s.until((o) => o.state === 'sitDown', 4) : s.button('Sit');
-    const first = [out.state, out.clip, out.faceCamera, out.move.mode, out.move.goal, out.sitLabel, out.face];
-    assert.deepEqual(first, ['sitDown', 'gait', true, 'face', camera, 'Stand', 'happy'], `${how}: a turn first`);
-    out = s.until((o) => o.clip !== 'gait', 1);
-    assert.deepEqual([out.state, out.clip, out.restart, out.faceCamera], ['sitDown', 'SitDown', true, false], how);
-    assert.ok(off() <= TUNE.facedEnough + 1e-6, `${how}: facing the camera before sitting (${off()} rad off)`);
-    out = s.until((o) => o.state === 'sit', 3);
-    assert.ok(off() < 0.05 && out.face === 'happy', `${how}: sitting facing it, happy (${off()} rad off)`);
+    const first = [out.state, out.clip, out.restart, out.faceCamera, out.move.mode, out.sitLabel, out.face];
+    assert.deepEqual(first, ['sitDown', 'SitDown', true, false, 'stay', 'Stand', 'happy'], `${how}: down at once`);
+    out = s.until(
+      (o) => o.state === 'sit',
+      3,
+      (o) => assert.equal(o.move.mode, 'stay', `${how}: no turn`),
+    );
+    assert.ok(
+      Math.abs(wrapAngle(s.w.body.yaw - yaw)) < 1e-9 && out.face === 'happy',
+      `${how}: sitting the way he faced, happy`,
+    );
   }
-  // Already facing it: SitDown at once.
-  const out = sim({ yaw: 0.05 }).button('Sit');
-  assert.deepEqual([out.state, out.clip, out.restart, out.faceCamera], ['sitDown', 'SitDown', true, false]);
-  // During the turn he hasn't begun to sit: a tap reacts, a floor tap walks, Stand calls it off.
-  const pokes = { react: (s) => s.tap(), walk: (s) => s.floorTap(1, 0), idle: (s) => s.button('Sit') };
-  for (const [state, poke] of Object.entries(pokes)) {
+  // Sitting down, he has begun to sit: a tap or Stand gets him up first.
+  for (const poke of [(s) => s.tap(), (s) => s.button('Sit')]) {
     const s = sim({ yaw: 2 });
     s.button('Sit');
-    assert.equal(poke(s).state, state, `no getting up from a sit that never began: ${state}`);
+    assert.equal(poke(s).state, 'standUp');
   }
 });
 
@@ -735,20 +840,30 @@ test('buttons are disabled while he is held or falling', () => {
   assert.equal(out.buttonsEnabled, true);
 });
 
-test('Give Device: the first press sits him down with the tablet (turned to the camera, SitDown, DeviceSit), the second lies him on his stomach with it, turned 60–75° from the camera (LieDown, DeviceLie), the third gets him up (GetUp, idle); device and deviceLabel say which', () => {
+test('Give Device: the first press sits him down with the tablet (SitDown, DeviceSit), the second lies him on his stomach with it (LieDown, DeviceLie), each the way he faced (no turn), the third gets him up (GetUp, idle); device and deviceLabel say which', () => {
   const s = sim({ camera: { x: 0, z: 6 }, yaw: 1.2 });
   let out = s.frame();
   assert.equal(out.device, null);
   assert.equal(out.deviceLabel, 'Give Device');
-  // 1: down with the tablet, turned to the camera first.
+  const yaw = s.w.body.yaw;
+  /** He faces the way he did, and isn't turned. */
+  const kept = (o, msg) => {
+    assert.equal(o.move.mode, 'stay', `${msg}: no turn`);
+    assert.ok(Math.abs(wrapAngle(s.w.body.yaw - yaw)) < 1e-9, `${msg}: facing as he did`);
+  };
+  // 1: down with the tablet, at once.
   out = s.button('Device');
   assert.equal(out.state, 'sitDown');
   assert.equal(out.device, 'sit');
   assert.equal(out.deviceLabel, 'Lie Down');
-  assert.equal(out.faceCamera, true, 'turns to the camera first');
-  out = s.until((o) => o.clip === 'SitDown', 3);
+  assert.equal(out.faceCamera, false);
+  assert.equal(out.clip, 'SitDown');
   assert.equal(out.restart, true);
-  out = s.until((o) => o.state === 'deviceSit', 3);
+  out = s.until(
+    (o) => o.state === 'deviceSit',
+    3,
+    (o) => kept(o, 'sitting down'),
+  );
   assert.equal(out.clip, 'DeviceSit');
   assert.equal(out.restart, true);
   assert.equal(out.device, 'sit');
@@ -758,25 +873,24 @@ test('Give Device: the first press sits him down with the tablet (turned to the 
   assert.equal(out.buttonsEnabled, true);
   out = s.run(4);
   assert.equal(out.state, 'deviceSit', 'he sits with it until asked');
-  const cameraYaw = Math.atan2(0 - s.w.body.x, 6 - s.w.body.z);
-  assert.ok(Math.abs(wrapAngle(s.w.body.yaw - cameraYaw)) < 0.2, 'sitting, he faces the camera');
-  // 2: lies down with it, turned 60–75° from the camera so his profile and the screen show.
+  kept(out, 'sitting');
+  // 2: lies down with it, the way he faces.
   out = s.button('Device');
   assert.equal(out.state, 'lieDown');
   assert.equal(out.clip, 'LieDown');
   assert.equal(out.restart, true);
   assert.equal(out.device, 'lie');
   assert.equal(out.deviceLabel, 'Get Up');
-  out = s.until((o) => o.state === 'deviceLie', 3);
+  out = s.until(
+    (o) => o.state === 'deviceLie',
+    3,
+    (o) => kept(o, 'lying down'),
+  );
   assert.equal(out.clip, 'DeviceLie');
   assert.equal(out.face, FACE_TRACK.DeviceLie.face);
   out = s.run(3);
   assert.equal(out.state, 'deviceLie');
-  const off = Math.abs(wrapAngle(s.w.body.yaw - Math.atan2(0 - s.w.body.x, 6 - s.w.body.z)));
-  assert.ok(
-    off >= (60 * Math.PI) / 180 && off <= (75 * Math.PI) / 180,
-    `lying ${((off * 180) / Math.PI).toFixed(1)}° from the camera`,
-  );
+  kept(out, 'lying');
   // 3: up again.
   out = s.button('Device');
   assert.equal(out.state, 'getUp');
