@@ -183,9 +183,10 @@ notes: `docs/design/visualizer.md`.
   flicker, film grain, cinema bars, a spotlight round the fire and a chroma split. Each
   time a look comes round, the layers in the mix are rolled again (at most two heavy ones
   at once), each with new details: the echo's direction, the glow's size, the gradient's
-  colors, the brush's angle, the grain's amount, the bars' height, the spotlight's size. Mirrors come in three kinds, each switchable:
-  horizontal (either half copied onto the other), vertical (the top reflected down like
-  a pool, or the bottom up) and quarter (one quarter, four ways). Every drop also throws
+  colors, the brush's angle, the grain's amount, the bars' height, the spotlight's size.
+  Mirrors come in three kinds, each switchable, all folded on the fire: horizontal (either
+  side copied onto the other), vertical (the top reflected down like a pool, or the bottom
+  up) and quarter (one quarter, four ways). Every drop also throws
   **drop hits**: those set to always, plus one to three drawn from the mix, never the
   same set twice running: shatter, shockwaves, an echo burst, a spiral, a kaleidoscope,
   mirror flips, a color cycle (with Color Cycle Off, no palette cycling at all: the Echo

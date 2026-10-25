@@ -26,9 +26,9 @@
 // Effects layer (the visualizer: compiled in only with createPixelPass({ effects: true }),
 // so the site's shader is just the scene, the breakdown views, the flash and the dither),
 // all before the palette so every effect comes out in the scene's own colors:
-//   where a pixel reads the scene from — a kaleidoscope, a mirror (horizontal: either
-//     half copied onto the other; vertical: the top reflected down like a pool, or the
-//     bottom up; or both, one quarter copied four ways), block crunch, a row
+//   where a pixel reads the scene from — a kaleidoscope, a mirror folded on the fire
+//     (horizontal: either side copied onto the other; vertical: the top reflected down like
+//     a pool, or the bottom up; or both, one quarter copied four ways), block crunch, a row
 //     wave, a shockwave ripple out of the fire, rows torn sideways;
 //   what's mixed in — an RGB split, echoes of the previous frame zooming out of (or into)
 //     the fire, turning as they go for a spiral (feedback: they step down the palette as
@@ -583,11 +583,17 @@ const fragmentShader = /* glsl */ `
       src = floor(uCenter + length(p) * 0.75 * vec2(cos(a), sin(a)));
     }
     if (uMirror > 0.5) {
+      // Folded on the fire (kept to the middle half of the screen), between two whole texels so
+      // no column or row shows twice: the flames are the seam, and what sits either side of
+      // them comes back whole, not cut in two. Past the screen's edge it folds back once more.
       float m = floor(uMirror + 0.5);
       float mx = mod(m, 3.0);
       float my = floor(m / 3.0);
-      if ((mx == 1.0 && src.x >= resolution.x * 0.5) || (mx == 2.0 && src.x < resolution.x * 0.5)) src.x = resolution.x - 1.0 - src.x;
-      if ((my == 1.0 && src.y < resolution.y * 0.5) || (my == 2.0 && src.y >= resolution.y * 0.5)) src.y = resolution.y - 1.0 - src.y;
+      vec2 fold = floor(clamp(uCenter, resolution * 0.25, resolution * 0.75) + 0.5);
+      if ((mx == 1.0 && src.x >= fold.x) || (mx == 2.0 && src.x < fold.x)) src.x = 2.0 * fold.x - 1.0 - src.x;
+      if ((my == 1.0 && src.y < fold.y) || (my == 2.0 && src.y >= fold.y)) src.y = 2.0 * fold.y - 1.0 - src.y;
+      src = mix(src, -1.0 - src, step(src, vec2(-0.5)));
+      src = mix(src, 2.0 * resolution - 1.0 - src, step(resolution - 0.5, src));
     }
     if (uBlock > 1.0) src = floor(src / uBlock) * uBlock + floor(uBlock * 0.5);
     if (uWave > 0.0) src.x += floor(sin(src.y * 0.11 + uTime * 7.0) * uWave + 0.5);
