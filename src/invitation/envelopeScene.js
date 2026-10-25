@@ -22,7 +22,7 @@
 //
 // Input is all its own while it's up: a tap or click, Enter, Space or ArrowUp opens it; Escape or
 // ArrowDown skips; a drag follows the finger with some give (the seal starting to open as it goes
-// up) and opens or skips on release (envelopeGesture), else springs back; the wheel opens or skips
+// up) and opens or skips on release (releaseGesture), else springs back; the wheel opens or skips
 // once it adds up; Skip Intro skips. While it floats it leans gently toward the pointer (a finger
 // while it's down), and a sideways drag or a held ArrowLeft or ArrowRight turns it further, springing
 // back (turnGoal; a sideways drag never opens or skips it); hovered, a gold rim pulses slowly round
@@ -38,12 +38,10 @@ import {
   DISSOLVE,
   ENVELOPE_TEXT,
   FLAP_OPEN,
-  SWIPE,
   TIMES,
   createEnvelope,
   dragHint,
   dragPose,
-  envelopeGesture,
   envelopeKey,
   hintFor,
   hoverPulse,
@@ -52,6 +50,7 @@ import {
   turnGoal,
   turnStep,
   particleAt,
+  releaseGesture,
   sealBloom,
   shedParticles,
 } from './envelope.js';
@@ -419,7 +418,7 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
   win.addEventListener('resize', onResize);
 
   // --- Input.
-  /** @type {{id: number, x: number, y: number, t: number, dx: number, dy: number}|null} */
+  /** @type {{id: number, x: number, y: number, t: number, dx: number, dy: number, far: number}|null} the press: where and when it went down, its last offset and the farthest it got (CSS px) */
   let drag = null;
   /** The drag's follow as shown (eased toward its target: the give), CSS px; and the flap's lift. */
   const follow = { y: 0, lift: 0 };
@@ -494,7 +493,7 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
   hit.addEventListener('pointerdown', (e) => {
     lastInput = clock();
     if (drag || (e.pointerType === 'mouse' && e.button !== 0) || !env.covers) return;
-    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), dx: 0, dy: 0 };
+    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), dx: 0, dy: 0, far: 0 };
     leanTo(e);
     try {
       hit.setPointerCapture(e.pointerId);
@@ -512,6 +511,8 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     lastInput = clock();
     drag.dx = e.clientX - drag.x;
     drag.dy = e.clientY - drag.y;
+    // (The farthest it got: a drag out and back to its start is no tap.)
+    drag.far = Math.max(drag.far, Math.abs(drag.dx), Math.abs(drag.dy));
     leanTo(e);
   });
   const release = (e, cancelled) => {
@@ -522,8 +523,7 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     // (A finger lifted: nothing to lean toward.)
     if (e.pointerType !== 'mouse') pointerX = null;
     if (cancelled) return;
-    const small = Math.abs(d.dx) < SWIPE.tap && Math.abs(d.dy) < SWIPE.tap;
-    const g = small ? 'open' : envelopeGesture(d.dx, d.dy, performance.now() - d.t, view.cssH);
+    const g = releaseGesture({ dx: d.dx, dy: d.dy, far: d.far, ms: performance.now() - d.t }, view.cssH);
     if (g === 'open') open();
     else if (g === 'skip') skip();
   };

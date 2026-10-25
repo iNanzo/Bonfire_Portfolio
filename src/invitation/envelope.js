@@ -259,6 +259,20 @@ export function envelopeGesture(dx, dy, ms, viewportH) {
 }
 
 /**
+ * What a press on the envelope did once it's let go. It is a tap (open) only if the pointer
+ * never got as far as the tap slop from where it went down; past that, the swipe its last offset
+ * makes, so a drag out and back to its start (turning the letter, or up and down) does nothing.
+ * @param {{dx: number, dy: number, far: number, ms: number}} drag  the last offset across and
+ *   down, CSS px; the farthest it got along either axis, CSS px; how long it took
+ * @param {number} viewportH  the screen's height, CSS px
+ * @returns {'open'|'skip'|'none'}
+ */
+export function releaseGesture({ dx, dy, far, ms }, viewportH) {
+  if (far < SWIPE.tap) return 'open';
+  return envelopeGesture(dx, dy, ms, viewportH);
+}
+
+/**
  * What a key does on the envelope.
  * @param {string} key  KeyboardEvent.key
  * @returns {'open'|'skip'|null}

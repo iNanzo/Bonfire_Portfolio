@@ -37,6 +37,7 @@ import {
   hoverPulse,
   hoverStep,
   particleAt,
+  releaseGesture,
   shedParticles,
 } from '../src/invitation/envelope.js';
 
@@ -108,6 +109,21 @@ test('a fast flick counts: 0.6 px/ms or more with |dy| of 24 px or more', () => 
   assert.equal(envelopeGesture(30, -30, 40, h), 'none', 'a fast diagonal');
   assert.equal(envelopeGesture(0, -30, 0, h), 'open', 'no time at all: as fast as can be');
   assert.ok(SWIPE.flick === 0.6 && SWIPE.flickMin === 24);
+});
+
+test('let go, a press that never strayed past the tap slop opens it; a drag out and back to its start does nothing', () => {
+  const h = 800;
+  assert.equal(releaseGesture({ dx: 2, dy: 1, far: 4, ms: 80 }, h), 'open', 'a real tap');
+  assert.equal(releaseGesture({ dx: 0, dy: 0, far: SWIPE.tap - 0.5, ms: 80 }, h), 'open', 'just under the slop');
+  assert.equal(releaseGesture({ dx: 0, dy: 0, far: 200, ms: 400 }, h), 'none', 'sideways out and back');
+  assert.equal(releaseGesture({ dx: 6, dy: 3, far: 220, ms: 500 }, h), 'none', 'sideways, back to 6 px off');
+  assert.equal(releaseGesture({ dx: 0, dy: 3, far: 120, ms: 400 }, h), 'none', 'up and back');
+  assert.equal(releaseGesture({ dx: 0, dy: 0, far: SWIPE.tap, ms: 80 }, h), 'none', 'at the slop it is no tap');
+  assert.equal(releaseGesture({ dx: 220, dy: 0, far: 220, ms: 400 }, h), 'none', 'sideways, let go out there');
+  // (Past the slop, it is the swipe the last offset makes.)
+  assert.equal(releaseGesture({ dx: 0, dy: -200, far: 200, ms: 300 }, h), 'open', 'a swipe up');
+  assert.equal(releaseGesture({ dx: 0, dy: 200, far: 200, ms: 300 }, h), 'skip', 'a swipe down');
+  assert.equal(releaseGesture({ dx: 0, dy: -30, far: 30, ms: 40 }, h), 'open', 'a flick up');
 });
 
 test('the keys: Enter, Space and ArrowUp open it; Escape and ArrowDown skip; the rest do nothing', () => {

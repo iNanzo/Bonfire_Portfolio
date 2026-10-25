@@ -61,7 +61,8 @@ loading screen too: NEWT loads behind it.
   way) and you're straight into the toy, with no intro.
 - **While you drag it**, it follows your finger with a little give and, going up, the seal
   starts to open; let go short of a swipe and it springs back
-  (swiped open, it stays where you left it while it opens). A sideways drag only turns it, and
+  (swiped open, it stays where you left it while it opens). A sideways drag only turns it, a
+  drag brought back to where it started does nothing (only a press that never strays opens it), and
   nothing you do on it reaches the toy underneath (the toolbar can't be reached until it's gone).
 - **The hint** ("Click or swipe up to open", or "Tap or swipe up to open" on a touch screen,
   and "Swipe down to skip") shows while the mouse is over it or it has keyboard focus, and on a
