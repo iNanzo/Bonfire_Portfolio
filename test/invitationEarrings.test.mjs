@@ -6,20 +6,26 @@
 // world; each anchored on a texel's centre, after his head's texel snap), the chain a one-texel
 // line, all marked as his trim (no outline round them). The cross's art: one-pixel bars, square
 // ends, a Latin cross. Each chain hangs straight down from its stud and swings back against his
-// head's acceleration (the limp spring), then settles.
+// head's acceleration (the limp spring), then settles. At the coarse Pixel Sizes the cross takes
+// smaller art (five, then three pixels tall), never drawn over half as big again as it is in the
+// world, and under that it isn't drawn at all (stud, chain and cross).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { createCharacter, EARLOBES, EARRING } from '../src/invitation/character.js';
 import {
+  ART_HOLD,
   CROSS_ART,
+  EAR_ARTS,
   MAX_SCALE,
   SCALE_HOLD,
   STUD_ART,
   artTexture,
+  earArt,
   earScale,
   spriteShift,
 } from '../src/invitation/earrings.js';
+import { frameView, newtTexels, texelGrid } from '../src/invitation/pixels.js';
 import { ID } from '../src/invitation/retro.js';
 import { BONES } from '../src/invitation/clips.js';
 import { standIn } from './lib/newtStandIn.mjs';
@@ -85,6 +91,53 @@ test('the art’s scale: a whole number of texels to a pixel, about the cross’
   assert.equal(earScale(7 * (1 + SCALE_HOLD + 0.01), 1), 2);
   assert.equal(earScale(7 * 1.4, 2), 2);
   assert.equal(earScale(7 * (2 - SCALE_HOLD - 0.01), 2), 1);
+});
+
+test('the smaller crosses: five pixels tall (arms one each side, top one, foot three), then three (a plus), each square, its top pixel in the column the chain meets; with them a one-pixel stud', () => {
+  const [big, small, tiny] = EAR_ARTS;
+  assert.equal(big.cross, CROSS_ART);
+  assert.equal(big.stud, STUD_ART);
+  assert.deepEqual(small.cross, ['..#..', '.###.', '..#..', '..#..', '..#..']);
+  assert.deepEqual(tiny.cross, ['.#.', '###', '.#.']);
+  for (const a of [small, tiny]) {
+    assert.deepEqual(a.stud, ['#']);
+    for (const row of a.cross) assert.equal(row.length, a.cross.length, 'square');
+    // (The chain meets the top pixel: spriteShift 'top' puts an odd sprite's middle column under it.)
+    assert.equal(a.cross[0].indexOf('#'), (a.cross.length - 1) / 2);
+  }
+  assert.ok(big.from > small.from && small.from > tiny.from, 'biggest first');
+});
+
+test('which art for the cross’s size in the world: never drawn over 1.5 times as tall, hidden under the smallest’s step, and held near a step so it never flickers', () => {
+  /** Drawn texels tall for a cross `texels` tall in the world (0: hidden). */
+  const drawn = (texels, prev = -1) => {
+    const a = earArt(texels, prev);
+    return a < 0 ? 0 : a === 0 ? CROSS_ART.length * earScale(texels) : EAR_ARTS[a].cross.length;
+  };
+  for (let h = 0; h <= 10; h += 0.01) {
+    const d = drawn(h);
+    assert.ok(d === 0 || d <= 1.5 * h + 1e-9, `${h.toFixed(2)} texels: drawn ${d}`);
+    if (h >= EAR_ARTS.at(-1).from) assert.ok(d > 0, `${h.toFixed(2)} texels: shown`);
+  }
+  assert.equal(earArt(0), -1);
+  assert.equal(earArt(Number.NaN), -1);
+  assert.equal(earArt(1.26), -1, 'Pixel Size 16: hidden');
+  assert.equal(earArt(2.5), 2, 'Pixel Size 32: the plus');
+  assert.equal(earArt(4.2), 1, 'Pixel Size 48: five tall');
+  assert.equal(earArt(6.3), 0, 'Pixel Size 64 on a desktop: the whole cross');
+  // (Held near a step: kept a little past it either way, and the kept one still within 1.5 times.)
+  for (let a = 0; a < EAR_ARTS.length; a++) {
+    const lo = EAR_ARTS[a].from;
+    assert.equal(earArt(lo - ART_HOLD + 0.01, a), a, `art ${a} kept just under its step`);
+    assert.equal(earArt(lo - ART_HOLD - 0.01, a), a + 1 < EAR_ARTS.length ? a + 1 : -1, `art ${a} left under it`);
+    assert.ok(EAR_ARTS[a].cross.length <= 1.5 * (lo - ART_HOLD) + 1e-9, `art ${a} kept within 1.5 times`);
+    if (a > 0) {
+      const up = EAR_ARTS[a - 1].from;
+      assert.equal(earArt(up + ART_HOLD - 0.01, a), a, `art ${a} kept just over the next one’s step`);
+      assert.equal(earArt(up + ART_HOLD + 0.01, a), a - 1);
+    }
+  }
+  assert.equal(earArt(EAR_ARTS.at(-1).from + ART_HOLD - 0.01, -1), -1, 'hidden kept just over its step');
 });
 
 test('a sprite covers whole texels from the texel its anchor snaps to: odd sizes centred on a texel, even ones on an edge; the cross’s top along the anchor texel’s top, its middle column over it', () => {
@@ -168,8 +221,10 @@ test('drawn, each sprite takes the frame’s texel grid and its scale: one texel
   // (The cross's height in texels: EARRING.cross.h, scaled with him, over the view's height there.)
   const tall = (texels, dist) =>
     (EARRING.cross.h * ch.root.scale.y * texels) / (2 * dist * Math.tan((15 * Math.PI) / 180));
-  const far = 40;
+  // (Far enough that the cross is six texels tall: the whole cross, one texel to a pixel.)
+  const far = (EARRING.cross.h * ch.root.scale.y * 128) / (2 * 6 * Math.tan((15 * Math.PI) / 180));
   draw(128, far);
+  assert.ok(Math.abs(tall(128, far) - 6) < 1e-9);
   assert.equal(e.scale, earScale(tall(128, far)));
   assert.equal(e.scale, 1);
   assert.deepEqual(e.stud.material.uniforms.uRes.value.toArray(), [128 * 0.6, 128]);
@@ -185,6 +240,54 @@ test('drawn, each sprite takes the frame’s texel grid and its scale: one texel
   const s = spriteShift(3 * CROSS_ART.length, 'top');
   assert.deepEqual(e.cross.material.uniforms.uShift.value.toArray(), [s.x, s.y]);
 });
+
+/**
+ * One earring drawn in the toy's own default framing at a Pixel Size (pixels.js texelGrid and
+ * frameView): the cross's height in the world, and as drawn (0: hidden), in texels.
+ */
+function drawnAt(screen, pixelSize) {
+  const { gltf } = standIn();
+  const ch = createCharacter(gltf);
+  ch.root.updateMatrixWorld(true);
+  const grid = texelGrid({ ...screen, pixelSize });
+  const view = frameView({
+    cssW: screen.cssW,
+    cssH: screen.cssH,
+    grid,
+    insets: { top: 0, right: 0, bottom: 64, left: 0 },
+  });
+  const camera = new THREE.PerspectiveCamera(view.fov, view.aspect, view.near, view.far);
+  camera.position.set(view.position.x, view.position.y, view.position.z);
+  camera.lookAt(view.target.x, view.target.y, view.target.z);
+  camera.updateMatrixWorld(true);
+  camera.updateProjectionMatrix();
+  const renderer = { getCurrentViewport: (v) => v.set(0, 0, grid.w, grid.h) };
+  const e = ch.earrings[0];
+  for (const o of [e.stud, e.line, e.cross]) o.onBeforeRender(renderer, null, camera);
+  const at = e.group.getWorldPosition(new THREE.Vector3()).applyMatrix4(camera.matrixWorldInverse);
+  const perUnit = (camera.projectionMatrix.elements[5] * grid.h) / 2 / -at.z;
+  const world = EARRING.cross.h * e.group.getWorldScale(new THREE.Vector3()).y * perUnit;
+  const on = [e.stud, e.line, e.cross].map((o) => o.material.uniforms.uOn.value);
+  return { newt: newtTexels(view, grid), world, drawn: e.cross.material.uniforms.uSize.value, on, e };
+}
+
+for (const screen of [
+  { name: 'a desktop, 1280×800', cssW: 1280, cssH: 800, dpr: 1 },
+  { name: 'a phone, 390×844 at 3×', cssW: 390, cssH: 844, dpr: 3 },
+]) {
+  test(`on ${screen.name}, at every coarse Pixel Size the cross is drawn at most 1.5 times its size in the world, or not at all (stud and chain too); from 32 up it shows`, () => {
+    for (const p of ['16', '24', '32', '48', '64']) {
+      const r = drawnAt(screen, p);
+      const where = `Pixel Size ${p}: drawn ${r.drawn} texels vs ${r.world.toFixed(2)} in the world (his ${r.newt.toFixed(1)})`;
+      assert.ok(r.drawn === 0 || r.drawn <= 1.5 * r.world, where);
+      if (r.drawn === 0) assert.deepEqual(r.on, [0, 0, 0], `${where}: stud and chain hidden with it`);
+      else assert.deepEqual(r.on, [1, 1, 1], where);
+      if (Number(p) >= 32) assert.ok(r.drawn > 0, `${where}: shown`);
+      // (The stud with it: never bigger than the cross's art allows.)
+      if (r.drawn) assert.ok(r.e.stud.material.uniforms.uSize.value <= Math.max(1, (2 / 7) * r.drawn + 1e-9), where);
+    }
+  });
+}
 
 test('his earrings sit on his earlobes as newt.glb’s head mesh has them: at the lobe’s lowest edge, against its skin, on its outside', () => {
   const glb = readGlbAnim(new URL('../public/models/newt.glb', import.meta.url));
