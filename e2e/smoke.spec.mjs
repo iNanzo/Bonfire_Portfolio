@@ -192,7 +192,9 @@ test('the pack’s knight item summons him, swaps his helmet and style (remember
   await summon.click();
   // Resting: send him off, his helmets, styles, finishes and gestures (the Default Dance too).
   const dismiss = page.locator('[data-pack-list="knight"] [data-pack-option="dismiss"]');
-  await expect(dismiss).toBeEnabled({ timeout: 15_000 });
+  // The forge advances in capped scene time; software WebGL can take much longer
+  // than its animation duration in wall time. Still require the resting-state control.
+  await expect(dismiss).toBeEnabled({ timeout: 45_000 });
   const helmets = page.locator('[data-pack-list="knight"] [data-pack-option^="helm:"]');
   await expect(helmets).toHaveCount(3);
   await expect(page.locator('[data-pack-list="knight"] [data-pack-option^="gesture:"]')).toHaveCount(9);
@@ -252,7 +254,9 @@ test('the pack keeps the keyboard: Summon and Send Him Off picked with Enter lea
   if (await page.locator('.pack-items').isHidden()) await page.keyboard.press('i');
   await intoKnight();
   const dismiss = page.locator('[data-pack-option="dismiss"]');
-  await expect(dismiss).toBeEnabled({ timeout: 15_000 });
+  // The forge advances in capped scene time; software WebGL can take much longer
+  // than its animation duration in wall time. Still require the resting-state control.
+  await expect(dismiss).toBeEnabled({ timeout: 45_000 });
   await intoKnight(); // (into the list again, now it can be picked)
   await expect(dismiss).toBeFocused();
   await page.keyboard.press('Enter');
