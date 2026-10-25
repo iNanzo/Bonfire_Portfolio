@@ -142,6 +142,48 @@ test('the pack opens and its Map fast travels to another place', async ({ page }
   expect(errors).toEqual([]);
 });
 
+test('a late knight load does not switch the pack list under a stationary pointer', async ({ page }) => {
+  const errors = watch(page);
+  let releaseKnight;
+  const knightReady = new Promise((resolve) => {
+    releaseKnight = resolve;
+  });
+  await page.route('**/models/knight.glb', async (route) => {
+    await knightReady;
+    await route.continue();
+  });
+  try {
+    await page.goto('/');
+    await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
+    await page.click('[data-pack-toggle]');
+    await page.waitForFunction(() =>
+      document
+        .querySelector('.pack-items')
+        .getAnimations({ subtree: true })
+        .every((a) => a.playState !== 'running'),
+    );
+    const map = page.locator('[data-pack-slot="map"]');
+    await map.hover();
+    await expect(map).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.locator('[data-pack-item="knight"]')).toBeHidden();
+    releaseKnight();
+    await expect(page.locator('[data-pack-item="knight"]')).toBeVisible({ timeout: 30_000 });
+    // Let layout and its native pointer boundary events run without moving the mouse.
+    await page.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+    );
+    await expect(map).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.locator('[data-pack-option="shrine"]')).toBeVisible();
+    // Deliberate pointer movement still selects another item's list.
+    await page.hover('[data-pack-slot="tome"]');
+    await expect(page.locator('[data-pack-slot="tome"]')).toHaveAttribute('aria-expanded', 'true');
+    await expect(map).toHaveAttribute('aria-expanded', 'false');
+    expect(errors).toEqual([]);
+  } finally {
+    releaseKnight();
+  }
+});
+
 for (const path of ['/', '/visualizer/']) {
   test(`the knight's model loads on ${path}`, async ({ page }) => {
     const errors = watch(page);

@@ -1,0 +1,23 @@
+/* ==========================================================================
+   The design tokens' values (tokens.css imports them after the typefaces): the
+   scene's neutral colors, the flame's accents (ui/theme.js rewrites these as the
+   flame changes) and the three typefaces' stacks. No @font-face here: a page that
+   imports this alone brings its own faces.
+   ========================================================================== */
+
+:root {
+  --c-void: #07070b;
+  --c-shadow: #15131d;
+  --c-stone: #2c2a3a;
+  --c-wood: #5b4535;
+  --c-bone: #e9e3d2;
+
+  --accent-lo: #8c1d2f;
+  --accent: #e0582a;
+  --accent-hi: #ffc76a;
+  --accent-core: #fff1d0;
+
+  --font-pixel: 'Pixelify Sans', ui-monospace, 'Cascadia Mono', monospace;
+  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-name: 'Cinzel', 'Trajan Pro', Georgia, serif;
+}

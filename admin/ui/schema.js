@@ -46,6 +46,16 @@ import {
   INVITATION_SUBGROUPS,
   INVITATION_TEMPLATES,
 } from './invitationSchema.js';
+import {
+  GATE_FIELDS,
+  GATE_HELP,
+  GATE_KEYWORDS,
+  GATE_LABELS,
+  GATE_MORE,
+  GATE_PAGE,
+  GATE_STARTERS,
+  GATE_SUBGROUPS,
+} from './gateSchema.js';
 import { titleCase } from './text.js';
 
 const PREVIEW_BLURB = 'The preview updates as you edit; nothing is published until you save.';
@@ -138,6 +148,8 @@ export const PAGES = [
     blurb:
       'Tab names, the header, menus and pack, weapon names and which weapons can be drawn, the starting equipment and the 404 page.',
   },
+  // The sitewide password lock (gateSchema.js; the password itself is gateTools.js's).
+  GATE_PAGE,
   {
     id: 'invitation',
     group: 'Toys',
@@ -381,6 +393,8 @@ export const LABELS = {
   'startingEquipment.flame': 'Flame colors',
   // The invitation toy's page.
   ...INVITATION_LABELS,
+  // The password lock's page.
+  ...GATE_LABELS,
   // The settings the site shares with Bonfire Live and the Painter: the map's names win.
   ...adminLabels(),
 };
@@ -598,6 +612,8 @@ export const HELP = {
     'Hold the Scene keeps all it sets for its stretch. Start From the Scene opens with its place, colors and look, then the show plays on.',
   // The invitation toy's page.
   ...INVITATION_HELP,
+  // The password lock's page.
+  ...GATE_HELP,
   // The settings the site shares with Bonfire Live and the Painter: the map's help wins.
   ...adminHelp(),
 };
@@ -632,6 +648,7 @@ const OWN_MORE = {
     'These are the scenes every visitor’s Bonfire Live has; the ones visitors make stay in their own browsers.\n' +
     'Bonfire Live’s Scenes & Cards settings can shuffle them.',
   ...INVITATION_MORE,
+  ...GATE_MORE,
 };
 /** A field's longer explanation (its "More"), or ''. */
 export const moreFor = (pattern) => hint(OWN_MORE, pattern) ?? meta('admin', pattern)?.more ?? '';
@@ -654,6 +671,7 @@ const OWN_KEYWORDS = {
   'effects.elements': ['lightning', 'ice', 'frost'],
   weaponDraw: ['weapons', 'random'],
   ...INVITATION_KEYWORDS,
+  ...GATE_KEYWORDS,
 };
 /** A field's search words. */
 export const keywordsFor = (pattern) => [
@@ -759,6 +777,7 @@ export const SUBGROUPS = {
     { label: 'Key prompts', keys: ['prompts'] },
   ],
   ...INVITATION_SUBGROUPS,
+  ...GATE_SUBGROUPS,
 };
 
 /**
@@ -989,13 +1008,14 @@ export const TEMPLATES = {
  * lacks shows as (the form adds it to the draft only once it's edited). Other entries show the
  * fields they have.
  */
-export const FIELDS = { ...INVITATION_FIELDS };
+export const FIELDS = { ...INVITATION_FIELDS, ...GATE_FIELDS };
 
 /**
  * A section content.json doesn't have yet that can start from built-in values: (draft) → its
- * value (the Invitation page's, from the toy's own; scenes start as an empty list on their own).
+ * value (the Invitation page's, from the toy's own; the lock's, its defaults: off, no key;
+ * scenes start as an empty list on their own).
  */
-export const STARTERS = { ...INVITATION_STARTERS };
+export const STARTERS = { ...INVITATION_STARTERS, ...GATE_STARTERS };
 
 /** “+ Add …” button wording per list. */
 export const ADD_LABELS = {

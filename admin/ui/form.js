@@ -7,7 +7,8 @@
 // one made from a list in the draft, OPTIONS_FROM, remade as that list is edited);
 // ranged numbers get sliders and #rrggbb text gets a color picker. Bonfire
 // Live's scenes get cards of their own (sceneTools.js: made in the Painter, so a card
-// shows a scene's colors and summary rather than its ~80 settings). Every
+// shows a scene's colors and summary rather than its ~80 settings). The lock's password
+// (gate.key) is gateTools.js's write-only Set Password, never a text field. Every
 // field carries data-path (e.g. projects[2].images[0].alt) so validation messages
 // and the search land on the right field.
 //
@@ -49,6 +50,7 @@ import { HEX_RE, ID_RE, shownImages, slugify } from '../../src/contentRules.js';
 import { newImageSrc, processImage } from './images.js';
 import { flameQuickRoll, flameTools } from './paletteTools.js';
 import { sceneCardBody, sceneMeta, sceneThumb } from './sceneTools.js';
+import { gateKeyField } from './gateTools.js';
 import { titleCase } from './text.js';
 import { ELEMENT_IDS } from '../../src/effectsDefaults.js';
 import { el } from './el.js';
@@ -169,6 +171,7 @@ const autoRows = (text) =>
  * @param {number} [level]
  */
 export function renderValue(value, path, ctx, level = 3) {
+  if (patternOf(path) === 'gate.key') return gateKeyField(value, path, ctx);
   if (path.at(-1) === 'images' && Array.isArray(value)) return renderImages(value, path, ctx);
   if (Array.isArray(value)) {
     const sample = value.find((v) => v !== null && v !== undefined) ?? hint(TEMPLATES, patternOf(path))?.();

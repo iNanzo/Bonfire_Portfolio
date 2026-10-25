@@ -31,6 +31,7 @@ const PAGES = [
   'scenes',
   'headings',
   'interface',
+  'access',
   'invitation',
 ];
 

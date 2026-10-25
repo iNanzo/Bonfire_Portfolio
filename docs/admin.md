@@ -144,6 +144,19 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     optional, holds up to 48 scenes, and ids must be unique. A problem deep inside a scene
     is listed on its card with where it is (`look.name: …`). The commit message says
     "edit scenes". There's no live preview for scenes; **Open in Painter** is the preview.
+- **Access** (under Settings): the sitewide password lock (`content.json` `gate`; the
+  page's schema is `admin/ui/gateSchema.js`, its password control `admin/ui/gateTools.js`).
+  It keeps visitors and search engines out of the pages you pick, but not someone who
+  reads the code: see **The password lock** below for what it does and doesn't do.
+  - **Lock the Site:** off until you turn it on. It can't turn on without a password.
+  - **Password:** **Set Password** takes it twice, hashes it in your browser and writes
+    only the hash into the draft; the boxes clear and the field says when it was set. A
+    save publishes it.
+  - **Remember For (days):** how long a browser stays unlocked (1–365, 30 to start).
+  - **Locked Pages:** Portfolio (every screen and project page), Bonfire Live, Bonfire
+    Painter, Campfire Game, Reliquary Game Page, and Invitation (open to start with).
+  - **Lock Page:** its words: the eyebrow, title and flavor line, the password's label,
+    the button, and what it says while it checks and when the password is wrong.
 - **Invitation** (under Toys): NEWT's toy at `/invitation/` (`content.json` `invitation`;
   [invitation.md](invitation.md) has the toy). The page's schema is
   `admin/ui/invitationSchema.js`, gathered into `schema.js`.
@@ -277,6 +290,41 @@ exceptions are the cards that draw their own body: scenes (`sceneTools.js`).
   The policy refuses inline styles, a `style=""` set by script included, so the page
   sets styles through the style object (`el()` takes `style` as an object) and keeps
   its fonts as files. Try it locally with `npm run admin:preview`.
+
+**The password lock (Access)**
+
+It keeps visitors and search engines out. It does not keep out someone who reads the
+code: the repository is public, so the pages' files and `content.json` can be read on
+GitHub, and the cookie that opens the lock can be set by hand. And any page can show the
+site inside a frame with `?preview`, the way the admin's live preview does. Treat it as a
+velvet rope, not a vault.
+
+- **How it works:** with the lock on, the build puts a small check first in each locked
+  page (`vite.config.js` `gate`, `src/gate/check.js`). A visitor without the `nh_gate`
+  cookie is sent to `/unlock/` (`src/gate/main.js`, in the 404 page's look) before any of
+  the page's own code runs. The browser reads ahead, so it may already have asked for the
+  page's scripts and model preloads; the check cuts those requests off at once, so at
+  most their first bytes arrive. The right password sets the cookie for **Remember For**
+  days and sends them back to where they were going, query and hash included. The
+  sitemap leaves out locked routes, and `/unlock/` is `noindex`, so search engines drop
+  them. The admin's live preview (`?preview` in a frame, from any site) is never locked.
+- **Never locked:** the 404 page, `/admin/`, `/assets/` and `/models/`; `/invitation/`
+  unless you switch it on. `npm run dev` and the admin's local preview never lock.
+- **What's stored:** only a salted slow hash (PBKDF2-SHA256, 600,000 iterations, a 16-byte
+  salt) in `gate.key`, never the password: the content rules refuse anything under `gate`
+  that looks like a password, so a save can't commit one. The hash is public, so a short
+  password can be guessed offline; the admin warns under 12 characters, and a few words
+  together are safest.
+- **Changing it:** a new password locks out every browser that unlocked with the old
+  one. It goes live with the deploy (13–15 minutes), plus up to 10 minutes while browsers
+  keep the old pages cached.
+- **Tests:** the browser specs start with the cookie made from `content.json`'s key at
+  test time (`e2e/lib/gateSetup.mjs`), so a password change never fails CI;
+  `e2e/gate.spec.mjs` locks pages itself with a key made per run.
+- **The stronger path:** serve the site from a Cloudflare Worker instead of GitHub Pages
+  (moving `nhoang.dev`'s DNS from Porkbun to Cloudflare), checking the password on the
+  server with an HttpOnly cookie, and make the repository private. The same cookie name,
+  `/unlock/` page and `gate` switches would carry over.
 
 **Use it locally (no setup)**
 

@@ -39,8 +39,9 @@
 import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import { gateStateFor } from '../e2e/lib/gateSetup.mjs';
 
 const SCENERY_NAMES = ['ruins', 'forge', 'shrine', 'cathedral', 'cult'];
 const ALL = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
@@ -122,6 +123,11 @@ if (!baseUrl) {
   }
   baseUrl = `http://localhost:${port}`;
 }
+// (A build with the sitewide lock on sends a context without its cookie to /unlock/, so every
+// context starts with the one the checkout's content.json opens: docs/admin.md, the lock.)
+const gate = await gateStateFor(root ?? fileURLToPath(new URL('..', import.meta.url)), baseUrl);
+/** A fresh context, past the lock. @param {import('@playwright/test').Browser} browser @param {object} [o] */
+const openContext = (browser, o = {}) => browser.newContext({ ...o, storageState: gate });
 const closeServer = async () => {
   try {
     await (server?.close?.() ?? server?.httpServer?.close());
@@ -448,7 +454,7 @@ async function cpuProfile(cdp, secs) {
 // --- A scenario's page: the settings it starts with, the show up and the demo playing.
 const BASE_SETTINGS = { scenes: 'off', scenery: 'ruins' };
 async function openShow(browser, settings = {}) {
-  const context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
+  const context = await openContext(browser, { viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
   await context.addInitScript(initPage, { seed: opts.seed, settings: { ...BASE_SETTINGS, ...settings } });
   const page = await context.newPage();
   const errors = [];
@@ -627,7 +633,7 @@ const SCENARIOS = {
     return { windows: out, errors };
   },
   async H(browser) {
-    const context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
+    const context = await openContext(browser, { viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
     await context.addInitScript(initPage, {
       seed: opts.seed,
       virtual: true,
@@ -765,7 +771,7 @@ const result = {
 try {
   // (A first visit warms Vite's transforms and dependency cache, so no scenario pays for it.)
   {
-    const context = await browser.newContext();
+    const context = await openContext(browser);
     const page = await context.newPage();
     await page.goto(`${baseUrl}/visualizer/?bench`);
     await page.waitForFunction(() => window.__viz?.fire?.knights, null, { timeout: 180000 }).catch(() => {});

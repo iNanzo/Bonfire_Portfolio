@@ -1,10 +1,14 @@
 import { defineConfig, normalizePath } from 'vite';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { gzipSync } from 'node:zlib';
 import sharp from 'sharp';
 import { screens, featured, projects, archive, items, site } from './src/content.js';
 import { pageMeta, withMeta, publicRoutes, sitemap } from './src/seoPages.js';
 import { esc } from './src/html.js';
+import { gateScript } from './src/gate/check.js';
+import { fromBase64, tokenOf } from './src/gate/crypto.js';
+import { lockedPages, unlockConfig } from './src/gate/pages.js';
 
 // GitHub Pages *project* site (username.github.io/repo-name/): build with
 //   BASE=repo-name npm run build
@@ -52,13 +56,24 @@ function routePages() {
           resolve(outDir, `og/project-${p.id}.jpg`),
         );
       }
-      writeFileSync(resolve(outDir, 'sitemap.xml'), sitemap(publicRoutes(), ['/visualizer/', '/painter/']));
+      writeFileSync(resolve(outDir, 'sitemap.xml'), sitemapFor(lockedPages(readGate())));
       writeFileSync(
         resolve(outDir, 'robots.txt'),
         `User-agent: *\nAllow: /\nDisallow: /admin/\nDisallow: /larp/\n\nSitemap: ${new URL('sitemap.xml', site.url).href}\n`,
       );
     },
   };
+}
+
+/**
+ * sitemap.xml without the routes the lock covers (Google follows the lock's redirect to a
+ * noindex page, so a locked route listed would only be a dead entry).
+ * @param {string[]} locked  the locked pages (src/gate/pages.js lockedPages)
+ */
+export function sitemapFor(locked) {
+  const open = (page) => !locked.includes(page);
+  const extra = [open('live') && '/visualizer/', open('painter') && '/painter/'].filter(Boolean);
+  return sitemap(open('portfolio') ? publicRoutes() : [], /** @type {string[]} */ (extra));
 }
 
 /** A 1200×630 preview: the image cropped to fill, a dark band along the bottom, the title on it. */
@@ -78,28 +93,29 @@ async function socialImage(src, title, out) {
 
 // The portfolio's first load (index.html's script and its modulepreloads) is the site's
 // alone. Bonfire Live's and the Painter's modules (the scene format, the looks, the scene
-// store, the palette maker), the campfire game's (src/larp/) and the invitation toy's
-// (src/invitation/) only ever reach it through a static import from the site: the pages are
-// built together, and Rolldown puts a module every page reaches into the chunk they share, so
-// one `import` in src/main.js of something that imports scenes.js (contentRules.js does) adds
-// ~20 kB gzip to every visit. The site imports those lazily (`import()`); this check says so at
-// build time if one comes back. (The other way round, a page importing one of the site's own
-// modules shares a chunk with its first load too: the invitation toy imports only three.js,
-// GLTFLoader and its own modules.)
-const SHOW_ONLY =
-  /[\\/]src[\\/]((scenes|sceneStore|paletteGen)\.js|visualizer[\\/]|painter[\\/]|larp[\\/]|invitation[\\/])/;
+// store, the palette maker), the campfire game's (src/larp/), the invitation toy's
+// (src/invitation/) and the lock page's (src/gate/) only ever reach it through a static import
+// from the site: the pages are built together, and Rolldown puts a module every page reaches
+// into the chunk they share, so one `import` in src/main.js of something that imports scenes.js
+// (contentRules.js does) adds ~20 kB gzip to every visit. The site imports those lazily
+// (`import()`); this check says so at build time if one comes back. (The other way round, a
+// page importing one of the site's own modules shares a chunk with its first load too: the
+// invitation toy imports only three.js, GLTFLoader and its own modules, and the lock page only
+// src/gate/ and the tokens, which a build that breaks that refuses: unlockLoad.)
+export const SHOW_ONLY =
+  /[\\/]src[\\/]((scenes|sceneStore|paletteGen)\.js|visualizer[\\/]|painter[\\/]|larp[\\/]|invitation[\\/]|gate[\\/])/;
 const shortId = (id) =>
   id
     .split('\\')
     .join('/')
     .replace(/^.*?\/src\//, 'src/');
 /**
- * The modules (with code in the bundle) a page's entry chunk loads before it runs: the
- * chunk and every chunk it imports statically, all the way down.
+ * The chunks a page's entry chunk loads before it runs: the chunk and every chunk it imports
+ * statically, all the way down (their file names).
  * @param {Record<string, any>} bundle  Rolldown's output bundle
  * @param {string} entry  the entry chunk's name (an `input` key)
  */
-export function firstLoadModules(bundle, entry) {
+function firstLoadChunks(bundle, entry) {
   const start = Object.values(bundle).find((c) => c.type === 'chunk' && c.isEntry && c.name === entry);
   const seen = new Set();
   const stack = start ? [start.fileName] : [];
@@ -109,11 +125,39 @@ export function firstLoadModules(bundle, entry) {
     seen.add(file);
     stack.push(...bundle[file].imports);
   }
-  return [...seen].flatMap((file) =>
+  return [...seen];
+}
+/**
+ * The modules (with code in the bundle) a page's entry chunk loads before it runs.
+ * @param {Record<string, any>} bundle  Rolldown's output bundle
+ * @param {string} entry  the entry chunk's name (an `input` key)
+ */
+export function firstLoadModules(bundle, entry) {
+  return firstLoadChunks(bundle, entry).flatMap((file) =>
     Object.entries(bundle[file].modules)
       .filter(([, m]) => m.renderedLength > 0)
       .map(([id]) => id),
   );
+}
+/** What the lock page must never load: content.json and what reads it, the renderer, three.js. */
+const UNLOCK_NEVER =
+  /[\\/]src[\\/](content\.json|content\.js|render\.js|palette\.js|effects\.js|ui[\\/]theme\.js)$|[\\/]node_modules[\\/]three[\\/]/;
+/** The lock page's JS and CSS, at most (gzip; fonts aside). */
+const UNLOCK_MAX = 10 * 1024;
+/**
+ * The lock page's first load: what it loads that it never should, and its JS and CSS gzipped.
+ * @param {Record<string, any>} bundle  Rolldown's output bundle
+ * @returns {{ stray: string[], gzip: number }}
+ */
+export function unlockLoad(bundle) {
+  const stray = firstLoadModules(bundle, 'unlock').filter((id) => UNLOCK_NEVER.test(id));
+  let gzip = 0;
+  for (const file of firstLoadChunks(bundle, 'unlock')) {
+    const chunk = bundle[file];
+    gzip += gzipSync(chunk.code ?? '').length;
+    for (const css of chunk.viteMetadata?.importedCss ?? []) gzip += gzipSync(bundle[css]?.source ?? '').length;
+  }
+  return { stray, gzip };
 }
 function firstLoadGuard() {
   return {
@@ -123,8 +167,89 @@ function firstLoadGuard() {
       const stray = firstLoadModules(bundle, 'main').filter((id) => SHOW_ONLY.test(id));
       if (stray.length)
         this.warn(
-          `The portfolio's first load carries Bonfire Live / Painter / campfire game / invitation toy modules: ${stray.map(shortId).join(', ')}. Import what pulls them in lazily (import()) from the site.`,
+          `The portfolio's first load carries Bonfire Live / Painter / campfire game / invitation toy / lock page modules: ${stray.map(shortId).join(', ')}. Import what pulls them in lazily (import()) from the site.`,
         );
+      const lock = unlockLoad(bundle);
+      if (lock.stray.length)
+        this.error(
+          `The lock page (/unlock/) loads ${lock.stray.map(shortId).join(', ')}: it imports only src/gate/, tokens.css and the fonts.`,
+        );
+      if (lock.gzip > UNLOCK_MAX)
+        this.warn(`The lock page's JS and CSS are ${(lock.gzip / 1024).toFixed(1)} kB gzip: keep them under 10.`);
+    },
+  };
+}
+
+// The sitewide password lock (content.json `gate`, the admin's Access page; docs/admin.md).
+// A build with the lock on and a key puts the check (src/gate/check.js) first in the head of
+// each locked page: before Vite's own tags, the model preloads and the entry module, so for a
+// visitor without the cookie the parser stops there and none of the page's code runs. (The
+// browser's preload scanner reads ahead and may already have asked for the preloads and the
+// entry's chunks; the check's window.stop() cuts those requests off at once, so at most their
+// first bytes arrive. Keeping them out of the HTML would take the page's whole boot behind the
+// check, for every visitor.) The portfolio's route copies are made from the
+// built index.html, so they carry it too; the Reliquary game is a file of public/ (no HTML
+// transform), so it gets the check once it's written. The lock page (/unlock/) gets its config
+// inline (unlockConfig: the words and the key, nothing else), in dev too. The lock is off, and
+// costs nothing, while it's off or has no key; a dev server is never locked. 404, the admin,
+// /assets and /models are never locked, and the invitation only if its switch is turned on.
+const GATE_HTML = {
+  '/index.html': 'portfolio',
+  '/visualizer/index.html': 'live',
+  '/painter/index.html': 'painter',
+  '/larp/index.html': 'larp',
+  '/invitation/index.html': 'invitation',
+};
+const UNLOCK_HTML = '/unlock/index.html';
+const CONTENT_FILE = resolve(import.meta.dirname, 'src/content.json');
+/** content.json's gate, read now (an edit in the admin changes the next build). */
+const readGate = (file = CONTENT_FILE) => JSON.parse(readFileSync(file, 'utf8')).gate;
+/**
+ * @param {string} [file]  content.json
+ * @returns {import('vite').Plugin & { configResolved: Function, closeBundle: Function, transformIndexHtml: { order: 'post', handler: Function } }}
+ */
+export function gate(file = CONTENT_FILE) {
+  let command = 'serve';
+  let outDir = 'dist';
+  let base = '/';
+  /** The check for one of the build's pages, or null when it stays open. @param {string} page */
+  const checkFor = async (page) => {
+    const g = readGate(file);
+    if (command !== 'build' || !lockedPages(g).includes(page)) return null;
+    return gateScript(await tokenOf(fromBase64(g.key.hash)), base);
+  };
+  return {
+    name: 'gate',
+    configResolved(config) {
+      command = config.command;
+      outDir = resolve(config.root, config.build.outDir);
+      base = config.base;
+    },
+    transformIndexHtml: {
+      order: 'post',
+      async handler(_html, ctx) {
+        if (ctx.path === UNLOCK_HTML) {
+          const json = JSON.stringify(unlockConfig(readGate(file))).replace(/</g, '\\u003c');
+          return [
+            { tag: 'script', attrs: { type: 'application/json', id: 'gate-config' }, children: json, injectTo: 'head' },
+          ];
+        }
+        const page = GATE_HTML[ctx.path];
+        const code = page ? await checkFor(page) : null;
+        if (!code) return undefined;
+        return [{ tag: 'script', attrs: { 'data-gate': true }, children: code, injectTo: 'head-prepend' }];
+      },
+    },
+    async closeBundle() {
+      const reliquary = resolve(outDir, 'games', 'reliquary.html');
+      const code = await checkFor('games');
+      if (!code || !existsSync(reliquary)) return;
+      const html = readFileSync(reliquary, 'utf8');
+      if (html.includes('<script data-gate>')) return;
+      writeFileSync(
+        reliquary,
+        html.replace(/<head>/i, (head) => `${head}<script data-gate>${code}</script>`),
+      );
     },
   };
 }
@@ -134,8 +259,11 @@ function firstLoadGuard() {
 // subtree inlined, so the toy never imports content.json (whose chunk the portfolio's first load
 // shares); the file is watched, so an edit reloads the toy in dev. The other way round, the
 // pages that import content.json itself (the portfolio, Bonfire Live, the Painter) get it
-// without that subtree: NEWT's lines in every visit would be weight for nothing.
+// without that subtree: NEWT's lines in every visit would be weight for nothing. Nor the lock's
+// (`gate`): its words and key are the build's and the lock page's (gate, above), never the site's.
 const INVITATION_CONTENT = 'virtual:invitation-content';
+/** content.json's subtrees the pages that import it never read. */
+const NOT_THE_SITES = ['invitation', 'gate'];
 /**
  * @param {string} [file]  content.json
  * @returns {import('vite').Plugin & {resolveId: Function, load: Function, transform: Function}}
@@ -158,8 +286,8 @@ export function invitationContent(file = resolve(import.meta.dirname, 'src/conte
     transform(code, id) {
       if (normalizePath(id.split('?')[0]) !== target) return null;
       const c = JSON.parse(code);
-      if (!c || typeof c !== 'object' || !('invitation' in c)) return null;
-      delete c.invitation;
+      if (!c || typeof c !== 'object' || !NOT_THE_SITES.some((k) => k in c)) return null;
+      for (const k of NOT_THE_SITES) delete c[k];
       return { code: JSON.stringify(c), map: null };
     },
   };
@@ -167,7 +295,7 @@ export function invitationContent(file = resolve(import.meta.dirname, 'src/conte
 
 export default defineConfig({
   base: repo ? `/${repo}/` : '/',
-  plugins: [routePages(), firstLoadGuard(), invitationContent()],
+  plugins: [routePages(), firstLoadGuard(), invitationContent(), gate()],
   build: {
     // The largest chunk is three.js's renderer (~410 kB, lazy-loaded with the fire); the
     // bonfire's own code is a chunk of its own beside it (~320 kB). More than this is
@@ -184,6 +312,8 @@ export default defineConfig({
         // The invitation toy (/invitation/): unlisted, so noindex and left out of the sitemap,
         // but not Disallow'd (a Disallow is public, and would hide the noindex from crawlers).
         invitation: resolve(import.meta.dirname, 'invitation/index.html'),
+        // The lock page (/unlock/): noindex, left out of the sitemap, never locked itself.
+        unlock: resolve(import.meta.dirname, 'unlock/index.html'),
       },
       output: {
         codeSplitting: {
