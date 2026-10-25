@@ -9,7 +9,9 @@
 // lies down), each the way he was facing (no turn to the camera), and get him up (it put away as
 // he starts to); the button's label (the brain's deviceLabel) goes Give Device, Lie Down, Get
 // Up. Every wait is on a state, never a duration (CI's software WebGL runs slower than real
-// time).
+// time); a state that lasts only a fraction of a second (a glance up, a Thrash, lying down,
+// getting up) is checked in the page every frame (onFrame), so a poll's back-off never steps
+// over it.
 import { test, expect } from '@playwright/test';
 
 /** Collect the page's errors (uncaught ones, console errors) for the test to check. */
@@ -30,6 +32,18 @@ const on = (page, part) => page.evaluate((p) => window.__invitation.screen(p), p
 /** Waits until `pred(snapshot)` holds (states, never durations). */
 const until = (page, pred, message, timeout = 20_000) =>
   expect.poll(async () => pred(await snapshot(page)), { message, timeout }).toBe(true);
+/**
+ * Waits until `pred(snapshot)` holds, checked in the page on every frame drawn, and returns that
+ * frame's snapshot (`pred` takes nothing from its scope: it runs in the page).
+ */
+async function onFrame(page, pred, message, timeout = 20_000) {
+  const check = `(() => { const s = window.__invitation.snapshot(); return (${pred})(s) ? s : null; })()`;
+  try {
+    return await (await page.waitForFunction(check, null, { polling: 'raf', timeout })).jsonValue();
+  } catch (e) {
+    throw new Error(`${message}: ${e instanceof Error ? e.message : e}`, { cause: e });
+  }
+}
 /** Ready, calm (no wandering, no sitting by himself) and standing still in idle. */
 async function calm(page) {
   await ready(page, '/invitation/?test&calm&seed=3');
@@ -135,8 +149,7 @@ test.describe('on a desktop', () => {
     const off = (h) => Math.abs(Math.atan2(Math.sin(h - heading), Math.cos(h - heading)));
     const cursor = await pickUp(page);
     await glide(page, cursor, { x: cursor.x + 160, y: cursor.y - 40 }, 4);
-    await until(page, (s) => s.held && s.lookUp === 1, 'a glance up', 40_000);
-    let s = await snapshot(page);
+    let s = await onFrame(page, (o) => o.held && o.lookUp === 1, 'a glance up', 40_000);
     expect(off(s.heading), 'held, facing as when grabbed').toBeLessThan(1e-3);
     expect(s.headPitch, 'his head up').toBeGreaterThan(-0.2);
     await until(page, (o) => o.held && o.lookUp === 0, 'and back down', 20_000);
@@ -150,8 +163,8 @@ test.describe('on a desktop', () => {
   test('held, he thrashes now and then: an angry kick and flail, then back to hanging', async ({ page }) => {
     await calm(page);
     await pickUp(page);
-    await until(page, (s) => s.clip === 'Thrash', 'a thrash', 40_000);
-    expect((await snapshot(page)).face).toBe('angry');
+    // (The face read on the same frame: a Thrash lasts about a second.)
+    await onFrame(page, (s) => s.clip === 'Thrash' && s.face === 'angry', 'an angry thrash', 40_000);
     await until(page, (s) => s.clip === 'Held' && s.held, 'back to hanging', 20_000);
     await page.mouse.up();
   });
@@ -193,13 +206,13 @@ test.describe('on a phone', () => {
     await kept('sitting');
     await press();
     // (In his hands as he lies down, too.)
-    await until(page, (s) => s.state === 'lieDown' && s.motion.device.shown, 'lying down with it', 30_000);
+    await onFrame(page, (s) => s.state === 'lieDown' && s.motion.device.shown, 'lying down with it', 30_000);
     await until(page, (s) => s.state === 'deviceLie' && s.motion.device.shown, 'lying with it', 30_000);
     await kept('lying');
     expect(await device()).toMatchObject({ state: 'lie', label: 'Get Up', shown: true });
     await expect(button).toHaveAccessibleName('Get Up');
     await press();
-    await until(page, (s) => s.state === 'getUp' && !s.motion.device.shown, 'getting up, it put away');
+    await onFrame(page, (s) => s.state === 'getUp' && !s.motion.device.shown, 'getting up, it put away');
     await until(page, (s) => s.state === 'idle', 'up', 30_000);
     expect(await device()).toMatchObject({ state: null, label: 'Give Device', shown: false });
     await expect(button).toHaveAccessibleName('Give Device');
