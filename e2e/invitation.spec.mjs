@@ -145,6 +145,44 @@ const inView = (page) =>
     return out;
   });
 const allSeen = (v) => v.head.seen && v.body.seen && v.feet.seen;
+/**
+ * Turns the camera with the Camera pad's Turn Left, `turns` × 45° from where it is, and closes
+ * the pad once it has come round.
+ */
+async function turnLeft(page, turns, press = (l) => l.tap()) {
+  if (!turns) return;
+  const camera = page.getByRole('button', { name: 'Camera', exact: true });
+  await press(camera);
+  const from = (await snapshot(page)).camera.yaw;
+  for (let i = 0; i < turns; i++) await press(page.getByRole('button', { name: 'Turn Left' }));
+  await until(
+    page,
+    (s) => Math.abs(Math.abs(s.camera.yaw - from) - (turns * Math.PI) / 4) < 0.01 && !s.camera.turning,
+    `turned ${turns * 45}°`,
+  );
+  await press(camera);
+  await expect(page.locator('#inv-camera')).toBeHidden();
+}
+/**
+ * How far past the play area's rim each spot of an 11×11 grid over the stage (above the toolbar)
+ * meets the floor, world units (0 or less: in reach).
+ */
+async function pastRim(page) {
+  const { area } = await snapshot(page);
+  const stage = await page.locator('[data-stage]').boundingBox();
+  const bar = await page.locator('.inv-toolbar').boundingBox();
+  const spots = await page.evaluate(
+    ({ x0, y0, w, h }) => {
+      const out = [];
+      for (let j = 0; j <= 10; j++)
+        for (let i = 0; i <= 10; i++) out.push(window.__invitation.floorAt(x0 + (i * w) / 10, y0 + (j * h) / 10));
+      return out;
+    },
+    { x0: stage.x + 2, y0: stage.y + 2, w: stage.width - 4, h: bar.y - stage.y - 4 },
+  );
+  const c = { x: (area.minX + area.maxX) / 2, z: (area.minZ + area.maxZ) / 2 };
+  return { area, past: spots.map((f) => (f ? Math.hypot(f.x - c.x, f.z - c.z) - area.r : Infinity)) };
+}
 /** Opens the Settings sheet and waits until NEWT shows whole beside or above it. */
 async function lookOpenWithNewtInSight(page) {
   await page.getByRole('button', { name: 'Settings' }).click();
@@ -1093,6 +1131,44 @@ test.describe('on a phone', () => {
     await page.touchscreen.tap(head.x, head.y);
     await until(page, (t) => !t.camera.panned, 'the pan over');
   });
+
+  test('the play area fills the screen: every spot of floor it shows is in reach at the default zoom, turned 0°, 45° and 90°; the URL bar showing leaves him be, and a tap at the top walks him all the way there, turned too', async ({
+    page,
+  }) => {
+    test.setTimeout(240_000);
+    await calm(page);
+    for (const turns of [0, 1, 2]) {
+      await turnLeft(page, turns ? 1 : 0);
+      const { area, past } = await pastRim(page);
+      expect(area.r, 'a disc').toBeGreaterThan(0);
+      expect(Math.max(...past), `turned ${turns * 45}°: every spot in reach`).toBeLessThanOrEqual(0.1);
+    }
+    // The URL bar showing (the stage a little shorter): the play area's worked out again, and he
+    // isn't moved.
+    const was = await snapshot(page);
+    await page.setViewportSize({ width: 390, height: 788 });
+    await until(page, (s) => s.area.r !== was.area.r, 'the play area worked out again');
+    await framesFor(page, 300);
+    const now = await snapshot(page);
+    expect(Math.hypot(now.pos.x - was.pos.x, now.pos.z - was.pos.z), 'not moved').toBeLessThan(1e-6);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await until(page, (s) => s.area.r === was.area.r, 'back as it was');
+    // Turned 90°, then not turned: a tap near the top, toward a corner, walks him all the way there.
+    for (const turned of [true, false]) {
+      if (!turned) await calm(page);
+      const stage = await page.locator('[data-stage]').boundingBox();
+      const at = { x: stage.x + stage.width * 0.2, y: stage.y + 30 };
+      const goal = await floorAt(page, at);
+      await page.touchscreen.tap(at.x, at.y);
+      await until(page, (s) => s.state === 'walk', 'walking');
+      await until(
+        page,
+        (s) => s.state === 'idle' && Math.hypot(s.pos.x - goal.x, s.pos.z - goal.z) < 0.12,
+        `there, at the top${turned ? ', turned 90°' : ''}`,
+        90_000,
+      );
+    }
+  });
 });
 
 test.describe('on a phone held sideways', () => {
@@ -1183,6 +1259,50 @@ test.describe('on a phone held sideways', () => {
 
 test.describe('on a desktop', () => {
   test.use({ viewport: { width: 1280, height: 800 } });
+
+  test('a window resize works the play area out again: every spot of floor in reach at 1280×800, turned too; narrower, it shrinks under him and he eases back inside, no jump', async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    await calm(page);
+    for (const turns of [0, 1, 2]) {
+      await turnLeft(page, turns ? 1 : 0, (l) => l.click());
+      const { past } = await pastRim(page);
+      expect(Math.max(...past), `turned ${turns * 45}°: every spot in reach`).toBeLessThanOrEqual(0.1);
+    }
+    // Near the top-left corner of the screen: he walks there.
+    const stage = await page.locator('[data-stage]').boundingBox();
+    const at = { x: stage.x + 12, y: stage.y + 12 };
+    const goal = await floorAt(page, at);
+    await page.mouse.click(at.x, at.y);
+    await until(page, (s) => s.state === 'walk', 'walking');
+    await until(
+      page,
+      (s) => s.state === 'idle' && Math.hypot(s.pos.x - goal.x, s.pos.z - goal.z) < 0.12,
+      'there',
+      90_000,
+    );
+    const there = (await snapshot(page)).pos;
+    const far = Math.hypot(there.x, there.z);
+    // Every frame from here, where he is and the play area's size.
+    await page.evaluate(() => {
+      window.__trail = [];
+      const tick = () => {
+        const s = window.__invitation.snapshot();
+        window.__trail.push({ x: s.pos.x, z: s.pos.z, r: s.area.r });
+        if (window.__trail.length < 3000) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    await page.setViewportSize({ width: 660, height: 640 });
+    await until(page, (s) => s.area.r < far - 0.2, 'the play area shrunk under him');
+    await until(page, (s) => Math.hypot(s.pos.x, s.pos.z) <= s.area.r + 1e-6, 'back inside it', 30_000);
+    const trail = await page.evaluate(() => window.__trail);
+    const steps = trail.slice(1).map((q, i) => Math.hypot(q.x - trail[i].x, q.z - trail[i].z));
+    expect(Math.max(...steps), 'eased back in, never in a jump').toBeLessThan(0.2);
+    const out = trail.filter((q) => Math.hypot(q.x, q.z) > q.r + 0.05).length;
+    expect(out, 'outside it for a few frames on the way in').toBeGreaterThan(2);
+  });
 
   test('loads to ready with no errors and draws', async ({ page }) => {
     const errors = watch(page);

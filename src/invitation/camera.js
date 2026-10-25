@@ -11,8 +11,8 @@
 // little once the finger lifts. A pan (the mouse's left-drag on empty space, or two fingers'
 // middle) slides it across and up and down the screen at once, the floor under the cursor going
 // with it (orbitPan), the point it looks at kept to a region round the play area's middle
-// (panRegion: the area's half less what the view shows its narrower way at this zoom, so none
-// fully zoomed out and more the closer it zooms): past it the pan gives like a rubber band
+// (panRegion: a disc, the area's radius less what the view shows its narrower way at this zoom,
+// more the closer it zooms): past it the pan gives like a rubber band
 // (ORBIT.band, at most ORBIT.bandPx further) and, let go, eases back inside at ORBIT.bandBack.
 // The wheel and a pinch zoom about the cursor or the fingers' middle (orbitZoom's `at`: the floor
 // there stays there as the zoom eases, and the view is the user's from then on, a pan), the
@@ -22,8 +22,9 @@
 // The point it orbits sits at NEWT's middle height over its rest point (`base`, the play area's
 // middle to begin with) and follows NEWT softly the closer it zooms, all the way at the closest;
 // on a phone (pixels.js compactStage), where he's drawn bigger, ORBIT.phoneFollow of the way at
-// the default zoom too. The play area is bigger than any view but the fully zoomed-out one
-// (area.js), so the view keeps him on screen however it's turned: while he's well inside the
+// the default zoom too. The play area holds all the floor the default view shows however it's
+// turned, so it's bigger than the screen (area.js), and the view keeps him on screen: while
+// he's well inside the
 // clear space (ORBIT.keepIn of it round where the point it looks at shows) it holds still, and
 // as he nears its edge the rest point moves on with him, softly, never letting him past
 // ORBIT.keepOut of it once he's on screen (orbitStep, from where screenOf puts him). A pan
@@ -31,7 +32,9 @@
 // grab or tap on him (orbitFollow) or Reset Camera ends it.
 // While he's held (orbitHold) it holds still, so the point he's grabbed by stays under the
 // cursor; let go out past ORBIT.keepOut (carried to the screen's edge), the view eases back
-// round him at ORBIT.settle rather than snapping there in a frame. While the Look sheet is open it follows him all the way at any zoom (orbitFollowAll),
+// round him at ORBIT.settle rather than snapping there in a frame. What's on screen
+// (orbitSight, the floor where he shows whole) is the play area's `sight`: wander goals and a
+// flee keep to it (steer.js). While the Look sheet is open it follows him all the way at any zoom (orbitFollowAll),
 // so he stays in the clear space the sheet leaves. Reset Camera eases back to the default view,
 // the short way round, and clears the pan. The light goes round with it (lightDir: the look's
 // sun turned by the camera's yaw), so his shadow always falls the same way on screen, back and
@@ -48,15 +51,17 @@
 // view from before the intro, its pan and zoom included. With reduced motion the turn to the
 // front and the way back cut too.
 
-import { NEWT_HEIGHT, NEWT_RADIUS } from './area.js';
+import { AREA_MARGIN, NEWT_HEIGHT, NEWT_RADIUS, playArea } from './area.js';
 import { FOCUS_Y, VIEW, compactStage } from './pixels.js';
-import { centreOf, clampTo } from './steer.js';
+import { centreOf, clampTo, turnBounds } from './steer.js';
 
 /** @typedef {import('./types.js').XZ} XZ */
 /** @typedef {import('./types.js').XYZ} XYZ */
 /** @typedef {import('./types.js').Bounds} Bounds */
 
 const RAD = Math.PI / 180;
+/** What's on screen (orbitSight) reaches no further back than this many times the view's distance. */
+const SIGHT_REACH = 4;
 
 /**
  * elevMin/elevMax: radians up from the floor. zoomMin/zoomMax: the distance's range, × the
@@ -254,10 +259,11 @@ export function orbitArea(s, area) {
 }
 
 /**
- * Where a pan keeps the point it looks at: a square round the play area's middle, the area's
- * half less what the view shows its narrower way at this zoom (none fully zoomed out, more the
- * closer it zooms, the same however it's turned), so at its edge the area's edge shows at the
- * clear space's; taking in where the pan under way began. Null with no play area.
+ * Where a pan keeps the point it looks at: round the play area's middle, the area's radius (a
+ * box's half) less what the view shows its narrower way at this zoom (more the closer it zooms,
+ * the same however it's turned), so at its edge the area's edge shows at the clear space's: a
+ * disc for the toy's disc, a square for a box; taking in where the pan under way began. Null
+ * with no play area.
  * @param {OrbitState} s
  * @returns {Bounds|null}
  */
@@ -265,12 +271,13 @@ export function panRegion(s) {
   const a = s.area;
   if (!a) return null;
   const c = centreOf(a);
-  const half = Math.min(a.maxX - a.minX, a.maxZ - a.minZ) / 2;
+  const half = a.r ?? Math.min(a.maxX - a.minX, a.maxZ - a.minZ) / 2;
   const k = worldPerPx(s);
   const shows = Math.min(s.frame.hw * k, (s.frame.hh * k) / Math.max(0.2, Math.sin(s.elevation)));
   const l = Math.max(0, half - shows);
-  const r = { minX: c.x - l, maxX: c.x + l, minZ: c.z - l, maxZ: c.z + l };
   const f = s.panFrom;
+  if (a.r !== undefined) return playArea(Math.max(l, f ? Math.hypot(f.x - c.x, f.z - c.z) : 0), c);
+  const r = { minX: c.x - l, maxX: c.x + l, minZ: c.z - l, maxZ: c.z + l };
   if (f) {
     r.minX = Math.min(r.minX, f.x);
     r.maxX = Math.max(r.maxX, f.x);
@@ -737,6 +744,60 @@ export function screenOf(s, p, target = s.target) {
   const across = vx * cy - vz * sy;
   const up = -vx * sy * se + vy * ce - vz * cy * se;
   return { x: (across / depth) * f, y: (-up / depth) * f, depth };
+}
+
+/**
+ * What's on screen now (the play area's `sight`, for wander goals and a flee's fence: steer.js):
+ * the floor where NEWT shows whole inside the clear space round where the point it looks at
+ * shows (s.frame), AREA_MARGIN CSS px in from its edges, at the view as it is (turned, tilted,
+ * zoomed or slid): his toes at its bottom on the front edge, the top of his head at its top on
+ * the back edge, his head's side (further out than his feet) at its sides. A trapezoid in the
+ * camera's frame widening toward the back, turned with it (Bounds.turn); never further back
+ * than SIGHT_REACH view distances (its top over the horizon); null where the clear space can't
+ * hold him.
+ * @param {OrbitState} s
+ * @returns {Bounds|null}
+ */
+export function orbitSight(s) {
+  const hw = s.frame.hw - AREA_MARGIN;
+  const hh = s.frame.hh - AREA_MARGIN;
+  if (hw < 2 || hh < 2) return null;
+  // (Worked out with the camera at yaw 0 round the point it looks at, then turned with it.)
+  const flat = { ...s, yaw: 0 };
+  const t = s.target;
+  const far = t.z - s.distance * SIGHT_REACH;
+  const near = t.z + s.distance * Math.cos(s.elevation) * 0.9;
+  const down = (/** @type {XYZ} */ p) => screenOf(flat, p)?.y ?? Infinity;
+  const minZ = solveUp(far, near, (z) => down({ x: t.x, y: NEWT_HEIGHT, z: z - NEWT_RADIUS }), -hh);
+  const maxZ = solveUp(far, near, (z) => down({ x: t.x, y: 0, z: z + NEWT_RADIUS }), hh);
+  /** His root's x range at depth `z`: his head's side inside the clear space's sides. */
+  const sides = (/** @type {number} */ z) => {
+    const at = (/** @type {number} */ x) => screenOf(flat, { x, y: NEWT_HEIGHT, z })?.x ?? 0;
+    const a = at(t.x);
+    const per = at(t.x + 1) - a;
+    if (!(per > 1e-9)) return [t.x, t.x];
+    return [t.x + (-hw - a) / per + NEWT_RADIUS, t.x + (hw - a) / per - NEWT_RADIUS];
+  };
+  const [minX, maxX] = sides(maxZ);
+  const [minXBack, maxXBack] = sides(minZ);
+  if (!(maxZ > minZ && maxX > minX && maxXBack > minXBack)) return null;
+  return turnBounds({ minX, maxX, minZ, maxZ, minXBack, maxXBack }, s.yaw, { x: t.x, z: t.z });
+}
+
+/**
+ * The `z` in [lo, hi] where `f(z)`, increasing, reaches `want` (lo or hi past either end).
+ * @param {number} lo
+ * @param {number} hi
+ * @param {(z: number) => number} f
+ * @param {number} want
+ */
+function solveUp(lo, hi, f, want) {
+  for (let i = 0; i < 60; i++) {
+    const m = (lo + hi) / 2;
+    if (f(m) < want) lo = m;
+    else hi = m;
+  }
+  return (lo + hi) / 2;
 }
 
 /**

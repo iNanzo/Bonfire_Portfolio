@@ -329,7 +329,7 @@ test('dragging: on a camera-facing vertical plane through where he was grabbed; 
 test('held at the play area’s edge, he stops there (a box, a disc, a trapezoid or a rounded square, round its corners too): the anchor keeps to the drag plane’s line across the floor (never slid along the edge in depth), and the push points on out along it', () => {
   const disc = { minX: -2, maxX: 2, minZ: -2, maxZ: 2, r: 2 };
   const trapezoid = { minX: -1.5, maxX: 1.5, minZ: -2, maxZ: 1.4, minXBack: -2.5, maxXBack: 2.5 };
-  // (The toy's play area, area.js roundSquare: the line below runs out through its corners.)
+  // (A rounded square, Bounds.round: the line below runs out through its corners.)
   const rounded = { minX: -2, maxX: 2, minZ: -2, maxZ: 2, round: 1 };
   const inBounds = (b, p) => {
     const q = clampTo(b, p);

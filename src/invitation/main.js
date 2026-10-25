@@ -11,10 +11,13 @@
 // lost WebGL context told). While the Settings sheet
 // is open NEWT stays in sight: the view shows him in the clear space above or beside it
 // (focusInsets, pixels.js clearInsets) and the orbit follows him all the way there. The floor
-// is endless (rays meet it anywhere) and his play area is one rounded square round the orbit's
-// centre (area.js viewArea), worked out again on a resize, its middle the brain's and Reset
-// Camera's; the light's shadow camera goes where he goes (floor.js fitShadow). Wander, a
-// setting, is kept for the next visit (ui.js loadWander) and goes to the brain as its button.
+// is endless (rays meet it anywhere) and his play area is one disc round the orbit's centre
+// holding all the floor the default view shows however it's turned (area.js viewArea), worked
+// out again on a resize (a shrink under him eases him back in: steer.js), its middle the
+// brain's and Reset Camera's; it carries what's on screen each frame (its `sight`, camera.js
+// orbitSight), so wander goals and a flee keep to the screen. The light's shadow camera goes
+// where he goes (floor.js fitShadow). Wander, a setting, is kept for the next visit (ui.js
+// loadWander) and goes to the brain as its button.
 //
 // A frame, in types.js's order: the pointers' gestures (gesture.js; taps get their floor spot
 // by ray) and the buttons → the camera moves → brain.step → talk.step (speech.js: what he says,
@@ -95,6 +98,7 @@ import {
   orbitRelease,
   orbitReset,
   orbitShot,
+  orbitSight,
   orbitSpan,
   orbitSpot,
   orbitStep,
@@ -168,9 +172,9 @@ const SHOT_MARGIN = { top: 10, bottom: 30 };
  */
 const SHADOW_TOP = LIFT + NEWT_HEIGHT;
 /**
- * Where NEWT may go: the play area (area.js viewArea, a rounded square round the orbit's centre),
- * one object kept in place (the brain and his steps hold it) and filled in again on a resize;
- * the default view's disc until then.
+ * Where NEWT may go: the play area (area.js viewArea, a disc round the orbit's centre), one
+ * object kept in place (the brain and his steps hold it) and filled in again on a resize, the
+ * default view's disc until then; its `sight`, what's on screen, is filled in every frame.
  * @type {import('./types.js').Bounds}
  */
 const area = playArea();
@@ -346,8 +350,8 @@ function stageSpan(s) {
 }
 
 /**
- * The play area: a rounded square round the default view's target, the biggest the fully
- * zoomed-out default view shows him whole in (area.js viewArea); the default view's disc until
+ * The play area: a disc round the default view's target holding all the floor the default view
+ * shows across the stage, however it's turned (area.js viewArea); the default view's disc until
  * the stage has a view.
  * @param {NonNullable<typeof stage>} s
  */
@@ -357,12 +361,22 @@ function areaOf(s) {
 }
 
 /**
- * The play area becomes `next`, in place (a disc's `r` gone with it).
+ * The play area becomes `next`, in place (its old shape's keys gone with it; what's on screen
+ * kept until the next frame's).
  * @param {import('./types.js').Bounds} next
  */
 function setArea(next) {
+  const sight = area.sight;
   for (const k of Object.keys(area)) delete area[/** @type {keyof typeof area} */ (k)];
   Object.assign(area, next);
+  if (sight) area.sight = sight;
+}
+
+/** The play area for ?test: its shape (`area`) and what's on screen (`sight`, or null). */
+function areaSnapshot() {
+  const shape = { ...area };
+  delete shape.sight;
+  return { area: shape, sight: area.sight ? { ...area.sight } : null };
 }
 
 /** Pixel Size's steps on this screen (pixels.js pixelSteps: two that draw alike here are one). */
@@ -1092,6 +1106,11 @@ function start(s) {
     resetCamera = false;
     orbitHold(cam, body.mode === 'held');
     orbitStep(cam, dt, { x: body.root.x, z: body.root.z, y: Math.max(0, body.root.y) });
+    // (What's on screen now: the brain's wander goals and a flee keep to it, the play area being
+    // bigger than the screen.)
+    const sight = orbitSight(cam);
+    if (sight) area.sight = sight;
+    else delete area.sight;
     const pose = orbitPose(cam);
     s.setCamera(pose);
     // (The zoom, NEWT's size on screen over the default view's: at a resolution the stage sizes
@@ -1476,8 +1495,9 @@ function start(s) {
         },
         // (Whether he wanders by himself, as the brain has it; the stage's cursor.)
         ...controlsSnapshot(),
-        // (Where he may go: the play area, area.js viewArea, a rounded square.)
-        area: { ...area },
+        // (Where he may go: the play area, area.js viewArea, a disc; and what's on screen, its
+        // sight, camera.js orbitSight: a trapezoid turned with the camera, or null.)
+        ...areaSnapshot(),
         // (Both of the retro pass's paths compiled: the first switch to Off or back won't stall.)
         warmed,
         // (The Shader options: every value, whether any is the user's own, and what reached

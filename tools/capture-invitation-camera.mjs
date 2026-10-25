@@ -1,8 +1,9 @@
 // Camera and input acts for tools/capture-invitation.mjs (its header lists them: pan, lift,
-// sweep): the view slid, turned and zoomed with the mouse's buttons or fingers, NEWT carried up
-// high with the grabbed point's distance from the press measured as it goes, and where he looks
-// over the whole screen. They take the capture tool's own helpers (cameraActs), so a press, a
-// sweep and a pinch work here as they do there.
+// sweep, reach, reach-turned): the view slid, turned and zoomed with the mouse's buttons or
+// fingers, NEWT carried up high with the grabbed point's distance from the press measured as it
+// goes, where he looks over the whole screen, and a tap at the top of the screen he walks all
+// the way to. They take the capture tool's own helpers (cameraActs), so a press, a sweep and a
+// pinch work here as they do there.
 
 /**
  * The acts, given the capture tool's helpers: `point(page, part)` (a point on NEWT, client px),
@@ -127,6 +128,48 @@ export function cameraActs({ point, presser, sweep, pinch, along, sleep }) {
       }
     await press.done();
   }
+  /** The camera now (?test's snapshot). */
+  const cameraOf = (page) => page.evaluate(() => window.__invitation.snapshot().camera);
+  /** The Camera pad's Turn Left pressed `turns` times (45° a press), the pad closed once it has come round. */
+  async function turnLeft(page, turns) {
+    const from = (await cameraOf(page)).yaw;
+    await page.locator('[data-camera-open]').click();
+    for (let i = 0; i < turns; i++) await page.locator('[data-camera="left"]').click();
+    for (let i = 0; i < 100; i++) {
+      const c = await cameraOf(page);
+      if (Math.abs(Math.abs(c.yaw - from) - (turns * Math.PI) / 4) < 0.01 && !c.turning) break;
+      await sleep(100);
+    }
+    await page.locator('[data-camera-open]').click();
+    await sleep(300);
+  }
+  /**
+   * A tap near the top of the screen, toward its left corner, and him walking all the way there
+   * (however the camera's turned: the play area holds all the floor the screen shows); up to 30 s.
+   */
+  async function reachTop(page, size) {
+    const at = { x: size.w * 0.2, y: 30 };
+    const goal = await page.evaluate(({ x, y }) => window.__invitation.floorAt(x, y), at);
+    const press = await presser(page, size);
+    await press.down(at);
+    await sleep(60);
+    await press.up();
+    await press.done();
+    for (let i = 0; i < 300; i++) {
+      const s = await page.evaluate(() => window.__invitation.snapshot());
+      if (s.state === 'idle' && Math.hypot(s.pos.x - goal.x, s.pos.z - goal.z) < 0.12) return;
+      await sleep(100);
+    }
+  }
+  /**
+   * The reach acts asked for in `acts` (reach; reach-turned, turned 90° before it's recorded),
+   * added with the capture tool's `act(name, run, tail, more)`.
+   */
+  function addReach(act, acts, size) {
+    if (acts.includes('reach')) act('reach', (page) => reachTop(page, size), 600, { full: true });
+    if (acts.includes('reach-turned'))
+      act('reach-turned', (page) => reachTop(page, size), 600, { full: true, setup: (page) => turnLeft(page, 2) });
+  }
 
-  return { panTurnZoom, liftHigh, lookSweep };
+  return { panTurnZoom, liftHigh, lookSweep, addReach };
 }

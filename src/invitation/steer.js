@@ -5,12 +5,16 @@
 // an edge close ahead, so his heading curves instead of zig-zagging between neighbours),
 // and turning to face the camera, all with acceleration and a capped turn rate (slower when he
 // isn't moving: on the spot his feet only glide round, so he pivots, never spins). Also picks his
-// wander goals. The play area (Bounds) is a box, a box with rounded corners (Bounds.round: the
-// toy's, area.js), a box that widens toward the back, or a disc (Bounds.r, around its box's
-// centre): xRange gives its sides at a depth, clampTo pulls a point inside (to its nearest point
-// on a rounded box's rim, a disc's straight in toward its centre) and centreOf is its middle.
-// Pure: no three.js. NEWT faces +z at yaw 0 (forward is (sin yaw, cos yaw)) and the camera looks
-// in from the +z side.
+// wander goals. The play area (Bounds) is a box, a box with rounded corners (Bounds.round), a box
+// that widens toward the back, or a disc (Bounds.r, around its box's centre: the toy's, area.js);
+// any of them turned about its middle (Bounds.turn: what's on screen, in the camera's frame;
+// turnBounds): xRange gives its sides at a depth (in its own frame), clampTo pulls a point inside
+// (to its nearest point on a rounded box's rim, a disc's straight in toward its centre) and
+// centreOf is its middle. Where the play area is bigger than the screen it carries what's on
+// screen now (Bounds.sight, camera.js orbitSight): wander goals keep inside both, and a flee
+// keeps to what was on screen as it began (Body.fence). A play area shrunk under him (a resize)
+// eases him back in, STEER.backIn, never in one jump. Pure: no three.js. NEWT faces +z at yaw 0
+// (forward is (sin yaw, cos yaw)) and the camera looks in from the +z side.
 
 /** @typedef {import('./types.js').Body} Body */
 /** @typedef {import('./types.js').Bounds} Bounds */
@@ -26,7 +30,9 @@
  * settles toward the best direction with a time constant of fleeSmooth s (fleeSmoothNear with
  * less than fleeNear of room ahead, so he still turns off an edge in time), and fleeMinPace of
  * his speed is kept while he turns. wanderMin: a wander goal is at least this far;
- * wanderMargin: and this far inside the bounds.
+ * wanderMargin: and this far inside the bounds. backIn: outside the bounds (shrunk under him by a
+ * resize) he's eased back in with this time constant, s, at least backInMin and at most
+ * backInMax units/s.
  */
 export const STEER = {
   accel: 5,
@@ -48,6 +54,9 @@ export const STEER = {
   fleeMinPace: 0.3,
   wanderMin: 1,
   wanderMargin: 0.1,
+  backIn: 0.3,
+  backInMin: 0.15,
+  backInMax: 2,
 };
 
 const TAU = Math.PI * 2;
@@ -75,7 +84,8 @@ export function turnToward(yaw, target, maxStep) {
 /**
  * The bounds' sides at depth `z`: minX/maxX at the front (maxZ), minXBack/maxXBack at the back
  * (minZ), straight lines between (a box without the back ones); a disc's rim at that depth
- * (its middle alone past the rim).
+ * (its middle alone past the rim). Turned bounds' in their own frame (inFrame takes a point there
+ * back out).
  * @param {Bounds} b
  * @param {number} z
  * @returns {[number, number]}
@@ -106,12 +116,13 @@ export function xRange(b, z) {
 
 /**
  * A point kept inside the bounds: its depth clamped, then its x between the sides there; for a
- * disc, pulled straight in toward its centre onto the rim.
+ * disc, pulled straight in toward its centre onto the rim; turned bounds' in their own frame.
  * @param {Bounds} b
  * @param {XZ} p
  * @returns {XZ}
  */
 export function clampTo(b, p) {
+  if (b.turn) return inFrame(b, clampTo(flatOf(b), inFrame(b, p)), true);
   const r = rounded(b);
   if (r > 0) {
     // (A rounded box is its inner box grown by r all round: inside within r of it, else onto
@@ -132,6 +143,63 @@ export function clampTo(b, p) {
   const z = clamp(p.z, b.minZ, b.maxZ);
   const [lo, hi] = xRange(b, z);
   return { x: clamp(p.x, lo, hi), z };
+}
+
+/**
+ * A point in turned bounds' own frame (Bounds.turn: the shape turned that far about its box's
+ * middle, + toward +x, as NEWT's yaw and the camera's), or, `back`, a point there back out in the
+ * world; as it is for bounds that aren't turned.
+ * @param {Bounds} b
+ * @param {XZ} p
+ * @param {boolean} [back]
+ * @returns {XZ}
+ */
+export function inFrame(b, p, back = false) {
+  const a = b.turn ?? 0;
+  if (!a) return { x: p.x, z: p.z };
+  const c = centreOf(b);
+  return turnedBy({ x: p.x - c.x, z: p.z - c.z }, back ? a : -a, c);
+}
+
+/**
+ * `v` turned `a` radians (+ toward +x: +z goes to (sin a, cos a)), plus `at`.
+ * @param {XZ} v
+ * @param {number} a
+ * @param {XZ} [at]
+ */
+function turnedBy(v, a, at = { x: 0, z: 0 }) {
+  const c = Math.cos(a);
+  const s = Math.sin(a);
+  return { x: at.x + v.x * c + v.z * s, z: at.z - v.x * s + v.z * c };
+}
+
+/** Turned bounds as they are in their own frame (no turn). */
+function flatOf(b) {
+  const flat = { ...b };
+  delete flat.turn;
+  return flat;
+}
+
+/**
+ * Bounds `b`, given in a frame turned `yaw` about `about` (camera.js orbitSight: what's on screen,
+ * worked out at yaw 0 round the point the camera looks at), as turned Bounds: the same shape,
+ * its box moved so that turning it about its own middle puts it there.
+ * @param {Bounds} b
+ * @param {number} yaw
+ * @param {XZ} about
+ * @returns {Bounds}
+ */
+export function turnBounds(b, yaw, about) {
+  const m = centreOf(b);
+  const v = { x: about.x - m.x, z: about.z - m.z };
+  const w = turnedBy(v, yaw);
+  const dx = v.x - w.x;
+  const dz = v.z - w.z;
+  /** @type {Bounds} */
+  const out = { ...b, minX: b.minX + dx, maxX: b.maxX + dx, minZ: b.minZ + dz, maxZ: b.maxZ + dz, turn: yaw };
+  if (b.minXBack !== undefined) out.minXBack = b.minXBack + dx;
+  if (b.maxXBack !== undefined) out.maxXBack = b.maxXBack + dx;
+  return out;
 }
 
 /**
@@ -160,7 +228,8 @@ export function centreOf(b) {
  *   seen, used when there's no pointer)
  * @param {XZ|null} pointer  the pointer on the floor (flee runs from it, else from move.goal,
  *   else from the play area's centre)
- * @param {Bounds|null} bounds
+ * @param {Bounds|null} bounds  the play area; its `sight`, what's on screen now, fences a flee
+ *   that begins this frame (Body.fence, kept until it ends)
  * @param {number} dt
  * @returns {Body}
  */
@@ -171,6 +240,8 @@ export function steer(body, move, pointer, bounds, dt) {
   let room = Infinity;
   /** @type {XZ|undefined} the way he runs, fleeing */
   let run;
+  /** @type {Bounds|null} what was on screen as the flee began: he keeps inside it too */
+  let fence = null;
   const mode = move?.mode ?? 'stay';
   if (mode === 'goto' && move.goal) {
     const g = bounds ? clampTo(bounds, move.goal) : move.goal;
@@ -184,19 +255,7 @@ export function steer(body, move, pointer, bounds, dt) {
       room = d;
     }
   } else if (mode === 'flee') {
-    const keep = body.run ?? { x: Math.sin(yaw), z: Math.cos(yaw) };
-    const best = fleeDirection({ x, z }, keep, pointer ?? move.goal ?? centreOf(bounds), bounds);
-    // (The way he runs settles toward the best one over fleeSmooth s: picked afresh each frame
-    // from a ring of directions, it flicked between neighbours several times a second.)
-    const near = bounds && body.run ? roomAlong({ x, z }, keep.x, keep.z, bounds) < STEER.fleeNear : false;
-    const k = body.run ? 1 - Math.exp(-dt / (near ? STEER.fleeSmoothNear : STEER.fleeSmooth)) : 1;
-    const rx = keep.x + (best.x - keep.x) * k;
-    const rz = keep.z + (best.z - keep.z) * k;
-    const len = Math.hypot(rx, rz);
-    run = len > 1e-6 ? { x: rx / len, z: rz / len } : best;
-    aim = Math.atan2(run.x, run.z);
-    const err = Math.abs(wrapAngle(aim - yaw));
-    want = move.speed * (STEER.fleeMinPace + (1 - STEER.fleeMinPace) * Math.max(0, Math.cos(err)));
+    ({ run, aim, want, fence } = fleeing(body, move, pointer, bounds, dt));
   } else if (mode === 'face') {
     aim = move.goal ? Math.atan2(move.goal.x - x, move.goal.z - z) : 0;
   }
@@ -207,12 +266,101 @@ export function steer(body, move, pointer, bounds, dt) {
   const step = Math.min(speed * dt, room);
   let nx = x + Math.sin(yaw) * step;
   let nz = z + Math.cos(yaw) * step;
+  if (fence) ({ x: nx, z: nz } = clampTo(fence, { x: nx, z: nz }));
   if (bounds) {
-    ({ x: nx, z: nz } = clampTo(bounds, { x: nx, z: nz }));
+    ({ x: nx, z: nz } = backInside(bounds, { x, z }, { x: nx, z: nz }, dt));
     // Pressed against an edge, he only goes as fast as he really moves.
     if (dt > 0 && step > 0) speed = Math.min(speed, Math.hypot(nx - x, nz - z) / dt);
   }
-  return run ? { x: nx, z: nz, yaw, speed, run } : { x: nx, z: nz, yaw, speed };
+  /** @type {Body} */
+  const out = { x: nx, z: nz, yaw, speed };
+  if (run) out.run = run;
+  if (fence) out.fence = fence;
+  return out;
+}
+
+/**
+ * A frame of a flee: the way he runs (Body.run, settling toward the best way), where he aims,
+ * how fast he wants to go, and the flee's fence (what was on screen as it began).
+ * @param {Body} body
+ * @param {{goal: XZ|null, speed: number}} move
+ * @param {XZ|null} pointer
+ * @param {Bounds|null} bounds
+ * @param {number} dt
+ * @returns {{run: XZ, aim: number, want: number, fence: Bounds|null}}
+ */
+function fleeing(body, move, pointer, bounds, dt) {
+  const { x, z, yaw } = body;
+  const keep = body.run ?? { x: Math.sin(yaw), z: Math.cos(yaw) };
+  const fence = body.run ? (body.fence ?? null) : fenceFor(bounds, { x, z });
+  /** @type {Bounds[]} */
+  const walls = [];
+  if (bounds) walls.push(bounds);
+  if (fence) walls.push(fence);
+  const best = fleeDirection({ x, z }, keep, pointer ?? move.goal ?? centreOf(bounds), walls);
+  // (The way he runs settles toward the best one over fleeSmooth s: picked afresh each frame
+  // from a ring of directions, it flicked between neighbours several times a second.)
+  const near = walls.length && body.run ? roomIn(walls, { x, z }, keep.x, keep.z) < STEER.fleeNear : false;
+  const k = body.run ? 1 - Math.exp(-dt / (near ? STEER.fleeSmoothNear : STEER.fleeSmooth)) : 1;
+  const rx = keep.x + (best.x - keep.x) * k;
+  const rz = keep.z + (best.z - keep.z) * k;
+  const len = Math.hypot(rx, rz);
+  const run = len > 1e-6 ? { x: rx / len, z: rz / len } : best;
+  const aim = Math.atan2(run.x, run.z);
+  const err = Math.abs(wrapAngle(aim - yaw));
+  const want = move.speed * (STEER.fleeMinPace + (1 - STEER.fleeMinPace) * Math.max(0, Math.cos(err)));
+  return { run, aim, want, fence };
+}
+
+/**
+ * What's on screen as a flee begins (the play area's `sight`), its fence, if he's inside it
+ * then; else none.
+ * @param {Bounds|null} bounds
+ * @param {XZ} p
+ * @returns {Bounds|null}
+ */
+function fenceFor(bounds, p) {
+  const s = bounds?.sight;
+  if (!s) return null;
+  const c = clampTo(s, p);
+  return Math.hypot(c.x - p.x, c.z - p.z) < 1e-6 ? s : null;
+}
+
+/**
+ * `to`, a step on from `from`, kept inside `b`: onto its edge; or, where `from` was already
+ * outside (the bounds shrunk under him: a resize), no further out than it was less this frame's
+ * easing back in (STEER.backIn), so he comes back in over a moment rather than in a jump.
+ * @param {Bounds} b
+ * @param {XZ} from
+ * @param {XZ} to
+ * @param {number} dt
+ * @returns {XZ}
+ */
+function backInside(b, from, to, dt) {
+  const c = clampTo(b, to);
+  const over = Math.hypot(to.x - c.x, to.z - c.z);
+  if (over < 1e-12) return to;
+  const f = clampTo(b, from);
+  const was = Math.hypot(from.x - f.x, from.z - f.z);
+  if (was < 1e-9 || !(dt > 0)) return c;
+  const back = clamp(was * (1 - Math.exp(-dt / STEER.backIn)), STEER.backInMin * dt, STEER.backInMax * dt);
+  const allow = Math.max(0, was - back);
+  if (over <= allow) return to;
+  const k = allow / over;
+  return { x: c.x + (to.x - c.x) * k, z: c.z + (to.z - c.z) * k };
+}
+
+/**
+ * How far he can go from `p` along (dx, dz) before leaving any of `walls`.
+ * @param {Bounds[]} walls
+ * @param {XZ} p
+ * @param {number} dx
+ * @param {number} dz
+ */
+function roomIn(walls, p, dx, dz) {
+  let t = Infinity;
+  for (const b of walls) t = Math.min(t, roomAlong(p, dx, dz, b));
+  return t;
 }
 
 /**
@@ -222,10 +370,10 @@ export function steer(body, move, pointer, bounds, dt) {
  * @param {XZ} p
  * @param {XZ} keep
  * @param {XZ} threat
- * @param {Bounds|null} bounds
+ * @param {Bounds[]} walls  the play area, and the flee's fence (none: room everywhere)
  * @returns {XZ}
  */
-function fleeDirection(p, keep, threat, bounds) {
+function fleeDirection(p, keep, threat, walls) {
   let ax = p.x - threat.x;
   let az = p.z - threat.z;
   const n = Math.hypot(ax, az);
@@ -239,7 +387,7 @@ function fleeDirection(p, keep, threat, bounds) {
     az /= n;
   }
   const score = (dx, dz) => {
-    const room = bounds ? roomAlong(p, dx, dz, bounds) : STEER.fleeRoom;
+    const room = walls.length ? roomIn(walls, p, dx, dz) : STEER.fleeRoom;
     return (
       dx * ax +
       dz * az +
@@ -263,8 +411,13 @@ function fleeDirection(p, keep, threat, bounds) {
   return best;
 }
 
-/** How far he can go from `p` along (dx, dz), a unit direction, before leaving the bounds (slanted sides, a rounded box's corners and a disc's rim too). */
+/** How far he can go from `p` along (dx, dz), a unit direction, before leaving the bounds (slanted sides, a rounded box's corners, a disc's rim and turned bounds too). */
 function roomAlong(p, dx, dz, b) {
+  if (b.turn) {
+    const q = inFrame(b, p);
+    const d = turnedBy({ x: dx, z: dz }, -b.turn);
+    return roomAlong(q, d.x, d.z, flatOf(b));
+  }
   const rr = rounded(b);
   if (rr > 0) {
     // (Out of the box first; where that's past a corner's arc, out of the arc instead.)
@@ -314,23 +467,47 @@ function roomAlong(p, dx, dz, b) {
 /**
  * Somewhere to wander to: inside the bounds (a little in from them, between the sides at its
  * depth), at least STEER.wanderMin from `from` (in a play area too small for that, the farthest
- * of the tries).
+ * of the tries). Where the bounds carry what's on screen (`sight`), inside that too, so he
+ * wanders where he's seen; the bounds alone if none of the tries there is in them.
  * @param {() => number} rng
  * @param {Bounds} bounds
  * @param {XZ} from
  * @returns {XZ}
  */
 export function wanderGoal(rng, bounds, from) {
-  const m = Math.min(STEER.wanderMargin, (bounds.maxX - bounds.minX) / 4, (bounds.maxZ - bounds.minZ) / 4);
-  const z0 = bounds.minZ + m;
-  const h = bounds.maxZ - m - z0;
-  let best = centreOf(bounds);
+  if (bounds.sight) {
+    const inside = (/** @type {XZ} */ p) => {
+      const c = clampTo(bounds, p);
+      return Math.hypot(c.x - p.x, c.z - p.z) < 1e-9;
+    };
+    const g = pickIn(rng, bounds.sight, from, inside);
+    if (g) return g;
+  }
+  return pickIn(rng, bounds, from, null) ?? centreOf(bounds);
+}
+
+/**
+ * Of 32 tries inside `b` (a little in from it, between its sides at a depth, turned with it),
+ * the first at least STEER.wanderMin from `from`, else the farthest (the middle if none is):
+ * only tries `ok` takes count, and with `ok`, null where none does.
+ * @param {() => number} rng
+ * @param {Bounds} b
+ * @param {XZ} from
+ * @param {((p: XZ) => boolean)|null} ok
+ * @returns {XZ|null}
+ */
+function pickIn(rng, b, from, ok) {
+  const m = Math.min(STEER.wanderMargin, (b.maxX - b.minX) / 4, (b.maxZ - b.minZ) / 4);
+  const z0 = b.minZ + m;
+  const h = b.maxZ - m - z0;
+  let best = ok ? null : centreOf(b);
   let far = -1;
   for (let i = 0; i < 32; i++) {
     const u = rng();
     const z = z0 + rng() * h;
-    const [lo, hi] = xRange(bounds, z);
-    const g = { x: lo + m + u * (hi - lo - 2 * m), z };
+    const [lo, hi] = xRange(b, z);
+    const g = inFrame(b, { x: lo + m + u * (hi - lo - 2 * m), z }, true);
+    if (ok && !ok(g)) continue;
     const d = Math.hypot(g.x - from.x, g.z - from.z);
     if (d >= STEER.wanderMin) return g;
     if (d > far) {
