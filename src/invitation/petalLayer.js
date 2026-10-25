@@ -19,8 +19,21 @@ import * as THREE from 'three';
 import { buildInk, createPetalScene } from './petalScene.js';
 import { FLOWS, PETAL_LEN, createTrail } from './petals.js';
 
-/** Texels along the screen's shorter side (the envelope's, so its petals and these match). */
+/** Texels along the screen's shorter side (the envelope's), as long as a texel stays in TEXEL_PX. */
 const TEXELS = 300;
+/**
+ * A texel's size, CSS px: never finer than the first or coarser than the second, so a petal sized
+ * in CSS px (petalPx) is always 5 texels long or more and reads as a petal, not a dot.
+ */
+export const TEXEL_PX = [1.25, 1.75];
+
+/**
+ * A texel's size on a screen `w` × `h` CSS px: the envelope's (TEXELS along its shorter side),
+ * held within TEXEL_PX.
+ * @param {number} w
+ * @param {number} h
+ */
+export const texelPx = (w, h) => Math.min(TEXEL_PX[1], Math.max(TEXEL_PX[0], Math.min(w, h) / TEXELS));
 /** The camera's field of view (degrees) and distance (the envelope's). */
 const FOV = 30;
 const DIST = 6;
@@ -154,7 +167,7 @@ export function createPetalLayer(root, { on, before = null, over = () => false, 
     function resize() {
       const cssW = Math.max(1, win.innerWidth);
       const cssH = Math.max(1, win.innerHeight);
-      const px = Math.max(1.25, Math.min(cssW, cssH) / TEXELS);
+      const px = texelPx(cssW, cssH);
       const tw = Math.max(1, Math.round(cssW / px));
       const th = Math.max(1, Math.round(cssH / px));
       renderer.setSize(tw, th, false);

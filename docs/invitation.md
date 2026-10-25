@@ -801,7 +801,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   is inside `QUIET` (`quietAt`: the HUD's parts, the dialogue's boxes, any button: the trail lifts
   there, so leaving it sheds nothing across it), and no trail while `carrying()` (NEWT held; a
   finger held still on him too); its own
-  WebGLRenderer at the envelope's texel size, made with the first press or move that may shed
+  WebGLRenderer at the envelope's texel size held within `TEXEL_PX` (1.25–1.75 CSS px, `texelPx`, so
+  even its smallest petal is 5 texels long), made with the first press or move that may shed
   petals (never with Rose Petals off or reduced motion; refused, it tries once), `pageUnit` (`LAYER_SCALE` of the envelope's letter
   width: how far they fly), each petal drawn `petalPx(w, h)` CSS px long (`PETAL_PX`: 12.5 on a
   desktop, 11 on a phone, its shorter side under 600 px; its sizes 0.75–1.3 of that), through

@@ -5,7 +5,7 @@
 // browser (node has no WebGL, so a context asked for is refused).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PETAL_PX, QUIET, createPetalLayer, petalPx, quietAt } from '../src/invitation/petalLayer.js';
+import { PETAL_PX, QUIET, createPetalLayer, petalPx, quietAt, texelPx } from '../src/invitation/petalLayer.js';
 
 /** A page with a canvas that counts how often a context was asked of it (and refuses it). */
 function fakePage() {
@@ -173,4 +173,16 @@ test('the page’s petals are sized in CSS px, about 10–16 px long, a little s
   assert.equal(petalPx(844, 390), phone, 'a phone held sideways');
   assert.equal(petalPx(2560, 1440), desk, 'never by the screen’s size');
   assert.deepEqual(Object.keys(PETAL_PX).sort(), ['desktop', 'phone']);
+  // (Drawn in texels small enough that even the smallest is a petal, not a dot.)
+  for (const [w, h] of [
+    [390, 844],
+    [844, 390],
+    [768, 1024],
+    [1280, 800],
+    [1920, 1080],
+    [3840, 2160],
+  ]) {
+    const long = (petalPx(w, h) * 0.75) / texelPx(w, h);
+    assert.ok(long >= 5, `${w}×${h}: the smallest ${long.toFixed(1)} texels long`);
+  }
 });
