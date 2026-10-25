@@ -517,9 +517,14 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     `lookFront`: no turn to the camera) on the Held clip's drooped head, the sad face (surprised
     while he's shaken hard). Every `lookUpMin`–`lookUpMax` s (3–6) he glances up at you for
     `lookUpForMin`–`lookUpForMax` s (0.8–1.2): `BrainOut.look.up` eases 0 → 1 → 0 over
-    `lookUpEase` (0.25 s) each way, the look's weight with it up to `lookUpWeight` (1), its
-    aim coming round and up to the viewer and `lookUpLift` (0.5 rad) past it, since the look goes
-    on over the Held clip's own droop of about 25°; never while he thrashes (one due meanwhile comes
+    `lookUpEase` (0.25 s) each way. The glance is a look of its own (`lookAt.js` `createGlance`,
+    `glanceStep`: kept on the viewer and `lookUpLift`, 0.5 rad, past it, `play.js`
+    `glanceFront`, since the look goes on over the Held clip's own droop of about 25°, at
+    `lookUpWeight`, 1, `BrainOut.look.upWeight`), and `glanceLook` turns the hung look into it
+    by `up` in the turn each puts on (weight × angle), so his head only ever comes straight up:
+    blending the weight and the angles apart had the weight climb first, showing more of the
+    droop's down pitch, and of any glance to a side it was in, before the lift (a dip and a
+    swing to a side). A cut (a Thrash) or a let-go eases it out at `GLANCE.rate`; never while he thrashes (one due meanwhile comes
     `lookUpRest`, 1 s, after the Thrash). Thrash comes once every
     `thrashMin`–`thrashMax` s (3–7; within `thrashShaken` of a hard shake, never before he's
     hung `thrashRest`, 1.5 s), then Held again on its own clock. Held, falling and landing he

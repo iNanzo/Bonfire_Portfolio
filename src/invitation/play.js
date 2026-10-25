@@ -216,8 +216,8 @@ export function lookAim(mode, { head, yaw, camera, pointer, pursuer = null }) {
  * Where "ahead" is for lookStep, from lookAim's `ahead` (the viewer) and the brain's look
  * (BrainOut.look): the viewer, unless it asks for a pitch; then that pitch, the viewer's yaw kept,
  * unless it also gives `up` (held: his head hung over his own front, no turn to the camera,
- * coming round and up to the viewer as he glances up, by `up` from 0 to 1, `lift` radians higher
- * at the top: the look goes on over the clip's own droop).
+ * however far up his glance is: the glance is a look of its own, glanceFront, that lookAt.js
+ * glanceLook turns this one into).
  * @param {Aim} ahead
  * @param {{pitch?: number, up?: number, lift?: number}} want
  * @returns {Aim}
@@ -225,8 +225,18 @@ export function lookAim(mode, { head, yaw, camera, pointer, pursuer = null }) {
 export function lookFront(ahead, want) {
   if (want.pitch === undefined) return ahead;
   if (want.up === undefined) return { yaw: ahead.yaw, pitch: want.pitch };
-  const k = Math.min(1, Math.max(0, want.up));
-  return { yaw: ahead.yaw * k, pitch: want.pitch + (ahead.pitch + (want.lift ?? 0) - want.pitch) * k };
+  return { yaw: 0, pitch: want.pitch };
+}
+
+/**
+ * Held, where his glance up looks (lookAt.js glanceStep): the viewer, `lift` radians higher (the
+ * look goes on over the Held clip's own droop).
+ * @param {Aim} ahead  lookAim's (the viewer)
+ * @param {{lift?: number}} want  BrainOut.look
+ * @returns {Aim}
+ */
+export function glanceFront(ahead, want) {
+  return { yaw: ahead.yaw, pitch: ahead.pitch + (want.lift ?? 0) };
 }
 
 /**

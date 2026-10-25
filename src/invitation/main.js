@@ -143,8 +143,18 @@ import { fitShadow, shadowTop } from './floor.js';
 import { createGesture, pickScreen, rayPlaneY } from './gesture.js';
 import { clearInsets, newtShare, newtTexels, pixelSteps, resolutionOf, stepFor } from './pixels.js';
 import { animFps, installDefaults, isCustom, loadLook, lookPreset, motionStep, saveLook, shaderOf } from './look.js';
-import { createLook, lookStep, torsoStep } from './lookAt.js';
-import { bodyStep, createBody, createMix, lookAim, lookFront, lookShare, mixStep, twinWeights } from './play.js';
+import { createGlance, createLook, glanceLook, glanceStep, lookStep, torsoStep } from './lookAt.js';
+import {
+  bodyStep,
+  createBody,
+  createMix,
+  glanceFront,
+  lookAim,
+  lookFront,
+  lookShare,
+  mixStep,
+  twinWeights,
+} from './play.js';
 import { burstAt, hoverEase } from './retro.js';
 import { createRng } from './rng.js';
 import { createTalk } from './speech.js';
@@ -493,6 +503,9 @@ function start(s) {
   const body = createBody();
   const mix = createMix();
   const gaze = createLook();
+  /** Held, his glance up at you (lookAt.js createGlance), and the look put on this frame. */
+  const glance = createGlance();
+  let headTurn = { yaw: 0, pitch: 0, weight: 1 };
   /** How much of a big look his chest takes (lookAt.js torsoStep). */
   let torso = 1;
   const faces = createFaceState();
@@ -1456,9 +1469,10 @@ function start(s) {
    * @param {ReturnType<typeof pointerNow>} ptr
    * @param {{position: import('./types.js').XYZ}} pose
    * @param {number} dt
-   * @param {{mode: 'pointer'|'camera'|'forward'|'back', weight: number, ease?: number, at?: import('./types.js').XZ|null, pitch?: number, up?: number, lift?: number}} want
+   * @param {{mode: 'pointer'|'camera'|'forward'|'back', weight: number, ease?: number, at?: import('./types.js').XZ|null, pitch?: number, up?: number, lift?: number, upWeight?: number}} want
    *   at: who he runs from ('back'); pitch: 'ahead' at this pitch (held: his head hangs); up:
-   *   held, his glance up toward the viewer (play.js lookFront)
+   *   held, his glance up toward the viewer at upWeight (play.js glanceFront, lookAt.js
+   *   glanceLook)
    * @param {import('./clips.js').FaceName} face
    * @param {import('./clips.js').BlinkMode} blink
    * @param {boolean} moved  his pose stepped this frame (the look goes on with it)
@@ -1479,9 +1493,12 @@ function start(s) {
     const at = sway && aim ? { yaw: aim.yaw + sway.yaw, pitch: aim.pitch + sway.pitch } : aim;
     const front = lookFront(ahead, want);
     lookStep(gaze, want.mode, at, dt, t, rng, want.weight, front, want.ease);
+    // (Held, his glance up: its own look on the viewer, the hung one turned into it.)
+    glanceStep(glance, want.up, glanceFront(ahead, want), dt, t, rng);
+    headTurn = glanceLook(gaze, glance, want.upWeight);
     // (His chest joins in on his feet only: held, his collar hangs from the cursor.)
     torso = torsoStep(torso, body.mode === 'ground', dt);
-    if (moved) c.applyLook(gaze.yaw, gaze.pitch, gaze.weight, torso);
+    if (moved) c.applyLook(headTurn.yaw, headTurn.pitch, headTurn.weight, torso);
     // (Any of the eight: character.js shows a dialogue face's stand-in until its sheet is in.)
     c.setFace(forcedFace ?? faceStep(faces, face, blink, t, rng));
     // (Off the floor, the blob goes straight down under his hips, sized and faded by his lowest
@@ -1717,8 +1734,8 @@ function start(s) {
         pos: { x: character?.root.position.x ?? 0, z: character?.root.position.z ?? 0 },
         lift: character?.root.position.y ?? 0,
         heading: body.body.yaw,
-        headYaw: gaze.yaw * gaze.weight,
-        headPitch: gaze.pitch * gaze.weight,
+        headYaw: headTurn.yaw * headTurn.weight,
+        headPitch: headTurn.pitch * headTurn.weight,
         // (Held: how far up his glance at you is, 0 hung to 1 up: brain.js BrainOut.look.up.)
         lookUp: out?.look.up ?? 0,
         held: body.mode === 'held',

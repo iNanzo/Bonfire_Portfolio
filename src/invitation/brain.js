@@ -134,9 +134,11 @@ export const TUNE = {
   /**
    * Held, every lookUpMin–lookUpMax s (since he was grabbed or his last glance up; one that came
    * due while he thrashed, lookUpRest s after the Thrash) he glances up at you for lookUpForMin–lookUpForMax s: BrainOut.look.up eases from 0
-   * to 1 over lookUpEase s and back down, his look's weight with it up to lookUpWeight (the page
-   * aims it toward the viewer as it comes up, lookUpLift radians higher at the top: the look goes
-   * on over the Held clip's own droop, about 25° of it, so without it he'd still look down).
+   * to 1 over lookUpEase s and back down; the glance is a look of its own at lookUpWeight
+   * (BrainOut.look.upWeight), the hung look keeping its heldLook (the page aims the glance at
+   * the viewer, lookUpLift radians higher, and turns the hung look into it by `up`: lookAt.js
+   * glanceLook; the look goes on over the Held clip's own droop, about 25° of it, so without
+   * the lift he'd still look down).
    */
   lookUpMin: 3,
   lookUpMax: 6,
@@ -908,9 +910,14 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     // (Held: his head hangs in defeat, the clip's; a light look aimed down, glancing about, and
     // now and then up at you: `up`.)
     if (st === 'held') {
-      const up = lookUpK();
-      const weight = T.heldLook + (T.lookUpWeight - T.heldLook) * up;
-      return { mode: 'forward', weight, pitch: T.heldPitch, up, lift: T.lookUpLift };
+      return {
+        mode: 'forward',
+        weight: T.heldLook,
+        pitch: T.heldPitch,
+        up: lookUpK(),
+        lift: T.lookUpLift,
+        upWeight: T.lookUpWeight,
+      };
     }
     // (With the tablet: at it, as the clips look.)
     if (st === 'deviceSit' || LYING.has(st)) return { mode: 'forward', weight: 0 };
