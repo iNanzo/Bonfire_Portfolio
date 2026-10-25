@@ -105,8 +105,8 @@ test.describe('on a desktop', () => {
   }) => {
     await envelopeUp(page);
     await expect(envelope(page)).toBeFocused();
-    // (On the toy's own white page.)
-    await expect(page.locator('.inv-envelope-paper')).toHaveCSS('background-color', 'rgb(243, 240, 234)');
+    // (On a plain white page: white, not the toy's off-white, as the user asked.)
+    await expect(page.locator('.inv-envelope-paper')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
     await expect(page.locator('.inv-hud')).toHaveAttribute('inert', '');
     await expect(skipIntro(page)).toBeVisible();
     await expect(skipIntro(page)).toHaveAccessibleName('Skip Intro');
