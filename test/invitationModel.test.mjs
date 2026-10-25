@@ -3,7 +3,7 @@
 // moves (a rest-pose export fails); the loops end where they start; every clip stays in place
 // (the page moves his root) and Held and Thrash keep the collar where it rests, so the page can
 // hang him from it; round 16's clips: Held hangs limp with no kick and his head down, Thrash kicks
-// from and back to Held's first pose, Give Device's DeviceSit and DeviceLie keep both palms on the
+// from and back to Held's first pose, Screen Time's DeviceSit and DeviceLie keep both palms on the
 // tablet's grip (clips.js DEVICE: its side edges sitting, its near corners lying), lying he's flat
 // with his chest raised 15-25 degrees, arms forward, the tablet past his face and the feet kicking
 // (round 17), LieDown and GetUp join them to Idle, and lying he rests on the floor without his back hair digging into his shirt; Walk and Run start on the same foot and their STRIDE values match what the
@@ -378,7 +378,7 @@ test('Cheer throws both fists up beside his head and hops', () => {
   assert.ok(air >= 0.15, `both feet leave the floor by ${air.toFixed(2)}`);
 });
 
-// Round 16: the limp carry, Thrash and Give Device.
+// Round 16: the limp carry, Thrash and Screen Time.
 
 test('Held hangs limp: no kick (both ankles stay near their mean height) and his head down', () => {
   const rows = track('Held');

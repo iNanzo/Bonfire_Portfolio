@@ -37,7 +37,7 @@ export const CLIPS = {
   Think: { loop: true, length: 48 / FPS, fadeIn: 0.2 },
   Cheer: { loop: false, length: 30 / FPS, fadeIn: 0.12 },
   // (Round 16: Thrash kicks and flails while he's held, pinned by the collar like Held, from and
-  // back to Held's first frame; Give Device sits him with a tablet (DeviceSit), then lies him on
+  // back to Held's first frame; Screen Time sits him with a tablet (DeviceSit), then lies him on
   // his stomach with it (LieDown from the sitting pose, DeviceLie), and GetUp ends on Idle.)
   Thrash: { loop: false, length: 28 / FPS, fadeIn: 0.1 },
   DeviceSit: { loop: true, length: 72 / FPS, fadeIn: 0.2 },
@@ -46,7 +46,7 @@ export const CLIPS = {
   GetUp: { loop: false, length: 30 / FPS, fadeIn: 0.15 },
 };
 /**
- * Give Device's tablet (round 16): the page draws it in his hands (device.js) and tools/newt.py's
+ * Screen Time's tablet (round 16): the page draws it in his hands (device.js) and tools/newt.py's
  * arm IK holds it. `size` is [width, height (away from him), thickness] in model units; `palm` is
  * how far along each ForeArm bone his palm is (its tip). Per clip: `centre` is where the tablet's
  * middle sits, `tilt` how many degrees its screen tips from facing straight up toward his face,

@@ -2,7 +2,7 @@
 
 Builds the 22 clips of src/invitation/clips.js (Idle, Walk, Run, Wave, Spook, Held, Fall, Land,
 SitDown, Sit, StandUp, round 15's talking gestures Talk, Nod, Shrug, Point, Think, Cheer, and
-round 16's Thrash and Give Device's DeviceSit, LieDown, DeviceLie, GetUp) on NEWT's rig as one slotted Action each, and exports the rig, its meshes and every clip as a binary
+round 16's Thrash and Screen Time's DeviceSit, LieDown, DeviceLie, GetUp) on NEWT's rig as one slotted Action each, and exports the rig, its meshes and every clip as a binary
 glTF for three.js.
 
 Run it either way:
@@ -672,7 +672,7 @@ def thrash(t):
     return p
 
 
-# Give Device: the tablet (clips.js DEVICE; the page draws it from his palms) in both hands while he
+# Screen Time: the tablet (clips.js DEVICE; the page draws it from his palms) in both hands while he
 # sits (DeviceSit) and while he lies on his stomach (DeviceLie). Each palm (the ForeArm bone's
 # tip) is pinned by the arm IK to the clip's grip: `grip` = (across, back toward him along the
 # screen) from the tablet's middle, raised `lift` along the screen's normal.
@@ -1004,7 +1004,7 @@ TABLES = {
         (21, merge(IDLE, hips={'loc': (0.02, 0, -0.08), 'rot': (0, 0, 0)})),
         (24, IDLE),
     ),
-    # Give Device's second press: from sitting with the tablet onto his stomach with it (the hips
+    # Screen Time's second press: from sitting with the tablet onto his stomach with it (the hips
     # stay over the same spot of floor: the page moves his root, the model test holds them). The
     # page holds the tablet by its near edge all the way (clips.js DEVICE LieDown), so his palms
     # set it down on the floor in front of him and push it out ahead as he lowers himself.
@@ -1045,7 +1045,7 @@ TABLES = {
         (31, merge(DEV_LIE, legL={'at': lie_foot(35), 'pitch': -110}, legR={'at': lie_foot(35), 'pitch': -110})),
         (36, 'devicelie@0'),
     ),
-    # Give Device's third press (or any other input): up from lying to Idle (the tablet is put
+    # Screen Time's third press (or any other input): up from lying to Idle (the tablet is put
     # away from its first frame).
     'GetUp': keys(
         (0, 'devicelie@0'),
