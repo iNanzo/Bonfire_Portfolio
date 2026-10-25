@@ -2,8 +2,9 @@
 // the play area is one shape on it however the camera turns (viewArea): a disc round the default
 // view's target, the orbit's centre, holding all the floor the default view shows edge to edge
 // at the default zoom, turned any way round that centre, so a tap anywhere on the screen reaches
-// it. The floor that view shows is a trapezoid widening toward the back (perspective: its top
-// corners are the farthest), and turned it sweeps a disc, so the disc's rim is his radius past
+// it (and walks him to the point under the finger, but near the top, where it stops short by his
+// height there so his head stays on the screen: tapReach). The floor that view shows is a
+// trapezoid widening toward the back (perspective: its top corners are the farthest), and turned it sweeps a disc, so the disc's rim is his radius past
 // those corners: a tall phone's is the biggest, as it sees furthest back. That's more floor
 // than the screen shows at any one yaw, so wander goals keep to what's on screen when they're
 // picked and a flee to what was on screen as it began (steer.js, Bounds.sight from camera.js
@@ -16,6 +17,7 @@
 // disc, AREA_RADIUS round the middle, is what a desktop's default view keeps in sight and the
 // size of the shadow camera's box (stage.js, pixels.js frameView, floor.js fitShadow).
 
+import { project } from './pixels.js';
 import { centreOf, inFrame } from './steer.js';
 
 /** @typedef {import('./types.js').Bounds} Bounds */
@@ -85,24 +87,14 @@ export function floorAt(v, sx, sy) {
  * (the default zoom by default), yaw 0, over the whole `cssW` × `cssH` stage, its target shown in
  * the middle of the clear space `insets` leave (so the open Settings sheet, which only shifts the
  * view, never changes it), turned any way round that target: his radius past the farthest of
- * the stage's corners, and never less than the default view's disc.
+ * the stage's corners, and never less than the default view's disc. (A tap walks him only as
+ * far up the screen as keeps his head on it: tapReach.)
  * @param {{view: View, cssW: number, cssH: number, insets: Insets, zoom?: number}} o
  * @returns {Bounds}
  */
 export function viewArea({ view, cssW, cssH, insets, zoom = 1 }) {
-  const e = view.elevation * RAD;
-  const t = view.target;
-  const distance = view.distance * zoom;
-  /** @type {View} */
-  const v = {
-    ...view,
-    distance,
-    position: { x: t.x, y: t.y + distance * Math.sin(e), z: t.z + distance * Math.cos(e) },
-    shift: {
-      x: (insets.left + cssW - insets.right) / 2 - view.canvasW / 2,
-      y: (insets.top + cssH - insets.bottom) / 2 - view.canvasH / 2,
-    },
-  };
+  const v = homeView({ view, cssW, cssH, insets, zoom });
+  const t = v.target;
   let far = 0;
   for (const [sx, sy] of [
     [0, 0],
@@ -114,6 +106,85 @@ export function viewArea({ view, cssW, cssH, insets, zoom = 1 }) {
     far = Math.max(far, Math.hypot(p.x - t.x, p.z - t.z));
   }
   return playArea(Math.max(AREA_RADIUS, far + NEWT_RADIUS), { x: t.x, z: t.z });
+}
+
+/**
+ * The default `view` `zoom` times as far back (the default zoom by default), yaw 0, over the
+ * whole `cssW` × `cssH` stage, its target shown in the middle of the clear space `insets` leave
+ * (viewArea's, reachRow's and tapReach's).
+ * @param {{view: View, cssW: number, cssH: number, insets: Insets, zoom?: number}} o
+ * @returns {View}
+ */
+function homeView({ view, cssW, cssH, insets, zoom = 1 }) {
+  const e = view.elevation * RAD;
+  const t = view.target;
+  const distance = view.distance * zoom;
+  return {
+    ...view,
+    distance,
+    position: { x: t.x, y: t.y + distance * Math.sin(e), z: t.z + distance * Math.cos(e) },
+    shift: {
+      x: (insets.left + cssW - insets.right) / 2 - view.canvasW / 2,
+      y: (insets.top + cssH - insets.bottom) / 2 - view.canvasH / 2,
+    },
+  };
+}
+
+/**
+ * How far down the stage, CSS px from its top, the play area reaches up to at the default zoom:
+ * the row his feet stand on with the top of his head (NEWT_HEIGHT up) AREA_MARGIN CSS px under
+ * the stage's top. Seen from the default view, the top of his head shows as high wherever he
+ * stands as far back, so the row is a line across the floor, square to the camera.
+ * @param {{view: View, cssW: number, cssH: number, insets: Insets, zoom?: number}} o
+ */
+export function reachRow(o) {
+  return rowOf(homeView(o), o.cssH);
+}
+
+/**
+ * reachRow in view `v` (homeView's), no lower than the stage's bottom, `cssH`: the stage's top
+ * where the top of his head never shows that high.
+ * @param {View} v
+ * @param {number} cssH
+ */
+function rowOf(v, cssH) {
+  const e = v.elevation * RAD;
+  const t = Math.tan((v.fov * RAD) / 2);
+  const shift = v.shift ?? { x: 0, y: 0 };
+  // (The margin's height on the screen, -1 at its bottom to 1 at its top, as pixels.js project.)
+  const n = 1 - ((AREA_MARGIN - shift.y) / v.canvasH) * 2;
+  const vy = NEWT_HEIGHT - v.position.y;
+  // (How far back that is: up the screen over depth there is n·t, so
+  // vy·cos e − vz·sin e = n·t·(−vy·sin e − vz·cos e).)
+  const under = Math.sin(e) - n * t * Math.cos(e);
+  if (!(under > 1e-9)) return 0;
+  const z = v.position.z + (vy * (Math.cos(e) + n * t * Math.sin(e))) / under;
+  const row = project(v, { x: v.target.x, y: 0, z }).y;
+  return Math.min(cssH, Math.max(0, row));
+}
+
+/**
+ * Where a tap on the floor at `p` walks him: the play area stops short of the top of the screen
+ * by his height there. `p` itself, unless at the default zoom (the default `view` over the
+ * stage, as viewArea has it, turned `yaw` round its target with the camera) he'd stand there
+ * higher up the screen than reachRow, his head over the stage's top; then the floor in the same
+ * column of the screen on that row: his feet straight under the finger, his whole head on the
+ * screen.
+ * @param {{view: View, cssW: number, cssH: number, insets: Insets}} o
+ * @param {number} yaw  the camera's, + toward +x (Bounds.turn)
+ * @param {XZ} p
+ * @returns {XZ}
+ */
+export function tapReach(o, yaw, p) {
+  const v = homeView(o);
+  const t = v.target;
+  /** @type {Bounds} the camera's frame round the default view's target */
+  const frame = { minX: t.x, maxX: t.x, minZ: t.z, maxZ: t.z, turn: yaw };
+  const q = inFrame(frame, p);
+  const feet = project(v, { x: q.x, y: 0, z: q.z });
+  const row = rowOf(v, o.cssH);
+  if (feet.depth > 0 && feet.y >= row) return { x: p.x, z: p.z };
+  return inFrame(frame, floorAt(v, feet.x, row), true);
 }
 
 /**

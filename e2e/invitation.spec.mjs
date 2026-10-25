@@ -183,6 +183,37 @@ async function pastRim(page) {
   const c = { x: (area.minX + area.maxX) / 2, z: (area.minZ + area.maxZ) / 2 };
   return { area, past: spots.map((f) => (f ? Math.hypot(f.x - c.x, f.z - c.z) - area.r : Infinity)) };
 }
+/**
+ * A tap on the floor at `at` (client px, near the top of the stage): he walks straight down the
+ * screen from the finger to where his whole head shows under the stage's top, and stops there
+ * (area.js tapReach: the play area stops short of the top by his height there). A touch, or
+ * `tap`'s. Returns his feet on screen once he's there.
+ */
+async function topTap(page, at, where, tap = (p) => page.touchscreen.tap(p.x, p.y)) {
+  const stage = await page.locator('[data-stage]').boundingBox();
+  await tap(at);
+  await until(page, (s) => s.state === 'walk', `${where}: walking`);
+  await until(page, (s) => s.state === 'idle', `${where}: there`, 90_000);
+  const head = await on(page, 'head');
+  const feet = await page.evaluate(() => window.__invitation.screen('feet'));
+  expect(head.y - head.r, `${where}: his whole head on the screen`).toBeGreaterThanOrEqual(stage.y);
+  expect(feet.y, `${where}: short of the finger, lower down the screen`).toBeGreaterThan(at.y + 20);
+  // (He stops within TUNE.arrive, 0.1, of where he walks to: a few px at the back.)
+  expect(Math.abs(feet.x - at.x), `${where}: his feet straight down from the finger`).toBeLessThan(16);
+  return feet;
+}
+/** A tap on the floor at `at` (client px) walks him all the way to the point under the finger. */
+async function tapReaches(page, at, where) {
+  const goal = await floorAt(page, at);
+  await page.touchscreen.tap(at.x, at.y);
+  await until(page, (s) => s.state === 'walk', `${where}: walking`);
+  await until(
+    page,
+    (s) => s.state === 'idle' && Math.hypot(s.pos.x - goal.x, s.pos.z - goal.z) < 0.12,
+    `${where}: there`,
+    90_000,
+  );
+}
 /** Opens the Settings sheet and waits until NEWT shows whole beside or above it. */
 async function lookOpenWithNewtInSight(page) {
   await page.getByRole('button', { name: 'Settings' }).click();
@@ -1136,7 +1167,7 @@ test.describe('on a phone', () => {
     await until(page, (t) => !t.camera.panned, 'the pan over');
   });
 
-  test('the play area fills the screen: every spot of floor it shows is in reach at the default zoom, turned 0°, 45° and 90°; the URL bar showing leaves him be, and a tap at the top walks him all the way there, turned too', async ({
+  test('the play area fills the screen: every spot of floor it shows is in reach at the default zoom, turned 0°, 45° and 90°; the URL bar showing leaves him be, and a tap at the top walks him as far as keeps his head on the screen and one under that all the way there, turned too', async ({
     page,
   }) => {
     test.setTimeout(240_000);
@@ -1157,24 +1188,23 @@ test.describe('on a phone', () => {
     expect(Math.hypot(now.pos.x - was.pos.x, now.pos.z - was.pos.z), 'not moved').toBeLessThan(1e-6);
     await page.setViewportSize({ width: 390, height: 844 });
     await until(page, (s) => s.area.r === was.area.r, 'back as it was');
-    // Turned 90°, then not turned: a tap near the top, toward a corner, walks him all the way there.
+    // Turned 90°, then not turned: a tap near the top, toward a corner, walks him straight down
+    // from the finger to where his whole head shows; one a little under where he stopped, toward
+    // the other side, walks him all the way to the finger.
     for (const turned of [true, false]) {
       if (!turned) await calm(page);
       const stage = await page.locator('[data-stage]').boundingBox();
-      const at = { x: stage.x + stage.width * 0.2, y: stage.y + 30 };
-      const goal = await floorAt(page, at);
-      await page.touchscreen.tap(at.x, at.y);
-      await until(page, (s) => s.state === 'walk', 'walking');
-      await until(
+      const where = `at the top${turned ? ', turned 90°' : ''}`;
+      const feet = await topTap(page, { x: stage.x + stage.width * 0.2, y: stage.y + 30 }, where);
+      await tapReaches(
         page,
-        (s) => s.state === 'idle' && Math.hypot(s.pos.x - goal.x, s.pos.z - goal.z) < 0.12,
-        `there, at the top${turned ? ', turned 90°' : ''}`,
-        90_000,
+        { x: stage.x + stage.width * 0.7, y: feet.y + 12 },
+        `just under that${turned ? ', turned 90°' : ''}`,
       );
     }
   });
 
-  test('a top tap after walking to the back still reaches the top: the view stays on the middle, so his feet end where the finger was, turned 90° too', async ({
+  test('a top tap after walking to the back still reaches as high as keeps his head on the screen: the view stays on the middle, so his feet end straight down from the finger, turned 90° too', async ({
     page,
   }) => {
     test.setTimeout(240_000);
@@ -1190,24 +1220,12 @@ test.describe('on a phone', () => {
         ['the top middle', { x: stage.x + stage.width / 2, y: stage.y + 30 }],
       ]) {
         const where = `${what}${turned ? ', turned 90°' : ''}`;
-        const goal = await floorAt(page, at);
-        await page.touchscreen.tap(at.x, at.y);
-        await until(page, (s) => s.state === 'walk', `${where}: walking`);
-        await until(
-          page,
-          (s) => s.state === 'idle' && Math.hypot(s.pos.x - goal.x, s.pos.z - goal.z) < 0.1,
-          `${where}: there`,
-          90_000,
-        );
+        await topTap(page, at, where);
         const s = await snapshot(page);
         expect(
           Math.hypot(s.camera.target.x - home.target.x, s.camera.target.z - home.target.z),
           `${where}: the view stayed on the middle`,
         ).toBeLessThan(1e-3);
-        const under = await floorAt(page, at);
-        expect(Math.hypot(under.x - s.pos.x, under.z - s.pos.z), `${where}: his feet under the finger`).toBeLessThan(
-          0.1,
-        );
       }
     }
   });
@@ -1302,7 +1320,7 @@ test.describe('on a phone held sideways', () => {
 test.describe('on a desktop', () => {
   test.use({ viewport: { width: 1280, height: 800 } });
 
-  test('a window resize works the play area out again: every spot of floor in reach at 1280×800, turned too; narrower, it shrinks under him and he walks back inside, no jump, and the view comes back to the middle', async ({
+  test('a window resize works the play area out again: every spot of floor in reach at 1280×800, turned too; smaller, it shrinks under him and he walks back inside, no jump, and the view comes back to the middle', async ({
     page,
   }) => {
     test.setTimeout(180_000);
@@ -1312,18 +1330,10 @@ test.describe('on a desktop', () => {
       const { past } = await pastRim(page);
       expect(Math.max(...past), `turned ${turns * 45}°: every spot in reach`).toBeLessThanOrEqual(0.1);
     }
-    // Near the top-left corner of the screen: he walks there.
+    // Near the top-left corner of the screen: he walks as near there as keeps his head on the
+    // screen.
     const stage = await page.locator('[data-stage]').boundingBox();
-    const at = { x: stage.x + 12, y: stage.y + 12 };
-    const goal = await floorAt(page, at);
-    await page.mouse.click(at.x, at.y);
-    await until(page, (s) => s.state === 'walk', 'walking');
-    await until(
-      page,
-      (s) => s.state === 'idle' && Math.hypot(s.pos.x - goal.x, s.pos.z - goal.z) < 0.12,
-      'there',
-      90_000,
-    );
+    await topTap(page, { x: stage.x + 12, y: stage.y + 12 }, 'the top-left corner', (p) => page.mouse.click(p.x, p.y));
     const there = (await snapshot(page)).pos;
     const far = Math.hypot(there.x, there.z);
     // Every frame from here, where he is and the play area's size.
@@ -1336,7 +1346,9 @@ test.describe('on a desktop', () => {
       };
       requestAnimationFrame(tick);
     });
-    await page.setViewportSize({ width: 660, height: 640 });
+    // (Small enough that the play area shrinks under him: his head kept on the screen, he's about
+    // 5.9 out, and 540×540's play area is about 5.4.)
+    await page.setViewportSize({ width: 540, height: 540 });
     await until(page, (s) => s.area.r < far - 0.2, 'the play area shrunk under him');
     await until(page, (s) => Math.hypot(s.pos.x, s.pos.z) <= s.area.r + 1e-6, 'back inside it', 30_000);
     const trail = await page.evaluate(() => window.__trail);

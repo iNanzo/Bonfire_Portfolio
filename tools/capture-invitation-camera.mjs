@@ -144,20 +144,22 @@ export function cameraActs({ point, presser, sweep, pinch, along, sleep }) {
     await sleep(300);
   }
   /**
-   * A tap near the top of the screen, toward its left corner, and him walking all the way there
-   * (however the camera's turned: the play area holds all the floor the screen shows); up to 30 s.
+   * A tap near the top of the screen, toward its left corner, and him walking there, however the
+   * camera's turned, straight down the screen from the finger to where his whole head shows
+   * (area.js tapReach); up to 30 s.
    */
   async function reachTop(page, size) {
     const at = { x: size.w * 0.2, y: 30 };
-    const goal = await page.evaluate(({ x, y }) => window.__invitation.floorAt(x, y), at);
     const press = await presser(page, size);
     await press.down(at);
     await sleep(60);
     await press.up();
     await press.done();
+    let walked = false;
     for (let i = 0; i < 300; i++) {
       const s = await page.evaluate(() => window.__invitation.snapshot());
-      if (s.state === 'idle' && Math.hypot(s.pos.x - goal.x, s.pos.z - goal.z) < 0.12) return;
+      walked ||= s.state === 'walk';
+      if (walked && s.state === 'idle') return;
       await sleep(100);
     }
   }

@@ -12,7 +12,8 @@
 // is open NEWT stays in sight: the view shows him in the clear space above or beside it
 // (focusInsets, pixels.js clearInsets) and the orbit follows him all the way there. The floor
 // is endless (rays meet it anywhere) and his play area is one disc round the orbit's centre
-// holding all the floor the default view shows however it's turned (area.js viewArea), worked
+// holding all the floor the default view shows however it's turned (area.js viewArea; a tap near
+// the top of the screen walks him only as far as keeps his head on it, area.js tapReach), worked
 // out again on a resize (the view eases onto its middle; a shrink under him walks him back in:
 // brain.js, steer.js backInGoal), its middle where the view rests at the default zoom, the
 // brain's and Reset Camera's; it carries what's on screen each frame (its `sight`, camera.js
@@ -109,7 +110,7 @@ import {
 } from './cues.js';
 import { depthAlong, levelAxes, squash } from './hold.js';
 import { createHold } from './holds/index.js';
-import { NEWT_HEIGHT, playArea, viewArea } from './area.js';
+import { NEWT_HEIGHT, playArea, tapReach, viewArea } from './area.js';
 import {
   areaFits,
   createOrbit,
@@ -722,6 +723,16 @@ function start(s) {
     const { o, d } = s.ray(x, y);
     return rayPlaneY(o, d, 0);
   }
+  /**
+   * Where a tap on the floor at `p` walks him: the play area stops short of the top of the screen
+   * by his height there at the default zoom (area.js tapReach, with the camera turned as it is).
+   * @param {import('./types.js').XZ} p
+   */
+  function tapGoal(p) {
+    if (!s.view) return p;
+    const { w, h } = stageSize();
+    return tapReach({ view: s.view, cssW: w, cssH: h, insets: insets() }, cam.yaw, p);
+  }
   /** NEWT's pick shapes on screen. */
   function shape() {
     return /** @type {NonNullable<typeof character>} */ (character).screenShape(
@@ -771,6 +782,8 @@ function start(s) {
       }
       if (e.type === 'tap' || e.type === 'release' || e.type === 'grab' || e.type === 'cancel')
         e.floor = floorAt(e.x, e.y);
+      // (A tap on the floor near the top of the screen walks him only as far as keeps his head on it.)
+      if (e.type === 'tap' && e.on === 'floor' && e.floor) e.floor = tapGoal(e.floor);
       events.push(e);
     }
   };

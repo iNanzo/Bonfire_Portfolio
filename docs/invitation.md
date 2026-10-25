@@ -114,8 +114,9 @@ so it reads as a letter, and it's the loading screen too: NEWT loads behind it.
   in) and **Reset Camera** (back to where it started). Camera again or Escape closes it.
 - **He stays on screen:** at the default zoom (and further out) the camera doesn't follow him,
   on a phone or a computer: it stays on the middle of where he can go, which fills the screen,
-  so a tap anywhere on the floor walks him to just where your finger was, the top of the screen
-  too, however many times in a row. It moves only to keep his feet on the screen (turned away
+  so a tap anywhere on the floor walks him to just where your finger was, however many times in
+  a row; near the very top of the screen he stops short, straight down from your finger, so his
+  whole head stays on the screen. It moves only to keep his feet on the screen (turned away
   from him, or tossed past an edge), only as far as that, and comes back to the middle as he
   walks back on. Zoomed in, it follows him softly (all the way at the closest) and keeps him
   well inside the screen; zoomed back out, it eases back to the middle. Once you've slid the
@@ -377,7 +378,12 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     farthest: about 9.6 units on a 390×844 phone, 8.4 on a 768×1024 tablet and 8.0 on a
     1280×800 desktop; one shape however the camera turns, worked out again on a resize, never
     moved by the camera or the Settings sheet; its middle is the orbit's, Reset Camera's and the
-    brain's; and `AREA_RADIUS`, the 2.0 disc a desktop's default view keeps in sight and the
+    brain's; `tapReach`, where a tap on the floor walks him (main.js hands the brain that as the
+    tap's floor): the point under the finger, but where at the default zoom, turned as the camera
+    is, the top of his head would show higher than `AREA_MARGIN` under the stage's top, the floor
+    straight down the screen from it where it shows just that far under, so the play area stops
+    short of the top by his height there (his feet about 130 CSS px under the top on a 1280×800
+    desktop, 85 on a 390×844 phone); and `AREA_RADIUS`, the 2.0 disc a desktop's default view keeps in sight and the
     shadow camera's box, `stage.setArea` keeping it round the area's middle; `steer.js` keeps
     wander goals inside the play area's `sight` when one's there, a flee inside what was on
     screen as it began, `Body.fence`; when a resize shrinks the area under him the brain walks
@@ -813,8 +819,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   `sweep` acts (`tools/capture-invitation-camera.mjs`) slide, turn and zoom the camera, carry
   him up high (the report says how far the grabbed point strayed from the cursor) and sweep the
   cursor, or a finger, over the whole screen to show where he looks, and its `reach` and
-  `reach-turned` acts tap near the top of the screen and follow him all the way there (turned
-  90° first); its `envelope` and `envelope-skip` acts open or skip the envelope
+  `reach-turned` acts tap near the top of the screen and follow him there, as far up as keeps
+  his head on the screen (turned 90° first); its `envelope` and `envelope-skip` acts open or skip the envelope
   (`?test&envelope`, whole frames). The record and the frames are
   `tools/capture-invitation-record.mjs`. One GPU capture at a time.
   `node tools/capture-invitation-drag.mjs --kinds today,tilt` records the same carry for each drag kind from each of the camera's views (yaw 0 and 90, elevation 36 and
