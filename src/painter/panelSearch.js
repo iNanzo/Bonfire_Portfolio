@@ -19,18 +19,22 @@
 //               on Glow in Layers to see this" (many left out for one reason share a line); the
 //               row that does (Glow's switch) shows in the panel, one click from the note. On
 //               a phone the list starts folded to its count.
+//   tools       a switch of the page's that isn't a part of the scene (the Stats Overlay, in the
+//               Tools menu) is found by its words from the settings map too, and listed under
+//               its own heading (In Tools), saying where it is by how it's set now: "Stats
+//               Overlay: turn it on in Tools, or press U", or on, how to turn it off.
 //   keys        `/` focuses the box (the page's keys, main.js); Esc clears it, and Esc in an
 //               empty box hands the keyboard back to the page. How many were found is read out
 //               once typing stops.
 import { buildMatcher, createSearchBox } from '../ui/settingsSearch.js';
-import { SECTIONS as MAP_SECTIONS, SYNONYMS } from '../settingsMap.js';
+import { SECTIONS as MAP_SECTIONS, SETTINGS, SYNONYMS } from '../settingsMap.js';
 import { LAYER_BLENDS, LAYER_DETAILS } from '../visualizer/looks.js';
 import { PANEL_SECTIONS, sectionRows, rowText, shownRule, choices } from './layout.js';
 
 /**
  * @typedef {import('../ui/settingsSearch.js').SearchEntry & { id: string }} PanelEntry
  * @typedef {{ rows: Map<string, { ranges: [number, number][], label: string }>, hidden: { id: string, label: string, why: string, note: string }[],
- *   via: Set<string>, first: string | null }} PanelFound
+ *   via: Set<string>, first: string | null, tools: { id: string, label: string, note: string }[] }} PanelFound
  */
 
 /**
@@ -80,20 +84,52 @@ export function searchEntries(ctx = {}) {
 }
 
 /**
+ * The page's switches the search finds (in Tools, not the panel), by the map's words, and where
+ * each is, off and on (`key`: the switch, as the page's `on` says whether it's on).
+ */
+const TOOL_SWITCHES = [
+  {
+    id: 'tool.stats',
+    key: 'stats',
+    entry: SETTINGS.stats,
+    where: { off: 'turn it on in Tools, or press U', on: 'on; turn it off in Tools, or press U' },
+  },
+];
+
+/**
+ * The Tools menu's switches as search entries (their own index: they aren't rows of the panel).
+ * @returns {PanelEntry[]}
+ */
+export const toolEntries = () =>
+  TOOL_SWITCHES.map(({ id, entry }) => ({
+    id,
+    label: entry.label,
+    keywords: entry.keywords ?? [],
+    section: 'Tools',
+    tab: '',
+    options: [],
+    hint: entry.hint,
+    key: '',
+  }));
+
+/**
  * What a query finds for `scene`: the rows the panel shows (id → its label and where the
  * query matched in it), and those the scene's shape leaves out, each with how to bring it
  * back. A row found only in its hint or path is left out when any is found by name (its
  * label, words, group or choices). For a row left out, the row that brings it back shows
  * too (`via`: shown for that, not found). `first`: the row the panel scrolls to (the best
- * found, or what brings it back). Pure.
+ * found, or what brings it back). `tools` (buildMatcher's, over toolEntries): a Tools switch
+ * found by name is listed apart (`tools`), saying where it is as it's set now (`on`). Pure.
  * @param {(query: string) => import('../ui/settingsSearch.js').SearchHit[]} match  buildMatcher's, over searchEntries
  * @param {string} query
  * @param {any} scene
+ * @param {((query: string) => import('../ui/settingsSearch.js').SearchHit[]) | null} [tools]
+ * @param {(key: string) => boolean} [on]  a Tools switch is on (by its key: 'stats')
  * @returns {PanelFound}
  */
-export function findInPanel(match, query, scene) {
+export function findInPanel(match, query, scene, tools = null, on = () => false) {
   /** @type {PanelFound} */
-  const found = { rows: new Map(), hidden: [], via: new Set(), first: null };
+  const found = { rows: new Map(), hidden: [], via: new Set(), first: null, tools: [] };
   const hits = match(query);
   const named = (hit) => Object.keys(hit.fields).some((f) => !WEAK.has(f));
   const kept = hits.some(named) ? hits.filter(named) : hits;
@@ -116,6 +152,12 @@ export function findInPanel(match, query, scene) {
     if (found.rows.has(id)) continue;
     found.rows.set(id, { ranges: [], label: rowText(id)?.label ?? '' });
     found.via.add(id);
+  }
+  for (const hit of tools?.(query).filter(named) ?? []) {
+    const { id, label } = /** @type {PanelEntry} */ (hit.entry);
+    const sw = TOOL_SWITCHES.find((t) => t.id === id);
+    const where = sw ? sw.where[on(sw.key) ? 'on' : 'off'] : 'in Tools';
+    found.tools.push({ id, label, note: `${label}: ${where}` });
   }
   return found;
 }
@@ -149,14 +191,25 @@ export function notesFor(hidden) {
 /**
  * Wire the panel's search box. `panel`: bindPanel's (its filter); `scene`: the scene now;
  * `notes`: where the rows the scene leaves out are listed (folded to their count to start
- * with where `folded()` says: a phone's short bottom sheet). Returns refresh() (search again:
- * the panel was drawn again), focus() and clear().
+ * with where `folded()` says: a phone's short bottom sheet), and the Tools' switches found,
+ * apart (`on`: whether one is on, by its key). Returns refresh() (search again: the panel
+ * was drawn again, or a switch was switched), focus() and clear().
  * @param {{ input: HTMLInputElement, status: HTMLElement | null, notes: HTMLElement,
  *   panel: { filter: (rows: PanelFound['rows'] | null, o?: { top?: boolean, to?: string | null }) => void }, scene: () => any, ctx?: object,
- *   folded?: () => boolean }} o
+ *   folded?: () => boolean, on?: (key: string) => boolean }} o
  */
-export function createPanelSearch({ input, status, notes, panel, scene, ctx = {}, folded = () => false }) {
+export function createPanelSearch({
+  input,
+  status,
+  notes,
+  panel,
+  scene,
+  ctx = {},
+  folded = () => false,
+  on = () => false,
+}) {
   const match = buildMatcher(searchEntries(ctx), { synonyms: PAINTER_SYNONYMS });
+  const tools = buildMatcher(toolEntries(), { synonyms: PAINTER_SYNONYMS });
   let query = '';
   let shown = ''; // the notes as last listed (so a redraw that changes nothing leaves them be)
   const doc = notes.ownerDocument;
@@ -169,30 +222,41 @@ export function createPanelSearch({ input, status, notes, panel, scene, ctx = {}
   const ul = doc.createElement('ul');
   fold.append(title, ul);
   let opened = false; // (the fold set open or not for the first list: after that, the user's)
+  // The Tools' switches found: under their own heading, after the fold (they're the page's, not
+  // the scene's: nothing about them is "not shown").
+  const toolsBlock = doc.createElement('div');
+  toolsBlock.className = 'pnt-search-tools';
+  const toolsTitle = doc.createElement('p');
+  toolsTitle.className = 'pnt-search-tools-title';
+  toolsTitle.textContent = 'In Tools';
+  const toolsList = doc.createElement('ul');
+  toolsBlock.append(toolsTitle, toolsList);
+  /** @param {string} text */
+  const item = (text) => {
+    const li = doc.createElement('li');
+    li.textContent = text;
+    return li;
+  };
 
-  /** The rows the scene leaves out, under the box. */
-  function list(hidden) {
-    const key = hidden.map((h) => h.id).join();
+  /** The rows the scene leaves out, and the Tools' switches found, under the box. */
+  function list(hidden, switches = []) {
+    const key = [...hidden.map((h) => h.id), ...switches.map((t) => t.note)].join();
     if (key === shown) return;
     shown = key;
-    notes.hidden = !hidden.length;
-    if (!hidden.length) {
-      notes.replaceChildren();
-      return;
+    notes.hidden = !hidden.length && !switches.length;
+    if (hidden.length) {
+      if (!opened) {
+        fold.open = !folded();
+        opened = true;
+      }
+      title.textContent = `Not shown now (${hidden.length})`; // (how many: the list scrolls)
+      ul.replaceChildren(...notesFor(hidden).map(item));
     }
-    if (!opened) {
-      fold.open = !folded();
-      opened = true;
-    }
-    title.textContent = `Not shown now (${hidden.length})`; // (how many: the list scrolls)
-    ul.replaceChildren(
-      ...notesFor(hidden).map((text) => {
-        const li = doc.createElement('li');
-        li.textContent = text;
-        return li;
-      }),
-    );
-    if (fold.parentNode !== notes) notes.replaceChildren(fold);
+    toolsList.replaceChildren(...switches.map((t) => item(t.note)));
+    const parts = [...(hidden.length ? [fold] : []), ...(switches.length ? [toolsBlock] : [])];
+    // (Put back only when what's there changes: the fold keeps its focus and its place.)
+    if (parts.length !== notes.children.length || parts.some((p, i) => notes.children[i] !== p))
+      notes.replaceChildren(...parts);
   }
   /**
    * Search for `q` and show what it finds; how many (the rows shown only to bring back one
@@ -207,10 +271,10 @@ export function createPanelSearch({ input, status, notes, panel, scene, ctx = {}
       list([]);
       return 0;
     }
-    const found = findInPanel(match, q, scene());
+    const found = findInPanel(match, q, scene(), tools, on);
     panel.filter(found.rows, { top: typed, to: found.first });
-    list(found.hidden);
-    return found.rows.size - found.via.size + found.hidden.length;
+    list(found.hidden, found.tools);
+    return found.rows.size - found.via.size + found.hidden.length + found.tools.length;
   }
   const box = createSearchBox({ input, status, onQuery: (q) => run(q), noun: 'setting' });
   // (Esc in an empty box: back to the page, so its keys work again.)
@@ -218,7 +282,7 @@ export function createPanelSearch({ input, status, notes, panel, scene, ctx = {}
     if (e.key === 'Escape' && !input.value && !e.defaultPrevented) input.blur();
   });
   return {
-    /** Search again (the scene's shape changed what the panel shows). */
+    /** Search again (the scene's shape changed what the panel shows, or a Tools switch was switched). */
     refresh() {
       if (query.trim()) run(query, { again: true });
     },

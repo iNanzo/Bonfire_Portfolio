@@ -12,6 +12,53 @@
   --panel-w: 384px;
   --lib-w: min(640px, 100vw);
 }
+/* The stats overlay (ui/perfOverlay.js, U): the stage's top left, under the bar, clear of the
+   panel (a phone's bottom sheet: it leaves that room under it) and the toasts (bottom left);
+   under Render Settings, the library and the bar, never drawing over them. Where Render
+   Settings opens over it (narrower screens), it steps down under the menu while that's open
+   (main.js keeps --menu-h at the menu's height); while the library's open, it's put away (the
+   drawer lets the stage show through, and the overlay's words would show through with it, as
+   the banners would). Smaller on a phone (held either way), the frame's parts and the GPU
+   folded away. As wide as the stage beside the panel allows, a gutter clear of either side,
+   however long a row of layers. */
+body.pnt {
+  --stats-top: calc(var(--bar-h) + 10px);
+  --stats-left: var(--gutter);
+  --stats-max-w: min(380px, calc(100vw - 2 * var(--gutter)));
+  --stats-bottom: auto;
+  --stats-z: 24;
+  --stats-below: 10px;
+  --stats-max-h: calc(100dvh - var(--stats-top) - var(--stats-below));
+}
+body.pnt.lib-open {
+  --stats-display: none;
+}
+@media (min-width: 760px) {
+  body.pnt:not(.panel-off) {
+    --stats-max-w: min(380px, calc(100vw - var(--panel-w) - 2 * var(--gutter)));
+  }
+}
+@media (max-width: 1199px) {
+  body.pnt:not(.panel-off):has(.pnt-render-menu:not([hidden])) {
+    --stats-top: calc(var(--bar-h) + var(--menu-h, 0px) + 20px);
+  }
+}
+@media (max-width: 799px) {
+  body.pnt:has(.pnt-render-menu:not([hidden])) {
+    --stats-top: calc(var(--bar-h) + var(--menu-h, 0px) + 20px);
+  }
+}
+@media (max-width: 759px), (max-height: 500px) {
+  body.pnt {
+    --stats-font: 10px;
+    --stats-detail: none;
+  }
+}
+@media (max-width: 759px) {
+  body.pnt:not(.panel-off) {
+    --stats-below: calc(46vh + 10px);
+  }
+}
 
 /* ---------- The stage ---------- */
 .pnt-stage {
@@ -246,6 +293,21 @@
   font-size: 0.6875rem;
   color: var(--text-dim);
 }
+/* A switch (the Stats Overlay): a box before its name, ticked while it's on. */
+.pnt-check {
+  display: inline-block;
+  width: 0.75em;
+  height: 0.75em;
+  margin-right: 8px;
+  vertical-align: -0.05em;
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+.pnt-tools-item[aria-checked='true'] .pnt-check {
+  background: var(--accent);
+  box-shadow:
+    inset 0 0 0 1px var(--accent),
+    inset 0 0 0 2px var(--c-void);
+}
 .pnt-tools-item:hover,
 .pnt-tools-item:focus-visible {
   color: var(--accent-hi);
@@ -396,6 +458,17 @@ body.lib-open .pnt-banners {
 }
 .pnt-search-notes-title:hover {
   color: var(--accent-hi);
+}
+/* The Tools' switches found (the page's, not the scene's): their own heading, after the fold. */
+.pnt-search-tools-title {
+  margin: 0 0 2px;
+  font: 400 0.6875rem/1.4 var(--font-pixel);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.pnt-search-notes-fold + .pnt-search-tools {
+  margin-top: 4px;
 }
 .pnt-search-notes ul {
   display: grid;

@@ -7,8 +7,8 @@
 // that's blocked), and a scene sent from the admin (#scene=) opens with its banner. The panel:
 // it remembers which sections are open; a shape change draws only its own section again; a
 // bulk toolbar's button is one undo step; the search narrows the panel (and says what the
-// scene's shape leaves out), keeping its focus through a redraw; the Tools menu, the keys
-// overlay, the render menu and the library's name filter. (Reduced motion showing the look
+// scene's shape leaves out), keeping its focus through a redraw; the Tools menu (its Stats
+// Overlay too), the keys overlay, the render menu and the library's name filter. (Reduced motion showing the look
 // being painted, on the stage and in its thumbnail, waits on the bonfire.)
 import { test, expect } from '@playwright/test';
 import sharp from 'sharp';
@@ -556,6 +556,130 @@ test('Tools: Render Settings in Bonfire Live’s words, and the keyboard shortcu
   expect(box.x + box.width).toBeLessThanOrEqual(390);
   await page.keyboard.press('Escape');
   await expect(tools).toBeFocused();
+  expect(errors).toEqual([]);
+});
+
+test('Tools: the Stats Overlay (or U) shows the stage’s frames, particles and the scene being painted, kept for next time', async ({
+  page,
+}) => {
+  const errors = watch(page);
+  await ready(page, '/painter/?scene=b:frozen-shrine');
+  const overlay = page.locator('.stats-overlay');
+  await expect(overlay).toHaveCount(0);
+  await page.locator('[data-cmd="tools"]').click();
+  const item = page.locator('[data-tool="stats"]');
+  await expect(item).toHaveAttribute('role', 'menuitemcheckbox');
+  await expect(item).toHaveAttribute('aria-checked', 'false');
+  await item.click();
+  await expect(overlay).toBeVisible();
+  for (const words of ['Frames', 'Particles', 'Scene', 'Painting', SHRINE, 'Layers'])
+    await expect(overlay).toContainText(words, { timeout: 10_000 });
+  await expect(overlay).toHaveAttribute('aria-hidden', 'true');
+  expect(await overlay.evaluate((el) => getComputedStyle(el).pointerEvents)).toBe('none');
+  // On the stage, under the bar and clear of the panel.
+  const box = await overlay.boundingBox();
+  const bar = await page.locator('[data-bar]').boundingBox();
+  const panel = await page.locator('[data-panel]').boundingBox();
+  expect(box.y).toBeGreaterThanOrEqual(bar.y + bar.height);
+  expect(box.x + box.width).toBeLessThan(panel.x);
+  // Kept for the next visit (the page's, not the scene's: the scene isn't changed).
+  await expect(page.locator('[data-saved]')).toHaveAttribute('data-state', 'builtin');
+  await page.reload();
+  await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
+  await expect(overlay).toBeVisible();
+  await page.locator('[data-cmd="tools"]').click();
+  await expect(item).toHaveAttribute('aria-checked', 'true');
+  await page.keyboard.press('Escape');
+  // U takes it away (and the menu's switch follows).
+  await page.keyboard.press('u');
+  await expect(overlay).toHaveCount(0);
+  await page.locator('[data-cmd="tools"]').click();
+  await expect(item).toHaveAttribute('aria-checked', 'false');
+  await page.keyboard.press('Escape');
+  // The panel's search finds it by its words, and says where it is, as it's set now: under the
+  // Tools' own heading, not among the rows the scene's shape leaves out.
+  await page.keyboard.press('/');
+  await page.keyboard.type('fps');
+  const notes = page.locator('[data-search-notes]');
+  await expect(notes).toContainText('Stats Overlay: turn it on in Tools, or press U');
+  await expect(notes.locator('.pnt-search-tools')).toContainText('Stats Overlay');
+  await expect(notes.locator('.pnt-search-notes-fold', { hasText: 'Stats Overlay' })).toHaveCount(0);
+  await page.locator('[data-cmd="tools"]').click();
+  await item.click();
+  await expect(overlay).toBeVisible();
+  await expect(notes).toContainText('Stats Overlay: on; turn it off in Tools, or press U');
+  await expect(notes).not.toContainText('turn it on');
+  await page.locator('[data-cmd="tools"]').click();
+  await item.click();
+  await expect(overlay).toHaveCount(0);
+  await expect(notes).toContainText('Stats Overlay: turn it on in Tools, or press U');
+  // ?perf shows it whatever the switch says: the menu ticks what's on the stage, and U switched
+  // off says ?perf keeps it showing (it does).
+  await page.goto('/painter/?perf&scene=b:frozen-shrine');
+  await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
+  await expect(overlay).toBeVisible();
+  await page.locator('[data-cmd="tools"]').click();
+  await expect(item).toHaveAttribute('aria-checked', 'true');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('u');
+  await page.keyboard.press('u');
+  await expect(page.locator('[data-note]')).toContainText('?perf');
+  await expect(overlay).toBeVisible();
+  await page.locator('[data-cmd="tools"]').click();
+  await expect(item).toHaveAttribute('aria-checked', 'true');
+  expect(errors).toEqual([]);
+});
+
+/** Two boxes (boundingBox's) overlap. */
+const crosses = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+/** The stacking order of an element (its computed z-index). */
+const zOf = (locator) => locator.evaluate((el) => Number(getComputedStyle(el).zIndex));
+
+test('Tools: the Stats Overlay stays under Render Settings (P) and clear of it and the panel, wide and on a phone', async ({
+  page,
+}) => {
+  const errors = watch(page);
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await ready(page, '/painter/?scene=b:frozen-shrine');
+  const overlay = page.locator('.stats-overlay');
+  const menu = page.locator('.pnt-render-menu');
+  const panel = page.locator('[data-panel]');
+  await page.keyboard.press('u');
+  await expect(overlay).toContainText('Frames', { timeout: 10_000 });
+  for (const [width, height] of [
+    [1600, 900],
+    [390, 844],
+  ]) {
+    await page.setViewportSize({ width, height });
+    await page.keyboard.press('p');
+    await expect(menu).toBeVisible();
+    // Resizing and opening the menu changes the available room via ResizeObserver;
+    // the overlay fits whole rows on its next sample. A zero-height box is clear of
+    // everything, so wait for usable rows before checking that they do not overlap.
+    await expect.poll(async () => (await overlay.boundingBox())?.height ?? 0).toBeGreaterThan(40);
+    await expect.poll(async () => crosses(await overlay.boundingBox(), await menu.boundingBox())).toBe(false);
+    expect(crosses(await overlay.boundingBox(), await panel.boundingBox()), `${width}: the panel`).toBe(false);
+    expect(await zOf(overlay)).toBeLessThan(await zOf(menu));
+    await page.keyboard.press('p');
+    await expect(menu).toBeHidden();
+  }
+  expect(errors).toEqual([]);
+});
+
+test('Tools: the library puts the Stats Overlay away while it’s open (nothing of it shows through)', async ({
+  page,
+}) => {
+  const errors = watch(page);
+  await ready(page, '/painter/?scene=b:frozen-shrine');
+  const overlay = page.locator('.stats-overlay');
+  await page.keyboard.press('u');
+  await expect(overlay).toContainText('Frames', { timeout: 10_000 });
+  await page.keyboard.press('l');
+  await expect(page.locator('.pnt-lib')).toBeVisible();
+  await expect(overlay).toBeHidden();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.pnt-lib')).toBeHidden();
+  await expect(overlay).toBeVisible();
   expect(errors).toEqual([]);
 });
 

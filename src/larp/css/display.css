@@ -1,0 +1,633 @@
+/* ==========================================================================
+   The shared display (display.js, displayDom.js): the projector window and the host's Preview
+   Display frame. Scoped under .larp-display. The type scale is in em off one base, 1.4583cqw
+   (28 px on a 1920 px wide 1080p projector, the design's body minimum), so the small preview
+   frame is the same picture scaled down: round title ≈ 80 px, timer 160 px, team names 56–62 px,
+   banner name 56 px. Fixed zones leave the middle third for the fire (left and right columns
+   are 30% wide). Text sits on opaque panels at 7:1 or better: bone (#e9e3d2) and the dim text
+   (#cdc6b6) on the panel (#0f0d15) are about 15:1 and 11:1. Signs and words carry meaning,
+   never color alone: a bonus gets the flame's warm edge, a deduction neutral stone.
+   ========================================================================== */
+
+/* ---------- The window: the still, the scene, the panels ---------- */
+
+#larp.larp-display {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--c-void);
+  container-type: size;
+}
+body.larp-display {
+  overflow: hidden;
+}
+.larp-display-still,
+.larp-display-stage,
+.larp-display-overlay {
+  position: absolute;
+  inset: 0;
+}
+/* The fallback: the build's og/home.jpg dimmed (displayDom.js sets --still), else a glow. */
+/* (The social image carries the site's name in its lower left: the lower band fades to the void.) */
+.larp-display-still {
+  --still: none;
+  background:
+    linear-gradient(to top, var(--c-void) 0 26%, transparent 52%),
+    linear-gradient(
+      color-mix(in srgb, var(--c-void) 55%, transparent),
+      color-mix(in srgb, var(--c-void) 55%, transparent)
+    ),
+    var(--still) center / cover no-repeat,
+    radial-gradient(
+      ellipse 38% 46% at 50% 74%,
+      color-mix(in srgb, var(--accent) 40%, var(--c-void)),
+      color-mix(in srgb, var(--accent-lo) 30%, var(--c-void)) 45%,
+      var(--c-void) 100%
+    );
+}
+.larp-display-stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.larp-display-overlay {
+  pointer-events: none;
+}
+
+/* ---------- The zones (the same in the preview frame, which is position: relative) ---------- */
+
+.larp-display {
+  --d-panel: #0f0d15;
+  --d-text: var(--c-bone);
+  --d-dim: #cdc6b6;
+  --d-edge: color-mix(in srgb, var(--c-bone) 22%, var(--d-panel));
+  --d-stone: #8d889c;
+  --d-amber: #f0a830;
+  --d-warm: color-mix(in srgb, var(--accent-hi) 55%, var(--c-bone));
+}
+/* A grid: the title band across the top, two 30% columns (the middle third stays the fire's),
+   a low band for small notes; a long title pushes the columns down rather than over them. */
+.larp-display-zones {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 30% minmax(0, 1fr) 30%;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'top top top'
+    'left . right'
+    'bottom . right';
+  gap: 1.1em 0;
+  padding: 2.2% 3% 2.6%;
+  font: 400 1.4583cqw/1.3 var(--font-body);
+  color: var(--d-text);
+  pointer-events: none;
+}
+.larp-display-zones :lang(vi) {
+  line-height: 1.35;
+}
+.larp-dz {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6em;
+  min-width: 0;
+  min-height: 0;
+  padding: 0.12em; /* (room for the panels' frames inside the clip) */
+  overflow: hidden;
+  animation: larp-d-in 420ms steps(6, end) both;
+}
+.larp-dz-top {
+  grid-area: top;
+  justify-self: start;
+  max-width: 80%;
+  align-items: flex-start;
+}
+.larp-dz-left {
+  grid-area: left;
+}
+.larp-dz-right {
+  grid-area: right;
+  align-items: stretch;
+}
+.larp-dz-bottom {
+  grid-area: bottom;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  align-self: end;
+}
+/* The right column runs to the bottom (the performing team and its timer need the height); the
+   rare "Host window closed" chip sits over its corner. */
+.larp-dz-chips {
+  position: absolute;
+  right: 3%;
+  bottom: 2.6%;
+  z-index: 1;
+}
+.larp-dz-controls {
+  position: absolute;
+  top: 1.5%;
+  right: 1.5%;
+  flex-direction: row;
+  gap: 0.3em;
+  font-size: 0.6em;
+  overflow: visible;
+  pointer-events: auto;
+}
+
+@keyframes larp-d-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.6em);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes larp-d-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+/* Reduced motion (Setup or the OS) and the calm prayer round: a cross-fade, no slide. */
+.larp-display-zones[data-reduced='true'] .larp-dz,
+.larp-display-zones[data-calm='true'] .larp-dz {
+  animation-name: larp-d-fade;
+}
+/* The host's preview redraws often: no entrances there. */
+.larp-preview-frame .larp-dz {
+  animation: none;
+}
+
+/* ---------- Panels and type ---------- */
+
+.larp-dpanel {
+  position: relative;
+  padding: 0.7em 0.9em;
+  background: var(--d-panel);
+  box-shadow: 0 0 0 0.08em var(--d-edge);
+  min-width: 0;
+}
+.larp-dz-top {
+  padding: 0.5em 0.9em 0.6em;
+  background: var(--d-panel);
+  box-shadow: 0 0 0 0.08em var(--d-edge);
+}
+.larp-display-title {
+  font-size: 2.6em;
+  line-height: 1.15;
+}
+.larp-display-title .larp-bi-sub {
+  font-size: 0.55em;
+  color: var(--d-dim);
+}
+.larp-display-brand {
+  font-size: 3.2em;
+}
+.larp-dphase,
+.larp-dkicker {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--d-dim);
+}
+.larp-dkicker {
+  margin-bottom: 0.3em;
+}
+.larp-dnote {
+  font-size: 1.1em;
+}
+.larp-dpager {
+  margin-top: 0.4em;
+  color: var(--d-dim);
+  font-family: var(--font-body);
+}
+.larp-dz .larp-bi-sub {
+  color: var(--d-dim);
+}
+.larp-dz .larp-emblem {
+  width: auto;
+  height: 1em;
+}
+.larp-dz .larp-chip {
+  --team: var(--d-edge);
+  padding-left: 0.4em;
+  gap: 0.35em;
+  box-shadow: inset 0.15em 0 0 var(--team);
+}
+.larp-dz .larp-chip-sub {
+  color: var(--d-dim);
+}
+
+/* The chips: host closed, new team (quiet, words, never a banner). */
+.larp-dchip {
+  display: inline-block;
+  padding: 0.15em 0.5em;
+  font-size: 0.8em;
+  font-weight: 600;
+  background: var(--d-panel);
+  box-shadow: 0 0 0 0.08em var(--d-edge);
+  color: var(--d-dim);
+  white-space: nowrap;
+}
+.larp-dchip-new {
+  margin-left: 0.4em;
+  vertical-align: middle;
+  color: var(--d-text);
+}
+
+/* ---------- Welcome ---------- */
+
+.larp-dteams {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45em;
+}
+.larp-dteam-chip {
+  font-size: 1.35em;
+}
+.larp-dteams.has-members .larp-dteam-chip {
+  font-size: 1.2em;
+}
+.larp-dmembers {
+  margin: 0.15em 0 0 0.6em;
+  color: var(--d-dim);
+}
+
+/* ---------- The round card ---------- */
+
+.larp-dprompt-text {
+  font-size: 1.25em;
+}
+.larp-dprompt-text .larp-bi-sub {
+  font-size: 0.8em;
+  margin-top: 0.4em;
+}
+.larp-dnext .larp-chip,
+.larp-dnext-small .larp-chip {
+  font-size: 1.15em;
+}
+.larp-dnext-small {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
+.larp-dnext-small .larp-dkicker {
+  margin: 0;
+}
+
+/* ---------- The timer: Pixelify digits, the ring amber for the last 10 s, Time at zero ---------- */
+
+.larp-dclock,
+.larp-dturn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.larp-dclock .larp-dkicker,
+.larp-dturn .larp-dkicker {
+  font-size: 1.15em;
+}
+.larp-dtimer {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: min(100%, 16em);
+  aspect-ratio: 1;
+  container-type: inline-size; /* the digits are sized to the ring (cqi), clear of its stroke */
+}
+.larp-dtimer-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.larp-dtimer-track,
+.larp-dtimer-ring {
+  fill: none;
+  stroke-width: 4;
+}
+.larp-dtimer-track {
+  stroke: var(--d-edge);
+}
+.larp-dtimer-ring {
+  stroke: var(--accent);
+}
+.larp-dtimer.is-low .larp-dtimer-ring {
+  stroke: var(--d-amber);
+}
+.larp-dtimer-digits {
+  /* "0:45" spans about 2 em in Pixelify: 38cqi keeps it inside ~76% of the ring (the stroke's
+     inner edge is at 88%), 160 px on a 1080p projector; five characters ("10:39") step down. */
+  font-size: 38cqi;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.larp-dtimer-digits.is-long {
+  font-size: 29cqi;
+}
+.larp-dtimer.is-paused .larp-dtimer-digits {
+  color: var(--d-dim);
+}
+.larp-dtimer-up {
+  font-size: 1.9em;
+  text-align: center;
+  line-height: 1.15;
+}
+.larp-dtimer-up .larp-bi-sub {
+  font-size: 0.6em;
+}
+/* Beside the performing team's name and emblem the ring is a little smaller, so the panel fits the
+   column at 16:9 as well as 16:10. */
+.larp-dturn .larp-dtimer {
+  width: min(100%, 15em);
+}
+/* The prayer round: small and still. */
+.larp-dtimer.is-calm {
+  width: auto;
+  aspect-ratio: auto;
+  padding: 0.2em 0;
+  container-type: normal;
+}
+.larp-dtimer.is-calm .larp-dtimer-digits.is-long {
+  font-size: 2.4em;
+}
+.larp-dtimer.is-calm .larp-dtimer-digits {
+  font-size: 2.4em;
+}
+.larp-dtimer.is-calm .larp-dtimer-up {
+  font-size: 1.3em;
+}
+
+/* ---------- Performances ---------- */
+
+.larp-dperformer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25em;
+  margin-bottom: 0.4em;
+}
+.larp-dperformer .larp-emblem {
+  height: 2.6em;
+}
+.larp-dperformer-name {
+  font-size: 2.1em;
+  line-height: 1.15;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Review ---------- */
+
+.larp-dcalm {
+  padding: 1.1em;
+}
+.larp-dcalm-text {
+  font-size: 1.6em;
+}
+
+/* ---------- The reveal: banners, the team page ---------- */
+
+.larp-dheader,
+.larp-dbanner {
+  display: grid;
+  gap: 0.35em;
+  padding: 0.9em 1em;
+}
+.larp-dteamhead {
+  display: flex;
+  align-items: center;
+  gap: 0.45em;
+}
+.larp-dteamhead .larp-emblem {
+  height: 2em;
+}
+.larp-dteamhead-name {
+  font-size: 1.75em;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.larp-dcompletion {
+  font-size: 1.2em;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.5em;
+  align-items: baseline;
+}
+.larp-dcompletion-status {
+  color: var(--d-dim);
+  font-weight: 600;
+}
+.larp-dbanner {
+  box-shadow:
+    0 0 0 0.08em var(--d-edge),
+    inset 0.3em 0 0 var(--edge, var(--d-stone));
+}
+.larp-dbanner.is-bonus {
+  --edge: var(--accent);
+}
+.larp-dbanner.is-deduction,
+.larp-dbanner.is-recognition {
+  --edge: var(--d-stone);
+}
+.larp-dbanner-tag {
+  justify-self: start;
+  padding: 0.05em 0.45em;
+  font-weight: 600;
+  box-shadow: 0 0 0 0.08em var(--edge);
+}
+.larp-dbanner.is-bonus .larp-dbanner-tag {
+  background: color-mix(in srgb, var(--accent-lo) 45%, var(--d-panel));
+}
+.larp-dbanner-name {
+  font-size: 2em;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.larp-dbanner-who {
+  font-size: 1.3em;
+}
+.larp-dbanner-pts {
+  font-size: 1.6em;
+}
+.larp-dz .larp-pts-plus {
+  color: var(--d-warm);
+}
+.larp-dz .larp-pts-minus,
+.larp-dz .larp-pts-zero {
+  color: var(--d-text);
+}
+.larp-dteampage {
+  display: grid;
+  gap: 0.4em;
+}
+.larp-dlines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.25em;
+}
+.larp-dline {
+  display: grid;
+  gap: 0.05em;
+  padding: 0.15em 0.4em;
+  box-shadow: inset 0.12em 0 0 var(--d-edge);
+}
+.larp-dline.is-bonus {
+  box-shadow: inset 0.12em 0 0 var(--accent);
+}
+.larp-dline.is-current {
+  background: color-mix(in srgb, var(--c-bone) 7%, var(--d-panel));
+}
+.larp-dline-name {
+  overflow-wrap: anywhere;
+}
+.larp-dline-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.6em;
+  font-size: 0.85em;
+}
+.larp-dline-who {
+  color: var(--d-dim);
+}
+.larp-dscore {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-top: 0.3em;
+  box-shadow: 0 -0.06em 0 var(--d-edge);
+  color: var(--d-dim);
+  font-weight: 600;
+}
+.larp-dscore-n {
+  font-size: 1.5em;
+  color: var(--d-text);
+}
+/* A long queue's grouped reveal: the team's one page, its rows arriving a second apart. */
+.larp-dteampage.is-grouped {
+  gap: 0.5em;
+}
+.larp-dteampage.is-grouped .larp-dlines {
+  gap: 0.35em;
+}
+.larp-dteampage.is-grouped .larp-dline {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: 0.6em;
+  font-size: 1.15em;
+}
+.larp-dteampage.is-grouped .larp-dline-meta {
+  justify-content: flex-end;
+  font-size: 0.9em;
+}
+/* The reveal has no low band: its page may use the column's full height. */
+.larp-display-zones[data-scene='reveal'] .larp-dz-left {
+  grid-row: 2 / 4;
+}
+.larp-dteampage.is-grouped .larp-dline.is-current {
+  animation: larp-d-in 360ms steps(4, end) both;
+}
+.larp-display-zones[data-reduced='true'] .larp-dline.is-current,
+.larp-display-zones[data-calm='true'] .larp-dline.is-current {
+  animation-name: larp-d-fade;
+}
+.larp-preview-frame .larp-dline.is-current {
+  animation: none;
+}
+
+/* ---------- Standings and leaders ---------- */
+
+.larp-drows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.2em;
+}
+.larp-drow {
+  display: grid;
+  grid-template-columns: 1.5em minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.4em;
+  font-size: 1.2em;
+  padding: 0.1em 0;
+  box-shadow: 0 0.04em 0 var(--d-edge);
+}
+.larp-dplace {
+  text-align: right;
+  font-size: 1.15em;
+}
+.larp-drow-team,
+.larp-dleader {
+  min-width: 0;
+}
+.larp-drow-team .larp-chip-name,
+.larp-dleader-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.larp-dplace,
+.larp-dtotal,
+.larp-dscore-n {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.larp-dtotal {
+  font-size: 1.1em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.larp-dmove {
+  min-width: 2.2em;
+  text-align: right;
+  font-size: 0.8em;
+  color: var(--d-dim);
+}
+.larp-drow .larp-dchip-new {
+  font-size: 0.6em;
+}
+.larp-dleader {
+  display: grid;
+}
+.larp-dleader-team {
+  font-size: 0.65em;
+}
+.larp-dleaders .larp-drow {
+  grid-template-columns: 1.5em minmax(0, 1fr) auto;
+}
+
+/* ---------- The window's controls: Full Screen (quiet), Close (on hover) ---------- */
+
+.larp-dz-controls .larp-btn {
+  min-height: 0;
+  padding: 0.3em 0.7em;
+  background: var(--d-panel);
+  box-shadow: 0 0 0 0.08em var(--d-edge);
+  opacity: 0.45;
+  transition: opacity 160ms;
+}
+.larp-dz-controls .larp-dctl-close {
+  opacity: 0;
+}
+.larp-dz-controls:hover .larp-btn,
+.larp-dz-controls .larp-btn:focus-visible {
+  opacity: 1;
+}
+/* Full screen on the projector: nothing shows until the pointer comes to the corner. */
+#larp.larp-display[data-fullscreen='true'] .larp-dz-controls .larp-dctl-full {
+  opacity: 0;
+}
+#larp.larp-display[data-fullscreen='true'] .larp-dz-controls:hover .larp-btn {
+  opacity: 1;
+}

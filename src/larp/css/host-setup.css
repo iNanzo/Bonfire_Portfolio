@@ -1,0 +1,301 @@
+/* The host console's Setup and Teams & Roster tabs (hostSetup.js). Scoped under .larp-setup and .larp-roster.
+   Owned by that screen; shared primitives live in base.css. A working tool: plain panels, no
+   entrance animation, everything wraps at 200% text zoom (U09). Team colors stay on swatches and
+   edges, never text; states carry words (Ready, Missing), never color alone. */
+
+/* ---------- The two tabs' layout ---------- */
+
+.larp-setup,
+.larp-roster {
+  display: grid;
+  gap: var(--larp-gap);
+  align-items: start;
+}
+.larp-setup-main,
+.larp-setup-side,
+.larp-roster-side {
+  display: grid;
+  gap: var(--larp-gap);
+  min-width: 0;
+}
+@media (min-width: 1200px) {
+  .larp-setup {
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  }
+  .larp-roster {
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  }
+}
+
+:is(.larp-setup, .larp-roster) ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+:is(.larp-setup, .larp-roster) .larp-panel {
+  min-width: 0;
+}
+
+/* ---------- Shared pieces ---------- */
+
+.larp-setup-form {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.larp-setup-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.larp-setup-inline > .larp-input {
+  flex: 1 1 12rem;
+  width: auto;
+}
+.larp-setup-check {
+  display: grid;
+  gap: 2px;
+}
+.larp-setup-check .larp-hint {
+  padding-left: 26px;
+}
+.larp-setup-h3 {
+  font: 600 0.9375rem/1.35 var(--font-body);
+  margin-bottom: 4px;
+}
+.larp-setup-group {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  padding-block: 12px;
+  box-shadow: 0 -1px 0 var(--line);
+}
+.larp-setup-group:first-of-type {
+  padding-top: 0;
+  box-shadow: none;
+}
+
+/* The display-face note (U01): a fallback to Inter is said in words. */
+.larp-setup-face {
+  font-size: 0.8125rem;
+}
+.larp-setup-preview {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 12px;
+  padding: 10px;
+  background: var(--inset-bg);
+  box-shadow: 0 0 0 1px var(--line);
+}
+.larp-setup-preview .larp-chip {
+  font-size: 1.25rem;
+}
+
+/* ---------- Teams & Roster ---------- */
+
+.larp-roster-total {
+  margin: -6px 0 10px;
+}
+.larp-roster-search {
+  margin-bottom: 12px;
+  max-width: 28rem;
+}
+.larp-roster-teams-list {
+  display: grid;
+  gap: 8px;
+}
+.larp-roster-team {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--inset-bg);
+  box-shadow: 0 0 0 1px var(--line);
+}
+.larp-roster-team-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.larp-roster-team-head .larp-chip {
+  font-size: 1.125rem;
+  min-width: 0;
+}
+.larp-roster-count {
+  font-size: 0.875rem;
+  color: var(--text-dim);
+}
+.larp-roster-team-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
+.larp-roster-team-body {
+  display: grid;
+  gap: 10px;
+  padding-top: 8px;
+  box-shadow: 0 -1px 0 var(--line);
+}
+.larp-roster-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 11rem), 1fr));
+  gap: 10px;
+}
+.larp-setup-color {
+  width: 100%;
+  min-height: 36px;
+  padding: 2px;
+  border: 0;
+  background: var(--inset-bg);
+  box-shadow: 0 0 0 1px var(--line-strong);
+  cursor: pointer;
+}
+.larp-roster-members {
+  display: grid;
+  gap: 6px;
+}
+.larp-roster-member,
+.larp-roster-gm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.larp-roster-member > .larp-input,
+.larp-roster-gm > .larp-input {
+  flex: 1 1 12rem;
+  width: auto;
+}
+.larp-roster-member > .larp-select {
+  flex: 0 1 14rem;
+  width: auto;
+}
+.larp-roster-gms-list {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 12px !important;
+}
+
+/* ---------- Setup ---------- */
+
+.larp-setup-est-text {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+.larp-setup-est-text.is-over {
+  color: var(--accent-hi);
+}
+.larp-setup-est {
+  width: 100%;
+  max-width: 32rem;
+  margin: 10px 0 14px;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+}
+.larp-setup-est th {
+  text-align: left;
+  font-weight: 400;
+  padding: 3px 12px 3px 0;
+}
+.larp-setup-est td {
+  text-align: right;
+  padding: 3px 0;
+}
+.larp-setup-est tbody tr {
+  box-shadow: 0 1px 0 var(--line);
+}
+.larp-setup-est tfoot th,
+.larp-setup-est tfoot td {
+  font-weight: 600;
+  padding-top: 6px;
+}
+.larp-setup-durs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 9.5rem), 1fr));
+  gap: 10px;
+}
+.larp-setup-dur .larp-input {
+  font-variant-numeric: tabular-nums;
+}
+.larp-setup-round {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 12px;
+  border: 0;
+  box-shadow: 0 0 0 1px var(--line);
+}
+.larp-setup-round:last-child {
+  margin-bottom: 0;
+}
+.larp-setup-round legend {
+  padding: 0 6px;
+  font-weight: 600;
+}
+.larp-setup-round-est {
+  font-weight: 400;
+  font-size: 0.875rem;
+  color: var(--text-dim);
+}
+:is(.larp-setup, .larp-roster) .larp-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Import: a file button, then the summary before anything is replaced. */
+.larp-setup-file {
+  position: relative;
+}
+.larp-setup-file:focus-within {
+  outline: var(--focus);
+  outline-offset: 3px;
+}
+.larp-setup-import {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--panel-solid);
+  box-shadow: 0 0 0 1px var(--accent-hi);
+}
+
+/* Ready for Offline: a mark, the item and its state in words. */
+.larp-setup-offline-sum {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.larp-setup-offline-sum.is-ready {
+  color: var(--accent-hi);
+}
+.larp-setup-offline {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 10px !important;
+}
+.larp-setup-offline-item {
+  display: grid;
+  grid-template-columns: 1.25em minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 0.9375rem;
+}
+.larp-setup-status {
+  font-size: 0.8125rem;
+  color: var(--text-dim);
+}
+.larp-setup-offline-item.is-missing .larp-setup-status,
+.larp-setup-offline-item.is-missing .larp-setup-mark {
+  color: var(--accent-hi);
+  font-weight: 600;
+}
+.larp-setup-offline-panel > .larp-btn {
+  margin-top: 8px;
+}
+
+/* A form's own button keeps its size instead of stretching across the column. */
+.larp-setup-form > .larp-btn,
+.larp-roster-add > .larp-btn {
+  justify-self: start;
+}

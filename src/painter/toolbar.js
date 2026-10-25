@@ -1,5 +1,6 @@
 // The Painter's top bar, the parts that aren't the scene's: the Tools menu (what only a key
-// reached before: Render Settings P, Pack I, Capture C, Full Screen F, Keyboard Shortcuts ?),
+// reached before: Render Settings P, Pack I, Capture C, the Stats Overlay U (a switch, named
+// as Bonfire Live's setting is: src/settingsMap.js), Full Screen F, Keyboard Shortcuts ?),
 // the bar buttons' tooltips, and the list of every key the Painter answers, for the keys
 // overlay (src/ui/keysOverlay.js).
 // No key changes by being listed here: main.js and cameraRig.js answer them as they always
@@ -7,17 +8,23 @@
 //
 // The menu is a menu button: Enter, Space or ↓ on it opens it on its first item (↑ on its
 // last); ↑ ↓ Home End move; Enter picks; Esc closes it back onto the button; Tab or a click
-// elsewhere closes it. A key an item shows (P, I, C, F, ?) picks that item, as the same key
+// elsewhere closes it. A key an item shows (P, I, C, U, F, ?) picks that item, as the same key
 // does on the page; any other key the page answers closes the menu first, so nothing it
 // opens comes up under the menu. While it's open the button's tooltip steps aside (it
 // would cover the menu), and coming back to the button from it doesn't bring the tip up.
 import { esc } from '../html.js';
+import { SETTINGS } from '../settingsMap.js';
 
-/** The Tools menu's items: what each does (main.js runs it by `cmd`) and its key. */
+/**
+ * The Tools menu's items: what each does (main.js runs it by `cmd`) and its key; `check`: a
+ * switch, on or off (a menuitemcheckbox; main.js says which: setChecked).
+ * @type {{ cmd: string, label: string, key: string, check?: boolean }[]}
+ */
 export const TOOLS = [
   { cmd: 'render', label: 'Render Settings', key: 'P' },
   { cmd: 'pack', label: 'Pack', key: 'I' },
   { cmd: 'capture', label: 'Capture', key: 'C' },
+  { cmd: 'stats', label: SETTINGS.stats.label, key: 'U', check: true },
   { cmd: 'fullscreen', label: 'Full Screen', key: 'F' },
   { cmd: 'keys', label: 'Keyboard Shortcuts', key: '?' },
 ];
@@ -55,6 +62,7 @@ export const PAINTER_KEYS = [
       { keys: ['1–8'], label: 'With Render Settings open: step a setting' },
       { keys: ['0'], label: 'With Render Settings open: reset them' },
       { keys: ['C'], label: 'Capture a picture of the stage' },
+      { keys: ['U'], label: 'The stats overlay: frame rate, particles, and the scene’s live layers' },
       { keys: ['F'], label: 'Full screen' },
       { keys: ['?'], label: 'These keyboard shortcuts' },
     ],
@@ -97,7 +105,7 @@ export const TIPS = {
   close: tipped('pnt-tip-close', 'Close this note (the scene stays as it is)'),
 };
 /** The Tools button's tooltip (read out too, the same way). */
-const TOOLS_TIP = 'Render Settings, the pack, a capture, full screen and the keyboard shortcuts';
+const TOOLS_TIP = 'Render Settings, the pack, a capture, the stats overlay, full screen and the keyboard shortcuts';
 
 /**
  * The Tools menu's markup: its button (`data-cmd="tools"`: the bar's other buttons are
@@ -109,7 +117,7 @@ export const toolsMarkup = (id = 'pnt-tools-menu') => `
     <button type="button" class="pix-btn" data-cmd="tools" aria-label="Tools" aria-haspopup="menu" aria-expanded="false" aria-controls="${esc(id)}" aria-describedby="${esc(id)}-tip" data-tip="${TOOLS_TIP}" data-tip-side="bottom"><span class="pnt-tools-word">Tools</span><span class="pnt-caret" aria-hidden="true">▾</span></button>
     <span class="visually-hidden" id="${esc(id)}-tip">${TOOLS_TIP}</span>
     <div class="pnt-tools-menu" id="${esc(id)}" role="menu" aria-label="Tools" data-tools-menu hidden>
-      ${TOOLS.map((t) => `<button type="button" role="menuitem" class="pnt-tools-item" data-tool="${esc(t.cmd)}" tabindex="-1" aria-keyshortcuts="${esc(shortcut(t.key))}"><span>${esc(t.label)}</span><kbd aria-hidden="true">${esc(t.key)}</kbd></button>`).join('')}
+      ${TOOLS.map((t) => `<button type="button" role="${t.check ? 'menuitemcheckbox" aria-checked="false' : 'menuitem'}" class="pnt-tools-item" data-tool="${esc(t.cmd)}" tabindex="-1" aria-keyshortcuts="${esc(shortcut(t.key))}"><span>${t.check ? '<i class="pnt-check" aria-hidden="true"></i>' : ''}${esc(t.label)}</span><kbd aria-hidden="true">${esc(t.key)}</kbd></button>`).join('')}
     </div>
   </div>`;
 
@@ -196,6 +204,10 @@ export function bindTools(el, run, { hideTip = () => {} } = {}) {
       else open(0);
     },
     close,
+    /** A switch's item shows it on or off (`cmd`: a TOOLS item with `check`). */
+    setChecked(cmd, on) {
+      items.find((i) => i.dataset.tool === cmd)?.setAttribute('aria-checked', on ? 'true' : 'false');
+    },
     get isOpen() {
       return isOpen();
     },

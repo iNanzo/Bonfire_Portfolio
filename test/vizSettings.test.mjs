@@ -45,6 +45,7 @@ import { TABS, SECTIONS, TRI_HELP, ITEM_HINTS, entriesFor, meta } from '../src/s
 import { titleCase } from '../src/text.js';
 import { defaultScene } from '../src/scenes.js';
 import { KEY_GROUPS, keyList } from '../src/visualizer/keys.js';
+import { SITE_KEYS } from '../src/ui/siteKeys.js';
 
 // A browser's storage, for the store: what it holds, and every write.
 const store = new Map();
@@ -237,6 +238,35 @@ test('Frame Rate: one of its choices, this computer’s own (never in a setup or
   store.clear();
 });
 
+test('Stats Overlay: off to begin with, a yes or no, this computer’s own (never in a setup or a preset)', () => {
+  assert.equal(PAGE_DEFAULTS.stats, false);
+  assert.equal(defaults().stats, false);
+  assert.equal(kindOf('stats'), 'check');
+  // (Only a yes or no is kept: anything else saved leaves it off.)
+  for (const v of [true, false, 'on', 1, null])
+    assert.equal(mergeInto(defaults(), { stats: v }).stats, v === true, `${JSON.stringify(v)}`);
+  assert.ok(LOCAL.includes('stats'));
+  const s = defaults();
+  s.stats = true;
+  assert.ok(!('stats' in snapshot(s)), 'not in a setup');
+  for (const id of Object.keys(PRESETS)) {
+    assert.ok(!('stats' in PRESETS[id].values), `${id} leaves it`);
+    applyPreset(s, id);
+    assert.equal(s.stats, true, `${id} keeps it`);
+  }
+  // A setup saved here and loaded elsewhere leaves that computer's overlay as it is; a file
+  // from elsewhere that carries one doesn't turn it on here.
+  saveSetup(s, 'Watching');
+  const there = defaults();
+  loadSetup(there, 'Watching');
+  assert.equal(there.stats, false);
+  assert.ok(!('stats' in readSetups().Watching));
+  importSetups(JSON.stringify({ app: 'bonfire-live', setups: { Odd: { stats: true, glitch: 1.3 } } }));
+  assert.deepEqual(loadSetup(there, 'Odd'), ['glitch']);
+  assert.equal(there.stats, false);
+  store.clear();
+});
+
 test('saving waits for a burst of changes to settle (one write), and flushSettings writes at once', async () => {
   writes.length = 0;
   const s = defaults();
@@ -414,6 +444,9 @@ test('the dialog: nine tabs from the map, each setting once, in its tab and sect
     assert.match(tabOf('effects'), new RegExp(`data-row="${k}"`), `${k} is in the Layers grid`);
   assert.match(tabOf('picture'), /data-section="performance"[\s\S]*data-row="frameRate"/);
   assert.deepEqual(choicesOf('frameRate'), ['display', '60', '30']);
+  // The Stats Overlay: a checkbox in Picture › Performance, beside Frame Rate and Particles.
+  assert.match(tabOf('picture'), /data-section="performance"[\s\S]*data-row="stats"/);
+  assert.match(rowOf('stats'), /<input type="checkbox" data-set="stats"/);
   assert.match(
     rowOf('linkPort'),
     /<input type="number" data-set="linkPort" min="1024" max="65535" step="1"/,
@@ -727,7 +760,7 @@ test('the hints: a field’s "?" isn’t a keyboard stop of its own (its input r
   );
 });
 
-test('the keyboard shortcuts: the same keys as ever, in four groups, plus ? and /', () => {
+test('the keyboard shortcuts: the same keys as ever, in four groups, plus ?, / and U (the stats overlay)', () => {
   assert.deepEqual(
     KEY_GROUPS.map((g) => g.title),
     ['Moments', 'Beat', 'Show', 'View & Menus'],
@@ -764,14 +797,16 @@ test('the keyboard shortcuts: the same keys as ever, in four groups, plus ? and 
     'S',
     'I',
   ];
-  assert.deepEqual(keys, [...before, '?', '/'].sort());
+  assert.deepEqual(keys, [...before, '?', '/', 'U'].sort());
+  // (U is free in the Painter's keys and the site's too: the same key nowhere means another thing.)
+  for (const g of SITE_KEYS) for (const row of g.keys) assert.ok(!row.keys.includes('U'), `the site: ${row.label}`);
   for (const g of KEY_GROUPS)
     for (const row of g.keys)
       assert.ok(row.label.length <= 120 && !/blade/i.test(row.label), `${row.keys}: "${row.label}"`);
   assert.match(html, /data-row="key:\d+"/, 'the search finds them');
 });
 
-test('the keyboard shortcuts: Shift+7 is title card 7 in the show even where it types / or ?; / and ? still work', async () => {
+test('the keyboard shortcuts: Shift+7 is title card 7 in the show even where it types / or ?; / ? and U still work', async () => {
   // The page's keydown (src/visualizer/actions.js) on a stand-in page: what each press did.
   const did = [];
   let onKey = null;
@@ -784,17 +819,20 @@ test('the keyboard shortcuts: Shift+7 is title card 7 in the show even where it 
       if (type === 'keydown') onKey = fn;
     },
   });
+  const ctxSettings = { stats: false };
   try {
     const { createActions } = await import('../src/visualizer/actions.js');
     createActions(
       /** @type {any} */ ({
-        settings: {},
+        settings: ctxSettings,
         fire: {},
         renderMenu: { handleKey: () => false, isOpen: false },
         keysOverlay: { el: { open: false } },
         openKeys: () => did.push('keys'),
         openSettings: (tab, o) => did.push(o?.search ? 'search' : 'settings'),
         showCard: (i) => did.push(`card ${i + 1}`),
+        applyStats: () => did.push(`stats ${ctxSettings.stats ? 'on' : 'off'}`),
+        note() {},
         wake() {},
       }),
     );
@@ -809,10 +847,14 @@ test('the keyboard shortcuts: Shift+7 is title card 7 in the show even where it 
     assert.deepEqual(press('/', 'Slash'), ['search']);
     assert.deepEqual(press('?', 'Slash', true), ['keys']);
     assert.deepEqual(press('?', 'Minus', true), ['keys'], 'German: ? is Shift+ß');
+    // U: the stats overlay on and off (the setting's own, kept on this computer).
+    assert.deepEqual(press('u', 'KeyU'), ['stats on']);
+    assert.deepEqual(press('U', 'KeyU', true), ['stats off'], 'Shift+U too (the key, not its case)');
     // Before the show (the start screen) there are no cards: / and ? are the search and the list.
     body.dataset.mode = 'start';
     assert.deepEqual(press('/', 'Digit7', true), ['search']);
     assert.deepEqual(press('?', 'Digit7', true), ['keys']);
+    assert.deepEqual(press('u', 'KeyU'), ['stats on'], 'on the start screen too (the fire burns behind it)');
   } finally {
     globalThis.document = saved.document;
     globalThis.window = saved.window;

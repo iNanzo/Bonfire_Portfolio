@@ -114,6 +114,10 @@ test('the pack opens and its Map fast travels to another place', async ({ page }
   await page.goto('/');
   await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
   await page.hover('[data-pack-toggle]');
+  await expect(page.locator('[data-pack-toggle]')).toHaveAttribute('aria-expanded', 'true');
+  // Hover opens it; a click pins it for the selection. Slow rendering must not let the
+  // pointer-leave timer close the list between Playwright's separate pointer actions.
+  await page.click('[data-pack-toggle]');
   // The items rise in stepped frames (which can look settled mid-rise): let them land first.
   await page.waitForFunction(() =>
     document
@@ -124,6 +128,14 @@ test('the pack opens and its Map fast travels to another place', async ({ page }
   await page.hover('[data-pack-slot="map"]');
   const shrine = page.locator('[data-pack-option="shrine"]');
   await expect(shrine).toBeVisible();
+  // The list has its own stepped entrance after the items land. Poll its current
+  // animations: a replaced/cancelled animation's finished promise rejects.
+  await page.waitForFunction(() =>
+    document
+      .querySelector('[data-pack-list="map"]')
+      .getAnimations({ subtree: true })
+      .every((a) => a.playState !== 'running'),
+  );
   await shrine.click();
   await expect(page.locator('[data-pack-option="shrine"]')).toHaveAttribute('aria-pressed', 'true');
   await page.keyboard.press('Escape');
@@ -180,7 +192,9 @@ test('the pack’s knight item summons him, swaps his helmet and style (remember
   await summon.click();
   // Resting: send him off, his helmets, styles, finishes and gestures (the Default Dance too).
   const dismiss = page.locator('[data-pack-list="knight"] [data-pack-option="dismiss"]');
-  await expect(dismiss).toBeEnabled({ timeout: 15_000 });
+  // The forge advances in capped scene time; software WebGL can take much longer
+  // than its animation duration in wall time. Still require the resting-state control.
+  await expect(dismiss).toBeEnabled({ timeout: 45_000 });
   const helmets = page.locator('[data-pack-list="knight"] [data-pack-option^="helm:"]');
   await expect(helmets).toHaveCount(3);
   await expect(page.locator('[data-pack-list="knight"] [data-pack-option^="gesture:"]')).toHaveCount(9);
@@ -240,7 +254,9 @@ test('the pack keeps the keyboard: Summon and Send Him Off picked with Enter lea
   if (await page.locator('.pack-items').isHidden()) await page.keyboard.press('i');
   await intoKnight();
   const dismiss = page.locator('[data-pack-option="dismiss"]');
-  await expect(dismiss).toBeEnabled({ timeout: 15_000 });
+  // The forge advances in capped scene time; software WebGL can take much longer
+  // than its animation duration in wall time. Still require the resting-state control.
+  await expect(dismiss).toBeEnabled({ timeout: 45_000 });
   await intoKnight(); // (into the list again, now it can be picked)
   await expect(dismiss).toBeFocused();
   await page.keyboard.press('Enter');
@@ -288,6 +304,38 @@ test('the Portfolio’s page takes this one apart: the breakdown, its render set
   await page.keyboard.press('b');
   await expect(page.locator('html')).not.toHaveClass(/is-breakdown/);
   await expect(page.getByRole('link', { name: TAKE_APART })).toBeFocused();
+  expect(errors).toEqual([]);
+});
+
+test('the breakdown counts the scene’s particle systems only: the stats overlay’s other counts aren’t among them', async ({
+  page,
+}) => {
+  const errors = watch(page);
+  // (?perf shows the stats overlay on the site too, from the same scene.)
+  await page.goto('/projects/portfolio/?perf');
+  await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
+  // The overlay's rows counted in something other than particles: a count of a whole (live of
+  // how many, "x / y") with a unit by it (the fireflies lit), by name.
+  const others = () =>
+    page.locator('.stats-overlay').evaluate((el) =>
+      [...el.firstElementChild.children].flatMap((block) => {
+        const cells = [...(block.children[1]?.children ?? [])];
+        const names = [];
+        for (let i = 0; i < cells.length; i += 2) {
+          const value = cells[i + 1].textContent;
+          if (value.includes(' / ') && /[a-z]/i.test(value)) names.push(cells[i].textContent);
+        }
+        return names;
+      }),
+    );
+  await expect.poll(others, { timeout: 15_000 }).not.toEqual([]);
+  const names = await others();
+  await page.getByRole('link', { name: TAKE_APART }).click();
+  await expect(page.locator('html')).toHaveClass(/is-breakdown/);
+  const rows = page.locator('[data-bd-stats] dt');
+  await expect(rows.first()).toBeVisible();
+  const listed = await rows.allTextContents();
+  for (const name of names) expect(listed, name).not.toContain(name);
   expect(errors).toEqual([]);
 });
 

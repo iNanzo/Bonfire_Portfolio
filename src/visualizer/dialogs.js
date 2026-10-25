@@ -49,6 +49,7 @@ export function createDialogs(ctx) {
     }
     if (ctx.engine) ctx.engine.monitor.gain.value = settings.volume;
     ctx.applyFrameRate();
+    ctx.applyStats();
     ctx.director?.applyRender();
     const held = !!ctx.director?.sceneRef;
     if (settings.scenery !== 'mix' && (!held || keys.includes('scenery'))) ctx.fire?.setScenery(settings.scenery);

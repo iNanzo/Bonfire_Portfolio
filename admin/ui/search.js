@@ -128,7 +128,7 @@ export function buildIndex(draft, { labelOf = defaultLabel } = {}) {
       add(path, label, 'group', crumbs);
       return walk(value, path, [...crumbs, label]);
     }
-    const options = SELECTS[patternOf(path)]?.(draft).map((o) => o.label) ?? [];
+    const options = SELECTS[patternOf(path)]?.(draft, path).map((o) => o.label) ?? [];
     const text = typeof value === 'string' && value.length <= VALUE_MAX && !HEX_RE.test(value) ? value : '';
     add(path, label, 'field', crumbs, { options, value: text });
   }

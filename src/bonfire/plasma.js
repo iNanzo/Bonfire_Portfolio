@@ -763,6 +763,8 @@ export function createPlasma({
   return {
     objects: [...bolts.objects, glow.mesh, ...impacts.map((g) => g.mesh), core, flashes, sparks],
     lights,
+    /** Its bolts (bolts.js): how many segments this frame drew, of its room (the stats overlay). */
+    bolts,
     step,
     discharge,
     /** Where the ball hangs (world), and its radius now. */

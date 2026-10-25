@@ -1,0 +1,213 @@
+/* Judge Mode (judge.js), which replaces the console while a co-GM judges. Scoped under .larp-judge.
+   Owned by that screen; shared primitives live in base.css.
+   Big, plain and fast: one centred column, large fields and a large Add button; the lists below. */
+
+.larp-judge {
+  width: min(52rem, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: var(--larp-gap);
+}
+.larp-judge h2.larp-label {
+  margin: 0 0 6px;
+}
+
+/* ---------- Header: who is judging, the round, Change Name and Done ---------- */
+
+.larp-judge-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+.larp-judge-who {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.larp-judge-kicker {
+  font: 600 0.8125rem/1.4 var(--font-body);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.larp-judge-title {
+  font: 600 clamp(1.25rem, 2.4vw, 1.625rem) / 1.35 var(--font-body);
+  overflow-wrap: anywhere;
+}
+.larp-judge-round {
+  color: var(--text-dim);
+}
+.larp-judge-head-actions,
+.larp-judge-actions,
+.larp-judge-pick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.larp-judge-done {
+  min-width: 7rem;
+}
+
+/* ---------- The name picker and the PIN prompt ---------- */
+
+.larp-judge-pick,
+.larp-judge-pinbox {
+  display: grid;
+  gap: 14px;
+  width: min(34rem, 100%);
+  margin: clamp(0px, 6vh, 64px) auto 0;
+}
+.larp-judge-gms {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: 8px;
+}
+.larp-judge-gm {
+  width: 100%;
+  min-height: 52px;
+  font-size: 1.125rem;
+  justify-content: center;
+}
+.larp-judge-pick-actions {
+  justify-content: flex-end;
+}
+.larp-judge-pin {
+  max-width: 14rem;
+  font-size: 1.5rem;
+  letter-spacing: 0.2em;
+}
+
+/* ---------- The award form ---------- */
+
+.larp-judge-form {
+  display: grid;
+  gap: 14px;
+}
+.larp-judge-form .larp-h2 {
+  margin-bottom: 0;
+}
+.larp-judge-form.is-editing {
+  box-shadow: 0 0 0 1px var(--accent-hi);
+}
+.larp-judge-form .larp-input {
+  min-height: 48px;
+  font-size: 1.125rem;
+}
+.larp-judge-form .larp-label {
+  font-size: 0.9375rem;
+}
+.larp-judge-form .larp-sign {
+  min-width: 52px;
+  font-size: 1.5rem;
+}
+.larp-judge-form .larp-amount {
+  font-size: 1.5rem;
+}
+.larp-judge-type .larp-btn {
+  min-height: 44px;
+  padding-inline: 18px;
+}
+.larp-judge-to {
+  font-size: 1.125rem;
+  overflow-wrap: anywhere;
+}
+.larp-judge-to .larp-label {
+  margin-right: 8px;
+}
+.larp-judge-form .is-large .larp-hint {
+  color: var(--accent-hi);
+}
+.larp-judge-duplicate {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--inset-bg);
+  box-shadow: 0 0 0 1px var(--accent-hi);
+}
+.larp-judge-submit {
+  min-height: 56px;
+  min-width: min(16rem, 100%);
+  font-size: 1.25rem;
+}
+
+/* ---------- Recent, Undo and the two lists ---------- */
+
+.larp-judge-lists {
+  display: grid;
+  gap: 18px;
+}
+.larp-judge-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.larp-judge-chip {
+  box-shadow: 0 0 0 1px var(--line-strong);
+}
+.larp-judge-undo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--inset-bg);
+}
+.larp-judge-list .larp-h2 {
+  margin-bottom: 6px;
+}
+.larp-judge-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.larp-judge-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+.larp-judge-row:first-child {
+  border-top: 0;
+}
+.larp-judge-row .larp-pts {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.larp-judge-row-text {
+  flex: 1 1 14rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.larp-judge-row-text .larp-note {
+  margin-left: 8px;
+  white-space: nowrap;
+}
+.larp-judge-row-to {
+  font-weight: 600;
+}
+.larp-judge-author {
+  color: var(--text-dim);
+}
+.larp-judge-row-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+/* ---------- Locked (Review has started) ---------- */
+
+.larp-judge-locked {
+  box-shadow: 0 0 0 1px var(--accent-hi);
+}
+.larp-judge-locked p {
+  font-size: 1.0625rem;
+}

@@ -1,0 +1,336 @@
+/* The intro's chat screen (dialogueUi.js), Uma Musume's layout in the invitation toy's own style:
+   cream fill, a dark 3 px outline with the buttons' chunky drop, big rounded corners, Pixelify
+   Sans. A wide box along the bottom (inside the safe area, where the toolbar was: it hides while
+   the intro runs) with the speaker's name on a tab at its top left, the line typed out in it and
+   a small bouncing ▼ at its bottom right once it's up; Auto, Skip and Log at the top right; the
+   replies stacked in the middle of the screen, under his face; a gentle dim along the bottom behind the box; the
+   Log and the "Skip the Intro?" question as cards over it all. Phone first (390×844), roomier on a
+   desktop and lower on a phone held sideways. Reduced motion: no bounce, no pop. The layer takes
+   every press, so the canvas under it gets none. */
+
+.inv-talk {
+  /* Pixelify Sans's "fi" ligature reads as an "A": the dialogue draws the two letters. */
+  font-variant-ligatures: none;
+  --talk-fill: #fff8e7;
+  --talk-ink: var(--inv-ink, #3a332d);
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  color: var(--talk-ink);
+  font-family: var(--inv-font, 'Pixelify Sans', ui-rounded, system-ui, sans-serif);
+  touch-action: none;
+  cursor: pointer;
+  outline: none;
+}
+
+/* (The dim: darker at the very bottom, gone by the middle; it never takes a press itself.) */
+.inv-talk-dim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgb(58 51 45 / 26%) 0%,
+    rgb(58 51 45 / 12%) 20%,
+    rgb(58 51 45 / 3%) 36%,
+    transparent 48%
+  );
+  pointer-events: none;
+  animation: inv-talk-fade 0.35s ease-out;
+}
+
+.inv-talk-top {
+  position: absolute;
+  top: calc(10px + env(safe-area-inset-top));
+  right: calc(10px + env(safe-area-inset-right));
+  display: flex;
+  gap: 6px;
+}
+/* Skip Intro, at the top left all through the intro. */
+.inv-talk-skip-intro {
+  position: absolute;
+  top: calc(10px + env(safe-area-inset-top));
+  left: calc(10px + env(safe-area-inset-left));
+}
+.inv-talk-btn {
+  min-height: 40px;
+  min-width: 56px;
+  padding: 0 12px;
+  font-size: 14px;
+  box-shadow: 0 3px 0 var(--talk-ink);
+}
+
+/* --- The box and its name tab. */
+.inv-talk-box {
+  position: absolute;
+  left: calc(12px + env(safe-area-inset-left));
+  right: calc(12px + env(safe-area-inset-right));
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  max-width: 760px;
+  min-height: 132px;
+  margin: 0 auto;
+  padding: 24px 22px 26px;
+  border: 3px solid var(--talk-ink);
+  border-radius: 22px;
+  background: var(--talk-fill);
+  box-shadow: 0 4px 0 var(--talk-ink);
+  animation: inv-talk-rise 0.28s ease-out;
+}
+.inv-talk-name {
+  position: absolute;
+  left: 16px;
+  top: 0;
+  margin: 0;
+  padding: 6px 14px 7px;
+  border: 3px solid var(--talk-ink);
+  border-radius: 12px;
+  background: var(--inv-on, #f4cf7a);
+  box-shadow: 0 3px 0 var(--talk-ink);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.03em;
+  transform: translateY(-62%);
+}
+.inv-talk-text {
+  margin: 0;
+  /* (Three lines' room, so a longer line never grows the box as it types.) */
+  min-height: calc(3 * 1.42em);
+  font-size: 18px;
+  line-height: 1.42;
+  letter-spacing: 0.01em;
+  overflow-wrap: break-word;
+  /* (The admin's own line breaks show.) */
+  white-space: pre-line;
+}
+.inv-talk-rest {
+  visibility: hidden;
+}
+.inv-talk-next {
+  position: absolute;
+  right: 16px;
+  bottom: 8px;
+  font-size: 14px;
+  line-height: 1;
+  animation: inv-talk-bob 0.9s ease-in-out infinite;
+}
+
+/* (For a screen reader only: the whole line once, and how to go on.) */
+.inv-talk-live,
+.inv-talk-hint {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- The replies, stacked in the middle of the screen, under his face (main.js frames the shot
+   over them). Laid out from the box's start, out of sight until its line is typed, then popping in. */
+.inv-talk-choices {
+  position: absolute;
+  left: 50%;
+  top: 44%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(340px, calc(100% - 48px));
+  transform: translate(-50%, -50%);
+}
+.inv-talk-choices.is-waiting {
+  visibility: hidden;
+}
+.inv-talk-choice {
+  min-height: 54px;
+  padding: 8px 16px;
+  border-radius: 16px;
+  background: var(--talk-fill);
+  font-size: 17px;
+  line-height: 1.2;
+}
+.inv-talk-choices:not(.is-waiting) .inv-talk-choice {
+  animation: inv-talk-pop 0.22s ease-out both;
+}
+.inv-talk-choice:nth-child(2) {
+  animation-delay: 0.05s;
+}
+.inv-talk-choice:nth-child(3) {
+  animation-delay: 0.1s;
+}
+
+/* --- The Log and the question: cards over everything, the Log's list scrolling. */
+.inv-talk-log,
+.inv-talk-ask {
+  position: absolute;
+  left: calc(12px + env(safe-area-inset-left));
+  right: calc(12px + env(safe-area-inset-right));
+  box-sizing: border-box;
+  max-width: 560px;
+  margin: 0 auto;
+  border: 3px solid var(--talk-ink);
+  border-radius: 20px;
+  background: var(--inv-paper, #fbf9f5);
+  box-shadow: 0 4px 0 var(--talk-ink);
+  cursor: default;
+}
+.inv-talk-log {
+  top: calc(60px + env(safe-area-inset-top));
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.inv-talk-log-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px 8px 18px;
+  border-bottom: 3px solid var(--inv-grey, #ddd6ca);
+}
+.inv-talk-log h2,
+.inv-talk-ask h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+.inv-talk-log-list {
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 10px 18px 18px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  list-style: none;
+  font-size: 16px;
+  line-height: 1.4;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.inv-talk-log-list li {
+  padding: 8px 0;
+  border-bottom: 2px dashed var(--inv-grey, #ddd6ca);
+}
+.inv-talk-log-who {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--inv-mid, #9c9286);
+  letter-spacing: 0.04em;
+}
+.inv-talk-log-reply {
+  text-align: right;
+}
+.inv-talk-ask {
+  top: 50%;
+  max-width: 360px;
+  padding: 18px 18px 20px;
+  text-align: center;
+  transform: translateY(-50%);
+}
+.inv-talk-ask-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+.inv-talk-ask-row .inv-btn {
+  flex: 1 1 0;
+}
+
+/* (The toolbar rests while the intro runs: out of sight and out of reach, its place kept.) */
+.inv-hud.is-talking .inv-toolbar {
+  visibility: hidden;
+}
+
+@keyframes inv-talk-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(4px);
+  }
+}
+@keyframes inv-talk-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+@keyframes inv-talk-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+@keyframes inv-talk-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* A desktop: more room in the box, bigger type. */
+@media (min-width: 700px) and (min-height: 560px) {
+  .inv-talk-box {
+    bottom: calc(24px + env(safe-area-inset-bottom));
+    min-height: 150px;
+    padding: 28px 30px 30px;
+  }
+  .inv-talk-name {
+    left: 22px;
+    font-size: 18px;
+  }
+  .inv-talk-text {
+    font-size: 21px;
+  }
+  .inv-talk-top {
+    top: 16px;
+    right: 16px;
+    gap: 8px;
+  }
+  .inv-talk-skip-intro {
+    top: 16px;
+    left: 16px;
+  }
+  .inv-talk-btn {
+    min-height: 44px;
+    min-width: 64px;
+    font-size: 15px;
+  }
+  .inv-talk-choices {
+    width: min(400px, calc(100% - 48px));
+  }
+}
+
+/* A phone held sideways: a shorter box, the replies higher. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .inv-talk-box {
+    max-width: 640px;
+    min-height: 0;
+    padding: 18px 18px 20px;
+    bottom: calc(8px + env(safe-area-inset-bottom));
+  }
+  .inv-talk-text {
+    min-height: calc(2 * 1.42em);
+    font-size: 16px;
+  }
+  .inv-talk-choices {
+    top: 38%;
+    gap: 8px;
+  }
+  .inv-talk-choice {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inv-talk-next,
+  .inv-talk-box,
+  .inv-talk-dim,
+  .inv-talk-choices:not(.is-waiting) .inv-talk-choice {
+    animation: none;
+  }
+}

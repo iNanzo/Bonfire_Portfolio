@@ -122,3 +122,11 @@ test('nothing found: words near the query that find something, or a few that alw
   assert.deepEqual(suggestFor('qqqq'), ['flash', 'frame rate', 'knights', 'colors']);
   for (const word of suggestFor('qqqq')) assert.ok(search(word).ids.length > 0, `${word} finds something`);
 });
+
+test('the Stats Overlay is found by the words people use for it: info, statistics, an fps counter', () => {
+  for (const q of ['info', 'statistics', 'fps counter', 'diagnostics', 'stats', 'fps']) {
+    const { ids, plan } = search(q);
+    assert.ok(ids.includes('stats'), `${q}: ${ids.join(', ')}`);
+    assert.ok(plan.counts.picture >= 1, `${q}: counted in Picture`);
+  }
+});

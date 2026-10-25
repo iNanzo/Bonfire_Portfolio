@@ -426,6 +426,8 @@ export function createLightningRing({
   return {
     objects: [...bolts.objects, sparkPts],
     lights: [...lights, ...strikeLights],
+    /** Its bolts (bolts.js): segments drawn this frame, of its room (the stats overlay). */
+    bolts,
     burst,
     crackle,
     step,

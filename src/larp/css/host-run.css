@@ -1,0 +1,409 @@
+/* The host console's Run tab (hostRun.js): queue, timer, Add Award, this round, projected totals, reveal controls.
+   Scoped under .larp-run. Owned by that screen; shared primitives live in base.css.
+   Three columns from 1200 px (queue and timer | Add Award and this round | Projected), stacked below. */
+
+.larp-run {
+  display: grid;
+  gap: var(--larp-gap);
+  align-items: start;
+}
+@media (min-width: 1200px) {
+  .larp-run {
+    grid-template-columns: minmax(15rem, 1fr) minmax(22rem, 1.6fr) minmax(15rem, 1fr);
+  }
+  /* With Preview Display beside it the tab is narrower: Projected moves under the queue. */
+  .larp-host-main:has(.larp-preview) .larp-run {
+    grid-template-columns: minmax(15rem, 1fr) minmax(20rem, 1.5fr);
+  }
+  .larp-host-main:has(.larp-preview) .larp-run-middle {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+  .larp-host-main:has(.larp-preview) .larp-run-right {
+    grid-column: 1;
+  }
+}
+@media (min-width: 760px) and (max-width: 1199px) {
+  .larp-run {
+    grid-template-columns: minmax(14rem, 1fr) minmax(18rem, 1.5fr);
+  }
+  /* Add Award spans both rows, so Projected sits right under the queue and timer. */
+  .larp-run-middle {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+  .larp-run-right {
+    grid-column: 1;
+  }
+}
+.larp-run-col {
+  display: grid;
+  gap: var(--larp-gap);
+  min-width: 0;
+}
+.larp-run-idle {
+  max-width: 40rem;
+}
+.larp-run h3.larp-label {
+  margin: 0 0 4px;
+}
+.larp-run-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* ---------- Queue ---------- */
+
+.larp-run-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.larp-run-row {
+  display: grid;
+  grid-template-columns: 1.1rem minmax(0, 1fr) auto;
+  grid-template-areas:
+    'mark who status'
+    'mark state status';
+  align-items: center;
+  column-gap: 8px;
+  padding: 4px 0;
+  box-shadow: 0 1px 0 var(--line);
+}
+.larp-run-mark {
+  grid-area: mark;
+  font: 600 0.875rem/1 var(--font-body);
+  color: var(--text-dim);
+  text-align: center;
+}
+.larp-run-row.is-performed .larp-run-mark::before {
+  content: '✓';
+}
+.larp-run-row.is-performing .larp-run-mark::before {
+  content: '▸';
+  color: var(--accent-hi);
+}
+.larp-run-row.is-performing {
+  background: color-mix(in srgb, var(--accent-lo) 22%, transparent);
+}
+.larp-run-who,
+.larp-run-pick {
+  grid-area: who;
+  min-width: 0;
+  justify-self: start;
+}
+.larp-run-pick {
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+.larp-run-pick:hover .larp-chip {
+  background: var(--inset-bg);
+}
+.larp-run-state {
+  grid-area: state;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  padding-left: 18px;
+}
+.larp-run-row.is-performing .larp-run-state {
+  color: var(--accent-hi);
+  font-weight: 600;
+}
+.larp-run-status,
+.larp-run-status-text {
+  grid-area: status;
+  width: auto;
+  min-width: 7.5rem;
+}
+.larp-run-status-text {
+  font-size: 0.875rem;
+  text-align: right;
+}
+/* No status yet: an outlined dash (it blocks publishing). */
+.larp-run-status.is-unset,
+.larp-run-status-text.is-unset {
+  box-shadow: 0 0 0 1px var(--accent-hi);
+  background: transparent;
+  color: var(--text-dim);
+}
+.larp-run-status-text.is-unset {
+  display: inline-block;
+  text-align: center;
+  padding: 2px 8px;
+  min-width: 2.5rem;
+}
+
+/* ---------- Timer and reveal ---------- */
+
+.larp-run-clockline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.larp-run-caption {
+  font-size: 0.9375rem;
+  color: var(--text-dim);
+}
+.larp-run-clock {
+  font-size: clamp(2.25rem, 3.4vw, 3rem);
+  line-height: 1.1;
+}
+.larp-run-clock.is-expired {
+  color: var(--accent-hi);
+}
+.larp-run-timeup {
+  margin-top: 4px;
+  font-size: 0.875rem;
+  color: var(--accent-hi);
+}
+.larp-run-step {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+/* ---------- Add Award ---------- */
+
+.larp-run-form {
+  display: grid;
+  gap: 12px;
+}
+.larp-run-form.is-editing {
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.larp-run-form-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.larp-run-form-head .larp-h2 {
+  margin: 0;
+}
+.larp-run-recipients {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.larp-run-recipients legend {
+  padding: 0;
+  margin-bottom: 4px;
+}
+.larp-run-search {
+  max-width: 20rem;
+}
+.larp-run-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 12.5rem;
+  overflow: auto;
+  padding: 2px;
+}
+.larp-run-recipient {
+  padding: 4px 8px 4px 6px;
+  box-shadow: 0 0 0 1px var(--line);
+}
+.larp-run-recipient:has(:checked) {
+  box-shadow: 0 0 0 1px var(--accent-hi);
+  background: color-mix(in srgb, var(--accent-lo) 30%, transparent);
+}
+.larp-run-recipient .larp-chip {
+  padding-right: 4px;
+}
+.larp-run-member {
+  font-weight: 500;
+}
+.larp-run-chip-sm {
+  font-size: 0.8125rem;
+  color: var(--text-dim);
+}
+.larp-run-to {
+  font-size: 1rem;
+}
+.larp-run-fields {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+}
+.larp-run-fields-points {
+  grid-template-columns: auto minmax(10rem, 1fr);
+  align-items: start;
+}
+@media (max-width: 480px) {
+  .larp-run-fields-points {
+    grid-template-columns: 1fr;
+  }
+}
+.larp-run-form .is-large .larp-hint {
+  color: var(--accent-hi);
+}
+.larp-run-duplicate {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--inset-bg);
+  box-shadow: 0 0 0 1px var(--accent-hi);
+}
+.larp-run-submit {
+  min-width: 10rem;
+}
+.larp-run-reuse {
+  display: grid;
+  gap: 4px;
+}
+.larp-run-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.larp-run-reuse-btn {
+  min-height: 30px;
+  padding: 3px 10px;
+  font-size: 0.875rem;
+}
+.larp-run-template {
+  display: inline-flex;
+}
+.larp-run-drop {
+  min-width: 28px;
+  border: 0;
+  background: var(--inset-bg);
+  box-shadow: 0 0 0 1px var(--line-strong);
+  cursor: pointer;
+  color: var(--text-dim);
+}
+.larp-run-drop:hover {
+  color: var(--text);
+}
+
+/* ---------- This round ---------- */
+
+.larp-run-entries {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.larp-run-entry {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 6px 0;
+  box-shadow: 0 1px 0 var(--line);
+}
+.larp-run-entry .larp-pts {
+  font-size: 0.875rem;
+}
+.larp-run-entry-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.larp-run-entry-text .larp-note {
+  margin-left: 6px;
+}
+.larp-run-entry-to {
+  font-weight: 600;
+}
+.larp-run-entry-author {
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.larp-run-entry-actions {
+  display: inline-flex;
+  gap: 2px;
+}
+.larp-run-entry-actions .larp-btn {
+  min-height: 30px;
+  padding: 3px 8px;
+  font-size: 0.875rem;
+}
+.larp-run-undo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  background: var(--panel-solid);
+  box-shadow: 0 0 0 1px var(--line-strong);
+}
+
+/* ---------- Projected ---------- */
+
+.larp-run-proj-note {
+  font-weight: 600;
+  color: var(--accent-hi);
+  font-size: 0.875rem;
+}
+.larp-run-legend {
+  font-size: 0.75rem;
+  margin: 2px 0 8px;
+}
+.larp-run-proj {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.larp-run-proj-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'team team'
+    'formula total';
+  gap: 2px 10px;
+  padding: 6px 0;
+  box-shadow: 0 1px 0 var(--line);
+}
+.larp-run-proj-row > .larp-chip {
+  grid-area: team;
+  justify-self: start;
+}
+.larp-run-formula {
+  grid-area: formula;
+  font-variant-numeric: tabular-nums;
+  padding-left: 11px;
+}
+.larp-run-formula .larp-pts {
+  font-weight: 500;
+}
+.larp-run-unset {
+  display: inline-block;
+  padding: 0 6px;
+  box-shadow: 0 0 0 1px var(--accent-hi);
+  color: var(--text-dim);
+}
+.larp-run-status-word {
+  font-size: 0.8125rem;
+  color: var(--text-dim);
+}
+.larp-run-total {
+  grid-area: total;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.larp-run-flag {
+  margin-top: 10px;
+  font-size: 0.875rem;
+}
+.larp-run-reveal-est {
+  margin-top: 12px;
+  font-size: 0.875rem;
+}

@@ -61,6 +61,7 @@ export const KEY_GROUPS = [
       { keys: ['S'], label: 'Settings' },
       { keys: ['/'], label: 'Search the settings' },
       { keys: ['I'], label: 'The pack: fast travel, swap the weapon, cast a ring, a living weapon or a new element' },
+      { keys: ['U'], label: 'The stats overlay: frame rate, particles, and the show’s section, look and live layers' },
       { keys: ['?'], label: 'These keyboard shortcuts' },
     ],
   },

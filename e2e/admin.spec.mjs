@@ -31,6 +31,7 @@ const PAGES = [
   'scenes',
   'headings',
   'interface',
+  'invitation',
 ];
 
 /** Collect what the Content Security Policy refuses: its events in the page, and the console's words. */

@@ -130,10 +130,11 @@
  */
 
 /**
- * What main.js gives the parts: building the scene, and capping how often it's drawn.
+ * What main.js gives the parts: building the scene, capping how often it's drawn, its stats.
  * @typedef {object} MainPart
  * @property {() => Promise<void>} startScene  build the scene (again: a setting it's built with changed)
  * @property {() => void} applyFrameRate  Frame Rate as the scene's cap
+ * @property {() => void} applyStats  the Stats Overlay shown or not, as the setting says
  */
 
 /** @typedef {LiveState & ScenesPart & CardsPart & SourcesPart & StartPart & HudPart & ActionsPart & DialogsPart & RenderPart & PackPart & MidiPart & OutputPart & MainPart} LiveContext */

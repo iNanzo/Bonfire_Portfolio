@@ -409,8 +409,12 @@ export function createBoltLines(fxMaterial, maxSegments, maxRibbons = 0, { after
         R.commit();
       }
     },
+    /** Segments drawn this frame, and the most it has room for (the stats overlay's bolts). */
     get count() {
       return v / 2;
+    },
+    get cap() {
+      return maxSegments;
     },
   };
 }

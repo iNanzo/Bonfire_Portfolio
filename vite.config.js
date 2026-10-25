@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig, normalizePath } from 'vite';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import sharp from 'sharp';
@@ -55,7 +55,7 @@ function routePages() {
       writeFileSync(resolve(outDir, 'sitemap.xml'), sitemap(publicRoutes(), ['/visualizer/', '/painter/']));
       writeFileSync(
         resolve(outDir, 'robots.txt'),
-        `User-agent: *\nAllow: /\nDisallow: /admin/\n\nSitemap: ${new URL('sitemap.xml', site.url).href}\n`,
+        `User-agent: *\nAllow: /\nDisallow: /admin/\nDisallow: /larp/\n\nSitemap: ${new URL('sitemap.xml', site.url).href}\n`,
       );
     },
   };
@@ -78,12 +78,16 @@ async function socialImage(src, title, out) {
 
 // The portfolio's first load (index.html's script and its modulepreloads) is the site's
 // alone. Bonfire Live's and the Painter's modules (the scene format, the looks, the scene
-// store, the palette maker) only ever reach it through a static import from the site: the
-// four pages are built together, and Rolldown puts a module every page reaches into the
-// chunk they share, so one `import` in src/main.js of something that imports scenes.js
-// (contentRules.js does) adds ~20 kB gzip to every visit. The site imports those lazily
-// (`import()`); this check says so at build time if one comes back.
-const SHOW_ONLY = /[\\/]src[\\/]((scenes|sceneStore|paletteGen)\.js|visualizer[\\/]|painter[\\/])/;
+// store, the palette maker), the campfire game's (src/larp/) and the invitation toy's
+// (src/invitation/) only ever reach it through a static import from the site: the pages are
+// built together, and Rolldown puts a module every page reaches into the chunk they share, so
+// one `import` in src/main.js of something that imports scenes.js (contentRules.js does) adds
+// ~20 kB gzip to every visit. The site imports those lazily (`import()`); this check says so at
+// build time if one comes back. (The other way round, a page importing one of the site's own
+// modules shares a chunk with its first load too: the invitation toy imports only three.js,
+// GLTFLoader and its own modules.)
+const SHOW_ONLY =
+  /[\\/]src[\\/]((scenes|sceneStore|paletteGen)\.js|visualizer[\\/]|painter[\\/]|larp[\\/]|invitation[\\/])/;
 const shortId = (id) =>
   id
     .split('\\')
@@ -119,15 +123,51 @@ function firstLoadGuard() {
       const stray = firstLoadModules(bundle, 'main').filter((id) => SHOW_ONLY.test(id));
       if (stray.length)
         this.warn(
-          `The portfolio's first load carries Bonfire Live / Painter modules: ${stray.map(shortId).join(', ')}. Import what pulls them in lazily (import()) from the site.`,
+          `The portfolio's first load carries Bonfire Live / Painter / campfire game / invitation toy modules: ${stray.map(shortId).join(', ')}. Import what pulls them in lazily (import()) from the site.`,
         );
+    },
+  };
+}
+
+// The invitation toy's editable content (content.json `invitation`, the admin's) as a module of
+// its own, `virtual:invitation-content`: read from the file at build and dev time with only that
+// subtree inlined, so the toy never imports content.json (whose chunk the portfolio's first load
+// shares); the file is watched, so an edit reloads the toy in dev. The other way round, the
+// pages that import content.json itself (the portfolio, Bonfire Live, the Painter) get it
+// without that subtree: NEWT's lines in every visit would be weight for nothing.
+const INVITATION_CONTENT = 'virtual:invitation-content';
+/**
+ * @param {string} [file]  content.json
+ * @returns {import('vite').Plugin & {resolveId: Function, load: Function, transform: Function}}
+ */
+export function invitationContent(file = resolve(import.meta.dirname, 'src/content.json')) {
+  const resolved = `\0${INVITATION_CONTENT}`;
+  const target = normalizePath(file);
+  return {
+    name: 'invitation-content',
+    enforce: 'pre',
+    resolveId(id) {
+      return id === INVITATION_CONTENT ? resolved : null;
+    },
+    load(id) {
+      if (id !== resolved) return null;
+      this.addWatchFile(file);
+      const c = JSON.parse(readFileSync(file, 'utf8'));
+      return `export default ${JSON.stringify(c?.invitation ?? {})};\n`;
+    },
+    transform(code, id) {
+      if (normalizePath(id.split('?')[0]) !== target) return null;
+      const c = JSON.parse(code);
+      if (!c || typeof c !== 'object' || !('invitation' in c)) return null;
+      delete c.invitation;
+      return { code: JSON.stringify(c), map: null };
     },
   };
 }
 
 export default defineConfig({
   base: repo ? `/${repo}/` : '/',
-  plugins: [routePages(), firstLoadGuard()],
+  plugins: [routePages(), firstLoadGuard(), invitationContent()],
   build: {
     // The largest chunk is three.js's renderer (~410 kB, lazy-loaded with the fire); the
     // bonfire's own code is a chunk of its own beside it (~320 kB). More than this is
@@ -139,6 +179,11 @@ export default defineConfig({
         notFound: resolve(import.meta.dirname, '404.html'),
         visualizer: resolve(import.meta.dirname, 'visualizer/index.html'),
         painter: resolve(import.meta.dirname, 'painter/index.html'),
+        // The campfire game (/larp/): noindex, left out of the sitemap, Disallow'd in robots.txt.
+        larp: resolve(import.meta.dirname, 'larp/index.html'),
+        // The invitation toy (/invitation/): unlisted, so noindex and left out of the sitemap,
+        // but not Disallow'd (a Disallow is public, and would hide the noindex from crawlers).
+        invitation: resolve(import.meta.dirname, 'invitation/index.html'),
       },
       output: {
         codeSplitting: {

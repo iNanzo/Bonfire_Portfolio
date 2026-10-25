@@ -33,6 +33,7 @@ export const PAGE_DEFAULTS = {
   intro: true, // the main title card when the music starts
   cards: [], // more title cards: [{ title, subtitle, show: drops | phrases | manual }]
   frameRate: 'display', // how often the picture is drawn: display (every frame the screen shows) | '60' | '30'
+  stats: false, // the stats overlay in a corner: frames, particles, what the show is doing (U)
 };
 // Switch groups (one checkbox each): a saved group keeps only the switches that still exist.
 export const GROUPS = ['elements', 'moves', 'flyMoves', 'mirrors', 'xrayViews', 'knightMoves', 'knightHelmets'];
@@ -119,7 +120,7 @@ export const CHOICES = {
   frameRate: ['display', '60', '30'],
 };
 // What a setup (or a preset) never changes: this computer's own things.
-export const LOCAL = ['deviceId', 'volume', 'view', 'frameRate'];
+export const LOCAL = ['deviceId', 'volume', 'view', 'frameRate', 'stats'];
 export const CARD_SHOWS = {
   drops: 'On Drops (Taking Turns)',
   phrases: 'Every 32 Bars',

@@ -27,6 +27,7 @@ export default defineConfig({
   reporter: process.env.CI ? 'github' : 'list',
   use: {
     baseURL: origin,
+    trace: 'retain-on-failure',
     channel: process.env.PW_CHANNEL || undefined,
     launchOptions: {
       args: [

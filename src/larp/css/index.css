@@ -1,0 +1,7 @@
+/* The campfire game's styles, in order: the shared base, then each screen's own file. */
+@import './base.css';
+@import './host-run.css';
+@import './host-setup.css';
+@import './host-review.css';
+@import './judge.css';
+@import './display.css';

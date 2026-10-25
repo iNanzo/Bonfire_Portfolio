@@ -32,6 +32,7 @@ import { sceneSwatches, sceneSummary } from '../scenes.js';
 import { entriesFor, ITEM_HINTS, sharedRange } from '../settingsMap.js';
 import {
   CARD_SHOWS,
+  PAGE_DEFAULTS,
   PRESETS,
   RANDOM,
   AT_LEAST_ONE,
@@ -203,7 +204,7 @@ export function kindOf(key) {
   if (GROUPS.includes(key)) return 'checks';
   if (Object.hasOwn(OPTIONS, key)) return 'select';
   if (MODE_KEYS.has(key)) return 'tri';
-  if (typeof DEFAULT_SETTINGS[key] === 'boolean' || key === 'intro') return 'check';
+  if (typeof DEFAULT_SETTINGS[key] === 'boolean' || typeof PAGE_DEFAULTS[key] === 'boolean') return 'check';
   return 'range';
 }
 
