@@ -612,9 +612,13 @@ function start(s) {
    * walked in, turned to the camera), so its line, face and gesture begin together.
    */
   let introHeld = false;
-  /** The envelope still hides his head or chest as it fades (envelope.veils): the intro's line waits. */
-  let envelopeVeils = false;
-  const veiled = () => Boolean(envelope?.state === 'fading' && character && envelope.veils(newtSpots()));
+  /**
+   * The envelope still hides him (envelope.veils: covering the toy, or fading with the letter
+   * still over his head or chest), as of this frame's step: the intro's first line waits on it.
+   * (With an envelope it starts out over him.)
+   */
+  let envelopeVeils = Boolean(envelope);
+  const veiled = () => Boolean(envelope && character && envelope.veils(newtSpots()));
   /** His head, collar and middle on screen, client px, each with its radius (for envelope.veils). */
   function newtSpots() {
     const { head, body } = shape();
@@ -1805,8 +1809,8 @@ function start(s) {
         burst: Boolean(burst),
         // (The envelope's state, null without one: types.js EnvelopeState.)
         envelope: envelopeState(),
-        // (It still hides his head or chest as it fades, now: the intro's first line waits on it.)
-        envelopeVeils: veiled(),
+        // (It still hides him, as of the last step: the intro's first line waits on it.)
+        envelopeVeils,
         options,
         motion: motionSnapshot(),
         drag: dragSnapshot(),
