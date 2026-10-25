@@ -778,7 +778,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   petal's `aShade`, its id pass on the scene's `uIdPass`); `buildInk`, the ink pass for a
   petals-only drawing), `petalLayer.js` (`createPetalLayer(root, {on})`: the page's petals, a
   fixed `canvas.inv-petals` at z-index 4 over everything with `pointer-events: none`, its own
-  WebGLRenderer at the envelope's texel size, `pageUnit` (`LAYER_SCALE` of the envelope's letter
+  WebGLRenderer at the envelope's texel size, made with the first press or move that may shed
+  petals (never with Rose Petals off or reduced motion; refused, it tries once), `pageUnit` (`LAYER_SCALE` of the envelope's letter
   width); passive capture-phase `pointerdown`, `pointermove`, `pointerup` and `pointercancel` on
   the document (never `preventDefault`) drive the trail and a ring at each press, the primary
   pointer only; it draws only while petals are up or a finger is held, then clears and stops;
@@ -888,7 +889,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   runner, and content.js's intro as it plays), the speech and content tests above,
   `invitationEnvelope` (its states, swipes, keys and timeline), `invitationPetals` (the petals'
   shapes, variety, the stepped simulation and every flow, the trail's spacing and rate),
-  `invitationPetalSetting` (Rose Petals stored with the look),
+  `invitationPetalSetting` (Rose Petals stored with the look), `invitationPetalLayer` (no WebGL
+  context till petals may come),
   `e2e/invitation.spec.mjs`, `e2e/invitationDialogue.spec.mjs`,
   `e2e/invitationEnvelope.spec.mjs` and `e2e/invitationPetals.spec.mjs` (the page's petal layer:
   the mouse, a finger, Rose Petals off, reduced motion) (`npm run e2e -- invitation`).
@@ -936,7 +938,7 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   stands still while the envelope covers him) and `envelope()` the envelope's state, reduced
   motion, pose, frames drawn, `petals` (`live`, and how many each flow has `emitted`), `seal`
   (its `first` and `last` placements), `hover` (`k`, `pulse`) and `turn` (`now`, `pointer`,
-  `key`); `petals()` the page's petal layer (`running`, `on`, `live`, `emitted`, `texels`). `?seed=N` makes the randomness repeatable; `?calm` stops him wandering and sitting by himself; `?perf` shows the frame times
+  `key`); `petals()` the page's petal layer (`gpu`: `none` till its renderer is made, `up` or `failed`; `running`, `on`, `live`, `emitted`, `texels`). `?seed=N` makes the randomness repeatable; `?calm` stops him wandering and sitting by himself; `?perf` shows the frame times
   (p50 and p90), the GPU's time a frame where the browser can measure it, the grid, the
   governor's level and the zoom in a corner; `?govern` turns the governor on under `?test`.
 - **Captures:** `node tools/capture-invitation.mjs` records real-speed clips of every clip and

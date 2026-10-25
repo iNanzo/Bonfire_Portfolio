@@ -31,7 +31,9 @@ async function toucher(page) {
 const total = (emitted) => Object.values(emitted).reduce((a, b) => a + b, 0);
 
 test.describe('with a mouse', () => {
-  test('the layer is over the whole page, lets every press through, and sleeps at rest', async ({ page }) => {
+  test('the layer is over the whole page, lets every press through, sleeps at rest, and has no renderer till a move', async ({
+    page,
+  }) => {
     await toyUp(page);
     const layer = page.locator('canvas.inv-petals');
     await expect(layer).toHaveCount(1);
@@ -42,6 +44,11 @@ test.describe('with a mouse', () => {
     expect(style).toEqual({ pe: 'none', pos: 'fixed', z: 4 });
     await expect.poll(async () => (await petals(page)).running).toBe(false);
     expect((await petals(page)).on).toBe(true);
+    // (No WebGL context at boot: it comes with the first move that may shed petals.)
+    expect((await petals(page)).gpu).toBe('none');
+    const a = clear(page);
+    await page.mouse.move(a.x, a.y);
+    await expect.poll(async () => (await petals(page)).gpu).toBe('up');
   });
 
   test('the mouse moving over the toy trails petals, a click bursts a ring, and then it sleeps', async ({ page }) => {
@@ -94,6 +101,7 @@ test.describe('with a mouse', () => {
     expect(total(off.emitted)).toBe(0);
     expect(off.live).toBe(0);
     expect(off.running).toBe(false);
+    expect(off.gpu, 'no renderer made while they are off').toBe('none');
     // The Settings switch shows it off; switched on, a move trails them again.
     await page.getByRole('button', { name: 'Settings' }).click();
     const sw = page.getByRole('switch', { name: 'Rose Petals' });
@@ -120,6 +128,7 @@ test.describe('with a mouse', () => {
     const s = await petals(page);
     expect(s.on).toBe(false);
     expect(total(s.emitted)).toBe(0);
+    expect(s.gpu, 'no renderer made').toBe('none');
   });
 
   test('over the envelope too, the mouse trails petals and the letter keeps floating', async ({ page }) => {

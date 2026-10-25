@@ -280,7 +280,10 @@ const ui = bindUi(stageEl, {
 });
 installCursors();
 stageEl.dataset.cursor = 'arrow';
-/** The page's rose petals (the cursor trail and a ring at every press), over everything, for good. */
+/**
+ * The page's rose petals (the cursor trail and a ring at every press), over everything, for good
+ * (its renderer made only once petals may come).
+ */
 const petalLayer = createPetalLayer(stageEl, { on: () => petalsOn(look) && !prefersReduced() });
 
 /** Whether the visitor asked for less motion (false where it can't be read). */
@@ -1927,8 +1930,8 @@ function start(s) {
       clock: () => t,
       /** The envelope's state, reduced motion, pose and frames drawn; null without one. */
       envelope: () => envelope?.snapshot() ?? null,
-      /** The page's petal layer (petalLayer.js snapshot): drawing, on, up, launched; null without one. */
-      petals: () => petalLayer?.snapshot() ?? null,
+      /** The page's petal layer (petalLayer.js snapshot): its renderer, drawing, on, up, launched. */
+      petals: () => petalLayer.snapshot(),
       /** @param {'head'|'body'|'feet'} part */
       screen(part) {
         const sh = shape();
