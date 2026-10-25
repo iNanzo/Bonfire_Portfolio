@@ -481,7 +481,9 @@ test('held, he thrashes every 3–7 s (sooner when he’s shaken): Thrash once f
       assert.equal(out.state, 'held');
       assert.equal(out.restart, true, 'from its start');
       const waited = s.w.t - hangingSince;
-      assert.ok(waited >= 3 - DT && waited <= 7 + DT, `seed ${seed}: thrashed after ${waited.toFixed(2)} s hanging`);
+      // (One due as a glance up comes waits for it: up to the Thrash's length and the glance's.)
+      const most = TUNE.thrashMax + CLIPS.Thrash.length + TUNE.lookUpForMax;
+      assert.ok(waited >= 3 - DT && waited <= most + DT, `seed ${seed}: thrashed after ${waited.toFixed(2)} s hanging`);
       const began = s.w.t;
       const back = s.until((o) => o.clip !== 'Thrash', 3);
       assert.equal(back.clip, 'Held', 'back to Held');
@@ -521,7 +523,7 @@ test('held, he thrashes every 3–7 s (sooner when he’s shaken): Thrash once f
   assert.equal(out.clip, 'Fall');
 });
 
-test('held, his head hangs (a light look aimed down) and every 3–6 s he glances up at you for 0.8–1.2 s, eased up and back down, the hung look’s weight left as it is (the glance has its own); never during a Thrash', () => {
+test('held, his head hangs (a light look aimed down) and 1.5–2.5 s after the grab, then every 2.5–4.5 s from one glance’s start to the next, he glances up at you for 0.8–1.2 s, eased up and back down, the hung look’s weight left as it is (the glance has its own); never during a Thrash', () => {
   for (const seed of [1, 2, 3, 4, 5]) {
     const s = sim({ seed, tune: { thrashMin: 99, thrashMax: 99 } });
     let out = s.grab();
@@ -559,16 +561,17 @@ test('held, his head hangs (a light look aimed down) and every 3–6 s he glance
       if (on && up === 0) {
         on.to = s.w.t;
         glances.push({ ...on, after: on.from - last });
-        last = s.w.t;
+        last = on.from;
         on = null;
       }
       prev = up;
     }
-    assert.ok(glances.length >= 2, `seed ${seed}: ${glances.length} glances up in 20 s`);
-    for (const g of glances) {
+    assert.ok(glances.length >= 4, `seed ${seed}: ${glances.length} glances up in 20 s`);
+    for (const [i, g] of glances.entries()) {
+      const [lo, hi] = i === 0 ? [TUNE.lookUpFirstMin, TUNE.lookUpFirstMax] : [TUNE.lookUpMin, TUNE.lookUpMax];
       assert.ok(
-        g.after >= TUNE.lookUpMin - DT && g.after <= TUNE.lookUpMax + DT,
-        `seed ${seed}: up after ${g.after.toFixed(2)} s`,
+        g.after >= lo - DT && g.after <= hi + DT,
+        `seed ${seed}: glance ${i + 1} up after ${g.after.toFixed(2)} s`,
       );
       const long = g.to - g.from;
       assert.ok(
@@ -600,10 +603,83 @@ test('held, his head hangs (a light look aimed down) and every 3–6 s he glance
   assert.equal(out.look.up, undefined);
 });
 
+test('“Full droop, occasionally looks up”: over a 12 s still hold, thrashes and all, he glances up at least 3 times, never while he thrashes', () => {
+  assert.equal(TUNE.lookUpMin, 2.5);
+  assert.equal(TUNE.lookUpMax, 4.5);
+  // (A Thrash that waits for a glance up always fits before the next one.)
+  assert.ok(TUNE.lookUpMin - TUNE.lookUpForMax > CLIPS.Thrash.length);
+  for (let seed = 1; seed <= 24; seed++) {
+    const s = sim({ seed });
+    s.grab();
+    let glances = 0;
+    let thrashes = 0;
+    let prev = s.w.out;
+    for (let i = 0; i < Math.round(12 / DT); i++) {
+      const out = s.frame();
+      if (out.clip === 'Thrash') assert.equal(out.look.up, 0, `seed ${seed}: not up while he thrashes`);
+      if (out.look.up === 1 && prev.look.up < 1) glances++;
+      if (out.clip === 'Thrash' && prev.clip !== 'Thrash') thrashes++;
+      prev = out;
+    }
+    assert.equal(s.w.out.state, 'held');
+    assert.ok(thrashes >= 1, `seed ${seed}: he thrashed (${thrashes})`);
+    assert.ok(glances >= 3, `seed ${seed}: ${glances} glances up in 12 s (${thrashes} thrashes)`);
+  }
+});
+
+test('held, a Thrash that comes due during a glance up waits for it to end; a hard shake’s cuts it short, and the glance comes again TUNE.lookUpRest s after the Thrash', () => {
+  // (Due at 3 s, with the glance up at 2.5 s for 1.2, or due at 3.5 s, before the Thrash would be
+  // over: the Thrash waits till it's down, then comes at once.)
+  for (const first of [2.5, 3.5]) {
+    const glance = { lookUpFirstMin: first, lookUpFirstMax: first, lookUpForMin: 1.2, lookUpForMax: 1.2 };
+    const s = sim({ tune: { thrashMin: 3, thrashMax: 3, ...glance } });
+    s.grab();
+    const t0 = s.w.t - DT;
+    s.until((o) => o.look.up === 1, 5);
+    const out = s.until((o) => o.clip === 'Thrash', 3);
+    assert.equal(out.look.up, 0);
+    const at = s.w.t - t0;
+    assert.ok(
+      at >= first + 1.2 - 2 * DT && at <= first + 1.2 + 2 * DT,
+      `the Thrash at ${at.toFixed(2)} s, as the glance ends`,
+    );
+  }
+  // (Shaken hard in the middle of one: the Thrash cuts it, and it's back after.)
+  const h = sim({
+    tune: {
+      thrashMin: 99,
+      thrashMax: 99,
+      lookUpFirstMin: 2.5,
+      lookUpFirstMax: 2.5,
+      lookUpForMin: 1.2,
+      lookUpForMax: 1.2,
+    },
+  });
+  h.grab();
+  h.until((o) => o.look.up === 1, 3);
+  h.w.carry = { dragSpeed: 0, shake: TUNE.shakeHard + 5 };
+  h.until((o) => o.clip === 'Thrash', 2);
+  h.w.carry = { dragSpeed: 0, shake: 0 };
+  h.until((o) => o.clip !== 'Thrash', 3);
+  const ended = h.w.t;
+  h.until((o) => o.look.up > 0, 3);
+  const after = h.w.t - DT - ended;
+  assert.ok(
+    Math.abs(after - TUNE.lookUpRest) <= 2 * DT,
+    `the cut glance up again ${after.toFixed(2)} s after the Thrash`,
+  );
+});
+
 test('held, a glance up that came due while he thrashed comes TUNE.lookUpRest s after the Thrash, not a whole wait later', () => {
-  const s = sim({ tune: { thrashMin: 3.5, thrashMax: 3.5, lookUpMin: 4, lookUpMax: 4 } });
+  // (Only a shake's Thrash can be under way as one comes due: any other waits for it.)
+  const s = sim({ tune: { thrashMin: 99, thrashMax: 99, lookUpFirstMin: 2.4, lookUpFirstMax: 2.4 } });
   s.grab();
-  s.until((o) => o.clip === 'Thrash', 5);
+  s.run(1.6);
+  s.w.carry = { dragSpeed: 0, shake: TUNE.shakeHard + 5 };
+  s.frame();
+  s.w.carry = { dragSpeed: 0, shake: 0 };
+  s.until((o) => o.clip === 'Thrash', 2);
+  assert.equal(s.w.out.look.up, 0, 'not up yet');
   const out = s.until((o) => o.clip !== 'Thrash', 3);
   assert.equal(out.look.up, 0);
   const ended = s.w.t;

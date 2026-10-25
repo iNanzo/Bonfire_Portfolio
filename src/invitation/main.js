@@ -93,13 +93,12 @@ import './envelope.css';
 import { DANGLE, createBrain, dangleLift, talkPhase } from './brain.js';
 import { createBubble, speakerPoint } from './bubble.js';
 import { introFrom, introScript, invitationDefaults, invitationLines, speechSettings } from './content.js';
-import { CARRY, carryFeel } from './carry.js';
+import { CARRY, createHand, handFeel, handStep } from './carry.js';
 import {
   CUES,
   blobLook,
   blobWeight,
   cueStep,
-  dragSpeedOf,
   groundCueMode,
   lineMode,
   lineShare,
@@ -107,7 +106,7 @@ import {
   ringFloor,
   ringStrength,
 } from './cues.js';
-import { depthAlong, squash } from './hold.js';
+import { depthAlong, levelAxes, squash } from './hold.js';
 import { createHold } from './holds/index.js';
 import { NEWT_HEIGHT, playArea, viewArea } from './area.js';
 import {
@@ -557,6 +556,8 @@ function start(s) {
   let holdT0 = 0;
   /** @type {import('./hold.js').HoldStep|null} the hold's last frame */
   let holdNow = null;
+  /** @type {import('./types.js').HandState|null} the user's own pointer while he's held: what the brain feels (carry.js handStep) */
+  let hand = null;
   /** @type {{x: number, y: number}|null} where the hold aims his collar, client px (the pointer, lifted over a finger) */
   let aimPx = null;
   /** The last hold's kind has the squash and stretch (it plays on through his landing). */
@@ -1266,7 +1267,7 @@ function start(s) {
       pointer: ptr?.floor ?? null,
       newt: { x: body.root.x, z: body.root.z, yaw: body.body.yaw, grounded: body.grounded },
       clip: playing ? { name: playing, time, remaining: c.clipLength(playing) - time } : null,
-      carry: body.carry ? { ...carryFeel(body.carry), dragSpeed: dragSpeedOf(screenSpeed(body.carry)) } : null,
+      carry: body.carry && hand ? handFeel(hand) : null,
       camera: dialogue ? talkSpot() : orbitSpot(cam),
       dialogue,
     });
@@ -1279,15 +1280,15 @@ function start(s) {
   }
 
   /**
-   * How fast his collar moves on screen while he's held, CSS px a second (the swing's drive, a
-   * smoothed follow of the anchor, carried a moment on at its speed).
-   * @param {import('./types.js').CarryState} c
+   * CSS px a world unit across the screen at `p` (along the camera's level right), so the hand's
+   * shake in px reads in the world units the brain's TUNE.shakeSoft and shakeHard are in.
+   * @param {import('./types.js').XYZ} p
    */
-  function screenSpeed(c) {
-    const k = 0.02;
-    const a = onScreen(c.drive);
-    const b = onScreen({ x: c.drive.x + c.vel.x * k, y: c.drive.y + c.vel.y * k, z: c.drive.z + c.vel.z * k });
-    return Math.hypot(b.x - a.x, b.y - a.y) / k;
+  function pxPerUnit(p) {
+    const { right } = levelAxes(cam.yaw);
+    const a = onScreen(p);
+    const b = onScreen({ x: p.x + right.x * 0.1, y: p.y, z: p.z + right.z * 0.1 });
+    return Math.hypot(b.x - a.x, b.y - a.y) / 0.1;
   }
 
   /** The camera as a drag kind reads it (hold.js HoldCamera). */
@@ -1341,6 +1342,8 @@ function start(s) {
         headAbove = press.y0 - (head.y - head.r);
         // (The grab ring, where the grip is made; it follows the point grabbed: effects.)
         burst = { t0: t, x: press.x, y: press.y };
+        // (What he feels: the pointer itself, from where it is as he's grabbed.)
+        hand = createHand({ x: press.x, y: press.y }, t);
       }
       // (A finger's lift over itself, coming in as he's picked up. Near the top of the stage it
       // gives way, then the finger's own spot, so the top of his head stays on the screen: lifted,
@@ -1370,6 +1373,8 @@ function start(s) {
         stage: { top: box.top, height: box.height },
       });
       target = holdNow.anchor;
+      // (Shaken and dragged only by the user's own pointer, never by the kind easing him onto it.)
+      if (hand) handStep(hand, { x: press.x, y: press.y }, dt, t, pxPerUnit(target));
       // (The plane he's dragged on: at the play area's edge he stops along it, carry.js holdStep.)
       if (body.carry) body.carry.plane = holdNow.plane;
       return null;
@@ -1380,6 +1385,7 @@ function start(s) {
     cue.flight = released ? (hold.landing ?? null) : null;
     hold = null;
     holdNow = null;
+    hand = null;
     aimPx = null;
     return released;
   }
