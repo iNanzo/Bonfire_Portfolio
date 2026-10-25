@@ -151,7 +151,7 @@ test.describe('with a mouse', () => {
     await expect.poll(async () => (await petals(page)).emitted.trail).toBeGreaterThan(0);
     const start = (await petals(page)).emitted;
     // Along the toolbar, button to button, its labels showing.
-    const tools = page.locator('.inv-toolbar .inv-tool');
+    const tools = page.locator('.inv-toolbar .inv-tool:visible');
     const first = await middle(tools.first());
     const last = await middle(tools.last());
     await page.mouse.move(first.x, first.y);
@@ -162,8 +162,8 @@ test.describe('with a mouse', () => {
     const pad = page.locator('.inv-camera-pad');
     await expect(pad).toBeVisible();
     await page.getByRole('button', { name: 'Zoom In', exact: true }).click();
-    const p0 = await middle(pad.locator('button').first());
-    const p1 = await middle(pad.locator('button').last());
+    const p0 = await middle(pad.locator('button:visible').first());
+    const p1 = await middle(pad.locator('button:visible').last());
     await page.mouse.move(p0.x, p0.y);
     await page.mouse.move(p1.x, p1.y, { steps: 20 });
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
