@@ -405,7 +405,7 @@ test('the speech and the lines go under the plan’s kinds, every trigger in one
     'dropped',
     'landed',
   ]);
-  // (Give Device's two moments go with sitting: he sits down with the tablet, then lies down with it.)
+  // (Screen Time's two moments go with sitting: he sits down with the tablet, then lies down with it.)
   assert.deepEqual(SUBGROUPS['invitation.lines'].find((g) => g.label === 'Sitting').keys, [
     'sitDown',
     'sitting',
