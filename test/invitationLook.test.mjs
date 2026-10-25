@@ -735,20 +735,20 @@ test('the retro pass warms the path it isn’t drawing (the canvas’s while the
   await assert.doesNotReject(plain.warm(scene, camera));
 });
 
-test('the toolbar, the camera pad and the Settings sheet: every button named by its own label beside a pixel icon, the settings checked, no tooltips', () => {
+test('the toolbar, the camera pad and the Settings sheet: every button named by its own label beside its icon, the settings checked, no tooltips', () => {
   const bar = toolbarHtml();
-  // The bar: Replay Intro, Wave, Sit, Give Device, Run, Camera and Settings, each a squircle with
-  // its pixel icon and its label in a span (the button's name: no aria-label, no title=). Spook
+  // The bar: Replay Intro, Wave, Sit, Screen Time, Run, Camera and Settings, each a squircle with
+  // its icon and its label in a span (the button's name: no aria-label, no title=). Spook
   // and Wander have left it (a tap on him still spooks or waves him; Wander is a setting).
   assert.equal(INTRO_LABEL, 'Replay Intro');
   assert.deepEqual([...BUTTONS], ['Wave', 'Sit', 'Device', 'Run']);
-  assert.deepEqual(BUTTON_LABELS, { Wave: 'Wave', Sit: 'Sit', Device: 'Give Device', Run: 'Run' });
+  assert.deepEqual(BUTTON_LABELS, { Wave: 'Wave', Sit: 'Sit', Device: 'Screen Time', Run: 'Run' });
   /** The bar's own buttons (not the pad's), in order: their attributes and their inside. */
   const own = [
     ...bar.replace(/<div class="inv-camera-pad"[^]*?<\/div>/, '').matchAll(/<button ([^>]*)>([^]*?)<\/button>/g),
   ];
   const labels = own.map((m) => /<span class="inv-btn-label">([^<]+)<\/span>$/.exec(m[2])?.[1]);
-  assert.deepEqual(labels, ['Replay Intro', 'Wave', 'Sit', 'Give Device', 'Run', 'Camera', 'Settings']);
+  assert.deepEqual(labels, ['Replay Intro', 'Wave', 'Sit', 'Screen Time', 'Run', 'Camera', 'Settings']);
   for (const [i, m] of own.entries()) {
     const label = labels[i] ?? '';
     assert.match(m[1], /^type="button" class="inv-btn inv-tool[^"]*"/, `${label}: a tool button`);
@@ -795,15 +795,15 @@ test('the toolbar, the camera pad and the Settings sheet: every button named by 
     /inv-hint[^>]*>[^<]*(drag|Drag)[^<]*(pinch|scroll)[^<]*\./,
     'how to turn and zoom by hand, in a sentence',
   );
-  // Give Device reads as what its next press does: Lie Down while he sits with the tablet, Get
-  // Up while he lies (BrainOut.deviceLabel; with none, from BrainOut.device, else Give Device).
-  assert.deepEqual([...DEVICE_LABELS], ['Give Device', 'Lie Down', 'Get Up']);
-  assert.equal(deviceLabelOf({}), 'Give Device');
-  assert.equal(deviceLabelOf({ device: null }), 'Give Device');
+  // Screen Time reads as what its next press does: Lie Down while he sits with the tablet, Get
+  // Up while he lies (BrainOut.deviceLabel; with none, from BrainOut.device, else Screen Time).
+  assert.deepEqual([...DEVICE_LABELS], ['Screen Time', 'Lie Down', 'Get Up']);
+  assert.equal(deviceLabelOf({}), 'Screen Time');
+  assert.equal(deviceLabelOf({ device: null }), 'Screen Time');
   assert.equal(deviceLabelOf({ device: 'sit' }), 'Lie Down');
   assert.equal(deviceLabelOf({ device: 'lie' }), 'Get Up');
   assert.equal(deviceLabelOf({ deviceLabel: 'Get Up', device: 'sit' }), 'Get Up', 'the brain’s label first');
-  assert.equal(deviceLabelOf({ deviceLabel: 'Fly' }), 'Give Device', 'never a label it doesn’t know');
+  assert.equal(deviceLabelOf({ deviceLabel: 'Fly' }), 'Screen Time', 'never a label it doesn’t know');
   for (const label of DEVICE_LABELS) assert.ok(LABEL_ICONS[label], `${label}: an icon`);
   const sheet = sheetHtml({ pixelSize: '24', dither: false, outlines: true, style: 'soft' });
   assert.match(sheet, /role="dialog" aria-modal="true"/, 'a modal dialog: what lies behind it is out of reach');

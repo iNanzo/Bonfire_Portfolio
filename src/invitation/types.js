@@ -21,7 +21,7 @@
 //   7. lookStep → character.applyLook (on top of the saved pose: it never adds up; his chest
 //      joins in for big looks while he's on his feet, lookAt.js chestShare and torsoStep)
 //   8. faceStep → character.setFace; character.accessories (his earrings swing on his head as
-//      the look left it; Give Device's tablet at his palms); bubble.update (while a line is up): his head on screen
+//      the look left it; Screen Time's tablet at his palms); bubble.update (while a line is up): his head on screen
 //      (character.screenShape; null while the open Look sheet covers it, bubble.js
 //      speakerPoint), clear of the toolbar and the open sheet
 //   9. stage.render: the shadow map once, the colour pass, the retro pass
@@ -71,7 +71,7 @@
  */
 
 /**
- * @typedef {'Wave'|'Spook'|'Sit'|'Run'|'Wander'|'Device'} ButtonName  Device: Give Device (each press
+ * @typedef {'Wave'|'Spook'|'Sit'|'Run'|'Wander'|'Device'} ButtonName  Device: Screen Time (each press
  *   sits him with the tablet, then lies him down with it, then gets him up); Spook and Wander
  *   stay brain inputs though the toolbar no longer shows them (a tap spooks; Wander is a setting)
  */
@@ -101,7 +101,7 @@
 /**
  * @typedef {object} BrainOut
  * @property {string} state  idle, walk, react, flee, held, fall, land, sitDown, sit, standUp, talk,
- *   and Give Device's deviceSit, lieDown, deviceLie, getUp
+ *   and Screen Time's deviceSit, lieDown, deviceLie, getUp
  * @property {string} clip  'gait' (Idle/Walk/Run by speed) or a clip name
  * @property {boolean} restart  start `clip` from 0 this frame
  * @property {{mode: 'stay'|'goto'|'flee'|'face', goal: XZ|null, speed: number}} move  goal: where a goto goes, the camera's spot to face, or where a flee's threat was last seen (with no pointer); speed: the target speed (steer ramps to it)
@@ -122,8 +122,8 @@
  * @property {'Wave'|'Spook'|null} reaction  the reaction under way (react only), turn included
  * @property {boolean} talkReady  the intro's talk state, in place: up, walked in and turned to the
  *   camera, so the box's line, face and gesture can begin (main.js holds the line until then)
- * @property {'sit'|'lie'|null} [device]  Give Device under way: sitting or lying with the tablet
- * @property {'Give Device'|'Lie Down'|'Get Up'} [deviceLabel]  what the Give Device button says
+ * @property {'sit'|'lie'|null} [device]  Screen Time under way: sitting or lying with the tablet
+ * @property {'Screen Time'|'Lie Down'|'Get Up'} [deviceLabel]  what the Screen Time button says
  *   (ui.js): what its next press does
  */
 

@@ -31,8 +31,8 @@
 //   stroll    the same grab carried about gently for 8 s (134 px/s at most) and let go: he lands
 //             calm, no flee
 //   hover     (desktop sizes) the cursor circling him, then on him and off again: his head follows
-//   buttons   Wave, Sit, Give Device and Run pressed in turn
-//   device    Give Device pressed three times: he sits with the tablet and plays, lies down on
+//   buttons   Wave, Sit, Screen Time and Run pressed in turn
+//   device    Screen Time pressed three times: he sits with the tablet and plays, lies down on
 //             his stomach with it, then gets up (each press once he's settled in the last)
 //   button-X  the toolbar's X button pressed once (button-Run: he runs for 3 s), 3.5 s
 //   floor     a tap on the floor in front of him

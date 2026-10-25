@@ -10,8 +10,8 @@
 // (a fifth of a desktop's), and running off to the rim never takes him off a phone's screen.
 // Playing with him: a tap makes him wave or start, a touch
 // drag holds him by the collar and letting go drops him (fall, then land), a finger on the floor
-// turns his head, each button plays its clip (Replay Intro, Wave, Sit, Give Device, Run, Camera
-// and Settings: pixel icons beside their labels, a label shown on hover or focus with a mouse, on
+// turns his head, each button plays its clip (Replay Intro, Wave, Sit, Screen Time, Run, Camera
+// and Settings: Phosphor icons beside their labels, a label shown on hover or focus with a mouse, on
 // a press held still on touch), a floor tap walks him there, and the cursor turns his
 // head on a desktop (down toward a cursor below him, up at one high over him, well round toward one
 // level with his head off to the side), and running away he faces where he runs, not up at the
@@ -81,6 +81,52 @@ async function newtPicture(page, frames = 3) {
 }
 /** How far apart two pictures are (the mean difference per channel). */
 const apart = (a, b) => a.reduce((s, v, i) => s + Math.abs(v - b[i]), 0) / a.length;
+/**
+ * The floor ring round `at` (client px, within `half` of it), from a screenshot in grey: the dark
+ * runs across and down through its middle (px each), its width (px) and how many of its pixels
+ * are in-between greys (neither floor nor ink: an edge's falloff).
+ */
+async function ringRuns(page, at, half) {
+  const clip = { x: at.x - half, y: at.y - half, width: 2 * half, height: 2 * half };
+  const { data, info } = await sharp(await page.screenshot({ clip }))
+    .greyscale()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const w = info.width;
+  const h = info.height;
+  const px = (x, y) => data[(y * w + x) * info.channels];
+  const floor = Math.max(px(0, 0), px(w - 1, 0), px(0, h - 1), px(w - 1, h - 1));
+  let ink = 255;
+  for (let i = 0; i < w * h; i++) ink = Math.min(ink, data[i * info.channels]);
+  const dark = (x, y) => px(x, y) < (floor + ink) / 2;
+  const box = [w, h, -1, -1];
+  let greys = 0;
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const v = px(x, y);
+      if (v > ink + 0.2 * (floor - ink) && v < floor - 0.2 * (floor - ink)) greys++;
+      if (!dark(x, y)) continue;
+      box[0] = Math.min(box[0], x);
+      box[1] = Math.min(box[1], y);
+      box[2] = Math.max(box[2], x);
+      box[3] = Math.max(box[3], y);
+    }
+  const runs = (cells) =>
+    (
+      cells
+        .map((d) => (d ? 1 : 0))
+        .join('')
+        .match(/1+/g) ?? []
+    ).map((r) => r.length);
+  const cx = Math.round((box[0] + box[2]) / 2);
+  const cy = Math.round((box[1] + box[3]) / 2);
+  return {
+    across: runs(Array.from({ length: w }, (_, x) => dark(x, cy))),
+    down: runs(Array.from({ length: h }, (_, y) => dark(cx, y))),
+    width: box[2] - box[0] + 1,
+    greys,
+  };
+}
 /** A picture of one flat colour: the mean of `pic`. */
 function flat(pic) {
   const mean = [0, 1, 2].map((c) => pic.filter((_, i) => i % 3 === c).reduce((s, v) => s + v, 0) / (pic.length / 3));
@@ -348,7 +394,7 @@ test.describe('on a phone', () => {
       ['Replay Intro', '[data-intro]'],
       ['Wave', '[data-button="Wave"]'],
       ['Sit', '[data-button="Sit"]'],
-      ['Give Device', '[data-button="Device"]'],
+      ['Screen Time', '[data-button="Device"]'],
       ['Run', '[data-button="Run"]'],
       ['Camera', '[data-camera-open]'],
       ['Settings', '[data-look-open]'],
@@ -360,6 +406,9 @@ test.describe('on a phone', () => {
       expect(size.height, name).toBeGreaterThanOrEqual(44);
       expect(size.width, name).toBeGreaterThanOrEqual(40);
       await expect(b.locator('svg.inv-icon')).toBeVisible();
+      // (A Phosphor glyph, 24 px in the button's text colour.)
+      const glyph = await b.locator('svg.inv-icon').boundingBox();
+      expect([Math.round(glyph.width), Math.round(glyph.height)], `${name}: a 24 px glyph`).toEqual([24, 24]);
       expect(
         await b.locator('.inv-btn-label').evaluate((el) => Number(getComputedStyle(el).opacity)),
         `${name}: icon only`,
@@ -831,8 +880,8 @@ test.describe('on a phone', () => {
     await expect(sit).toHaveText('Sit');
     await until(page, (s) => s.state === 'idle', 'up');
     await press('Device');
-    await until(page, (s) => s.button === 'Device', 'Give Device goes to the brain as Device');
-    await expect(page.locator('[data-button="Device"]')).toHaveText(/^(Give Device|Lie Down|Get Up)$/);
+    await until(page, (s) => s.button === 'Device', 'Screen Time goes to the brain as Device');
+    await expect(page.locator('[data-button="Device"]')).toHaveText(/^(Screen Time|Lie Down|Get Up)$/);
     await press('Run');
     await until(page, (s) => s.state === 'flee' && s.clip === 'Run', 'running', 30_000);
     // Wander is a setting now: a switch in Settings, kept for the next visit.
@@ -1645,7 +1694,7 @@ test.describe('on a desktop', () => {
       'Replay Intro true',
       'Wave true',
       'Sit true',
-      'Give Device true',
+      'Screen Time true',
       'Run true',
       'Camera true',
       'Settings false',
@@ -1681,7 +1730,7 @@ test.describe('on a desktop', () => {
     await page.keyboard.press('Escape');
     await expect(look).toBeFocused();
     expect(await toolbarInert(), 'the toolbar back in reach').toEqual(
-      ['Replay Intro', 'Wave', 'Sit', 'Give Device', 'Run', 'Camera', 'Settings'].map((name) => `${name} false`),
+      ['Replay Intro', 'Wave', 'Sit', 'Screen Time', 'Run', 'Camera', 'Settings'].map((name) => `${name} false`),
     );
   });
 
@@ -1774,7 +1823,7 @@ test.describe('on a desktop', () => {
     const home = (await snapshot(page)).camera;
     const settled = (pred, msg) => until(page, (s) => !s.camera.turning && pred(s.camera), msg);
     await page.getByRole('button', { name: 'Turn Right' }).click();
-    await settled((c) => Math.abs(Math.abs(c.yaw - home.yaw) - Math.PI / 4) < 0.01, 'Turn Right: 45°');
+    await settled((c) => Math.abs(c.yaw - home.yaw - Math.PI / 4) < 0.01, 'Turn Right: 45° clockwise');
     await page.getByRole('button', { name: 'Tilt Up' }).click();
     await settled((c) => Math.abs(c.elevation - home.elevation - (12 * Math.PI) / 180) < 0.01, 'Tilt Up: 12°');
     await page.getByRole('button', { name: 'Tilt Down' }).click();
@@ -1805,8 +1854,29 @@ test.describe('on a desktop', () => {
       (s) => !s.camera.panned && Math.hypot(s.camera.target.x - s.pos.x, s.camera.target.z - s.pos.z) < 0.05,
       'onto him',
     );
+    // Turn Left turns the scene the way its arrow shows, counter-clockwise: a spot of floor to
+    // his right on screen comes round away from the camera, up the screen and in toward him.
+    const feet = await on(page, 'feet');
+    const right = { x: feet.x + 120, y: feet.y };
+    const spot = await floorAt(page, right);
+    const before = (await snapshot(page)).camera.yaw;
     await page.getByRole('button', { name: 'Turn Left' }).click();
-    await settled((c) => Math.abs(c.yaw - home.yaw - Math.PI / 4) < 0.01, 'Turn Left: 45° before reset');
+    await settled((c) => Math.abs(c.yaw - before + Math.PI / 4) < 0.01, 'Turn Left: 45° counter-clockwise');
+    const now = await page.evaluate(
+      ({ at, w }) => {
+        let best = { x: at.x, y: at.y, d: Infinity };
+        for (let dy = -160; dy <= 160; dy += 4)
+          for (let dx = -160; dx <= 160; dx += 4) {
+            const f = window.__invitation.floorAt(at.x + dx, at.y + dy);
+            const d = f ? Math.hypot(f.x - w.x, f.z - w.z) : Infinity;
+            if (d < best.d) best = { x: at.x + dx, y: at.y + dy, d };
+          }
+        return best;
+      },
+      { at: right, w: spot },
+    );
+    expect(now.y, 'the spot to his right went up the screen').toBeLessThan(right.y - 20);
+    expect(now.x, 'and in toward him').toBeLessThan(right.x - 10);
     await page.getByRole('button', { name: 'Reset Camera' }).click();
     await settled(
       (c) => Math.abs(c.yaw - home.yaw) < 0.01 && Math.abs(c.distance - home.distance) < home.distance * 0.01,
@@ -1880,6 +1950,82 @@ test.describe('on a desktop', () => {
       [32, 32],
       [64, 64],
     ]);
+  });
+
+  test('the floor ring is drawn from its distance: at 48×48 a rim two texels wide across and down, six texels round at least; it fades as the view gets low over it, and at Off its edge is smooth', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => localStorage.setItem('invitation.look.v1', JSON.stringify({ pixelSize: '48' })));
+    await calm(page);
+    const body = await on(page, 'body');
+    const at = { x: Math.round(body.x + 260), y: Math.round(body.y + 30) };
+    await page.mouse.move(at.x, at.y);
+    await until(page, (s) => s.drag.marker.visible && s.drag.marker.alpha > 0.99, 'the cursor marker up');
+    const { drag, pass } = await snapshot(page);
+    expect(drag.marker.texels, 'six texels round at least').toBeGreaterThanOrEqual(5.99);
+    const ring = await ringRuns(page, at, Math.ceil((drag.marker.texels + 4) * pass.pd));
+    // (dpr 1: a texel is pd CSS px. Two runs across and two down through its middle, each about
+    // two texels: the rim keeps its width on screen however the floor is foreshortened.)
+    for (const [way, runs] of [
+      ['across', ring.across],
+      ['down', ring.down],
+    ]) {
+      expect(runs.length, `${way}: the rim twice`).toBe(2);
+      for (const r of runs) {
+        expect(r / pass.pd, `${way}: about two texels`).toBeGreaterThanOrEqual(1.5);
+        expect(r / pass.pd, `${way}: about two texels`).toBeLessThanOrEqual(3);
+      }
+    }
+    expect(ring.width / pass.pd, 'twelve texels across at least').toBeGreaterThanOrEqual(11);
+    expect(ring.greys, 'a hard cut with the pixel look on').toBeLessThanOrEqual(ring.width / pass.pd);
+    // A low view over it: the cursor marker fades (gone by 10°), and comes back up high.
+    await page.evaluate(() => window.__invitation.view({ elevation: (12 * Math.PI) / 180 }));
+    await until(page, (s) => !s.camera.turning && Math.abs(s.camera.elevation - (12 * Math.PI) / 180) < 0.01, '12°');
+    const middle = await page.evaluate(() => {
+      const r = document.querySelector('[data-stage]').getBoundingClientRect();
+      const bar = document.querySelector('.inv-toolbar').getBoundingClientRect();
+      return { x: r.left + r.width * 0.75, y: (r.top + bar.top) / 2 };
+    });
+    await page.mouse.move(middle.x, middle.y);
+    await until(page, (s) => s.drag.marker.elevation < (14 * Math.PI) / 180 && s.drag.marker.alpha < 0.5, 'faded low');
+    await page.evaluate(() => window.__invitation.view({ elevation: (70 * Math.PI) / 180 }));
+    await page.mouse.move(middle.x + 1, middle.y);
+    await until(page, (s) => !s.camera.turning && s.drag.marker.visible && s.drag.marker.alpha > 0.99, 'full high');
+    // At Off: the same ring, its edge smooth (in-between greys on the way in and out).
+    await page.addInitScript(() => localStorage.setItem('invitation.look.v1', JSON.stringify({ pixelSize: 'off' })));
+    await calm(page);
+    const again = await on(page, 'body');
+    const spot = { x: Math.round(again.x + 260), y: Math.round(again.y + 30) };
+    await page.mouse.move(spot.x, spot.y);
+    await until(page, (s) => s.drag.marker.visible && s.drag.marker.alpha > 0.99, 'the cursor marker up at Off');
+    const off = await ringRuns(page, spot, Math.ceil((await snapshot(page)).drag.marker.texels + 6));
+    expect(off.across.length, 'the rim twice across').toBe(2);
+    expect(off.greys, 'a smooth edge').toBeGreaterThanOrEqual(4);
+  });
+
+  test('lying with Screen Time, the blob shadow sits under his body, not his feet', async ({ page }) => {
+    await calm(page);
+    const button = page.locator('[data-button="Device"]');
+    await button.click();
+    await until(page, (s) => s.state === 'deviceSit' && s.motion.device.shown, 'sitting with the tablet', 30_000);
+    await expect(button).toHaveAccessibleName('Lie Down');
+    await button.click();
+    await until(page, (s) => s.state === 'deviceLie' && s.motion.device.shown, 'lying with it', 30_000);
+    // (Its middle: halfway from his hips to his head, on the floor.)
+    const blobFrom = () =>
+      page.evaluate(() => {
+        const s = window.__invitation.snapshot();
+        const b = window.__invitation.bones();
+        const mid = { x: s.pos.x + (b.Bone.x + b.Neck001.x) / 2, z: s.pos.z + (b.Bone.z + b.Neck001.z) / 2 };
+        return {
+          body: Math.hypot(s.drag.blob.x - mid.x, s.drag.blob.z - mid.z),
+          feet: Math.hypot(s.drag.blob.x - s.pos.x, s.drag.blob.z - s.pos.z),
+          reach: Math.hypot(mid.x - s.pos.x, mid.z - s.pos.z),
+        };
+      });
+    await expect.poll(async () => (await blobFrom()).body, { message: 'under his body' }).toBeLessThan(0.03);
+    const d = await blobFrom();
+    expect(d.feet, 'moved off his feet').toBeGreaterThan(d.reach * 0.9);
   });
 
   test('hovering turns his head', async ({ page }) => {

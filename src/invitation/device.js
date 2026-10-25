@@ -1,4 +1,4 @@
-// Give Device's tablet in the invitation toy: a procedural three.js pad NEWT holds in both hands
+// Screen Time's tablet in the invitation toy: a procedural three.js pad NEWT holds in both hands
 // while he sits or lies with it (0 bytes to load, no glb change). clips.js DEVICE is its
 // contract with tools/newt.py's arm IK: its size, where his palms are along each ForeArm, and
 // per clip the tilt of its screen, how far his palms sit off its mid-plane and where they grip

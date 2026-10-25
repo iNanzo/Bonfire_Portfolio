@@ -4,7 +4,7 @@
 // finds the moments worth a line: the plan's triggers (TRIGGERS) for a tap's wave or spook,
 // running off, being caught mid-run, picked up, shaken, thrashing, dropped and landing, walking
 // to a floor tap or wandering off, sitting down by himself, still sitting a while, standing up,
-// getting the tablet (Give Device) and lying down with it, idle time
+// getting the tablet (Screen Time) and lying down with it, idle time
 // every 20 to 40 s, the camera spun round a lot or zoomed in very close. A moment speaks at its
 // trigger's chance, once its cooldown is over (the admin's, content.json `invitation.speech`,
 // read by speechFrom), with one of its lines (`invitation.lines`, linesFrom) picked at random,

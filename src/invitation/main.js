@@ -158,6 +158,7 @@ import {
   twinWeights,
 } from './play.js';
 import { burstAt, hoverEase } from './retro.js';
+import { blobCentre, lieWeight } from './ring.js';
 import { createRng } from './rng.js';
 import { createTalk } from './speech.js';
 import { LIFT, createStage } from './stage.js';
@@ -573,7 +574,7 @@ function start(s) {
   /** The toolbar as last set, so the DOM is only touched on a change. */
   const shown = {
     sit: 'Sit',
-    device: /** @type {string} */ ('Give Device'),
+    device: /** @type {string} */ ('Screen Time'),
     wander: /** @type {boolean|null} */ (null),
     enabled: true,
     cursor: 'arrow',
@@ -1226,14 +1227,15 @@ function start(s) {
   }
 
   /**
-   * One of the Camera pad's presses: Turn Left or Right a 45° turn (Left as a drag to the left
+   * One of the Camera pad's presses: Turn Left or Right a 45° turn (Left turns the scene
+   * counter-clockwise, the way its arrow shows: the camera's yaw goes down, as a drag to the right
    * turns it), Tilt Up or Down 12°, Zoom In or Out about where it looks, Follow NEWT onto him.
    * @param {import('./ui.js').CameraKey} key
    */
   function padPress(key) {
     const TURN = Math.PI / 4;
     const TILT = (12 * Math.PI) / 180;
-    if (key === 'left' || key === 'right') orbitNudge(cam, { yaw: key === 'left' ? TURN : -TURN });
+    if (key === 'left' || key === 'right') orbitNudge(cam, { yaw: key === 'left' ? -TURN : TURN });
     else if (key === 'up' || key === 'down') orbitNudge(cam, { elevation: key === 'up' ? TILT : -TILT });
     else if (key === 'in' || key === 'out') orbitZoom(cam, key === 'in' ? 1.25 : 0.8);
     else if (key === 'follow') orbitFollow(cam, { x: body.root.x, z: body.root.z });
@@ -1453,7 +1455,7 @@ function start(s) {
   }
 
   /**
-   * The toolbar, only on a change: the Sit/Stand label, Give Device's (what its next press does:
+   * The toolbar, only on a change: the Sit/Stand label, Screen Time's (what its next press does:
    * the brain's deviceLabel, ui.js deviceLabelOf), Wander's switch, the buttons resting.
    * @param {import('./types.js').BrainOut} o
    */
@@ -1521,17 +1523,17 @@ function start(s) {
     // (Any of the eight: character.js shows a dialogue face's stand-in until its sheet is in.)
     c.setFace(forcedFace ?? faceStep(faces, face, blink, t, rng));
     // (Off the floor, the blob goes straight down under his hips, sized and faded by his lowest
-    // foot's height: cues.js blobLook, eased in and out.)
+    // foot's height: cues.js blobLook, eased in and out. Lying on the floor, under his body, not
+    // his feet: ring.js blobCentre, by the lying clips' weight.)
     const off = body.mode !== 'ground';
     const footH = Math.max(0, lowestY() - CARRY.floorY);
     const hips = c.bonePos(BONES.hips, { x: 0, y: 0, z: 0 });
+    const under = off ? hips : blobCentre(root.position, hips, head, lieWeight(c.weightOf));
     cue.blob = blobWeight(cue.blob, off, dt);
-    s.setBlob(
-      off ? hips.x : root.position.x,
-      off ? hips.z : root.position.z,
-      off ? Math.min(1, root.position.y / 0.5) : 0,
-      { ...blobLook(footH, s.blobLifted), w: cue.blob },
-    );
+    s.setBlob(under.x, under.z, off ? Math.min(1, root.position.y / 0.5) : 0, {
+      ...blobLook(footH, s.blobLifted),
+      w: cue.blob,
+    });
     if (sun)
       fitShadow(sun, s.bounds, shadowTop(root.position.y, SHADOW_TOP), { x: root.position.x, z: root.position.z });
     const mark = ptr && !ptr.pinch && !ptr.onNewt && body.mode === 'ground' ? ptr.floor : null;
@@ -1571,7 +1573,7 @@ function start(s) {
     cue.mode = mode;
     cue.ringAt = ring > 0 ? at : null;
     if (ring > 0) s.setMarker(at, 2 * CUES.ring * NEWT_HEIGHT, ring);
-    else s.setMarker(mark);
+    else s.setPointerMarker(mark);
     s.setLine(
       c.bonePos(COLLAR, { x: 0, y: 0, z: 0 }),
       { x: at.x, y: CARRY.floorY, z: at.z },
@@ -1673,7 +1675,7 @@ function start(s) {
     return { x: r.left + ((at.x + 1) / 2) * r.width, y: r.top + ((1 - at.y) / 2) * r.height };
   }
 
-  /** The carry, the limp layer and Give Device, for ?test (snapshot().motion). */
+  /** The carry, the limp layer and Screen Time, for ?test (snapshot().motion). */
   function motionSnapshot() {
     const c = character;
     const carry = body.mode === 'held' ? body.carry : null;
@@ -1690,7 +1692,7 @@ function start(s) {
       limp: { weight: c?.limpWeight ?? 0, most: c ? Math.max(0, ...Object.values(c.limpAngles())) : 0 },
       device: {
         state: out?.device ?? null,
-        label: out?.deviceLabel ?? 'Give Device',
+        label: out?.deviceLabel ?? 'Screen Time',
         shown: tabletShown,
         turn: Math.abs(Math.atan2(Math.sin(off), Math.cos(off))),
         screen: c && tabletShown ? onScreen(c.tablet.getWorldPosition(new Vector3())) : null,
@@ -1724,6 +1726,8 @@ function start(s) {
       hips: hips ? { x: hips.x, z: hips.z } : null,
       lowestFoot: c ? lowestY() : null,
       ring: cue.ringAt ? { x: cue.ringAt.x, z: cue.ringAt.z, alpha: s.marker.material.opacity / 0.85 } : null,
+      // (The floor ring as drawn: the cursor marker or the ring under him, ring.js.)
+      marker: s.markerState,
       line: s.lineState,
       groundCues: cue.mode,
       pushed: Boolean(carry?.push),
@@ -1882,7 +1886,7 @@ function start(s) {
         testIntro = value == null ? null : introFrom(value);
       },
       /**
-       * A toolbar button's press, as the brain gets it (Give Device's before the toolbar has one).
+       * A toolbar button's press, as the brain gets it (Screen Time's before the toolbar has one).
        * @param {import('./types.js').ButtonName} name
        */
       press(name) {

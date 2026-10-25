@@ -83,7 +83,11 @@ loads behind it.
   hips and shrinks, fades and softens the higher his feet are; it stays while he flies, so you
   see where he'll land. With **Ground Cues** on (Settings), a ring sits on the floor under him
   while he's held and a dashed line drops from his collar to it; the ring flashes when you push
-  him against the edge of his patch.
+  him against the edge of his patch. That ring, and the smaller one that marks where the cursor
+  meets the floor, are drawn crisp at any angle and zoom: a rim two pixels wide, at least six
+  pixels round, stepping a whole pixel at a time as it moves (a smooth edge at Pixel Size Off).
+  The cursor's fades out as the view gets low over it, under about 18°, where a ring would
+  flatten into a dash.
 - **Point at him** (the mouse over him, or a finger pressing on him) and a gold dithered outline
   fills in round him, a texel or two outside him and two in, with a sprinkle further in; it
   fades as you move off, and it doesn't show while he's held or during the intro. At Pixel Size
@@ -114,7 +118,8 @@ loads behind it.
   fingers (the floor there stays there). The light turns with the camera, so his shadow always
   falls behind him and to one side.
 - **The Camera pad:** **Camera** on the toolbar opens it over the stage: **Turn Left** and **Turn
-  Right** (45° round), **Tilt Up** and **Tilt Down** (12°, from 12° to 70° up), **Zoom In** and
+  Right** (45° round, the way their arrows show: Turn Left turns the scene counter-clockwise, as
+  a drag to the right does), **Tilt Up** and **Tilt Down** (12°, from 12° to 70° up), **Zoom In** and
   **Zoom Out**, **Follow NEWT** (back to him: the middle at the default zoom, onto him zoomed
   in) and **Reset Camera** (back to where it started). Camera again or Escape closes it.
 - **He stays on screen:** at the default zoom (and further out) the camera doesn't follow him,
@@ -139,21 +144,23 @@ loads behind it.
   shows, he wanders where you can see him and runs off within what was on screen.
 - **Leave him alone** for about 20 seconds and he sits down where he is, facing the way he was
   (the Sit button too: no turn to the camera).
-- **The toolbar:** Replay Intro (below), Wave, Sit (Stand once he's sitting), Give Device (Lie
+- **The toolbar:** Replay Intro (below), Wave, Sit (Stand once he's sitting), Screen Time (Lie
   Down while he sits with the tablet, Get Up while he lies), Run (he runs off for a few seconds,
   across the screen to one side or the other, or away from the cursor), Camera (the pad above)
-  and Settings. Each is a rounded square with a pixel icon; with a mouse its name shows as a
+  and Settings. Each is a rounded square with a Phosphor icon (bold weight: an envelope, a
+  waving hand, arrows down and up, a phone, fat arrows down and up, a sneaker, a camera, sliders);
+  with a mouse its name shows as a
   little tab over it when you point at it or Tab to it, and on a phone (icons only) when you
   press and hold it, which then does nothing else. Pointed at or pressed, a button fills with a
   dither. Spook has gone from the bar (a tap on him still startles or waves him) and Wander is in
   Settings. The action buttons rest while he's being held or falling.
 - **The cursor** is pixel art too: an open hand over NEWT, a closed hand while you hold him or
   slide the view, a turning arrow while you turn it, and a pointing hand on the buttons.
-- **Give Device** hands him a tablet with a tiny pixel game on it. Each press does the next
+- **Screen Time** hands him a tablet with a tiny pixel game on it. Each press does the next
   thing: he sits down with it in both hands, playing (the button then says Lie Down); he lies
   down flat on his stomach, arms out in front holding it on the floor past his face, feet kicking
   behind him (the button says Get Up); he gets up and
-  puts it away. He keeps the way he was facing throughout: no turn to the camera. Anything else you do (a tap, the floor, another button) gets him up
+  puts it away. Lying, his soft shadow sits under his body, not his feet. He keeps the way he was facing throughout: no turn to the camera. Anything else you do (a tap, the floor, another button) gets him up
   first, then does it; picking him up takes him straight off the floor.
 - **His earrings:** a black stud on each earlobe and a little Latin cross hanging from it on a
   thin chain, drawn as pixel art (one-pixel lines with square ends, crisp at every Pixel Size),
@@ -224,7 +231,7 @@ Now and then NEWT says something in a speech bubble over his head, in the page's
 | Running | he runs off; he's caught mid-run |
 | Carried | he's picked up, shaken, thrashes, dropped; he lands |
 | Moving | he walks to a floor tap; he wanders off by himself |
-| Sitting | he sits down by himself (not with Sit); he's still sitting after a quiet spell; he stands up (or gets up from lying); Give Device sits him down with the tablet; he lies down with it |
+| Sitting | he sits down by himself (not with Sit); he's still sitting after a quiet spell; he stands up (or gets up from lying); Screen Time sits him down with the tablet; he lies down with it |
 | Passive | standing about, after a quiet spell of 20 to 40 seconds |
 | Camera | the camera is spun round more than a turn in a few seconds; it's zoomed in very close |
 
@@ -289,7 +296,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   modules (a shared `src/` module would share a chunk with the portfolio's first load).
   - Browser-only and thin: `main.js` (boot, the loop, the wiring in `types.js`'s frame
     order), `stage.js` (renderer at texel size, the camera with its off-centre projection,
-    lights and shadows, the blob shadow and the floor marker, and each frame the boxes round
+    lights and shadows, the blob shadow and the floor ring (`setMarker`, under him while he's
+    held; `setPointerMarker`, the cursor's), and each frame the boxes round
     NEWT the retro pass keeps its work to; `setZoomScale(k)`, which main.js calls with the
     orbit's home distance over its distance, sizes the texel to the zoom, refitting the grid only
     when the block changes; the frame-time governor's level added to every texel, and `?perf`'s
@@ -313,7 +321,7 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     chain and cross aren't drawn (`uOn` 0: the vertex shader puts them outside the view), each anchor
     snapped to a texel's centre after his head's texel snap (`spriteShift` keeps them on whole
     texels), marked as his trim (retro.js `ID.trim`: drawn as he is, no outline round it), each
-    chain swinging on the same spring about straight down; and Give Device's tablet, `device.js`: 1.6 × 1.2 × 0.08 model units, a cream
+    chain swinging on the same spring about straight down; and Screen Time's tablet, `device.js`: 1.6 × 1.2 × 0.08 model units, a cream
     bezel and an unlit 16×12 game, nearest-filtered, placed at his palms and their grip from clips.js `DEVICE` (sitting
     by its side edges; lying, by its near edge's corners, so it sticks out past his face),
     shown while DeviceSit, LieDown and DeviceLie weigh half or more (in his hands as he lies
@@ -330,13 +338,21 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     `setDeviceLabel` changing only a label and its icon, `deviceLabelOf` reading the brain's
     `deviceLabel`; `createHold`, a touch held still `HOLD_MS` (450 ms) showing a label and
     swallowing the click after it; Wander kept under `invitation.wander.v1`, `loadWander` and
-    `saveWander` in try/catch), `icons.js` (the 16×16 pixel icons as ASCII art turned into crisp
-    SVG, and the Bayer dither tiles of the buttons' hover and press, `installDither`: copies of
-    `src/ui/pixelArt.js`'s and `src/ui/dither.js`'s approaches, as the page imports nothing from
-    `src/ui`), `cursor.js` (the five pixel cursors drawn at 1× and 2×, at most 32 CSS px, as
+    `saveWander` in try/catch), `icons.js` (the Phosphor bold icons, MIT, their path data vendored with the
+    licence and drawn as 24 px inline SVG in `currentColor` on Phosphor's 256 grid, and the Bayer
+    dither tiles of the buttons' hover and press, `installDither`: a copy of `src/ui/dither.js`'s
+    approach, as the page imports nothing from `src/ui`), `cursor.js` (the five pixel cursors drawn at 1× and 2×, at most 32 CSS px, as
     `url()`, `-webkit-image-set()` and `image-set()` with exact hotspots and a system fallback;
     `cursorKind`, which shows, set as the stage's `data-cursor` each frame), `invitation.css`.
-  - Pure and unit-tested: `pixels.js` (the texel grid: at sprite resolution N, `RESOLUTIONS` 16
+  - Pure and unit-tested: `ring.js` (the floor ring's shader, `RING_FRAGMENT`: each texel's
+    distance to its centre, the rim `RING.rim` (2) texels wide from that distance's screen
+    derivative (per texel: the way out from the centre dotted with the floor's derivatives), cut
+    hard with the pixel look on and smooth over a texel at Off, `ringCover` its
+    JS twin; `snapToTexel`, the centre moved to the nearest texel corner on screen;
+    `ringRadius`/`texelSize`, at least `RING.minTexels` (6) texels round; `markerFade`, the
+    cursor marker full from 18° of elevation over it and gone by 10°; `blobCentre`, the blob
+    moved from under his feet to the middle of his hips and head by `lieWeight`, the weight of
+    `LIE_CLIPS`), `pixels.js` (the texel grid: at sprite resolution N, `RESOLUTIONS` 16
     to 256, a texel is `max(1, round(NEWT's default height in device px / N))` device pixels,
     `blockFor`, so he's about N texels tall; Native, a texel a device pixel at the real DPR with
     no cap; Off, the screen's pixels with the DPR capped at `OFF_DPR` (2); `pixelSteps`, a
@@ -558,7 +574,7 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     `thrashMin`–`thrashMax` s (3–7; within `thrashShaken` of a hard shake, never before he's
     hung `thrashRest`, 1.5 s), then Held again on its own clock. Held, falling and landing he
     keeps the yaw he had when grabbed (`move` 'stay'; `play.js` `bodyStep` never turns him
-    off the ground), and carries on from there. Give Device (`ButtonName` 'Device') goes sitDown →
+    off the ground), and carries on from there. Screen Time (`ButtonName` 'Device') goes sitDown →
     deviceSit, lieDown → deviceLie, getUp, each the way he faced (`move` 'stay', as a sit); `BrainOut.device` and `deviceLabel` say which, for the toolbar. The Run button with no pointer runs him from a spot beside him square to the
     camera (`TUNE.runFromGap`), across the view. `floor.js` `fitShadow(…, at)` moves the
     shadow camera to wherever he is, by whole shadow texels.
@@ -773,14 +789,16 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   grabbed by shows, client px), `say(text)` (a line in his bubble now, as talk would show it),
   `play(clip)` (Walk and Run step in place at their own pace), `face(name)` (holds any of
   `FACE_NAMES` on him, no blinks; null gives his face back to the brain) and `press(name)` (a
-  toolbar button's press as the brain gets it, Give Device's `Device` too). The snapshot's
+  toolbar button's press as the brain gets it, Screen Time's `Device` too). The snapshot's
   `motion` has the carry (`collar` on screen, `heldFor`, the `anchor`, the drag `plane`'s
   normal, `pushed` at the edge), `drag` the hold's (its own height `controls`, `aim`: where it aims his collar, client px, the `pointer`, the `gap` between them,
   CSS px, `holdY`, the `anchor` and its `depth` along the camera's level axis, away positive,
   the `blob` as set, his `hips`' floor point and `lowestFoot`, the `ring` and the drop `line`,
+  the floor ring as drawn (`marker`: shown, centre, radius in world units and `texels`, `alpha`,
+  the view's `elevation` over it),
   `groundCues` as it plays and `pushed`); `view({yaw, elevation, zoom})` eases the camera there
   (radians; zoom the home distance over the distance); the limp layer (`limp.weight`, `limp.most`: the most a limb
-  has swung, radians) and Give Device (`device.state` and `label`, the tablet `shown` and its
+  has swung, radians) and Screen Time (`device.state` and `label`, the tablet `shown` and its
   `screen` point, his `turn` off the camera). The snapshot's `camera` has
   the point it looks at on the floor (`target`) and whether a pan holds it (`panned`), `area` is
   the play area (a disc: `r`), `sight` what's on screen (camera.js `orbitSight`), and `talk` is

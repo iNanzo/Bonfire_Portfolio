@@ -926,11 +926,11 @@ test('buttons are disabled while he is held or falling', () => {
   assert.equal(out.buttonsEnabled, true);
 });
 
-test('Give Device: the first press sits him down with the tablet (SitDown, DeviceSit), the second lies him on his stomach with it (LieDown, DeviceLie), each the way he faced (no turn), the third gets him up (GetUp, idle); device and deviceLabel say which', () => {
+test('Screen Time: the first press sits him down with the tablet (SitDown, DeviceSit), the second lies him on his stomach with it (LieDown, DeviceLie), each the way he faced (no turn), the third gets him up (GetUp, idle); device and deviceLabel say which', () => {
   const s = sim({ camera: { x: 0, z: 6 }, yaw: 1.2 });
   let out = s.frame();
   assert.equal(out.device, null);
-  assert.equal(out.deviceLabel, 'Give Device');
+  assert.equal(out.deviceLabel, 'Screen Time');
   const yaw = s.w.body.yaw;
   /** He faces the way he did, and isn't turned. */
   const kept = (o, msg) => {
@@ -982,9 +982,9 @@ test('Give Device: the first press sits him down with the tablet (SitDown, Devic
   assert.equal(out.state, 'getUp');
   assert.equal(out.clip, 'GetUp');
   assert.equal(out.device, null);
-  assert.equal(out.deviceLabel, 'Give Device');
+  assert.equal(out.deviceLabel, 'Screen Time');
   out = s.until((o) => o.state === 'idle', 3);
-  assert.equal(out.deviceLabel, 'Give Device');
+  assert.equal(out.deviceLabel, 'Screen Time');
   // From plain sitting, the press hands him the tablet where he sits.
   const t = sim({ camera: { x: 0, z: 6 } });
   t.button('Sit');

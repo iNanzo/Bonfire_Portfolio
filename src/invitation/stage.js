@@ -22,8 +22,10 @@
 // The blob shadow under NEWT, the ring marker under the finger and the dashed drop line sit on
 // their own layer (LAYERS.decal: rays and the shadow pass leave them out) and write no depth, so
 // they make no lines; main.js moves them (setBlob: stronger while he's lifted, and off the floor
-// sized, faded and softened by cues.js blobLook; setMarker: the ring where the pointer meets the
-// floor, or under him while he's held, Ground Cues; setLine: the drop line from his collar to the
+// sized, faded and softened by cues.js blobLook, and under his body while he lies; setMarker: the
+// ring under him while he's held, Ground Cues, and setPointerMarker, the cursor marker where the
+// pointer meets the floor, faded as the view gets low: both drawn by ring.js's shader from the
+// distance to a centre on the texel grid, a two-texel rim; setLine: the drop line from his collar to the
 // ring, two texels wide and dashed in texels, turned to face the camera). `bounds` is the default view's disc (area.js playArea), kept round the play
 // area's middle (setArea: the play area itself is main.js's, area.js viewArea): what a desktop's
 // default view keeps in sight (pixels.js frameView) and the size of the shadow camera's box, moved
@@ -55,6 +57,7 @@ import { createGovernor, governReset, governStep, percentile } from './governor.
 import { blockAt, frameView, resolutionOf, texelGrid } from './pixels.js';
 import { FLOOR_SIZE, createFloor, fitShadow, floorLook } from './floor.js';
 import { createRetro, decalMaterial, subjectBoxes } from './retro.js';
+import { RING_FRAGMENT, elevationAt, markerFade, ringRadius, snapToTexel, texelSize } from './ring.js';
 import { parseQuery } from './ui.js';
 
 export const LAYERS = { decal: 2 };
@@ -70,7 +73,7 @@ const PERF_EVERY = 500;
 const SHADOW_TYPES = { basic: THREE.BasicShadowMap, pcf: THREE.PCFShadowMap, vsm: THREE.VSMShadowMap };
 /** The blob's size standing, world units across (off the floor, cues.js blobLook's). */
 const BLOB_STANDING = 0.62;
-/** The marker ring's size, world units across (its texture's outer edge), and its strength. */
+/** The marker ring's size, world units across (its rim's outer edge), and its strength. */
 const MARKER = { size: 0.34, opacity: 0.85 };
 /** The drop line: texels wide, and its dashes, texels on and off. */
 const DASH = { width: 2, on: 4, off: 2 };
@@ -138,22 +141,31 @@ function dashTexture() {
 }
 
 /**
- * A pixel ring for the floor marker: two texels thick, nearest.
- * @param {number} n  texels across
+ * The floor ring's material: retro.js decalMaterial drawing ring.js RING_FRAGMENT, the ring from
+ * each texel's distance to `uRingCentre` (x, z) out to `uRingRadius`, world units.
  */
-function ringTexture(n = 16) {
-  const data = new Uint8Array(n * n * 4);
-  for (let y = 0; y < n; y++)
-    for (let x = 0; x < n; x++) {
-      const r = Math.hypot(x + 0.5 - n / 2, y + 0.5 - n / 2);
-      const on = r <= n / 2 - 0.5 && r >= n / 2 - 2.5;
-      data.set([255, 255, 255, on ? 255 : 0], (y * n + x) * 4);
-    }
-  const t = new THREE.DataTexture(data, n, n, THREE.RGBAFormat);
-  t.magFilter = THREE.NearestFilter;
-  t.minFilter = THREE.NearestFilter;
-  t.needsUpdate = true;
-  return t;
+function ringMaterial() {
+  const m = decalMaterial({ color: 0x000000, opacity: MARKER.opacity });
+  const uniforms = { uRingCentre: { value: new THREE.Vector2() }, uRingRadius: { value: MARKER.size / 2 } };
+  const decal = m.onBeforeCompile;
+  m.onBeforeCompile = (shader, renderer) => {
+    decal.call(m, shader, renderer);
+    Object.assign(shader.uniforms, uniforms);
+    shader.vertexShader = shader.vertexShader
+      .replace('void main() {', 'varying vec3 vRingWorld;\nvoid main() {')
+      .replace(
+        '#include <project_vertex>',
+        '#include <project_vertex>\n\tvRingWorld = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;',
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        'void main() {',
+        'varying vec3 vRingWorld;\nuniform vec2 uRingCentre;\nuniform float uRingRadius;\nvoid main() {',
+      )
+      .replace('#include <alphatest_fragment>', `${RING_FRAGMENT}\n#include <alphatest_fragment>`);
+  };
+  m.customProgramCacheKey = () => 'invitation-ring';
+  return { material: m, uniforms };
 }
 
 /**
@@ -220,10 +232,8 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
   blob.position.y = 0.002;
   blob.renderOrder = 1;
   blob.layers.set(LAYERS.decal);
-  const marker = new THREE.Mesh(
-    new THREE.PlaneGeometry(MARKER.size, MARKER.size),
-    decalMaterial({ map: ringTexture(), color: 0x000000, opacity: MARKER.opacity, alphaTest: 0.5 }),
-  );
+  const ringMat = ringMaterial();
+  const marker = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), ringMat.material);
   marker.rotation.x = -Math.PI / 2;
   marker.position.y = 0.003;
   marker.renderOrder = 2;
@@ -268,6 +278,9 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
   let blobOpacity = { opacity: 0.16, lifted: 0.3 };
   /** The blob as last set, for ?test: where, its radius, strength and soft edge, and the held look's share. */
   const blobNow = { x: 0, z: 0, radius: BLOB_STANDING / 2, alpha: 0, soft: 0, held: 0 };
+  /** The floor ring as last placed, for ?test: its centre, radius (world units, and texels where it is), strength and the view's elevation over it. */
+  const ringNow = { visible: false, x: 0, z: 0, radius: MARKER.size / 2, texels: 0, alpha: 0, elevation: 0 };
+  const ringAt = new THREE.Vector3();
   const lineX = new THREE.Vector3();
   const lineY = new THREE.Vector3();
   const lineZ = new THREE.Vector3();
@@ -336,6 +349,45 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
     retro.setParams(p, l);
     container.dataset.pixel = l.pixelSize;
     placeSun();
+  }
+
+  /**
+   * The floor ring at (x, z) (null: hidden), `across` world units across at least, `k` of its
+   * strength times `fade`: its centre snapped to the texel grid and its radius at least
+   * RING.minTexels texels where it is (ring.js), the quad just big enough for it.
+   * @param {import('./types.js').XZ|null} at
+   * @param {number} across
+   * @param {number} k
+   * @param {number} fade
+   */
+  function placeRing(at, across, k, fade) {
+    const strength = Math.min(1, Math.max(0, k)) * fade;
+    marker.visible = Boolean(at) && strength > 0;
+    if (!at || !marker.visible) {
+      Object.assign(ringNow, { visible: false, alpha: 0, elevation: at ? elevationAt(camera.position, at) : 0 });
+      return;
+    }
+    const y = marker.position.y;
+    const mid = snapToTexel(at, camera, grid, y);
+    const texel = texelSize(camera.position.distanceTo(ringAt.set(mid.x, y, mid.z)), camera.fov, grid.h);
+    const radius = ringRadius(across / 2, texel);
+    const elevation = elevationAt(camera.position, mid);
+    marker.position.set(mid.x, y, mid.z);
+    // (Room for Off's smooth edge, half a texel out, where the floor runs away from the camera
+    // and a texel spans more of it.)
+    marker.scale.setScalar(2 * (radius + (2 * texel) / Math.max(0.15, Math.sin(elevation))));
+    ringMat.uniforms.uRingCentre.value.set(mid.x, mid.z);
+    ringMat.uniforms.uRingRadius.value = radius;
+    marker.material.opacity = MARKER.opacity * strength;
+    Object.assign(ringNow, {
+      visible: true,
+      x: mid.x,
+      z: mid.z,
+      radius,
+      texels: radius / texel,
+      alpha: strength,
+      elevation,
+    });
   }
 
   /**
@@ -588,11 +640,19 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
      * @param {number} [k]
      */
     setMarker(at, across = MARKER.size, k = 1) {
-      marker.visible = Boolean(at) && k > 0;
-      if (!at) return;
-      marker.position.set(at.x, marker.position.y, at.z);
-      marker.scale.setScalar(across / MARKER.size);
-      marker.material.opacity = MARKER.opacity * Math.min(1, Math.max(0, k));
+      placeRing(at, across, k, 1);
+    },
+    /**
+     * The cursor marker: the ring where the pointer meets the floor (null: hidden), MARKER.size
+     * across, faded out as the view gets low over it (ring.js markerFade).
+     * @param {import('./types.js').XZ|null} at
+     */
+    setPointerMarker(at) {
+      placeRing(at, MARKER.size, 1, at ? markerFade(elevationAt(camera.position, at)) : 0);
+    },
+    /** The ring as last placed, for ?test: shown, its centre, radius (world units and texels), strength and the view's elevation over it (radians). */
+    get markerState() {
+      return { ...ringNow };
     },
     /**
      * The dashed drop line from `top` (his collar) down to `bottom` (the ring on the floor), `k`
