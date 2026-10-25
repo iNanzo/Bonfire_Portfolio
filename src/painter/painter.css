@@ -1232,6 +1232,13 @@ body.pnt.panel-off .pack {
   .pnt-render-menu {
     right: 8px;
   }
+  /* Keep a heading and usable stats rows between the menu and the bottom sheet.
+     Long menus scroll instead of consuming the overlay's entire remaining height.
+     Reserve 64px for stats plus the 20px upper and 10px lower gutters. */
+  body.pnt:not(.panel-off):has(.stats-overlay) .pnt-render-menu {
+    max-height: max(120px, calc(100dvh - 46vh - var(--bar-h) - 94px));
+    overflow-y: auto;
+  }
   body.pnt .pack {
     right: 10px;
     bottom: calc(46vh + 10px);

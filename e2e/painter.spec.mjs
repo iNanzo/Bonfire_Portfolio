@@ -660,8 +660,16 @@ test('Tools: the Stats Overlay stays under Render Settings (P) and clear of it a
     await expect.poll(async () => crosses(await overlay.boundingBox(), await menu.boundingBox())).toBe(false);
     expect(crosses(await overlay.boundingBox(), await panel.boundingBox()), `${width}: the panel`).toBe(false);
     expect(await zOf(overlay)).toBeLessThan(await zOf(menu));
+    // A phone's menu may scroll to preserve stats space; its final control stays reachable.
+    const reset = menu.getByRole('button', { name: /Reset Render Settings/ });
+    await reset.scrollIntoViewIfNeeded();
+    const resetBox = await reset.boundingBox();
+    const menuBox = await menu.boundingBox();
+    expect(resetBox.y).toBeGreaterThanOrEqual(menuBox.y);
+    expect(resetBox.y + resetBox.height).toBeLessThanOrEqual(menuBox.y + menuBox.height);
     await page.keyboard.press('p');
     await expect(menu).toBeHidden();
+    await expect.poll(async () => (await overlay.boundingBox())?.height ?? 0).toBeGreaterThan(40);
   }
   expect(errors).toEqual([]);
 });
