@@ -1,24 +1,19 @@
-// NEWT's limp limbs and his earrings (src/invitation/character.js) with three.js in Node, on the
-// stand-in skeleton (test/lib/newtStandIn.mjs) and, for where the earrings hang, newt.glb's own
-// head mesh. While he's carried (and through the fall), a spring layer on his 12 arm and leg
-// bones (carry.js limbStep: a point mass at each limb's end, pinned at its joint) answers his
-// joints' acceleration and gravity against the clip's upright pose, and springs back to that
-// pose: still and upright, his limbs keep it exactly; dragged, they lag behind; tilted by the
-// swing, they hang back toward the floor. It never adds up from frame to frame (restored before
+// NEWT's limp limbs (src/invitation/character.js) with three.js in Node, on the stand-in
+// skeleton (test/lib/newtStandIn.mjs). While he's carried (and through the fall), a spring layer
+// on his 12 arm and leg bones (carry.js limbStep: a point mass at each limb's end, pinned at its
+// joint) answers his joints' acceleration and gravity against the clip's upright pose, and
+// springs back to that pose: still and upright, his limbs keep it exactly; dragged, they lag
+// behind; tilted by the swing, they hang back toward the floor. It never adds up from frame to frame (restored before
 // the mixer like the look's bones), never touches his chest, neck or head, does nothing on a
 // frame his pose didn't step (limp(0): Motion Choppy) and eases out over 0.2 s once he's down.
-// His earrings: a flat black stud on each earlobe (measured from the glb's head mesh), a thin
-// black line and a Latin cross about 2.5 times the stud's width, toon and marked as his so they
-// get his outlines; each hangs straight down from its stud and swings back against his head's
-// acceleration (the same integrator), then settles.
+// (His earrings, which swing on the same spring: invitationEarrings.test.mjs.)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { createCharacter, EARLOBES, EARRING, LIMBS } from '../src/invitation/character.js';
+import { createCharacter, LIMBS } from '../src/invitation/character.js';
 import { LIMP } from '../src/invitation/carry.js';
 import { BONES } from '../src/invitation/clips.js';
 import { standIn } from './lib/newtStandIn.mjs';
-import { readGlbAnim, skinnedMesh } from './lib/glbAnim.mjs';
 
 const DT = 1 / 60;
 const DEG = Math.PI / 180;
@@ -46,21 +41,6 @@ function still(name, length, rots) {
 /** Where a bone points in the world: its +Y. */
 const axisOf = (bone) => new THREE.Vector3(0, 1, 0).transformDirection(bone.matrixWorld);
 const DOWN = new THREE.Vector3(0, -1, 0);
-/**
- * The stand-in with its bones' axes turned from his model's as newt.glb's are (its hips turned a
- * quarter round about Y, everything under them where it was): his pose the same, his bones'
- * own x and z not his model's.
- */
-function turnedStandIn() {
-  const s = standIn();
-  const turn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2);
-  const back = turn.clone().invert();
-  const hips = s.bones[BONES.hips];
-  hips.quaternion.copy(turn);
-  hips.traverse((b) => b !== hips && b.isBone && b.position.applyQuaternion(back));
-  return s;
-}
-
 /**
  * The stand-in in a held pose: his left arm hanging (the shoulder turned half round), the rest
  * as the stand-in has them; `frame(on)` steps one frame as main.js does (update, limp, matrices).
@@ -169,114 +149,3 @@ test('it never adds up, never touches his chest, neck or head, does nothing on a
   for (const l of LIMBS)
     assert.ok(angle(bones[l.bone].quaternion, rest.bones[l.bone].quaternion) < 1e-6, `${l.bone}: no pop`);
 });
-
-test('his earrings: at each earlobe on his head bone a flat black stud, a thin black line and a Latin cross about 2.5 times the stud’s width, toon and marked as his', () => {
-  for (const make of [standIn, turnedStandIn]) earringsOn(make);
-});
-
-/** @param {() => ReturnType<typeof standIn>} make */
-function earringsOn(make) {
-  const { gltf, bones } = make();
-  const ch = createCharacter(gltf);
-  assert.equal(ch.earrings.length, 2);
-  const size = (o) => new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3());
-  for (const e of ch.earrings) {
-    assert.equal(e.group.parent, bones[BONES.head], `${e.side}: on his head bone`);
-    // (EARLOBES are from his head bone's head in his model's axes, model units.)
-    ch.root.updateMatrixWorld(true);
-    const at = ch.root.worldToLocal(e.group.getWorldPosition(new THREE.Vector3()));
-    const from = ch.root.worldToLocal(bones[BONES.head].getWorldPosition(new THREE.Vector3()));
-    at.sub(from)
-      .toArray()
-      .forEach((x, k) => assert.ok(Math.abs(x - EARLOBES[e.side][k]) < 1e-6, `${e.side}: at the earlobe`));
-    for (const part of [e.stud, e.line, ...e.cross]) {
-      const m = part.material;
-      assert.ok(m.isMeshToonMaterial, `${part.name}: toon`);
-      assert.ok(m.color.r + m.color.g + m.color.b < 0.3, `${part.name}: black`);
-      assert.match(m.customProgramCacheKey(), /invitation-surface-id/, `${part.name}: marked as his`);
-      assert.equal(part.castShadow, true);
-    }
-  }
-  ch.root.updateMatrixWorld(true);
-  const e = ch.earrings[0];
-  const stud = size(e.stud);
-  const studWide = Math.max(stud.y, stud.z);
-  assert.ok(stud.x < studWide / 2, 'the stud is flat, facing out');
-  const [bar, arm] = e.cross.map(size);
-  const crossWide = Math.max(arm.x, arm.z);
-  assert.ok(Math.abs(crossWide / studWide - 2.5) < 0.4, `the cross ${crossWide / studWide}× the stud`);
-  assert.ok(bar.y > crossWide * 1.3, 'a Latin cross: taller than wide');
-  const line = size(e.line);
-  assert.ok(Math.max(line.x, line.z) < studWide / 3 && line.y > Math.max(line.x, line.z) * 4, 'a thin line');
-  assert.ok(Math.abs(EARRING.cross.w / EARRING.stud - 2.5) < 0.4, 'the sizes as the module has them');
-}
-
-test('his earrings sit at his earlobes as newt.glb’s head mesh has them', () => {
-  const glb = readGlbAnim(new URL('../public/models/newt.glb', import.meta.url));
-  const pose = new Map();
-  const head = glb.worldPos(pose, 'Neck.001');
-  const verts = skinnedMesh(glb, 'Head').at(pose);
-  for (const [side, sign] of [
-    ['L', 1],
-    ['R', -1],
-  ]) {
-    // His ear: the head mesh out past his hair at that side; its lobe, the ear's lowest part.
-    const ear = verts.filter((p) => sign * p[0] > 1.25).sort((a, b) => a[1] - b[1]);
-    assert.ok(ear.length > 10, `${side}: an ear`);
-    const lobe = ear.slice(0, Math.ceil(ear.length / 5));
-    const mean = [0, 1, 2].map((k) => lobe.reduce((s, p) => s + p[k], 0) / lobe.length);
-    const at = EARLOBES[side].map((v, k) => v + head[k]);
-    assert.ok(Math.abs(at[0] - mean[0]) < 0.12, `${side}: x ${at[0]} by the lobe's ${mean[0]}`);
-    assert.ok(Math.abs(at[1] - mean[1]) < 0.12, `${side}: y ${at[1]} by the lobe's ${mean[1]}`);
-    assert.ok(Math.abs(at[2] - mean[2]) < 0.15, `${side}: z ${at[2]} by the lobe's ${mean[2]}`);
-    assert.ok(sign * at[0] >= sign * mean[0] - 0.02, `${side}: on the lobe's outside`);
-  }
-});
-
-test('each earring hangs straight down from its stud, swings back against his head’s acceleration and settles, whichever way he faces', () => {
-  for (const make of [standIn, turnedStandIn]) swingOn(make);
-});
-
-/** @param {() => ReturnType<typeof standIn>} make */
-function swingOn(make) {
-  const { gltf } = make();
-  const ch = createCharacter(gltf);
-  const hang = (e) => {
-    const top = e.pivot.getWorldPosition(new THREE.Vector3());
-    const end = e.cross[0].getWorldPosition(new THREE.Vector3());
-    return end.sub(top).normalize();
-  };
-  const frame = () => {
-    ch.update(DT);
-    ch.root.updateMatrixWorld(true);
-    ch.accessories(DT, 0);
-    ch.root.updateMatrixWorld(true);
-  };
-  for (const yaw of [0, 1.2, -2.5]) {
-    ch.root.rotation.y = yaw;
-    ch.root.position.set(0, 0, 0);
-    for (let i = 0; i < 240; i++) frame();
-    for (const e of ch.earrings) assert.ok(hang(e).angleTo(DOWN) < 0.02, `yaw ${yaw}: ${e.side} hangs straight down`);
-  }
-  // His head jerked along +z: they swing back (−z), then settle again.
-  let v = 0;
-  for (let i = 0; i < 12; i++) {
-    v += 15 * DT;
-    ch.root.position.z += v * DT;
-    frame();
-  }
-  for (const e of ch.earrings) assert.ok(hang(e).z < -0.1, `${e.side} swings back: ${hang(e).z}`);
-  for (let i = 0; i < 300; i++) frame();
-  for (const e of ch.earrings) assert.ok(hang(e).angleTo(DOWN) < 0.02, `${e.side} settled`);
-  // A frame his pose didn't step (Motion Choppy): they don't move.
-  const was = ch.earrings.map((e) => e.pivot.quaternion.clone());
-  ch.root.position.x += 0.5;
-  ch.root.updateMatrixWorld(true);
-  ch.accessories(0, 0);
-  ch.earrings.forEach((e, k) => assert.ok(angle(e.pivot.quaternion, was[k]) < 1e-6));
-  // The cross faces his front.
-  ch.root.rotation.y = 0;
-  for (let i = 0; i < 120; i++) frame();
-  const face = new THREE.Vector3(0, 0, 1).transformDirection(ch.earrings[0].cross[1].matrixWorld);
-  assert.ok(Math.abs(face.z) > 0.95, `the cross faces his front: ${face.toArray()}`);
-}

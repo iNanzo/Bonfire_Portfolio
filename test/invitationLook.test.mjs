@@ -897,7 +897,8 @@ test('the toolbar, the camera pad and the Settings sheet: every button named by 
   const texts = [...`${bar}${sheet}`.matchAll(/>([^<>]+)</g)]
     .map((m) => m[1].trim())
     .filter((t) => t && !/[.:]/.test(t));
-  for (const label of texts) assert.match(label, /^[A-Z0-9][^ ]*( ([A-Z][^ ]*|&amp;))*$/, label);
+  // (Articles stay lower case past the first word, as text.js titleCase has them: In the Mix.)
+  for (const label of texts) assert.match(label, /^[A-Z0-9][^ ]*( ([A-Z][^ ]*|&amp;|a|an|the))*$/, label);
   assert.equal(presetOf({ ...DEFAULT_LOOK, style: 'soft' }), LOOKS.soft);
   assert.deepEqual(parseQuery('?test&seed=42&calm'), {
     test: true,
@@ -1076,4 +1077,57 @@ test('the frame-time governor’s coarser texels: `coarser` device px on every t
   const z = texelGrid({ cssW: 390, cssH: 844, dpr: 3, pixelSize: '64', zoom: 2 });
   const zv = frameView({ cssW: 390, cssH: 844, grid: z, insets: INSETS, area: AREA });
   assert.ok(Math.abs(newtTexels(zv, z) - 64) < 64 * 0.15, `zoomed ×2 at 64×64: ${newtTexels(zv, z)} texels`);
+});
+
+test('Ground Cues, the ring and the dashed drop line under him while he’s held: Off, In the Mix or Always in Settings, In the Mix (the bead hold’s) until one is picked, then kept in invitation.look.v1 (a look stored before it loads as it was)', () => {
+  // Not picked: left out of the look (In the Mix plays); picked, kept.
+  assert.equal('groundCues' in validLook(null), false);
+  for (const mode of ['off', 'mix', 'always']) assert.equal(validLook({ groundCues: mode }).groundCues, mode);
+  for (const bad of ['auto', 'On', 1, null, {}])
+    assert.equal('groundCues' in validLook({ groundCues: bad }), false, String(bad));
+  const saved = JSON.stringify({ ...DEFAULT_LOOK, groundCues: 'always' });
+  assert.equal(loadLook({ getItem: () => saved }).groundCues, 'always');
+  const before = JSON.stringify({ pixelSize: '64', dither: true, outlines: true, style: 'soft', motion: 'smooth' });
+  assert.deepEqual(loadLook({ getItem: () => before }), { ...DEFAULT_LOOK, pixelSize: '64', style: 'soft' });
+  /** @type {Record<string, string>} */
+  const kept = {};
+  saveLook({ ...DEFAULT_LOOK, groundCues: 'mix' }, { setItem: (k, v) => (kept[k] = v) });
+  assert.equal(JSON.parse(kept[LOOK_KEY]).groundCues, 'mix');
+  // In Settings: three segments, the look's own checked, or In the Mix with none.
+  const cues = (html) => [
+    ...html.matchAll(/<input type="radio" name="inv-ground" value="(\w+)" data-look="groundCues"( checked)?>/g),
+  ];
+  const sheet = sheetHtml(DEFAULT_LOOK);
+  assert.match(sheet, /<legend>Ground Cues<\/legend>/);
+  assert.deepEqual(
+    cues(sheet).map((m) => [m[1], Boolean(m[2])]),
+    [
+      ['off', false],
+      ['mix', true],
+      ['always', false],
+    ],
+  );
+  assert.match(sheet, /value="mix" data-look="groundCues"[^>]*><span>In the Mix<\/span>/);
+  assert.equal(cues(sheetHtml({ ...DEFAULT_LOOK, groundCues: 'always' })).find((m) => m[2])?.[1], 'always');
+  assert.equal(cues(sheetHtml({ ...DEFAULT_LOOK, groundCues: 'off' })).find((m) => m[2])?.[1], 'off');
+  assert.match(
+    sheet,
+    /<legend>Ground Cues<\/legend>[^]*?<p class="inv-hint">([^<]{1,160})\.<\/p>/,
+    'a line on what they are',
+  );
+});
+
+test('no Drag in Settings: the bead hold is how he’s carried; an old address’s ?drag= is ignored (?drag=level gets the bead too), and a look stored with an old Drag or Ground Cues value still loads', () => {
+  for (const q of ['?drag=today', '?drag=level', '?drag=tilt', '?drag=bead', '?drag=fly', '?drag'])
+    assert.deepEqual(parseQuery(q), parseQuery(''), q);
+  assert.equal('drag' in parseQuery('?test&drag=level'), false);
+  const sheet = sheetHtml(DEFAULT_LOOK);
+  assert.doesNotMatch(sheet, /inv-drag|data-setting="drag"|<legend>Drag<\/legend>/);
+  assert.match(sheet, /data-setting="wander"/, 'Wander stays');
+  assert.equal('drag' in validLook({ drag: 'tilt' }), false, 'not a Look setting');
+  // (Stored by an older page: a Drag value alongside, Ground Cues as it was or no longer offered.)
+  const stored = (o) => loadLook({ getItem: () => JSON.stringify({ ...DEFAULT_LOOK, ...o }) });
+  assert.deepEqual(stored({ drag: 'level', groundCues: 'mix' }), { ...DEFAULT_LOOK, groundCues: 'mix' });
+  assert.deepEqual(stored({ drag: 'today', groundCues: 'off' }), { ...DEFAULT_LOOK, groundCues: 'off' });
+  assert.deepEqual(stored({ drag: 'tilt', groundCues: 'auto' }), DEFAULT_LOOK, 'an old auto: In the Mix plays');
 });

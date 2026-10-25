@@ -2,12 +2,17 @@
 // `?test`'s window.__invitation and real input. Carried with a mouse, his collar comes under the
 // cursor within 2 px once the grab has eased in (0.15 s), up and across; at the play area's
 // edge he stops (the cursor carries on, he stays put, never sliding toward or away from the
-// camera); his limbs swing against a quick drag and settle; held, he thrashes now and then (an
-// angry kick and flail, then back to hanging). Give Device's three presses sit him down with the
-// tablet (visible in his hands), lie him on his stomach with it, turned 60–75° from the camera,
-// and get him up; the button's label (the brain's deviceLabel) goes Give Device, Lie Down, Get
+// camera); his limbs swing against a quick drag and settle; held, he keeps the way he faced
+// when grabbed, glances up now and then (his head only ever rising as it does: no dip, no swing to
+// a side first), and lands facing the same way; he thrashes now and then
+// (an angry kick and flail, then back to hanging). Give Device's three presses sit him down
+// with the tablet (visible in his hands), lie him on his stomach with it (in his hands as he
+// lies down), each the way he was facing (no turn to the camera), and get him up (it put away as
+// he starts to); the button's label (the brain's deviceLabel) goes Give Device, Lie Down, Get
 // Up. Every wait is on a state, never a duration (CI's software WebGL runs slower than real
-// time).
+// time); a state that lasts only a fraction of a second (a glance up, a Thrash, lying down,
+// getting up) is checked in the page every frame (onFrame), so a poll's back-off never steps
+// over it.
 import { test, expect } from '@playwright/test';
 
 /** Collect the page's errors (uncaught ones, console errors) for the test to check. */
@@ -28,6 +33,50 @@ const on = (page, part) => page.evaluate((p) => window.__invitation.screen(p), p
 /** Waits until `pred(snapshot)` holds (states, never durations). */
 const until = (page, pred, message, timeout = 20_000) =>
   expect.poll(async () => pred(await snapshot(page)), { message, timeout }).toBe(true);
+/**
+ * Waits until `pred(snapshot)` holds, checked in the page on every frame drawn, and returns that
+ * frame's snapshot (`pred` takes nothing from its scope: it runs in the page).
+ */
+async function onFrame(page, pred, message, timeout = 20_000) {
+  const check = `(() => { const s = window.__invitation.snapshot(); return (${pred})(s) ? s : null; })()`;
+  try {
+    return await (await page.waitForFunction(check, null, { polling: 'raf', timeout })).jsonValue();
+  } catch (e) {
+    throw new Error(`${message}: ${e instanceof Error ? e.message : e}`, { cause: e });
+  }
+}
+/**
+ * Held, his next glance up all the way, sampled in the page every frame as it rises: his head's
+ * turn (snapshot headYaw, headPitch) the frame before it starts, the lowest pitch and the widest
+ * yaw while it rises, and the snapshot at the top (one a Thrash cuts short starts it over).
+ */
+const nextGlance = (page, timeout = 40_000) =>
+  page.evaluate(
+    (ms) =>
+      new Promise((resolve) => {
+        const end = performance.now() + ms;
+        /** @type {{pitch: number, yaw: number}|null} */
+        let base = null;
+        /** @type {{start: {pitch: number, yaw: number}, low: number, wide: number}|null} */
+        let rising = null;
+        const tick = () => {
+          const s = window.__invitation.snapshot();
+          if (!s.held || performance.now() > end) return resolve(null);
+          if (s.lookUp === 0) {
+            base = { pitch: s.headPitch, yaw: s.headYaw };
+            rising = null;
+          } else if (base && !rising) rising = { start: base, low: Infinity, wide: Math.abs(base.yaw) };
+          if (rising) {
+            rising.low = Math.min(rising.low, s.headPitch);
+            rising.wide = Math.max(rising.wide, Math.abs(s.headYaw));
+            if (s.lookUp === 1) return resolve({ ...rising, top: s });
+          }
+          requestAnimationFrame(tick);
+        };
+        tick();
+      }),
+    timeout,
+  );
 /** Ready, calm (no wandering, no sitting by himself) and standing still in idle. */
 async function calm(page) {
   await ready(page, '/invitation/?test&calm&seed=3');
@@ -83,17 +132,15 @@ test.describe('on a desktop', () => {
     page,
   }) => {
     await calm(page);
-    // (Zoomed all the way out, the play area's sides come inside the screen.)
-    // Wheel zoom anchors to the pointer and pans the view. Use the pad to keep
-    // the play area's centre in view so the left boundary lies inside the viewport.
-    await page.getByRole('button', { name: 'Camera', exact: true }).click();
-    for (let i = 0; i < 4; i++) await page.getByRole('button', { name: 'Zoom Out', exact: true }).click();
-    await until(
-      page,
-      (s) => s.camera.distance >= s.cameraHome.distance * 1.999 && !s.camera.turning && !s.camera.panned,
-      'zoomed out without panning',
-    );
-    await page.keyboard.press('Escape');
+    // (The play area fills the screen at the default zoom. Zoomed all the way out about him (no
+    // pan) and walked to the back, where the screen is widest, its rim comes inside the screen.)
+    const at = await on(page, 'body');
+    await page.mouse.move(at.x, at.y);
+    for (let i = 0; i < 8; i++) await page.mouse.wheel(0, 400);
+    await until(page, (s) => s.camera.distance >= s.cameraHome.distance * 1.99 && !s.camera.turning, 'zoomed out');
+    const zoomed = await on(page, 'body');
+    await page.mouse.click(zoomed.x, zoomed.y - 150);
+    await until(page, (s) => s.states.includes('walk') && s.state === 'idle', 'walked to the back', 30_000);
     let cursor = await pickUp(page);
     await until(page, (s) => s.motion.heldFor >= 0.15, 'the grab eased in');
     const start = (await snapshot(page)).motion;
@@ -127,11 +174,37 @@ test.describe('on a desktop', () => {
     await until(page, (s) => s.motion.limp.weight === 0, 'the limp layer off once he’s down');
   });
 
+  test('held, he keeps the way he faced when grabbed, glances up at you now and then (only ever lifting his head as he does), and lands facing the same way', async ({
+    page,
+  }) => {
+    await calm(page);
+    const heading = (await snapshot(page)).heading;
+    const off = (h) => Math.abs(Math.atan2(Math.sin(h - heading), Math.cos(h - heading)));
+    const cursor = await pickUp(page);
+    await glide(page, cursor, { x: cursor.x + 160, y: cursor.y - 40 }, 4);
+    const glance = await nextGlance(page);
+    expect(glance, 'a glance up').not.toBeNull();
+    let s = glance.top;
+    expect(off(s.heading), 'held, facing as when grabbed').toBeLessThan(1e-3);
+    expect(s.headPitch, 'his head up').toBeGreaterThan(-0.2);
+    // (Rising: never under where it hung, never further to a side than it was or is at the top.)
+    expect(glance.low, 'no dip as it rises').toBeGreaterThanOrEqual(glance.start.pitch - 0.03);
+    expect(glance.wide, 'no swing to a side').toBeLessThanOrEqual(
+      Math.max(Math.abs(glance.start.yaw), Math.abs(s.headYaw)) + 0.05,
+    );
+    await until(page, (o) => o.held && o.lookUp === 0, 'and back down', 20_000);
+    await page.mouse.up();
+    await until(page, (o) => o.state === 'idle' || o.state === 'flee', 'down again', 30_000);
+    s = await snapshot(page);
+    expect(s.states).toContain('land');
+    if (s.state === 'idle') expect(off(s.heading), 'landed, facing as when grabbed').toBeLessThan(1e-3);
+  });
+
   test('held, he thrashes now and then: an angry kick and flail, then back to hanging', async ({ page }) => {
     await calm(page);
     await pickUp(page);
-    await until(page, (s) => s.clip === 'Thrash', 'a thrash', 40_000);
-    expect((await snapshot(page)).face).toBe('angry');
+    // (The face read on the same frame: a Thrash lasts about a second.)
+    await onFrame(page, (s) => s.clip === 'Thrash' && s.face === 'angry', 'an angry thrash', 40_000);
     await until(page, (s) => s.clip === 'Held' && s.held, 'back to hanging', 20_000);
     await page.mouse.up();
   });
@@ -140,7 +213,7 @@ test.describe('on a desktop', () => {
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
 
-  test('Give Device, pressed on the toolbar (it reads Lie Down, then Get Up): sits him down with the tablet in his hands, lies him on his stomach with it turned 60–75° from the camera, and gets him up', async ({
+  test('Give Device, pressed on the toolbar (it reads Lie Down, then Get Up): sits him down with the tablet in his hands, lies him on his stomach with it, each the way he was facing, and gets him up', async ({
     page,
   }) => {
     const errors = watch(page);
@@ -151,6 +224,15 @@ test.describe('on a phone', () => {
     const button = page.locator('[data-button="Device"]');
     await expect(button).toHaveAccessibleName('Give Device');
     const press = () => button.tap();
+    // (The way he faces as it's pressed: he keeps it, sitting and lying.)
+    const heading = (await snapshot(page)).heading;
+    const kept = async (what) => {
+      const h = (await snapshot(page)).heading;
+      expect(
+        Math.abs(Math.atan2(Math.sin(h - heading), Math.cos(h - heading))),
+        `${what}: facing as he was`,
+      ).toBeLessThan(1e-3);
+    };
     await press();
     await until(page, (s) => s.state === 'deviceSit' && s.motion.device.shown, 'sitting with the tablet', 30_000);
     expect(await device()).toMatchObject({ state: 'sit', label: 'Lie Down', shown: true });
@@ -161,17 +243,16 @@ test.describe('on a phone', () => {
     const body = await on(page, 'body');
     const head = await on(page, 'head');
     expect(gap(at, body), 'by his body').toBeLessThan(head.r * 3);
+    await kept('sitting');
     await press();
+    // (In his hands as he lies down, too.)
+    await onFrame(page, (s) => s.state === 'lieDown' && s.motion.device.shown, 'lying down with it', 30_000);
     await until(page, (s) => s.state === 'deviceLie' && s.motion.device.shown, 'lying with it', 30_000);
-    await until(
-      page,
-      (s) => s.motion.device.turn >= (59 * Math.PI) / 180 && s.motion.device.turn <= (76 * Math.PI) / 180,
-      'turned 60–75° from the camera',
-    );
+    await kept('lying');
     expect(await device()).toMatchObject({ state: 'lie', label: 'Get Up', shown: true });
     await expect(button).toHaveAccessibleName('Get Up');
     await press();
-    await until(page, (s) => s.state === 'getUp', 'getting up');
+    await onFrame(page, (s) => s.state === 'getUp' && !s.motion.device.shown, 'getting up, it put away');
     await until(page, (s) => s.state === 'idle', 'up', 30_000);
     expect(await device()).toMatchObject({ state: null, label: 'Give Device', shown: false });
     await expect(button).toHaveAccessibleName('Give Device');

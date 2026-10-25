@@ -70,13 +70,14 @@ export const TRIGGERS = /** @type {Trigger[]} */ ([
 
 /**
  * How much each moment matters: while a line is up, only a higher one replaces it (so a wave
- * stays up over a wander, and being caught cuts in over running off).
+ * stays up over a wander, being caught cuts in over running off, and a thrash's line over a
+ * shaken one: a hard shake brings a thrash on sooner, so it would otherwise always be blocked).
  * @type {Record<Trigger, number>}
  */
 export const PRIORITY = {
+  thrash: 5,
   caught: 4,
   shaken: 4,
-  thrash: 4,
   spook: 3,
   flee: 3,
   pickedUp: 3,

@@ -11,23 +11,31 @@
 // lost WebGL context told). While the Settings sheet
 // is open NEWT stays in sight: the view shows him in the clear space above or beside it
 // (focusInsets, pixels.js clearInsets) and the orbit follows him all the way there. The floor
-// is endless (rays meet it anywhere) and his play area is one rounded square round the orbit's
-// centre (area.js viewArea), worked out again on a resize, its middle the brain's and Reset
-// Camera's; the light's shadow camera goes where he goes (floor.js fitShadow). Wander, a
-// setting, is kept for the next visit (ui.js loadWander) and goes to the brain as its button.
+// is endless (rays meet it anywhere) and his play area is one disc round the orbit's centre
+// holding all the floor the default view shows however it's turned (area.js viewArea; a tap near
+// the top of the screen walks him only as far as keeps his head on it, area.js tapReach), worked
+// out again on a resize (the view eases onto its middle; a shrink under him walks him back in:
+// brain.js, steer.js backInGoal), its middle where the view rests at the default zoom, the
+// brain's and Reset Camera's; it carries what's on screen each frame (its `sight`, camera.js
+// orbitSight), so wander goals and a flee keep to the screen. The light's shadow camera goes
+// where he goes (floor.js fitShadow). Wander, a setting, is kept for the next visit (ui.js
+// loadWander) and goes to the brain as its button.
 //
 // A frame, in types.js's order: the pointers' gestures (gesture.js; taps get their floor spot
 // by ray) and the buttons → the camera moves → brain.step → talk.step (speech.js: what he says,
 // from the admin's lines and settings, content.js; a line goes to the bubble) → his root: steer
-// on the ground, carry while he's held (his collar, the Neck bone's head, hung where the
-// pointer's ray meets the camera-facing plane through where he was grabbed, plus the grab
-// offset as it eases out, so his collar comes under the cursor; 24 CSS px above a finger, coming in as
-// he's picked up, and near the top of the stage as low as keeps his head on it: carry.js
-// dragTarget), the fall once he's let go (play.js bodyStep)
+// on the ground, carry while he's held (his collar, the Neck bone's head, hung where the bead hold
+// puts it: holds/bead.js createBeadHold for each grab, through hold.js's interface; a bead on the
+// pointer's ray, plus the grab offset as it eases out, so his collar comes under the cursor; the
+// hold's lift above a finger, coming in as he's picked up; the wheel and a second finger go to
+// the hold for his height), the fall once he's let go (play.js bodyStep, with the hold's release
+// velocity), the hold's squash and stretch on his root
 // → the clip mix and step phase (play.js mixStep; a restart of a clip still showing fades its
 // twin out) → character.setWeights and update → the swing's tilt on his root and the collar
 // anchoring, matrices updated before and after → lookStep and applyLook → faceStep and setFace
-// → the blob shadow, the marker, the toolbar → the speech bubble (bubble.js: over his head as
+// → the blob shadow (straight down under his hips while he's off the floor, sized and faded by his
+// lowest foot's height: cues.js), the marker (or, while he's held, the ring under him and the
+// dashed drop line, Ground Cues), the toolbar → the speech bubble (bubble.js: over his head as
 // posed, clear of the toolbar, the open Camera pad and Settings sheet, out of sight while the sheet covers his
 // head; near the top, beside his head, narrowed to fit there, or under his feet) → render. With Motion Choppy (look.js) his pose (the update and applyLook) only moves
 // on the clock's steps, 15 a second; his root, the camera and the rest move every frame. The
@@ -38,7 +46,9 @@
 // controls, so it's the loading screen too, it covers the toy and takes every press (the HUD is
 // inert under it); the toy draws its first frame (.is-ready) and waits behind it, paused. Opened,
 // it fades and the intro starts by itself (introWanted, held until the buttons are on), the
-// camera cut to the talk shot; skipped, it drops away and the toy is free, focus on the toolbar.
+// camera cut to the talk shot behind the letter, its first line and his gesture held until the
+// letter no longer hides his head and chest (envelope.veils, envelopeVeils); skipped, it drops
+// away and the toy is free, focus on the toolbar.
 // Without WebGL 2, or if NEWT can't load, it steps aside for the message. ?test skips it unless
 // &envelope.
 //
@@ -66,9 +76,13 @@
 // carry (his collar on screen, how long he's been held, the anchor and the drag plane, whether
 // he's pushed at the edge), the limp layer (its weight, the most a limb has swung) and Give
 // Device (the brain's device and label, the tablet shown and where, his turn off the camera);
-// `?seed=N` and `?calm` go to the brain (and the seed to talk). clock() is the toy's clock (it
-// stands still while the envelope covers him), envelope() the envelope's state and pose (null
-// without one).
+// snapshot().drag is the hold's (its height controls, the collar's gap from where it's aimed, CSS px,
+// the hold height, the anchor's depth along the camera's level axis, the blob, his hips' floor
+// point and lowest foot, the ring, the drop line and Ground Cues as they play, the way his root
+// faces as drawn); view({yaw, elevation, zoom}) eases the camera there; `?seed=N` and `?calm` go
+// to the brain (and the seed to talk).
+// clock() is the toy's clock (it stands still while the envelope covers him), envelope() the
+// envelope's state and pose (null without one).
 import { Vector3 } from 'three';
 import '@fontsource/pixelify-sans/400.css';
 import '@fontsource/pixelify-sans/600.css';
@@ -79,9 +93,24 @@ import './envelope.css';
 import { DANGLE, createBrain, dangleLift, talkPhase } from './brain.js';
 import { createBubble, speakerPoint } from './bubble.js';
 import { introFrom, introScript, invitationDefaults, invitationLines, speechSettings } from './content.js';
-import { CARRY, carryFeel, dragPlane, dragTarget, gripFor, offsetAt } from './carry.js';
-import { NEWT_HEIGHT, playArea, viewArea } from './area.js';
+import { CARRY, createHand, handFeel, handStep } from './carry.js';
 import {
+  CUES,
+  blobLook,
+  blobWeight,
+  cueStep,
+  groundCueMode,
+  lineMode,
+  lineShare,
+  mixWants,
+  ringFloor,
+  ringStrength,
+} from './cues.js';
+import { depthAlong, levelAxes, squash } from './hold.js';
+import { createBeadHold } from './holds/bead.js';
+import { NEWT_HEIGHT, playArea, tapReach, viewArea } from './area.js';
+import {
+  areaFits,
   createOrbit,
   orbitArea,
   orbitEvents,
@@ -95,6 +124,7 @@ import {
   orbitRelease,
   orbitReset,
   orbitShot,
+  orbitSight,
   orbitSpan,
   orbitSpot,
   orbitStep,
@@ -115,8 +145,18 @@ import { fitShadow, shadowTop } from './floor.js';
 import { createGesture, pickScreen, rayPlaneY } from './gesture.js';
 import { clearInsets, newtShare, newtTexels, pixelSteps, resolutionOf, stepFor } from './pixels.js';
 import { animFps, installDefaults, isCustom, loadLook, lookPreset, motionStep, saveLook, shaderOf } from './look.js';
-import { createLook, lookStep, torsoStep } from './lookAt.js';
-import { bodyStep, createBody, createMix, lookAim, lookShare, mixStep, twinWeights } from './play.js';
+import { createGlance, createLook, glanceLook, glanceStep, lookStep, torsoStep } from './lookAt.js';
+import {
+  bodyStep,
+  createBody,
+  createMix,
+  glanceFront,
+  lookAim,
+  lookFront,
+  lookShare,
+  mixStep,
+  twinWeights,
+} from './play.js';
 import { burstAt, hoverEase } from './retro.js';
 import { createRng } from './rng.js';
 import { createTalk } from './speech.js';
@@ -153,7 +193,7 @@ const RIGHT_MENU_MS = 1000;
 /** States remembered for ?test (the last ones, in order). */
 const STATES_KEPT = 40;
 /**
- * The script Play Intro runs: content.js introScript() (the admin's, mended where it's broken, or
+ * The script the intro runs (from the envelope or Replay Intro): content.js introScript() (the admin's, mended where it's broken, or
  * the toy's own), through dialogue.js normalizeScript as the runner's own safety net.
  */
 /** @type {ReturnType<typeof introScript>|null} Only set through the ?test hooks. */
@@ -168,9 +208,9 @@ const SHOT_MARGIN = { top: 10, bottom: 30 };
  */
 const SHADOW_TOP = LIFT + NEWT_HEIGHT;
 /**
- * Where NEWT may go: the play area (area.js viewArea, a rounded square round the orbit's centre),
- * one object kept in place (the brain and his steps hold it) and filled in again on a resize;
- * the default view's disc until then.
+ * Where NEWT may go: the play area (area.js viewArea, a disc round the orbit's centre), one
+ * object kept in place (the brain and his steps hold it) and filled in again on a resize, the
+ * default view's disc until then; its `sight`, what's on screen, is filled in every frame.
  * @type {import('./types.js').Bounds}
  */
 const area = playArea();
@@ -246,8 +286,8 @@ const envelope = options.envelope
       onUncover: (how) => {
         hudEl.removeAttribute('inert');
         if (how === 'open') introWanted = true;
-        // (Skipped: the toy is free, focus on the toolbar's first button.)
-        else /** @type {HTMLElement|null} */ (ui.toolbar.querySelector('button:not(:disabled)'))?.focus();
+        // (Skipped: the toy is free, focus on the toolbar's first button, its ring only after a key.)
+        else ui.focusToolbar();
         envelopeGone();
       },
     })
@@ -346,8 +386,8 @@ function stageSpan(s) {
 }
 
 /**
- * The play area: a rounded square round the default view's target, the biggest the fully
- * zoomed-out default view shows him whole in (area.js viewArea); the default view's disc until
+ * The play area: a disc round the default view's target holding all the floor the default view
+ * shows across the stage, however it's turned (area.js viewArea); the default view's disc until
  * the stage has a view.
  * @param {NonNullable<typeof stage>} s
  */
@@ -357,12 +397,22 @@ function areaOf(s) {
 }
 
 /**
- * The play area becomes `next`, in place (a disc's `r` gone with it).
+ * The play area becomes `next`, in place (its old shape's keys gone with it; what's on screen
+ * kept until the next frame's).
  * @param {import('./types.js').Bounds} next
  */
 function setArea(next) {
+  const sight = area.sight;
   for (const k of Object.keys(area)) delete area[/** @type {keyof typeof area} */ (k)];
   Object.assign(area, next);
+  if (sight) area.sight = sight;
+}
+
+/** The play area for ?test: its shape (`area`) and what's on screen (`sight`, or null). */
+function areaSnapshot() {
+  const shape = { ...area };
+  delete shape.sight;
+  return { area: shape, sight: area.sight ? { ...area.sight } : null };
 }
 
 /** Pixel Size's steps on this screen (pixels.js pixelSteps: two that draw alike here are one). */
@@ -428,10 +478,13 @@ function start(s) {
   setArea(areaOf(s));
   s.setArea(area);
   const brain = createBrain({ seed, calm: options.calm, bounds: area, middle: centreOf(area) });
-  const gesture = createGesture();
+  const gesture = createGesture({ holdLift: () => Boolean(hold?.feel.secondFinger && hold.onSecondFinger) });
   const body = createBody();
   const mix = createMix();
   const gaze = createLook();
+  /** Held, his glance up at you (lookAt.js createGlance), and the look put on this frame. */
+  const glance = createGlance();
+  let headTurn = { yaw: 0, pitch: 0, weight: 1 };
   /** How much of a big look his chest takes (lookAt.js torsoStep). */
   let torso = 1;
   const faces = createFaceState();
@@ -475,8 +528,38 @@ function start(s) {
   const states = [];
   /** The collar's height while he's held, world units (from the Held clip at load). */
   let hangY = 1.1;
-  /** @type {import('./carry.js').Grip|null} how he's held, while he is */
-  let grip = null;
+  /** @type {import('./hold.js').Hold|null} how he's held (the bead hold), while he is */
+  let hold = null;
+  /** @type {import('./hold.js').Hold|null} a hold not yet grabbed with, for ?test's controls */
+  let spareHold = null;
+  /** When he was last grabbed (the toy's clock). */
+  let holdT0 = 0;
+  /** @type {import('./hold.js').HoldStep|null} the hold's last frame */
+  let holdNow = null;
+  /** @type {import('./types.js').HandState|null} the user's own pointer while he's held: what the brain feels (carry.js handStep) */
+  let hand = null;
+  /** @type {{x: number, y: number}|null} where the hold aims his collar, client px (the pointer, lifted over a finger) */
+  let aimPx = null;
+  /** The last hold has the squash and stretch (it plays on through his landing). */
+  let squashing = false;
+  /** The hold's own random numbers (a stream of their own: the rest stay as seeded). */
+  const holdRng = createRng(seed + 7);
+  /**
+   * The ground cues (cues.js): the blob's held look eased in, the ring's and the drop line's
+   * strengths, when the ring last pulsed, whether he was pushed at the edge last frame, where the
+   * hold said he'd land as he was let go (the ring waits there till he does: hold.js
+   * Hold.landing), and, for ?test, Ground Cues as it plays and where the ring is while it shows.
+   */
+  const cue = {
+    flight: /** @type {import('./types.js').XZ|null} */ (null),
+    blob: 0,
+    ring: 0,
+    line: 0,
+    pulse: /** @type {number|null} */ (null),
+    pushed: false,
+    mode: /** @type {import('./hold.js').CueMode} */ ('off'),
+    ringAt: /** @type {import('./types.js').XZ|null} */ (null),
+  };
   /** How far the top of his head shows above the point grabbed, CSS px (followed while held). */
   let headAbove = 0;
   /** @type {import('./types.js').XYZ} where his collar was carried last */
@@ -495,7 +578,7 @@ function start(s) {
     enabled: true,
     cursor: 'arrow',
   };
-  /** @type {ReturnType<typeof createDialogue>|null} the intro under way (Play Intro) */
+  /** @type {ReturnType<typeof createDialogue>|null} the intro under way (the envelope or Replay Intro) */
   let intro = null;
   /** The box whose shot the camera last went to (dialogue.js DialogueView seq). */
   let shotSeq = -1;
@@ -510,6 +593,22 @@ function start(s) {
    * walked in, turned to the camera), so its line, face and gesture begin together.
    */
   let introHeld = false;
+  /**
+   * The envelope still hides him (envelope.veils: covering the toy, or fading with the letter
+   * still over his head or chest), as of this frame's step: the intro's first line waits on it.
+   * (With an envelope it starts out over him.)
+   */
+  let envelopeVeils = Boolean(envelope);
+  const veiled = () => Boolean(envelope && character && envelope.veils(newtSpots()));
+  /** His head, collar and middle on screen, client px, each with its radius (for envelope.veils). */
+  function newtSpots() {
+    const { head, body } = shape();
+    return [
+      head,
+      { x: body.b.x, y: body.b.y, r: body.r },
+      { x: (body.a.x + body.b.x) / 2, y: (body.a.y + body.b.y) / 2, r: body.r },
+    ];
+  }
   /**
    * The clips he's played since the intro's box came up, in order ('gait': Idle, Walk or Run by
    * speed), for ?test.
@@ -601,6 +700,16 @@ function start(s) {
     const { o, d } = s.ray(x, y);
     return rayPlaneY(o, d, 0);
   }
+  /**
+   * Where a tap on the floor at `p` walks him: the play area stops short of the top of the screen
+   * by his height there at the default zoom (area.js tapReach, with the camera turned as it is).
+   * @param {import('./types.js').XZ} p
+   */
+  function tapGoal(p) {
+    if (!s.view) return p;
+    const { w, h } = stageSize();
+    return tapReach({ view: s.view, cssW: w, cssH: h, insets: insets() }, cam.yaw, p);
+  }
   /** NEWT's pick shapes on screen. */
   function shape() {
     return /** @type {NonNullable<typeof character>} */ (character).screenShape(
@@ -610,15 +719,12 @@ function start(s) {
   }
   /**
    * Where the point he's held by shows, client px: his collar as posed less the grab offset as
-   * it is now (eased out: his collar, once the grab is in).
-   * @param {import('./carry.js').Grip} g
+   * it is now (eased out: his collar, once the grab is in), as the hold has it.
+   * @param {import('./hold.js').Hold} h
    */
-  function grabbedAt(g) {
+  function grabbedAt(h) {
     const p = /** @type {NonNullable<typeof character>} */ (character).bonePos(COLLAR, { x: 0, y: 0, z: 0 });
-    const o = offsetAt(g, t);
-    const at = new Vector3(p.x - o.x, p.y - o.y, p.z - o.z).project(s.camera);
-    const r = canvas.getBoundingClientRect();
-    return { x: r.left + ((at.x + 1) / 2) * r.width, y: r.top + ((1 - at.y) / 2) * r.height };
+    return h.grabbedAt(t, p, onScreen);
   }
   /** Whether a client point is on NEWT. */
   function onNewt(x, y, slop = 0) {
@@ -646,8 +752,15 @@ function start(s) {
   /** @param {import('./types.js').GestureEvent[]} evs */
   const take = (evs) => {
     for (const e of evs) {
+      // (A second finger lifting him: the hold's height, not the brain's.)
+      if (e.type === 'holdLift') {
+        hold?.onSecondFinger?.(e.dy ?? 0);
+        continue;
+      }
       if (e.type === 'tap' || e.type === 'release' || e.type === 'grab' || e.type === 'cancel')
         e.floor = floorAt(e.x, e.y);
+      // (A tap on the floor near the top of the screen walks him only as far as keeps his head on it.)
+      if (e.type === 'tap' && e.on === 'floor' && e.floor) e.floor = tapGoal(e.floor);
       events.push(e);
     }
   };
@@ -711,6 +824,8 @@ function start(s) {
     (e) => {
       e.preventDefault();
       const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? canvas.clientHeight : 1;
+      // (Held, the hold takes the wheel for his height; a trackpad's pinch still zooms.)
+      if (gesture.current()?.grabbed && !e.ctrlKey && hold?.onWheel?.(e.deltaY * unit)) return;
       // (A trackpad's pinch comes as a wheel with ctrl held, in small steps. About the cursor: the
       // floor under it stays under it.)
       const at = shownAt();
@@ -762,6 +877,7 @@ function start(s) {
     events = [];
     if (introPressed || introWanted) beginIntro();
     introPressed = false;
+    envelopeVeils = veiled();
     const box = introStep();
     const pose = moveCamera(evs, dt);
     const ptr = pointerNow();
@@ -817,6 +933,8 @@ function start(s) {
       ease: o.look.ease,
       at: o.look.at ?? null,
       pitch: o.look.pitch,
+      up: o.look.up,
+      lift: o.look.lift,
     };
     finish(c, intro ? null : ptr, pose, dt, want, o.face, o.blink, moved);
     toolbar(o);
@@ -863,7 +981,7 @@ function start(s) {
    * @param {number} dt
    */
   function effects(ptr, dt) {
-    const on = Boolean(ptr?.onNewt) && body.mode === 'ground' && !intro && !grip;
+    const on = Boolean(ptr?.onNewt) && body.mode === 'ground' && !intro && !hold;
     hoverK = hoverEase(hoverK, on, dt);
     s.setHover(hoverK);
     if (!burst) return;
@@ -873,7 +991,7 @@ function start(s) {
       s.setBurst(0, 0, 0, 0);
       return;
     }
-    const at = grip ? grabbedAt(grip) : burst;
+    const at = hold ? grabbedAt(hold) : burst;
     s.setBurst(at.x, at.y, b.radius, b.strength);
   }
 
@@ -988,7 +1106,8 @@ function start(s) {
     if (!intro) return null;
     // (In place, as of the brain's last frame: the line goes on from its start, unless the Log or
     // the question holds it.)
-    if (introHeld && out?.talkReady) {
+    // (From the envelope, the line waits on the letter too: until it no longer hides him.)
+    if (introHeld && out?.talkReady && !envelopeVeils) {
       introHeld = false;
       intro.pause(talkUi.logOpen || talkUi.asking, t);
     }
@@ -999,6 +1118,9 @@ function start(s) {
     }
     talkUi.render(heldView(v));
     shotFor(v);
+    // (Held back, the brain sees no box yet: he waits idle with his own face, and the box's
+    // gesture and face start with its line.)
+    if (introHeld) return { seq: -1, animation: 'none', face: v.box.face, typing: false };
     return { seq: v.seq, animation: v.box.animation, face: v.box.face, typing: !v.typed };
   }
 
@@ -1090,6 +1212,11 @@ function start(s) {
     resetCamera = false;
     orbitHold(cam, body.mode === 'held');
     orbitStep(cam, dt, { x: body.root.x, z: body.root.z, y: Math.max(0, body.root.y) });
+    // (What's on screen now: the brain's wander goals and a flee keep to it, the play area being
+    // bigger than the screen.)
+    const sight = orbitSight(cam);
+    if (sight) area.sight = sight;
+    else delete area.sight;
     const pose = orbitPose(cam);
     s.setCamera(pose);
     // (The zoom, NEWT's size on screen over the default view's: at a resolution the stage sizes
@@ -1132,7 +1259,7 @@ function start(s) {
       pointer: ptr?.floor ?? null,
       newt: { x: body.root.x, z: body.root.z, yaw: body.body.yaw, grounded: body.grounded },
       clip: playing ? { name: playing, time, remaining: c.clipLength(playing) - time } : null,
-      carry: body.carry ? carryFeel(body.carry) : null,
+      carry: body.carry && hand ? handFeel(hand) : null,
       camera: dialogue ? talkSpot() : orbitSpot(cam),
       dialogue,
     });
@@ -1145,9 +1272,119 @@ function start(s) {
   }
 
   /**
-   * His root: steered, carried (dragged on the camera-facing plane through where he was grabbed,
-   * the point grabbed under the cursor, or a little above a finger: carry.js) or falling
-   * (play.js bodyStep).
+   * CSS px a world unit across the screen at `p` (along the camera's level right), so the hand's
+   * shake in px reads in the world units the brain's TUNE.shakeSoft and shakeHard are in.
+   * @param {import('./types.js').XYZ} p
+   */
+  function pxPerUnit(p) {
+    const { right } = levelAxes(cam.yaw);
+    const a = onScreen(p);
+    const b = onScreen({ x: p.x + right.x * 0.1, y: p.y, z: p.z + right.z * 0.1 });
+    return Math.hypot(b.x - a.x, b.y - a.y) / 0.1;
+  }
+
+  /** The camera as the hold reads it (hold.js HoldCamera). */
+  function holdCamera() {
+    const p = s.camera.position;
+    return {
+      position: { x: p.x, y: p.y, z: p.z },
+      yaw: cam.yaw,
+      elevation: cam.elevation,
+      distance: cam.distance,
+      target: { x: cam.target.x, z: cam.target.z },
+    };
+  }
+
+  /**
+   * The press holding him, this frame: on the grab, a bead hold (holds/bead.js createBeadHold)
+   * started where the press began; then its step, his collar's target (aimed at the pointer, or a
+   * finger's lift over it); let go, the velocity the hold lets him go with (null: carry.js toss).
+   * @param {NonNullable<typeof character>} c
+   * @param {number} dt
+   * @param {string} clip  the clip he's showing (the brain's)
+   * @returns {import('./types.js').XYZ|null}
+   */
+  function carryStep(c, dt, clip) {
+    const press = gesture.current();
+    if (press?.grabbed) {
+      const view = holdCamera();
+      /** @param {number} x @param {number} y */
+      const rayAt = (x, y) => s.ray(x, y);
+      if (!hold) {
+        // (The point pressed, where the press began: a grab comes only once the press has strayed
+        // moveTol or more, and nothing moved him before it, so the point under the cursor now is
+        // not the one grabbed. From the press, the first frame carries him the whole way.)
+        const collar = c.bonePos(COLLAR, { x: 0, y: 0, z: 0 });
+        hold = createBeadHold({ rng: holdRng });
+        holdT0 = t;
+        squashing = hold.feel.squash;
+        hold.start({
+          t,
+          collar,
+          press: { x: press.x0, y: press.y0 },
+          collarPx: onScreen(collar),
+          rayAt,
+          camera: view,
+          low: hangY,
+          bounds: area,
+          touch: pressKind === 'touch',
+        });
+        const head = shape().head;
+        headAbove = press.y0 - (head.y - head.r);
+        // (The grab ring, where the grip is made; it follows the point grabbed: effects.)
+        burst = { t0: t, x: press.x, y: press.y };
+        // (What he feels: the pointer itself, from where it is as he's grabbed.)
+        hand = createHand({ x: press.x, y: press.y }, t);
+      }
+      // (A finger's lift over itself, coming in as he's picked up. Near the top of the stage it
+      // gives way, then the finger's own spot, so the top of his head stays on the screen: lifted,
+      // he hangs nearer the camera and his head shows further over the point grabbed, so that's
+      // followed from the last frame's pose. A mouse's cursor has his collar under it, once the
+      // grab offset has eased out.)
+      let y = press.y;
+      const box = stageEl.getBoundingClientRect();
+      if (pressKind === 'touch') {
+        y -= (hold.feel.fingerLift ?? FINGER_LIFT) * Math.min(1, (t - holdT0) / CARRY.liftIn);
+        const head = shape().head;
+        headAbove += (grabbedAt(hold).y - (head.y - head.r) - headAbove) * Math.min(1, dt / HEAD_FOLLOW);
+        y = Math.max(y, box.top + HEAD_ROOM + headAbove);
+      }
+      aimPx = { x: press.x, y };
+      holdNow = hold.step({
+        t,
+        dt,
+        px: aimPx,
+        rayAt,
+        camera: view,
+        low: hangY,
+        bounds: area,
+        carry: body.mode === 'held' ? body.carry : null,
+        clip,
+        project: onScreen,
+        stage: { top: box.top, height: box.height },
+      });
+      target = holdNow.anchor;
+      // (Shaken and dragged only by the user's own pointer, never by the hold easing him onto it.)
+      if (hand) handStep(hand, { x: press.x, y: press.y }, dt, t, pxPerUnit(target));
+      // (The plane he's dragged on: at the play area's edge he stops along it, carry.js holdStep.)
+      if (body.carry) body.carry.plane = holdNow.plane;
+      return null;
+    }
+    if (!hold) return null;
+    // (Let go: the hold's release velocity, or carry.js toss with none.)
+    const released = body.mode === 'held' && body.carry ? hold.release(body.carry, t) : null;
+    cue.flight = released ? (hold.landing ?? null) : null;
+    hold = null;
+    holdNow = null;
+    hand = null;
+    aimPx = null;
+    return released;
+  }
+
+  /**
+   * His root: steered, carried (where the bead hold puts his collar: the point grabbed under the
+   * cursor, or above a finger) or falling (play.js bodyStep, let go with the hold's release
+   * velocity or carry.js toss), the hold's squash and stretch on his root.
    * @param {NonNullable<typeof character>} c
    * @param {import('./types.js').BrainOut} o
    * @param {ReturnType<typeof pointerNow>} ptr
@@ -1156,35 +1393,7 @@ function start(s) {
   function moveRoot(c, o, ptr, dt) {
     const root = c.root;
     root.updateMatrixWorld(true);
-    const press = gesture.current();
-    if (press?.grabbed) {
-      if (!grip) {
-        // (The point pressed, where the press began: a grab comes only once the press has strayed
-        // moveTol or more, and nothing moved him before it, so the point under the cursor now is
-        // not the one grabbed. From the press, the first frame carries him the whole way.)
-        const collar = c.bonePos(COLLAR, { x: 0, y: 0, z: 0 });
-        grip = gripFor(s.ray(press.x0, press.y0), dragPlane(s.camera.position, collar), collar, t);
-        const head = shape().head;
-        headAbove = press.y0 - (head.y - head.r);
-        // (The grab ring, where the grip is made; it follows the point grabbed: effects.)
-        burst = { t0: t, x: press.x, y: press.y };
-      }
-      // (A finger's lift over itself, coming in as he's picked up. Near the top of the stage it
-      // gives way, then the finger's own spot, so the top of his head stays on the screen: lifted,
-      // he hangs nearer the camera and his head shows further over the point grabbed, so that's
-      // followed from the last frame's pose. A mouse's cursor has his collar under it, once the
-      // grab offset has eased out.)
-      let y = press.y;
-      if (pressKind === 'touch') {
-        y -= FINGER_LIFT * Math.min(1, (t - grip.t0) / CARRY.liftIn);
-        const head = shape().head;
-        headAbove += (grabbedAt(grip).y - (head.y - head.r) - headAbove) * Math.min(1, dt / HEAD_FOLLOW);
-        y = Math.max(y, stageEl.getBoundingClientRect().top + HEAD_ROOM + headAbove);
-      }
-      target = dragTarget(grip, s.ray(press.x, y), hangY, t);
-      // (The plane he's dragged on: at the play area's edge he stops along it, carry.js holdStep.)
-      if (body.carry) body.carry.plane = grip.plane;
-    } else grip = null;
+    const released = carryStep(c, dt, o.clip);
     bodyStep(body, {
       state: o.state,
       move: o.move,
@@ -1195,9 +1404,20 @@ function start(s) {
       collar: c.bonePos(COLLAR, { x: 0, y: 0, z: 0 }),
       target,
       footOffset: soleY() - root.position.y,
+      released,
     });
+    // (The hold's side clamp: its push, kept for the toss.)
+    if (holdNow && holdNow.push !== undefined && body.carry) body.carry.push = holdNow.push;
+    // (The hold's own body: its tilt in place of the swing. Never his heading: held, falling and
+    // landing he keeps the one he had as he was grabbed, the user's rule, so the hold never turns him.)
+    if (holdNow?.tilt && body.mode === 'held') body.tilt = { x: holdNow.tilt.x, z: holdNow.tilt.z };
     if (body.mode !== 'held') root.position.set(body.root.x, body.root.y, body.root.z);
     root.rotation.set(body.tilt.x, body.body.yaw, body.tilt.z);
+    const sq = squashing
+      ? squash(body.mode === 'held' ? t - holdT0 : null, body.landedAt !== null ? t - body.landedAt : null)
+      : null;
+    // (On his model's own scale, clips.js SCALE.)
+    root.scale.set(SCALE * (sq?.xz ?? 1), SCALE * (sq?.y ?? 1), SCALE * (sq?.xz ?? 1));
   }
 
   /**
@@ -1268,8 +1488,10 @@ function start(s) {
    * @param {ReturnType<typeof pointerNow>} ptr
    * @param {{position: import('./types.js').XYZ}} pose
    * @param {number} dt
-   * @param {{mode: 'pointer'|'camera'|'forward'|'back', weight: number, ease?: number, at?: import('./types.js').XZ|null, pitch?: number}} want
-   *   at: who he runs from ('back'); pitch: 'ahead' at this pitch (held: his head hangs)
+   * @param {{mode: 'pointer'|'camera'|'forward'|'back', weight: number, ease?: number, at?: import('./types.js').XZ|null, pitch?: number, up?: number, lift?: number, upWeight?: number}} want
+   *   at: who he runs from ('back'); pitch: 'ahead' at this pitch (held: his head hangs); up:
+   *   held, his glance up toward the viewer at upWeight (play.js glanceFront, lookAt.js
+   *   glanceLook)
    * @param {import('./clips.js').FaceName} face
    * @param {import('./clips.js').BlinkMode} blink
    * @param {boolean} moved  his pose stepped this frame (the look goes on with it)
@@ -1288,21 +1510,73 @@ function start(s) {
     // (Talking, a little sway on his look at the camera, so it's never a fixed stare.)
     const sway = intro && aim ? lookSway(t) : null;
     const at = sway && aim ? { yaw: aim.yaw + sway.yaw, pitch: aim.pitch + sway.pitch } : aim;
-    const front = want.pitch === undefined ? ahead : { yaw: ahead.yaw, pitch: want.pitch };
+    const front = lookFront(ahead, want);
     lookStep(gaze, want.mode, at, dt, t, rng, want.weight, front, want.ease);
+    // (Held, his glance up: its own look on the viewer, the hung one turned into it.)
+    glanceStep(glance, want.up, glanceFront(ahead, want), dt, t, rng);
+    headTurn = glanceLook(gaze, glance, want.upWeight);
     // (His chest joins in on his feet only: held, his collar hangs from the cursor.)
     torso = torsoStep(torso, body.mode === 'ground', dt);
-    if (moved) c.applyLook(gaze.yaw, gaze.pitch, gaze.weight, torso);
+    if (moved) c.applyLook(headTurn.yaw, headTurn.pitch, headTurn.weight, torso);
     // (Any of the eight: character.js shows a dialogue face's stand-in until its sheet is in.)
     c.setFace(forcedFace ?? faceStep(faces, face, blink, t, rng));
-    s.setBlob(root.position.x, root.position.z, body.mode === 'ground' ? 0 : Math.min(1, root.position.y / 0.5));
+    // (Off the floor, the blob goes straight down under his hips, sized and faded by his lowest
+    // foot's height: cues.js blobLook, eased in and out.)
+    const off = body.mode !== 'ground';
+    const footH = Math.max(0, lowestY() - CARRY.floorY);
+    const hips = c.bonePos(BONES.hips, { x: 0, y: 0, z: 0 });
+    cue.blob = blobWeight(cue.blob, off, dt);
+    s.setBlob(
+      off ? hips.x : root.position.x,
+      off ? hips.z : root.position.z,
+      off ? Math.min(1, root.position.y / 0.5) : 0,
+      { ...blobLook(footH, s.blobLifted), w: cue.blob },
+    );
     if (sun)
       fitShadow(sun, s.bounds, shadowTop(root.position.y, SHADOW_TOP), { x: root.position.x, z: root.position.z });
     const mark = ptr && !ptr.pinch && !ptr.onNewt && body.mode === 'ground' ? ptr.floor : null;
-    s.marker.visible = Boolean(mark);
-    if (mark) s.marker.position.set(mark.x, s.marker.position.y, mark.z);
+    groundCues(c, footH, hips, mark, dt);
     // (His earrings swing on his head as the look left it; the tablet goes to his palms.)
     c.accessories(moved ? stepped : 0, t);
+  }
+
+  /**
+   * The ring under him and the dashed drop line from his collar to it while he's held (Ground
+   * Cues: the look's, or In the Mix with none picked; In the Mix as cues.js mixWants says),
+   * the ring pulsing on a wall clamp; otherwise the marker where the pointer meets the floor.
+   * @param {NonNullable<typeof character>} c
+   * @param {number} footH  his lowest foot's height
+   * @param {import('./types.js').XYZ} hips
+   * @param {import('./types.js').XZ|null} mark  the pointer's spot on the floor, when it shows
+   * @param {number} dt
+   */
+  function groundCues(c, footH, hips, mark, dt) {
+    const carry = body.mode === 'held' ? body.carry : null;
+    const isHeld = Boolean(carry && hold);
+    // (Let go where the hold said he'd land: the ring waits there till he does, then fades.)
+    if (body.mode !== 'fall') cue.flight = null;
+    const flying = cue.flight !== null;
+    const cues = holdNow?.cues ?? (flying ? { ring: cue.flight, line: false } : {});
+    const mode = groundCueMode(look.groundCues);
+    const want = mixWants(footH, carry ? Math.hypot(carry.vel.x, carry.vel.z) : 0);
+    cue.ring = cueStep(cue.ring, { mode, want: want || flying, held: isHeld || flying, dt });
+    cue.line = cueStep(cue.line, { mode: lineMode(mode, cues.line), want, held: isHeld, dt });
+    // (A wall clamp: the hold says, or the edge starts pushing him.)
+    const pushed = Boolean(carry?.push);
+    if (isHeld && (cues.pulse || (pushed && !cue.pushed))) cue.pulse = t;
+    cue.pushed = pushed;
+    const pulsed = ringStrength(cue.ring, cue.pulse === null ? null : t - cue.pulse, mode);
+    const ring = isHeld ? ringFloor(pulsed, mode, cues.floor, t - holdT0) : flying ? pulsed : 0;
+    const at = cues.ring ?? { x: hips.x, z: hips.z };
+    cue.mode = mode;
+    cue.ringAt = ring > 0 ? at : null;
+    if (ring > 0) s.setMarker(at, 2 * CUES.ring * NEWT_HEIGHT, ring);
+    else s.setMarker(mark);
+    s.setLine(
+      c.bonePos(COLLAR, { x: 0, y: 0, z: 0 }),
+      { x: at.x, y: CARRY.floorY, z: at.z },
+      cue.line * lineShare(footH),
+    );
   }
 
   /** @param {number} ms */
@@ -1409,9 +1683,9 @@ function start(s) {
     const tabletShown = Boolean(c?.tablet.visible);
     return {
       collar: c && carry ? onScreen(c.bonePos(COLLAR, { x: 0, y: 0, z: 0 })) : null,
-      heldFor: carry && grip ? t - grip.t0 : null,
+      heldFor: carry && hold ? t - holdT0 : null,
       anchor: carry ? { ...carry.anchor } : null,
-      plane: grip ? { x: grip.plane.normal.x, z: grip.plane.normal.z } : null,
+      plane: hold?.plane ? { x: hold.plane.normal.x, z: hold.plane.normal.z } : null,
       pushed: Boolean(carry?.push),
       limp: { weight: c?.limpWeight ?? 0, most: c ? Math.max(0, ...Object.values(c.limpAngles())) : 0 },
       device: {
@@ -1421,6 +1695,39 @@ function start(s) {
         turn: Math.abs(Math.atan2(Math.sin(off), Math.cos(off))),
         screen: c && tabletShown ? onScreen(c.tablet.getWorldPosition(new Vector3())) : null,
       },
+    };
+  }
+
+  /**
+   * The hold for ?test (snapshot().drag): its own height controls, where its collar is aimed and how far the collar is from it
+   * (CSS px), the hold height, the anchor and its depth along the camera's level axis (away
+   * positive), the blob, his hips' floor point and lowest foot, the ring and the drop line, Ground
+   * Cues as it plays, whether he's pushed at the edge, and the way his root faces as drawn (radians).
+   */
+  function dragSnapshot() {
+    const c = character;
+    const carry = body.mode === 'held' ? body.carry : null;
+    const collar = c && carry ? onScreen(c.bonePos(COLLAR, { x: 0, y: 0, z: 0 })) : null;
+    const hips = c ? c.bonePos(BONES.hips, { x: 0, y: 0, z: 0 }) : null;
+    const press = gesture.current();
+    const h = hold ?? (spareHold ??= createBeadHold());
+    return {
+      // (The hold's own height controls, for the tools: the wheel, a second finger.)
+      controls: { wheel: typeof h.onWheel === 'function', secondFinger: h.feel.secondFinger },
+      aim: aimPx && carry ? { ...aimPx } : null,
+      pointer: press?.grabbed ? { x: press.x, y: press.y } : null,
+      gap: collar && aimPx ? Math.hypot(collar.x - aimPx.x, collar.y - aimPx.y) : null,
+      holdY: carry ? (holdNow?.holdY ?? carry.anchor.y) : null,
+      anchor: carry ? { ...carry.anchor } : null,
+      depth: carry ? depthAlong(carry.anchor, cam.yaw) : null,
+      blob: s.blobState,
+      hips: hips ? { x: hips.x, z: hips.z } : null,
+      lowestFoot: c ? lowestY() : null,
+      ring: cue.ringAt ? { x: cue.ringAt.x, z: cue.ringAt.z, alpha: s.marker.material.opacity / 0.85 } : null,
+      line: s.lineState,
+      groundCues: cue.mode,
+      pushed: Boolean(carry?.push),
+      facing: c ? c.root.rotation.y : null,
     };
   }
 
@@ -1443,8 +1750,10 @@ function start(s) {
         pos: { x: character?.root.position.x ?? 0, z: character?.root.position.z ?? 0 },
         lift: character?.root.position.y ?? 0,
         heading: body.body.yaw,
-        headYaw: gaze.yaw * gaze.weight,
-        headPitch: gaze.pitch * gaze.weight,
+        headYaw: headTurn.yaw * headTurn.weight,
+        headPitch: headTurn.pitch * headTurn.weight,
+        // (Held: how far up his glance at you is, 0 hung to 1 up: brain.js BrainOut.look.up.)
+        lookUp: out?.look.up ?? 0,
         held: body.mode === 'held',
         stress: out?.stress ?? 0,
         states: [...states],
@@ -1459,20 +1768,22 @@ function start(s) {
         texels: { w: s.grid.w, h: s.grid.h },
         // (CSS px he stands tall in the default view, where he starts.)
         newtTall: s.view ? (newtTexels(s.view, s.grid) * s.grid.pd) / s.grid.dpr : 0,
-        // (The camera's yaw, elevation and distance, the point it looks at on the floor, and
-        // whether a pan holds it.)
+        // (The camera's yaw, elevation and distance, the point it looks at on the floor, whether
+        // a pan holds it, and whether the play area fits the screen at this zoom: no following.)
         camera: {
           yaw: cam.yaw,
           elevation: cam.elevation,
           distance: cam.distance,
           target: { x: cam.target.x, z: cam.target.z },
           panned: cam.panned,
+          fits: areaFits(cam),
           turning: orbitTurning(cam),
         },
         // (Whether he wanders by himself, as the brain has it; the stage's cursor.)
         ...controlsSnapshot(),
-        // (Where he may go: the play area, area.js viewArea, a rounded square.)
-        area: { ...area },
+        // (Where he may go: the play area, area.js viewArea, a disc; and what's on screen, its
+        // sight, camera.js orbitSight: a trapezoid turned with the camera, or null.)
+        ...areaSnapshot(),
         // (Both of the retro pass's paths compiled: the first switch to Off or back won't stall.)
         warmed,
         // (The Shader options: every value, whether any is the user's own, and what reached
@@ -1492,9 +1803,25 @@ function start(s) {
         burst: Boolean(burst),
         // (The envelope's state, null without one: types.js EnvelopeState.)
         envelope: envelopeState(),
+        // (It still hides him, as of the last step: the intro's first line waits on it.)
+        envelopeVeils,
         options,
         motion: motionSnapshot(),
+        drag: dragSnapshot(),
       }),
+      /**
+       * Ease the camera to `yaw` and `elevation` (radians, as snapshot().camera has them) and a
+       * zoom (the home distance over the distance: 2 is twice as near), each left as it is when
+       * left out, as the Camera pad would.
+       * @param {{yaw?: number, elevation?: number, zoom?: number}} v
+       */
+      view({ yaw, elevation, zoom } = {}) {
+        orbitNudge(cam, {
+          yaw: yaw === undefined ? 0 : yaw - cam.goal.yaw,
+          elevation: elevation === undefined ? 0 : elevation - cam.goal.elevation,
+        });
+        if (zoom) orbitZoom(cam, (cam.goal.distance * zoom) / cam.home.distance);
+      },
       /** The toy's clock, seconds (it stands still while the envelope covers him). */
       clock: () => t,
       /** The envelope's state, reduced motion, pose and frames drawn; null without one. */
@@ -1512,8 +1839,8 @@ function start(s) {
        * posed less the grab offset as it eases out); null otherwise.
        */
       grabbed() {
-        if (!grip || !character || body.mode !== 'held') return null;
-        return grabbedAt(grip);
+        if (!hold || !character || body.mode !== 'held') return null;
+        return grabbedAt(hold);
       },
       /** His ankles (the Foot bones' heads), world units: for measuring foot slide. */
       feet: () =>
@@ -1546,7 +1873,7 @@ function start(s) {
         forcedFace = FACE_NAMES.includes(/** @type {any} */ (name)) ? /** @type {any} */ (name) : null;
         return forcedFace !== null;
       },
-      /** The intro's script as Play Intro runs it (playScript). */
+      /** The intro's script as the envelope and Replay Intro run it (playScript). */
       intro: () => playScript(),
       /** Use a controlled script for UI behavior tests; null restores the admin’s content.
        * @param {unknown} value

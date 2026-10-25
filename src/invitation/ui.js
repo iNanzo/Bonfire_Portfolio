@@ -7,8 +7,11 @@
 // for HOLD_MS shows the label and swallows the click that follows (createHold; a quicker press
 // acts as ever). Hover and press fill the button with ordered dither. Replay Intro starts the
 // intro's dialogue (dialogueUi.js), and while it runs the toolbar rests out of sight
-// (setTalking). Camera opens the Camera pad over the stage (above the bar, never moving it, so
-// the view's clear space and the play area stay as they are): Turn Left and Right, Tilt Up and
+// (setTalking); once it's over, or the envelope's skipped (focusToolbar), focus goes to the
+// toolbar's first button, with its ring (and label) only if the visitor's last press was a key,
+// as a browser shows it for focus their own press moves. Camera opens the Camera pad over the
+// stage (above the bar, never moving it, so the view's clear space and the play area stay as
+// they are): Turn Left and Right, Tilt Up and
 // Down, Zoom In and Out, Follow NEWT and Reset Camera, and a line on moving the view by hand;
 // Escape or Camera again closes it. Settings opens the Settings sheet, a bottom sheet (Pixel
 // Size, a
@@ -19,8 +22,10 @@
 // (Smooth or Choppy), Shader (every control in shader.js's table, rendered from it: a slider
 // with its value beside it, a row of segments or a switch; Reset To Style; the pixel look's
 // ones resting at Pixel Size Off, the lines' while Outlines is off, the dither's while
-// Dithering is), and Wander, whether he walks about by himself, kept for the next visit
-// (loadWander, in localStorage, every read and write in try/catch)). The slider's steps are the screen's (pixels.js pixelSteps: two resolutions that come
+// Dithering is), Ground Cues (the ring and the dashed drop line under him while he's held: Off,
+// In the Mix or Always, In the Mix until it's picked: cues.js CUE_DEFAULT), and Wander, whether
+// he walks about by himself, kept for the next visit (loadWander, in localStorage, every read and
+// write in try/catch)). The slider's steps are the screen's (pixels.js pixelSteps: two resolutions that come
 // to the same block there are one step, and one that comes to 1 px is Native), set by main.js
 // as the stage is measured (setPixelSteps); every Pixel Size is a step until then. The sheet is a modal dialog: it opens on Done, Tab goes
 // round inside it, the toolbar's other buttons are inert while it's open (Settings, pressed,
@@ -34,10 +39,12 @@
 //   parseQuery(search)   ?test (the window.__invitation hooks), ?seed=N, ?calm, ?perf (frame
 //                        times and the governor's level on screen: stage.js), ?govern (the
 //                        frame-time governor on under ?test; ?govern=off, off for anyone)
+//                        (an old address's ?drag= is ignored: the bead hold is the only carry)
 
 import { PIXEL_SIZES, resolutionOf, shownPixel, stepFor } from './pixels.js';
 import { LOOKS, MOTIONS, STYLES, isCustom, shaderOf, validLook } from './look.js';
 import { SHADER_CONTROLS, controlFor, shaderText } from './shader.js';
+import { CUE_DEFAULT, CUE_LABELS, CUE_MODES } from './cues.js';
 import { LABEL_ICONS, iconSvg, installDither } from './icons.js';
 
 /** @typedef {import('./types.js').ButtonName} ButtonName */
@@ -375,6 +382,9 @@ export function sheetHtml(look, steps = ALL_STEPS, { wander = true } = {}) {
     STYLES.map((s) => segment('inv-style', 'style', s, LOOKS[s].label, !custom && l.style === s)).join('') +
     segment('inv-style', 'style', 'custom', 'Custom', custom, { disabled: !custom });
   const motions = MOTIONS.map((m) => segment('inv-motion', 'motion', m, MOTION_LABELS[m], l.motion === m)).join('');
+  // (In the Mix, the bead hold's, until one is picked.)
+  const ground = l.groundCues ?? CUE_DEFAULT;
+  const cues = CUE_MODES.map((m) => segment('inv-ground', 'groundCues', m, CUE_LABELS[m], ground === m)).join('');
   return `<section class="inv-sheet" id="inv-look" role="dialog" aria-modal="true" aria-labelledby="inv-look-title" hidden>
   <header class="inv-sheet-head"><h2 id="inv-look-title">Settings</h2><button type="button" class="inv-btn inv-btn-done" data-look-close>Done</button></header>
   <p class="inv-hint">Changes show right away and stay for your next visit.</p>
@@ -384,6 +394,7 @@ export function sheetHtml(look, steps = ALL_STEPS, { wander = true } = {}) {
   <fieldset class="inv-field"><legend>Style</legend><div class="inv-segs">${styles}</div></fieldset>
   <fieldset class="inv-field"><legend>Motion</legend><div class="inv-segs">${motions}</div></fieldset>
   ${shaderHtml(l)}
+  <fieldset class="inv-field"><legend>Ground Cues</legend><div class="inv-segs">${cues}</div><p class="inv-hint">The ring and the dashed line under NEWT while he’s held, showing where he is over the floor.</p></fieldset>
   <div class="inv-field inv-play">${toggle('wander', 'Wander', wander, 'data-setting')}<p class="inv-hint">Left be, he walks about by himself now and then.</p></div>
 </section>`;
 }
@@ -411,6 +422,9 @@ export function statusHtml() {
   return `<div class="inv-status" role="status" aria-live="polite"><p class="inv-status-text">Loading…</p><button type="button" class="inv-btn" data-reload hidden>Reload</button></div>`;
 }
 
+/** Keys that alone aren't a visitor using the keyboard (a modifier held for a click). */
+const MODIFIERS = new Set(['Shift', 'Control', 'Alt', 'Meta']);
+
 /**
  * Put the page's controls in the stage and report what's pressed.
  * @param {HTMLElement} stage
@@ -434,8 +448,26 @@ export function bindUi(stage, { look, wander = true, onButton, onLook, onCamera,
   const padOpener = $('[data-camera-open]');
   /** The intro is running: the toolbar rests (setTalking). */
   let talking = false;
-  /** Focus goes back to Play Intro once it's on again (the intro just ended). */
+  /** Focus goes back to Replay Intro once it's on again (the intro just ended). */
   let refocus = false;
+  /** The visitor's last press was a key (not a pointer, a touch, or nothing yet). */
+  let byKey = false;
+  const onAnyKey = (/** @type {KeyboardEvent} */ e) => {
+    if (!MODIFIERS.has(e.key)) byKey = true;
+  };
+  const onAnyPointer = () => {
+    byKey = false;
+  };
+  // (On the window, so they hear a key before anything over the page takes it.)
+  window.addEventListener('keydown', onAnyKey, true);
+  window.addEventListener('pointerdown', onAnyPointer, true);
+  /**
+   * Focus moved for the visitor: its ring (and a button's label) only after a key. A scripted
+   * focus() alone shows the ring in Chrome when nothing before it was a pointer's. focusVisible
+   * is newer than the DOM's types.
+   * @param {HTMLElement|null} el
+   */
+  const focusFor = (el) => el?.focus(/** @type {FocusOptions} */ ({ preventScroll: true, focusVisible: byKey }));
   /** The sheet's first and last stops for Tab. */
   const first = $('[data-look-close]');
   const last = $('[data-setting="wander"]');
@@ -814,13 +846,13 @@ export function bindUi(stage, { look, wander = true, onButton, onLook, onCamera,
       intro.disabled = !on;
       if (on && refocus) {
         refocus = false;
-        intro.focus({ preventScroll: true });
+        focusFor(intro);
       }
     },
     /**
      * The intro running (on): the toolbar rests out of sight and out of reach, its place kept (so
      * the view and the play area, which keep clear of it, stay as they are); off, it's back, and
-     * focus goes back to Play Intro.
+     * focus goes back to Replay Intro.
      * @param {boolean} on
      */
     setTalking(on) {
@@ -829,11 +861,11 @@ export function bindUi(stage, { look, wander = true, onButton, onLook, onCamera,
       if (on) openPad(false);
       hud.classList.toggle('is-talking', on);
       $('.inv-toolbar').inert = on;
-      // (Focus back on Play Intro, once it's on again: the brain turns the buttons back on.)
+      // (Focus back on Replay Intro, once it's on again: the brain turns the buttons back on.)
       refocus = !on;
       if (refocus && !intro.disabled) {
         refocus = false;
-        intro.focus({ preventScroll: true });
+        focusFor(intro);
       }
     },
     get talking() {
@@ -845,6 +877,10 @@ export function bindUi(stage, { look, wander = true, onButton, onLook, onCamera,
     },
     get toolbar() {
       return $('.inv-toolbar');
+    },
+    /** Focus on the toolbar's first button that's on (the envelope skipped: the toy is free). */
+    focusToolbar() {
+      focusFor(/** @type {HTMLElement|null} */ ($('.inv-toolbar').querySelector('button:not(:disabled)')));
     },
     get sheetOpen() {
       return !sheet.hidden;
@@ -861,6 +897,8 @@ export function bindUi(stage, { look, wander = true, onButton, onLook, onCamera,
     destroy() {
       document.removeEventListener('keydown', onKey);
       document.removeEventListener('keydown', onPadKey);
+      window.removeEventListener('keydown', onAnyKey, true);
+      window.removeEventListener('pointerdown', onAnyPointer, true);
       hud.remove();
     },
   };

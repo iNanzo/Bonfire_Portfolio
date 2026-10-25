@@ -5,8 +5,8 @@
   "reporter": ["text", "text-summary", "lcov", "json-summary"],
   "report-dir": "coverage",
   "check-coverage": true,
-  "lines": 64.4,
-  "statements": 64.4,
-  "functions": 82.3,
-  "branches": 88.6
+  "lines": 70.3,
+  "statements": 70.3,
+  "functions": 85.8,
+  "branches": 90.2
 }

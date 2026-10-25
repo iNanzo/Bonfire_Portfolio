@@ -1,32 +1,47 @@
-// The invitation toy's play area (src/invitation/area.js). The floor is endless: the play area is
-// one shape however the camera turns, a rounded square round the default view's target (the
-// orbit's centre), the biggest that the default view fully zoomed out (twice the default
-// distance, yaw 0, no pan) shows NEWT whole in, a margin inside the clear space over the toolbar
-// (so the floor's narrower span there sets it: a phone's width, a desktop's depth), bigger than
-// the old disc, the same whatever the Pixel Size, the open Settings sheet or the camera does, and
-// new on a resize; walking, wandering, fleeing and carrying stay inside it. The disc it replaced is still the default
-// view's framing: a desktop's default view (pixels.js frameView) shows all of it, at every Pixel
-// Size, with NEWT still about a fifth of the screen's short side tall; on a phone he's drawn
-// about 30% bigger, the disc no longer all fits, and the camera follows him softly (camera.js)
-// so a dash to its rim, or round it, never takes him off the screen. A disc's Bounds still work
-// everywhere (steer.js and carry.js read a disc's radius from its Bounds: walking, wandering,
-// fleeing, sliding along the rim when cornered with no zig-zag, carrying, the toss and the
-// fall's bounces). The light's shadow camera (floor.js fitShadow) covers the disc up to the
-// highest he's lifted, wherever the camera has turned the light (camera.js lightDir), and moved
-// to wherever he is in the play area (shadow texels whole, so his shadow doesn't shimmer).
+// The invitation toy's play area (src/invitation/area.js). The floor is endless: the play area
+// fills the screen, one shape however the camera turns, a disc round the default view's target
+// (the orbit's centre) holding every spot of floor the default view shows across the whole stage
+// turned any way, his radius past the farthest (a tall phone's the biggest), the same whatever
+// the Pixel Size, the open Settings sheet or the camera does, and new on a resize (a shrink under
+// him eases him back in, no jump, or walks him back in, never slid; one that still holds him
+// never moves him); walking, wandering,
+// fleeing and carrying stay inside it. It's more floor than the screen shows, so wander goals
+// keep to what's on screen when they're picked and a flee to what was on screen as it began
+// (camera.js orbitSight, a trapezoid turned with the camera: turned Bounds work like the rest).
+// The default view's own disc is its framing: a desktop's default view (pixels.js frameView)
+// shows all of it, at every Pixel Size, with NEWT still about a fifth of the screen's short side
+// tall; on a phone he's drawn about 30% bigger, the disc no longer all fits, and the camera
+// moves on just far enough (camera.js) that a dash to its rim, or round it, never takes his feet
+// off the screen. A disc's Bounds work everywhere (steer.js and carry.js read a disc's radius from its
+// Bounds: walking, wandering, fleeing, sliding along the rim when cornered with no zig-zag,
+// carrying, the toss and the fall's bounces). The light's shadow camera (floor.js fitShadow)
+// covers the disc up to the highest he's lifted, wherever the camera has turned the light
+// (camera.js lightDir), and moved to wherever he is in the play area (shadow texels whole, so
+// his shadow doesn't shimmer).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {
-  AREA_MARGIN,
   AREA_RADIUS,
   NEWT_HEIGHT,
   NEWT_RADIUS,
+  TOP_ROOM,
   playArea,
+  reachRow,
   rimPoints,
+  tapReach,
   viewArea,
 } from '../src/invitation/area.js';
-import { STEER, centreOf, clampTo, steer, wanderGoal, xRange } from '../src/invitation/steer.js';
+import {
+  STEER,
+  backInGoal,
+  centreOf,
+  clampTo,
+  steer,
+  turnBounds,
+  wanderGoal,
+  xRange,
+} from '../src/invitation/steer.js';
 import { CARRY, fallStep, grab, holdStep } from '../src/invitation/carry.js';
 import { fitShadow, shadowTop } from '../src/invitation/floor.js';
 import {
@@ -39,7 +54,17 @@ import {
   texelGrid,
   clearInsets,
 } from '../src/invitation/pixels.js';
-import { ORBIT, createOrbit, lightDir, orbitPose, orbitStep } from '../src/invitation/camera.js';
+import {
+  ORBIT,
+  createOrbit,
+  lightDir,
+  orbitArea,
+  orbitPose,
+  orbitSight,
+  orbitSpan,
+  orbitStep,
+  screenOf,
+} from '../src/invitation/camera.js';
 import { DEFAULT_LOOK, LOOKS } from '../src/invitation/look.js';
 import { GAIT } from '../src/invitation/clips.js';
 import { createRng } from '../src/invitation/rng.js';
@@ -83,76 +108,114 @@ function areaFor(cssW, cssH, dpr, pixelSize = DEFAULT_LOOK.pixelSize) {
   };
   return { grid, view, area, far };
 }
-/** NEWT standing at `p` on screen in view `v`: the extremes of his body (his width, feet to head). */
-function newtBox(v, p) {
-  const box = { left: Infinity, right: -Infinity, top: Infinity, bottom: -Infinity };
-  for (const y of [0, NEWT_HEIGHT])
-    for (const [dx, dz] of [
-      [-NEWT_RADIUS, 0],
-      [NEWT_RADIUS, 0],
-      [0, -NEWT_RADIUS],
-      [0, NEWT_RADIUS],
-    ]) {
-      const s = project(v, { x: p.x + dx, y, z: p.z + dz });
-      box.left = Math.min(box.left, s.x);
-      box.right = Math.max(box.right, s.x);
-      box.top = Math.min(box.top, s.y);
-      box.bottom = Math.max(box.bottom, s.y);
-    }
-  return box;
-}
 const MORE_SIZES = [...SIZES, [844, 390, 3], [1920, 1080, 1], [768, 1024, 2]];
 
-test('the play area is one shape however the camera turns: a rounded square round the default view’s target, the biggest the fully zoomed-out default view shows NEWT whole in, a margin inside the clear space, snug where the floor’s narrower span sets it', () => {
-  assert.ok(AREA_MARGIN >= 4 && AREA_MARGIN <= 16, `margin ${AREA_MARGIN}`);
+/** Where the floor shows at a stage point (CSS px) in view `v`: pixels.js project's inverse there. */
+function floorOf(v, sx, sy) {
+  const e = (v.elevation * Math.PI) / 180;
+  const t = Math.tan((v.fov * Math.PI) / 360);
+  const nx = ((sx - v.shift.x) / v.canvasW) * 2 - 1;
+  const ny = 1 - ((sy - v.shift.y) / v.canvasH) * 2;
+  const d = {
+    x: nx * t * v.aspect,
+    y: -Math.sin(e) + ny * t * Math.cos(e),
+    z: -Math.cos(e) - ny * t * Math.sin(e),
+  };
+  assert.ok(d.y < 0, 'the floor shows there');
+  const k = -v.position.y / d.y;
+  return { x: v.position.x + d.x * k, z: v.position.z + d.z * k };
+}
+/** `p` turned `a` radians about `c` (yaw: + toward +x). */
+const turnedAbout = (p, c, a) => ({
+  x: c.x + (p.x - c.x) * Math.cos(a) + (p.z - c.z) * Math.sin(a),
+  z: c.z - (p.x - c.x) * Math.sin(a) + (p.z - c.z) * Math.cos(a),
+});
+
+test('the play area fills the screen: a disc round the default view’s target holding every spot of floor the default view shows, the whole stage edge to edge, however the camera turns, the farthest his radius inside its rim', () => {
   for (const [cssW, cssH, dpr] of MORE_SIZES) {
     const at = `${cssW}x${cssH}@${dpr}`;
-    const { area: b, far, view } = areaFor(cssW, cssH, dpr);
+    const { area: b, view } = areaFor(cssW, cssH, dpr);
     assert.ok(
-      b.r === undefined && b.minXBack === undefined && b.maxXBack === undefined,
-      `${at}: no disc, no trapezoid`,
+      b.r !== undefined && b.round === undefined && b.minXBack === undefined && b.maxXBack === undefined,
+      `${at}: a disc`,
     );
-    const half = (b.maxX - b.minX) / 2;
-    close(b.maxZ - b.minZ, b.maxX - b.minX, 1e-9, `${at}: a square`);
-    assert.deepEqual(centreOf(b), { x: view.target.x, z: view.target.z }, `${at}: round the orbit's centre`);
-    assert.ok(
-      (b.round ?? 0) > 0.2 * half && (b.round ?? 0) < 0.5 * half,
-      `${at}: rounded corners (${b.round} of ${half})`,
-    );
-    assert.ok(half > R, `${at}: bigger than the old disc (half ${half.toFixed(2)})`);
-    const clear = {
-      left: INSETS.left + AREA_MARGIN,
-      right: cssW - INSETS.right - AREA_MARGIN,
-      top: INSETS.top + AREA_MARGIN,
-      bottom: cssH - INSETS.bottom - AREA_MARGIN,
-    };
-    let spare = Infinity;
-    for (const p of rimPoints(b, 64)) {
-      const box = newtBox(far, p);
-      const where = `${at}: NEWT at (${p.x.toFixed(2)}, ${p.z.toFixed(2)})`;
-      assert.ok(
-        box.left >= clear.left - 0.5 && box.right <= clear.right + 0.5,
-        `${where} across ${box.left.toFixed(1)}–${box.right.toFixed(1)}`,
-      );
-      assert.ok(
-        box.top >= clear.top - 0.5 && box.bottom <= clear.bottom + 0.5,
-        `${where} down ${box.top.toFixed(1)}–${box.bottom.toFixed(1)}`,
-      );
-      spare = Math.min(
-        spare,
-        box.left - clear.left,
-        clear.right - box.right,
-        box.top - clear.top,
-        clear.bottom - box.bottom,
-      );
-    }
-    assert.ok(spare < 1, `${at}: as big as holds him whole (${spare.toFixed(2)} px to spare)`);
+    const c = centreOf(b);
+    assert.deepEqual(c, { x: view.target.x, z: view.target.z }, `${at}: round the orbit's centre`);
+    assert.ok(b.r > R, `${at}: bigger than the old disc (${b.r.toFixed(2)})`);
+    let far = 0;
+    for (let j = 0; j <= 10; j++)
+      for (let i = 0; i <= 10; i++) {
+        const f = floorOf(view, (i * cssW) / 10, (j * cssH) / 10);
+        far = Math.max(far, dist(f, c));
+        // (Turned, the view shows that floor turned round the point it orbits.)
+        for (let deg = 0; deg < 360; deg += 15) {
+          const p = turnedAbout(f, c, (deg * Math.PI) / 180);
+          const k = clampTo(b, p);
+          assert.ok(dist(k, p) < 1e-6, `${at} at ${deg}°: the floor at (${i}, ${j}) of the grid is out of reach`);
+        }
+      }
+    close(b.r, far + NEWT_RADIUS, 1e-6, `${at}: snug, his radius past the farthest`);
   }
-  // A phone's is much shallower than the old strip (22 units deep), a desktop's about as deep.
-  const phone = areaFor(390, 844, 3).area;
-  const desk = areaFor(1280, 800, 1).area;
-  assert.ok(phone.maxX > 2.2 && phone.maxX < 3.2, `a phone: half ${phone.maxX.toFixed(2)}`);
-  assert.ok(desk.maxX > 4.2 && desk.maxX < 5.6, `a desktop: half ${desk.maxX.toFixed(2)}`);
+  // A tall phone sees furthest back, so its disc is the biggest; a desktop's is a little smaller.
+  const r = (w, h, dpr) => areaFor(w, h, dpr).area.r ?? NaN;
+  assert.ok(r(390, 844, 3) > 8.8 && r(390, 844, 3) < 10.5, `a phone: ${r(390, 844, 3).toFixed(2)}`);
+  assert.ok(r(768, 1024, 2) > 7.6 && r(768, 1024, 2) < 9.2, `a tablet: ${r(768, 1024, 2).toFixed(2)}`);
+  assert.ok(r(1280, 800, 1) > 7.2 && r(1280, 800, 1) < 8.8, `a desktop: ${r(1280, 800, 1).toFixed(2)}`);
+  assert.ok(r(390, 844, 3) > r(1280, 800, 1), 'a tall phone sees further back than a desktop');
+});
+
+test('a tap stops short of the top of the screen by his height there: at the default zoom, turned any way, a tap on the top rows walks him straight down the screen from the finger to where his whole head shows under the top, and every other tap reaches the point under the finger', () => {
+  for (const [cssW, cssH, dpr] of MORE_SIZES) {
+    const { area: b, view } = areaFor(cssW, cssH, dpr);
+    const c = centreOf(b);
+    const o = { view, cssW, cssH, insets: INSETS };
+    let cut = 0;
+    let kept = 0;
+    for (const deg of [0, 45, 90, 180, 270]) {
+      const a = (deg * Math.PI) / 180;
+      for (let j = 0; j <= 20; j++)
+        for (let i = 0; i <= 10; i++) {
+          const at = `${cssW}x${cssH}@${dpr} turned ${deg}°, the tap at (${i}, ${j})`;
+          const sx = (i * cssW) / 10;
+          const sy = (j * (cssH - INSETS.bottom)) / 20;
+          // (The floor under the finger, turned with the camera round the point it orbits.)
+          const p = turnedAbout(floorOf(view, sx, sy), c, a);
+          const g = tapReach(o, a, p);
+          assert.ok(dist(clampTo(b, g), g) < 1e-9, `${at}: in the play area`);
+          // (Where he ends, seen in the default view: his feet, the top of his head.)
+          const q = turnedAbout(g, c, -a);
+          const feet = project(view, { x: q.x, y: 0, z: q.z });
+          const head = project(view, { x: q.x, y: NEWT_HEIGHT, z: q.z });
+          const was = project(view, { ...turnedAbout(p, c, -a), y: NEWT_HEIGHT });
+          if (was.y >= TOP_ROOM) {
+            assert.ok(dist(g, p) < 1e-9, `${at}: reaches the point under the finger`);
+            kept++;
+            continue;
+          }
+          cut++;
+          close(feet.x, sx, 0.01, `${at}: his feet straight under the finger`);
+          assert.ok(feet.y > sy, `${at}: lower down the screen than the finger`);
+          close(head.y, TOP_ROOM, 0.01, `${at}: the top of his head just under the top of the screen`);
+        }
+    }
+    const at = `${cssW}x${cssH}@${dpr}`;
+    assert.ok(cut > 0 && kept > cut, `${at}: the top rows are cut (${cut}), the rest reached (${kept})`);
+    // (The band a tap stops short of: about his height on screen at the back, plus the margin.)
+    // (The row a tap stops on, reachRow: his height on screen at the back, plus the margin.)
+    const top = tapReach(o, 0, floorOf(view, cssW / 2, 0));
+    const feet = project(view, { x: top.x, y: 0, z: top.z });
+    const tall = feet.y - project(view, { x: top.x, y: NEWT_HEIGHT, z: top.z }).y;
+    close(feet.y, tall + TOP_ROOM, 0.01, `${at}: a top-middle tap ends his height and the room over it under the top`);
+    close(reachRow(o), feet.y, 0.01, `${at}: on reachRow`);
+    assert.ok(tall > 0.08 * Math.min(cssW, cssH), `${at}: his height there, ${tall.toFixed(0)} px`);
+  }
+  // About 140 CSS px down a desktop's stage, 95 down a phone's: his height at the back, and room
+  // over his head (a little more than AREA_MARGIN: he sways and glances up).
+  const row = (/** @type {number} */ w, /** @type {number} */ h, /** @type {number} */ dpr) =>
+    reachRow({ view: viewFor(w, h, dpr).view, cssW: w, cssH: h, insets: INSETS });
+  assert.ok(row(1280, 800, 1) > 125 && row(1280, 800, 1) < 155, `a desktop: ${row(1280, 800, 1).toFixed(0)} px`);
+  assert.ok(row(390, 844, 3) > 80 && row(390, 844, 3) < 105, `a phone: ${row(390, 844, 3).toFixed(0)} px`);
+  assert.ok(TOP_ROOM >= 12 && TOP_ROOM <= 24, `${TOP_ROOM} CSS px over his head`);
 });
 
 test('a rounded square’s sides, clamp and middle: x between its sides at a depth (narrower round the corners), a point outside pulled to its nearest point on the rim, a ray’s room up to the rim', () => {
@@ -215,7 +278,7 @@ test('the play area keeps to the default view: the Pixel Size and the open Setti
     const { area: base, view } = areaFor(cssW, cssH, dpr);
     for (const pixelSize of PIXEL_SIZES) {
       const { area } = areaFor(cssW, cssH, dpr, pixelSize);
-      for (const k of ['minX', 'maxX', 'minZ', 'maxZ', 'round'])
+      for (const k of Object.keys(base))
         assert.ok(
           Math.abs(area[k] - base[k]) <= 0.01 * Math.abs(base[k]) + 1e-6,
           `${at} ${pixelSize}: ${k} ${area[k]} vs ${base[k]}`,
@@ -349,25 +412,29 @@ function onScreen(view, o, p) {
   );
 }
 
-test('on a phone, at the default zoom, running to the rim, across the disc and round its rim never takes NEWT off the screen: the camera follows him softly', () => {
+test('on a phone, at the default zoom, running to the rim, across the disc and round its rim never takes NEWT’s feet off the screen: the camera moves on only as far as keeps them on it', () => {
   // Portrait and landscape phones, the camera turned three ways.
   for (const [cssW, cssH, dpr] of [...SIZES.filter(([w]) => w < 600), [360, 740, 3], [844, 390, 3]]) {
     const { view } = viewFor(cssW, cssH, dpr);
+    const frame = { hw: (cssW - INSETS.left - INSETS.right) / 2, hh: (cssH - INSETS.top - INSETS.bottom) / 2 };
+    /** The toolbar's top: the clear space's bottom is 8 CSS px over it. */
+    const bar = cssH - INSETS.bottom + 8;
     for (const yaw of [0, 1, 2.6]) {
       const at = `${cssW}x${cssH}@${dpr} at yaw ${yaw}`;
-      /** His body (his width across the screen, feet to head) is on the stage and over the toolbar. */
+      /** His feet are on the stage and over the toolbar. */
       const check = (o, n, when) => {
-        const right = { x: Math.cos(o.yaw), z: -Math.sin(o.yaw) };
-        for (const y of [0, NEWT_HEIGHT])
-          for (const k of [-1, 1]) {
-            const p = onScreen(view, o, { x: n.x + k * NEWT_RADIUS * right.x, y, z: n.z + k * NEWT_RADIUS * right.z });
-            const ok = p.x >= 0 && p.x <= cssW && p.y >= 0 && p.y <= cssH - INSETS.bottom;
-            assert.ok(ok, `${at}, ${when}: his ${y ? 'head' : 'feet'} at (${p.x.toFixed(0)}, ${p.y.toFixed(0)})`);
-          }
+        const p = onScreen(view, o, { x: n.x, y: 0, z: n.z });
+        const ok = p.x >= 0 && p.x <= cssW && p.y >= 0 && p.y <= bar + 0.5;
+        assert.ok(ok, `${at}, ${when}: his feet at (${p.x.toFixed(0)}, ${p.y.toFixed(0)})`);
+      };
+      const make = () => {
+        const o = createOrbit({ distance: view.distance, yaw, span: { w: cssW, h: cssH } });
+        orbitSpan(o, { w: cssW, h: cssH, ch: view.canvasH, ...frame });
+        return o;
       };
       /** A run at running speed from `a` to `b` (the camera settled on `a`), then 2 s standing. */
       const run = (a, b, when) => {
-        const o = createOrbit({ distance: view.distance, yaw, span: { w: cssW, h: cssH } });
+        const o = make();
         for (let i = 0; i < 6 * 60; i++) orbitStep(o, DT, a);
         const T = dist(a, b) / GAIT.run;
         for (let t = 0; t < T + 2; t += DT) {
@@ -385,7 +452,7 @@ test('on a phone, at the default zoom, running to the rim, across the disc and r
       }
       // Round the rim, both ways, for two turns.
       for (const way of [1, -1]) {
-        const o = createOrbit({ distance: view.distance, yaw, span: { w: cssW, h: cssH } });
+        const o = make();
         for (let i = 0; i < 6 * 60; i++) orbitStep(o, DT, { x: 0, z: R });
         for (let t = 0; t < (4 * Math.PI * R) / GAIT.run; t += DT) {
           const a = (way * GAIT.run * t) / R;
@@ -634,5 +701,171 @@ test('the shadow camera reaches as high as before while he stands or is carried 
     assert.ok(top >= last, 'never lower as he goes up');
     assert.ok(Number.isInteger(top * 2) || top === base, `in half units (${top})`);
     last = top;
+  }
+});
+
+test('turned bounds (Bounds.turn: what’s on screen, in the camera’s frame) are the same shape turned about their middle: a point outside is pulled onto it, a walk stops at its edge, wander goals cover it and a flee keeps inside it', () => {
+  const flat = { minX: -1, maxX: 1, minZ: -6, maxZ: 2, minXBack: -2.5, maxXBack: 2.5 };
+  const about = { x: 0.3, z: -0.4 };
+  for (const yaw of [0.7, Math.PI / 2, -2.4]) {
+    const at = `turned ${yaw}`;
+    const b = turnBounds(flat, yaw, about);
+    assert.equal(b.turn, yaw);
+    // Its corners: the flat one's, turned about `about`.
+    const want = rimPoints(flat).map((p) => turnedAbout(p, about, yaw));
+    rimPoints(b).forEach((p, i) => {
+      close(p.x, want[i].x, 1e-6, `${at}: corner ${i}`);
+      close(p.z, want[i].z, 1e-6);
+    });
+    const rng = createRng(5);
+    for (let i = 0; i < 200; i++) {
+      const p = { x: (rng() - 0.5) * 20, z: (rng() - 0.5) * 20 };
+      const k = clampTo(b, p);
+      const w = turnedAbout(clampTo(flat, turnedAbout(p, about, -yaw)), about, yaw);
+      close(k.x, w.x, 1e-6, `${at}: clamped ${JSON.stringify(p)}`);
+      close(k.z, w.z, 1e-6);
+    }
+    const inside = (p) => dist(clampTo(b, p), p) < 1e-6;
+    let w = { x: about.x, z: about.z, yaw: 0, speed: 0 };
+    for (let i = 0; i < 20 * 60; i++) {
+      w = steer(w, { mode: 'goto', goal: { x: 30, z: -30 }, speed: GAIT.run }, null, b, DT);
+      assert.ok(inside(w), `${at}: walking ${JSON.stringify(w)}`);
+    }
+    assert.ok(dist(w, clampTo(b, { x: 30, z: -30 })) <= STEER.arrive + 1e-6, `${at}: stopped at its edge`);
+    const goals = Array.from({ length: 200 }, () => wanderGoal(rng, b, about));
+    for (const g of goals) assert.ok(inside(g), `${at}: a wander goal ${JSON.stringify(g)}`);
+    // (Spread over it, its back to its front.)
+    const depth = goals.map((g) => turnedAbout(g, about, -yaw).z);
+    assert.ok(Math.min(...depth) < -4.5 && Math.max(...depth) > 1, `${at}: goals all over it`);
+    let f = { x: about.x, z: about.z, yaw: 0, speed: 0 };
+    let ran = 0;
+    for (let i = 0; i < 10 * 60; i++) {
+      const chaser = { x: f.x - 0.5 * Math.sin(f.yaw), z: f.z - 0.5 * Math.cos(f.yaw) };
+      const n = steer(f, { mode: 'flee', goal: null, speed: GAIT.run }, chaser, b, DT);
+      ran += dist(n, f);
+      f = n;
+      assert.ok(inside(f), `${at}: fleeing ${JSON.stringify(f)}`);
+    }
+    assert.ok(ran > 10, `${at}: he keeps running (${ran.toFixed(1)})`);
+  }
+});
+
+test('where the play area is bigger than the screen, a wander goal is on screen when it’s picked and a flee keeps to what was on screen as it began (orbitSight; the camera keeps his feet on screen beyond that)', () => {
+  for (const [cssW, cssH, dpr] of [
+    [390, 844, 3],
+    [1280, 800, 1],
+  ]) {
+    const { area, view } = areaFor(cssW, cssH, dpr);
+    const frame = { hw: (cssW - INSETS.left - INSETS.right) / 2, hh: (cssH - INSETS.top - INSETS.bottom) / 2 };
+    for (const yaw of [0, Math.PI / 4, Math.PI / 2]) {
+      const at = `${cssW}x${cssH} at yaw ${yaw.toFixed(2)}`;
+      const o = createOrbit({ distance: view.distance, yaw, span: { w: cssW, h: cssH } });
+      orbitSpan(o, { w: cssW, h: cssH, ch: view.canvasH, ...frame });
+      orbitArea(o, area);
+      for (let i = 0; i < 120; i++) orbitStep(o, DT, { x: 0, z: 0 });
+      const sight = orbitSight(o);
+      assert.ok(sight, `${at}: something's on screen`);
+      /** NEWT standing at `n` shows whole inside the clear space. */
+      const whole = (n) => {
+        const right = { x: Math.cos(o.yaw), z: -Math.sin(o.yaw) };
+        for (const y of [0, NEWT_HEIGHT])
+          for (const k of [-1, 1]) {
+            const s = screenOf(o, { x: n.x + k * NEWT_RADIUS * right.x, y, z: n.z + k * NEWT_RADIUS * right.z });
+            if (!s || Math.abs(s.x) > frame.hw + 0.5 || Math.abs(s.y) > frame.hh + 0.5) return false;
+          }
+        return true;
+      };
+      const inArea = (p) => dist(clampTo(area, p), p) < 1e-6;
+      const b = { ...area, sight };
+      const rng = createRng(11);
+      let from = { x: 0, z: 0 };
+      let top = 0;
+      for (let i = 0; i < 200; i++) {
+        const g = wanderGoal(rng, b, from);
+        assert.ok(inArea(g) && whole(g), `${at}: a wander goal off the screen ${JSON.stringify(g)}`);
+        top = Math.min(top, screenOf(o, { x: g.x, y: 0, z: g.z })?.y ?? 0);
+        from = g;
+      }
+      assert.ok(top < -frame.hh * 0.4, `${at}: wander goals up near the top of the screen too (${top.toFixed(0)})`);
+      // A flee: inside what was on screen as it began, however what's on screen changes after.
+      let f = { x: 0, z: 0, yaw: 0, speed: 0 };
+      const live = { ...area, sight };
+      for (let i = 0; i < 8 * 60; i++) {
+        const chaser = { x: f.x - 0.5 * Math.sin(f.yaw), z: f.z - 0.5 * Math.cos(f.yaw) };
+        f = steer(f, { mode: 'flee', goal: null, speed: GAIT.run }, chaser, live, DT);
+        if (i === 60) live.sight = turnBounds(sight, 2, { x: 0, z: 0 });
+        assert.ok(inArea(f) && whole(f), `${at}: fleeing off what was on screen ${JSON.stringify(f)}`);
+      }
+      // Without what's on screen, as before: anywhere in the play area.
+      const anywhere = Array.from({ length: 300 }, () => wanderGoal(rng, area, { x: 0, z: 0 }));
+      assert.ok(
+        anywhere.some((g) => !whole(g)),
+        `${at}: with nothing on screen given, wander goals go all over the play area`,
+      );
+    }
+  }
+});
+
+test('a resize that shrinks the play area under him: standing or turning, he’s eased back inside, a little a frame and never further out; walking back in, he walks, never slid; one that still holds him never moves him', () => {
+  const small = playArea(5);
+  // Inside it: not moved.
+  const still = { x: 2, z: -3, yaw: 1, speed: 0 };
+  const s2 = steer(still, { mode: 'stay', goal: null, speed: 0 }, null, small, DT);
+  assert.equal(s2.x, still.x);
+  assert.equal(s2.z, still.z);
+  /** @type {Array<[any, any]>} */
+  const moves = [
+    ['stay', null],
+    ['face', { x: 0, z: 9 }],
+  ];
+  for (const [mode, goal] of moves) {
+    let p = { x: 0.3, z: -5.9, yaw: Math.PI, speed: 0 };
+    let was = dist(p, clampTo(small, p));
+    let t = 0;
+    for (; t < 4 && was > 1e-6; t += DT) {
+      const n = steer(p, { mode, goal, speed: GAIT.walk }, null, small, DT);
+      assert.ok(dist(n, p) <= (STEER.backInMax + GAIT.walk) * DT + 1e-6, `${mode}: no jump at ${t.toFixed(2)} s`);
+      const now = dist(n, clampTo(small, n));
+      assert.ok(now <= was + 1e-12, `${mode}: never further out (${now} after ${was})`);
+      p = n;
+      was = now;
+    }
+    assert.ok(was < 1e-6 && t < 2.5, `${mode}: back inside after ${t.toFixed(2)} s`);
+  }
+  // Walking back in (the brain's walk to just inside: steer.js backInGoal): every frame's move is
+  // a step along the way he faces, no faster than a walk, never further out.
+  {
+    let p = { x: 0.3, z: -5.9, yaw: Math.PI, speed: 0 };
+    const goal = backInGoal(small, p);
+    assert.ok(goal && radius(goal) < 5 - 0.2 && radius(goal) > 5 - 0.3, `just inside: ${JSON.stringify(goal)}`);
+    let was = dist(p, clampTo(small, p));
+    let t = 0;
+    for (; t < 6 && was > 1e-6; t += DT) {
+      const n = steer(p, { mode: 'goto', goal, speed: GAIT.walk }, null, small, DT);
+      const step = dist(n, p);
+      if (step > 1e-9) {
+        const along = ((n.x - p.x) * Math.sin(n.yaw) + (n.z - p.z) * Math.cos(n.yaw)) / step;
+        assert.ok(along > 0.999, `walking in at ${t.toFixed(2)} s: a step along his heading, not a slide (${along})`);
+      }
+      assert.ok(step <= GAIT.walk * DT + 1e-9, `no faster than a walk at ${t.toFixed(2)} s`);
+      const now = dist(n, clampTo(small, n));
+      assert.ok(now <= was + 1e-12, `never further out (${now} after ${was})`);
+      p = n;
+      was = now;
+    }
+    assert.ok(was < 1e-6, `walked back inside (${t.toFixed(2)} s)`);
+    assert.equal(backInGoal(small, p), null, 'inside: nowhere to walk back to');
+  }
+  // A phone's URL bar showing or hiding: the play area a little different, and him inside both untouched.
+  const tall = areaFor(390, 844, 3).area;
+  const short = areaFor(390, 788, 3).area;
+  assert.notDeepEqual(tall, short, 'the play area changes with the height');
+  const r = Math.min(tall.r ?? 0, short.r ?? 0) - 0.01;
+  for (const a of [0, 1, 2, 3, 4, 5]) {
+    const n = { x: r * Math.sin(a), z: r * Math.cos(a), yaw: a, speed: 0 };
+    for (const b of [tall, short]) {
+      const m = steer(n, { mode: 'stay', goal: null, speed: 0 }, null, b, DT);
+      assert.ok(m.x === n.x && m.z === n.z, `at ${a}: not moved`);
+    }
   }
 });

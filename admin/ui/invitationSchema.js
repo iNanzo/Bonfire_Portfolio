@@ -9,7 +9,7 @@
 // the toy reads it through src/invitation/content.js. Each Shader option goes by the Look
 // menu's own name (shader.js SHADER_CONTROLS), so a control added there shows here by itself.
 //
-// The Intro (`invitation.intro`, the chat Play Intro opens: types.js DialogueScript): the
+// The Intro (`invitation.intro`, the chat the envelope and Replay Intro open: types.js DialogueScript): the
 // speaker, the start box and the chat boxes. The start, each box's Next and each choice's box
 // are picked from the boxes there are (one that's gone still shows, marked, so it can be put
 // right), the lists remade as a box is renamed (INVITATION_OPTIONS_FROM); Face, Animation and
@@ -172,10 +172,11 @@ export const INVITATION_HELP = {
     ]),
   ),
   'invitation.intro':
-    'The chat Play Intro opens: NEWT talks to the visitor box by box, with a face, a move and a shot for each line.',
+    'The chat the envelope and Replay Intro open: NEWT talks to the visitor box by box, with a face, a move and a shot for each line.',
   'invitation.intro.speaker':
     'The name on the tab at the top left of every chat box (a box’s Speaker Override changes it for that box).',
-  'invitation.intro.start': 'The box Play Intro opens on. Every Play Intro starts here: nothing is kept from the last.',
+  'invitation.intro.start':
+    'The box the intro opens on, from the envelope or Replay Intro. It starts here every time: nothing is kept from the last.',
   'invitation.intro.boxes':
     'One line each, in this order: a tap goes on to the box after it unless the box says otherwise. Drag ⋮⋮ or use ↑/↓ to reorder.',
   [`${BOX}.id`]:

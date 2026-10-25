@@ -25,6 +25,7 @@ import {
   markId,
   snapShift,
   subjectBoxes,
+  surfaceIdUniforms,
 } from '../src/invitation/retro.js';
 import { LOOKS, lookPreset, validLook } from '../src/invitation/look.js';
 import { warmthTint } from '../src/invitation/shader.js';
@@ -447,6 +448,26 @@ test('outside the area round NEWT, his shadow and the decals, the canvas is the 
   assert.deepEqual(calls, ['target whole', 'clear colour alpha 0', 'clear', 'scene', 'canvas', 'post']);
 });
 
+test('his trim (the earrings’ pixel sprites: ID.trim) is drawn as he is, graded and quantized, but takes no lines, no hover and no ring round it, and doesn’t line his edge where it crosses him', () => {
+  assert.equal(ID.trim, 3);
+  assert.equal(new Set(Object.values(ID)).size, 3, 'its own id');
+  // A material of its own (not a built-in) writes it by the uniforms markId uses, sharing whether ids are on.
+  const u = surfaceIdUniforms(ID.trim);
+  assert.equal(u.uSurfaceId.value, ID.trim / 16);
+  const his = compiled(markId(new THREE.MeshToonMaterial(), ID.newt), 'toon');
+  assert.equal(u.uIdOn, his.uniforms.uIdOn, 'one switch for every id');
+  const main = POST_SHADER.slice(POST_SHADER.indexOf('void main()'));
+  assert.match(main, /bool trim = abs\(idOf\(src\) - TRIM\) < 0\.5;/);
+  assert.match(main, /if \(trim \|\| abs\(idOf\(src\) - NEWT\) < 0\.5\)/, 'drawn in his branch: graded, quantized');
+  assert.match(main, /if \(!trim && uOutline > 0\.5 && edgeOnNewt\(p\)\)/, 'no lines on it');
+  assert.match(main, /if \(!trim && uHover > 0\.0 && bayer\(p\)/, 'no hover on it');
+  assert.match(main, /if \(!trim && burstAt\(p\)\)/, 'no grab ring on it');
+  // His edge texels next to it aren't his silhouette; the ring outside him still looks for him alone.
+  assert.match(POST_SHADER, /if \(!isNewt\(n\) && !isTrim\(n\)\) \{/);
+  assert.match(POST_SHADER, /bool isNewt\(vec2 p\) \{ return inside\(p\) && abs\(idOf\(at\(p\)\) - NEWT\) < 0\.5; \}/);
+  assert.equal([...main.matchAll(/quantize\(/g)].length, 2);
+});
+
 test('the hover dither and the grab burst live in the post shader: a Bayer rim on NEWT filling inward, a halo just outside him in the ring box, a dither ring at the grab point, each off at 0', () => {
   assert.match(POST_SHADER, /uniform float uHover;/);
   assert.match(POST_SHADER, /uniform vec3 uHoverInk;/);
@@ -455,7 +476,7 @@ test('the hover dither and the grab burst live in the post shader: a Bayer rim o
   // His texels: the rim (all of his edge, a thinner share of the rest as it fills inward), and
   // the ring where it crosses him, both before his own quantize.
   const his = main.slice(0, main.indexOf('return;'));
-  assert.match(his, /if \(uHover > 0\.0 && bayer\(p\) < uHover \* \(edge \? 1\.0 : HOVER_FILL\)\)/);
+  assert.match(his, /if \((!trim && )?uHover > 0\.0 && bayer\(p\) < uHover \* \(edge \? 1\.0 : HOVER_FILL\)\)/);
   assert.match(his, /burstAt\(p\)/);
   // The paper: the halo only while hovering and only in the ring box (it searches round each
   // texel), the ring an ALU test anywhere in the area; both marked as a line, so the shader keeps
