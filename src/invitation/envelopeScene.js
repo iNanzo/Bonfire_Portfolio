@@ -23,9 +23,10 @@
 // up) and opens or skips on release (envelopeGesture), else springs back; the wheel opens or skips
 // once it adds up; Skip Intro skips. It takes focus at boot with no ring: the ring shows once a key
 // is pressed. veils(spots) says whether it still hides NEWT (his head, collar and middle: the
-// intro's first line waits for it; envelope.js letterCovers at points of each on the letter). The hint ("Click or swipe up to open", "Tap ..." on a touch screen, / "Swipe down
-// to skip") shows on hover, keyboard focus, or after a while with no input on a touch screen, and
-// reads "Open ↑" / "Skip ↓" while dragging. Once it's done (and its last petals have fallen) it
+// intro's first line waits for it; envelope.js letterCovers at points of each on the letter).
+// The hint ("Click or swipe up to open", "Tap ..." on a touch screen, / "Swipe down to skip")
+// shows on hover, keyboard focus, or after a while with no input on a touch screen, and reads
+// "Open ↑" / "Skip ↓" while dragging. Once it's done (and its last petals have fallen) it
 // disposes its renderer, loses its context and leaves the page.
 import * as THREE from 'three';
 import {

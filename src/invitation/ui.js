@@ -9,8 +9,9 @@
 // intro's dialogue (dialogueUi.js), and while it runs the toolbar rests out of sight
 // (setTalking); once it's over, or the envelope's skipped (focusToolbar), focus goes to the
 // toolbar's first button, with its ring (and label) only if the visitor's last press was a key,
-// as a browser shows it for focus their own press moves. Camera opens the Camera pad over the stage (above the bar, never moving it, so
-// the view's clear space and the play area stay as they are): Turn Left and Right, Tilt Up and
+// as a browser shows it for focus their own press moves. Camera opens the Camera pad over the
+// stage (above the bar, never moving it, so the view's clear space and the play area stay as
+// they are): Turn Left and Right, Tilt Up and
 // Down, Zoom In and Out, Follow NEWT and Reset Camera, and a line on moving the view by hand;
 // Escape or Camera again closes it. Settings opens the Settings sheet, a bottom sheet (Pixel
 // Size, a

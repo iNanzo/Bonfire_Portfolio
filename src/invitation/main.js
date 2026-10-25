@@ -47,7 +47,8 @@
 // inert under it); the toy draws its first frame (.is-ready) and waits behind it, paused. Opened,
 // it fades and the intro starts by itself (introWanted, held until the buttons are on), the
 // camera cut to the talk shot behind the letter, its first line and his gesture held until the
-// letter no longer hides his head and chest (envelope.veils, envelopeVeils); skipped, it drops away and the toy is free, focus on the toolbar.
+// letter no longer hides his head and chest (envelope.veils, envelopeVeils); skipped, it drops
+// away and the toy is free, focus on the toolbar.
 // Without WebGL 2, or if NEWT can't load, it steps aside for the message. ?test skips it unless
 // &envelope.
 //
@@ -1108,7 +1109,7 @@ function start(s) {
     if (!intro) return null;
     // (In place, as of the brain's last frame: the line goes on from its start, unless the Log or
     // the question holds it.)
-    // (From the envelope, the line waits on the letter too: until it no longer hides his head.)
+    // (From the envelope, the line waits on the letter too: until it no longer hides him.)
     if (introHeld && out?.talkReady && !envelopeVeils) {
       introHeld = false;
       intro.pause(talkUi.logOpen || talkUi.asking, t);
