@@ -17,9 +17,10 @@ One engine, three apps:
 - **[Bonfire Painter](https://nhoang.dev/painter/)**: a scene editor for Bonfire Live.
   Paint a scene (place, colors, framing, look, knights), watch it play to a silent beat,
   and send it to Bonfire Live.
-- **Lửa Trại Nghĩa Sĩ** (`/larp/`): a campfire game for a TNTT youth activity. Teams perform,
-  leaders award named points, and a projector window reveals them as banners around the
-  bonfire. It runs on one laptop with no network ([docs/campfire.md](docs/campfire.md)).
+- **The Campfire Game** (`/larp/`): a game night on the bonfire, set up like Bonfire Live.
+  Rounds with a timer and their own scenes, team scores, and modifiers that bring up the
+  site's banner and make the fire (and the knights) answer, with an output window for the
+  projector ([docs/campfire.md](docs/campfire.md)).
 
 Vite and plain JavaScript (type-checked through JSDoc), Three.js, Blender-built models,
 and a content admin on a Cloudflare Worker. Node 22.12 or later.

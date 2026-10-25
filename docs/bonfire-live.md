@@ -484,7 +484,7 @@ style, the finish, seat and edge glow in the mix (the glow round 0.5).
 | Piece | File |
 | --- | --- |
 | Page, start screen, sources, HUD | `visualizer/index.html`, `src/visualizer/main.js` (wires the parts below together), `markup.js`, `start.js`, `sources.js`, `hud.js`, `src/visualizer/visualizer.css` |
-| Keys and buttons, dialogs, title cards, output window, pack, MIDI (the page's parts) | `src/visualizer/actions.js`, `dialogs.js`, `cards.js`, `output.js`, `packUi.js`, `midiUi.js` (their shared state: `context.js`) |
+| Keys and buttons, dialogs, title cards, output window, pack, MIDI (the page's parts) | `src/visualizer/actions.js`, `dialogs.js`, `cards.js`, `output.js` (over `src/ui/output.js`, shared with the campfire game), `packUi.js`, `midiUi.js` (their shared state: `context.js`) |
 | Keyboard shortcuts (the ? list) | `src/visualizer/keys.js` (shown by `src/ui/keysOverlay.js`) |
 | Settings: the values, saving, presets and setups | `src/visualizer/settings.js` |
 | The settings dialog: its layout and what its controls do; each setting's control; the search; bulk buttons and Reset Section (names, hints and places: `src/settingsMap.js`; the fields and "?" hints: `src/ui/fields.js`, shared with the Painter; the tooltip: `src/ui/tooltip.js`) | `src/visualizer/settingsDialog.js`, `settingsControls.js`, `settingsSearchUi.js`, `settingsBulk.js` |

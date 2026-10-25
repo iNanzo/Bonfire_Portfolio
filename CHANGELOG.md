@@ -11,7 +11,7 @@ toolbar, a new way to carry him and more to do. Round 15, below it: an Uma Musum
 intro dialogue for NEWT. Round 14, below that: his second wave (a Default look, new
 controls, speech bubbles, the admin's Invitation page). Round 13: NEWT's toy at
 `/invitation/`. Round 11: the knight at home in every place, every module type-checked, and
-a cleanup for what agents and test runs leave running.
+a campfire game on the bonfire, and a cleanup for what agents and test runs leave running.
 Round 10: menus and search, the knight's fixes, hygiene and performance.
 
 ### The password lock (round 16)
@@ -173,6 +173,24 @@ Round 10: menus and search, the knight's fixes, hygiene and performance.
   changes, on the ground where they sit; and the *Pillar Side* shot looks from the front
   left at what stands by his seat, him and the fire, all three in frame in every place.
 
+### The campfire game (round 11)
+
+- The Campfire Game at `/larp/`: a game night on the bonfire, set up like Bonfire Live. The
+  fire fills the screen with the scores and the round's timer over it; the host's controls
+  are a bar along the bottom that fades when the mouse rests, and Output opens the same
+  picture without them for a projector.
+- Rounds each play their own scene (one of the site's, one from the Painter, or the plain
+  fire) and have a timer: Space starts and pauses it, + adds a minute.
+- Modifiers give points, a multiplier for the rest of the round, or both. Each brings up
+  the site's own banner with its title, subtitle and what it gave ("+50 · Red Team"), and
+  the fire answers it with a stoke, a ring, a flash or a new element, rolled fresh each time
+  unless the modifier names one. A Special modifier calls the knights to the fire, and they
+  cheer every banner after it.
+- Teams are a name and a color; Undo takes the last points back; a game exports to a file
+  and imports on another laptop. A game saved by the first version (with rosters and two
+  languages) carries over its teams, rounds and points. How to run a night:
+  [docs/campfire.md](docs/campfire.md).
+
 ### Checks and tools (round 11)
 
 - Every module in `src/` and `admin/` is type-checked, new ones too (`tsconfig.json` no
@@ -292,3 +310,4 @@ admin.
 
 [Unreleased]: https://github.com/iNanzo/Bonfire_Portfolio/compare/v2.0.0...HEAD
 [2.0.0]: https://github.com/iNanzo/Bonfire_Portfolio/tree/v2.0.0
+
