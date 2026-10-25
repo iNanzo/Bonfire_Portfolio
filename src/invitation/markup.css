@@ -63,42 +63,42 @@
 }
 @keyframes inv-fx-shake {
   0% {
-    transform: translate(0.07em, 0);
+    transform: translate(0.09em, 0);
   }
   25% {
-    transform: translate(-0.07em, 0.07em);
+    transform: translate(-0.09em, 0.09em);
   }
   50% {
-    transform: translate(0, -0.07em);
+    transform: translate(0, -0.09em);
   }
   75% {
-    transform: translate(-0.07em, -0.07em);
+    transform: translate(-0.09em, -0.09em);
   }
 }
 @keyframes inv-fx-wave-shake {
   0% {
-    transform: translate(0.07em, 0);
+    transform: translate(0.09em, 0);
   }
   12.5% {
-    transform: translate(-0.07em, -0.12em);
+    transform: translate(-0.09em, -0.12em);
   }
   25% {
     transform: translate(0, -0.27em);
   }
   37.5% {
-    transform: translate(0.07em, -0.12em);
+    transform: translate(0.09em, -0.12em);
   }
   50% {
-    transform: translate(-0.07em, 0.07em);
+    transform: translate(-0.09em, 0.09em);
   }
   62.5% {
     transform: translate(0, 0.08em);
   }
   75% {
-    transform: translate(0.07em, 0.12em);
+    transform: translate(0.09em, 0.12em);
   }
   87.5% {
-    transform: translate(-0.07em, 0.01em);
+    transform: translate(-0.09em, 0.01em);
   }
 }
 
