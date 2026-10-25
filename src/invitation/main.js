@@ -297,8 +297,8 @@ const envelope = options.envelope
       onUncover: (how) => {
         hudEl.removeAttribute('inert');
         if (how === 'open') introWanted = true;
-        // (Skipped: the toy is free, focus on the toolbar's first button.)
-        else /** @type {HTMLElement|null} */ (ui.toolbar.querySelector('button:not(:disabled)'))?.focus();
+        // (Skipped: the toy is free, focus on the toolbar's first button, its ring only after a key.)
+        else ui.focusToolbar();
         envelopeGone();
       },
     })

@@ -41,7 +41,8 @@ so it reads as a letter, and it's the loading screen too: NEWT loads behind it.
   and "Swipe down to skip") shows while the mouse is over it or it has keyboard focus, and on a
   touch screen after a moment without a touch; while you drag it reads "Open ↑" or "Skip ↓".
 - **Focus:** it has focus from the start, but its ring only shows once you press a key (Tab goes
-  between it and Skip Intro).
+  between it and Skip Intro). Skipped, focus goes to the toolbar's first button, again with its
+  ring (and its label) only if your last press was a key: a swipe or a drag shows neither.
 - **Reduced motion:** it holds still, with no petals; the flap is open at once and the seal and
   the letter fade away plainly.
 - Without WebGL 2, or if NEWT can't load, it steps aside so the message shows. Nothing about it
@@ -648,7 +649,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   makes it right after `bindUi`, sets the HUD inert under it, lets the toy draw its first frame
   and then holds the loop while it covers him (`sync`), and on its way out either sets
   `introWanted` (held until `beginIntro` can run, which cuts the camera to the talk shot) or
-  focuses the toolbar. `?test` skips it unless `&envelope` (`parseQuery`'s `envelope`).
+  focuses the toolbar (`ui.focusToolbar`: ui.js moves focus for the visitor with `focusVisible`
+  only when their last press was a key, there and when the intro ends; a plain scripted
+  `focus()` shows Chrome's ring when nothing before it was a pointer's). `?test` skips it unless `&envelope` (`parseQuery`'s `envelope`).
 - **The hover and the grab ring:** `retro.js`'s post shader takes `uHover` (a two-texel Bayer
   rim on NEWT's texels, a tenth of the rest, and a halo up to two texels outside him in the ring
   box: 12 reads a texel, only while hovering) and `uBurst` (a dither ring at the grip, an ALU

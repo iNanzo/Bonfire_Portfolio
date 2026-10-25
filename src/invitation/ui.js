@@ -7,7 +7,9 @@
 // for HOLD_MS shows the label and swallows the click that follows (createHold; a quicker press
 // acts as ever). Hover and press fill the button with ordered dither. Replay Intro starts the
 // intro's dialogue (dialogueUi.js), and while it runs the toolbar rests out of sight
-// (setTalking). Camera opens the Camera pad over the stage (above the bar, never moving it, so
+// (setTalking); once it's over, or the envelope's skipped (focusToolbar), focus goes to the
+// toolbar's first button, with its ring (and label) only if the visitor's last press was a key,
+// as a browser shows it for focus their own press moves. Camera opens the Camera pad over the stage (above the bar, never moving it, so
 // the view's clear space and the play area stay as they are): Turn Left and Right, Tilt Up and
 // Down, Zoom In and Out, Follow NEWT and Reset Camera, and a line on moving the view by hand;
 // Escape or Camera again closes it. Settings opens the Settings sheet, a bottom sheet (Pixel
@@ -428,6 +430,9 @@ export function statusHtml() {
   return `<div class="inv-status" role="status" aria-live="polite"><p class="inv-status-text">Loading…</p><button type="button" class="inv-btn" data-reload hidden>Reload</button></div>`;
 }
 
+/** Keys that alone aren't a visitor using the keyboard (a modifier held for a click). */
+const MODIFIERS = new Set(['Shift', 'Control', 'Alt', 'Meta']);
+
 /**
  * Put the page's controls in the stage and report what's pressed.
  * @param {HTMLElement} stage
@@ -469,6 +474,24 @@ export function bindUi(
   let talking = false;
   /** Focus goes back to Replay Intro once it's on again (the intro just ended). */
   let refocus = false;
+  /** The visitor's last press was a key (not a pointer, a touch, or nothing yet). */
+  let byKey = false;
+  const onAnyKey = (/** @type {KeyboardEvent} */ e) => {
+    if (!MODIFIERS.has(e.key)) byKey = true;
+  };
+  const onAnyPointer = () => {
+    byKey = false;
+  };
+  // (On the window, so they hear a key before anything over the page takes it.)
+  window.addEventListener('keydown', onAnyKey, true);
+  window.addEventListener('pointerdown', onAnyPointer, true);
+  /**
+   * Focus moved for the visitor: its ring (and a button's label) only after a key. A scripted
+   * focus() alone shows the ring in Chrome when nothing before it was a pointer's. focusVisible
+   * is newer than the DOM's types.
+   * @param {HTMLElement|null} el
+   */
+  const focusFor = (el) => el?.focus(/** @type {FocusOptions} */ ({ preventScroll: true, focusVisible: byKey }));
   /** The sheet's first and last stops for Tab. */
   const first = $('[data-look-close]');
   const last = $('[data-setting="wander"]');
@@ -872,7 +895,7 @@ export function bindUi(
       intro.disabled = !on;
       if (on && refocus) {
         refocus = false;
-        intro.focus({ preventScroll: true });
+        focusFor(intro);
       }
     },
     /**
@@ -891,7 +914,7 @@ export function bindUi(
       refocus = !on;
       if (refocus && !intro.disabled) {
         refocus = false;
-        intro.focus({ preventScroll: true });
+        focusFor(intro);
       }
     },
     get talking() {
@@ -903,6 +926,10 @@ export function bindUi(
     },
     get toolbar() {
       return $('.inv-toolbar');
+    },
+    /** Focus on the toolbar's first button that's on (the envelope skipped: the toy is free). */
+    focusToolbar() {
+      focusFor(/** @type {HTMLElement|null} */ ($('.inv-toolbar').querySelector('button:not(:disabled)')));
     },
     get sheetOpen() {
       return !sheet.hidden;
@@ -919,6 +946,8 @@ export function bindUi(
     destroy() {
       document.removeEventListener('keydown', onKey);
       document.removeEventListener('keydown', onPadKey);
+      window.removeEventListener('keydown', onAnyKey, true);
+      window.removeEventListener('pointerdown', onAnyPointer, true);
       hud.remove();
     },
   };
