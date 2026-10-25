@@ -6,7 +6,8 @@
 // that may shed petals, so with Rose Petals off or reduced motion there is never one; then it lives
 // for the rest of the page (refused, it tries once and stays quiet). Document-level passive
 // pointer listeners (never preventDefault, in the capture phase so nothing stops them) drive the
-// cursor trail (createTrail: a mouse moving, a finger dragging, a finger held still) and a burst
+// cursor trail (createTrail: a mouse moving, a finger dragging, a finger held still; lifted when
+// the pointer leaves the window or it loses focus, so a return elsewhere sheds nothing) and a burst
 // ring at every press, over the envelope and through the toy alike. It draws only while petals are
 // up or a finger is held, and sleeps otherwise (cleared, no frames). Rose Petals off (Settings) or
 // reduced motion: none at all (any up shrink away). ?test reads snapshot().
@@ -220,11 +221,18 @@ export function createPetalLayer(root, { on }) {
     holds = false;
     trail.up();
   };
+  /** @param {PointerEvent} e  out of the window (no element it went to): no trail across the gap */
+  const onOut = (e) => {
+    if (e.isPrimary && !e.relatedTarget) trail.lift();
+  };
+  const onBlur = () => trail.lift();
   const listen = { passive: true, capture: true };
   doc.addEventListener('pointerdown', onDown, listen);
   doc.addEventListener('pointermove', onMove, listen);
   doc.addEventListener('pointerup', onUp, listen);
   doc.addEventListener('pointercancel', onUp, listen);
+  doc.addEventListener('pointerout', onOut, listen);
+  win.addEventListener('blur', onBlur);
 
   // --- Each frame, while there's anything to draw.
   function wake() {
@@ -278,6 +286,8 @@ export function createPetalLayer(root, { on }) {
       doc.removeEventListener('pointermove', onMove, listen);
       doc.removeEventListener('pointerup', onUp, listen);
       doc.removeEventListener('pointercancel', onUp, listen);
+      doc.removeEventListener('pointerout', onOut, listen);
+      win.removeEventListener('blur', onBlur);
       gpu?.dispose();
       gpu = null;
       canvas.remove();

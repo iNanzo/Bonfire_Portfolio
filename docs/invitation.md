@@ -770,7 +770,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   oldest free petal goes first, the swirl kept), none with reduced motion. `createTrail` is the
   cursor trail in CSS px: a step every 14–30 px (rolled each time, put where the distance comes
   up), 1–3 petals a step, at most `TRAIL.rate` (20) a second, the pointer's smoothed velocity
-  with each, and a press that holds (a finger) kept still keeps `TRAIL.hold` a second coming),
+  with each, and a press that holds (a finger) kept still keeps `TRAIL.hold` a second coming; a
+  move after a pause of 0.3 s, or after `lift()` (the pointer left the window, or it lost focus),
+  starts afresh where it is, shedding nothing along the jump),
   `petalScene.js` (`createPetalScene({scene, unit, seed, reduced, uniforms, id})`: a flow in a
   scene's world units, `unit` world units a letter width; `emit`, `letter(matrix, {h, opening,
   floating})` from the letter's world matrix, `step(dt)` writing the petals into an instanced mesh

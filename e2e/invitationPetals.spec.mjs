@@ -71,6 +71,25 @@ test.describe('with a mouse', () => {
     expect((await petals(page)).live).toBe(0);
   });
 
+  test('the mouse leaving the window and coming back elsewhere sheds nothing across the gap', async ({ page }) => {
+    await toyUp(page);
+    const a = clear(page, 0.1, 0.3);
+    await page.mouse.move(a.x, a.y);
+    await page.mouse.move(a.x + 60, a.y, { steps: 6 });
+    await expect.poll(async () => (await petals(page)).gpu).toBe('up');
+    const before = (await petals(page)).emitted.trail;
+    // (It leaves the window: the browser's pointerout with no element it went to.)
+    await page.evaluate(() =>
+      document.dispatchEvent(new PointerEvent('pointerout', { isPrimary: true, pointerType: 'mouse', bubbles: true })),
+    );
+    const b = clear(page, 0.85, 0.7);
+    await page.mouse.move(b.x, b.y);
+    expect((await petals(page)).emitted.trail, 'nothing along a path it never took').toBe(before);
+    // (From there it trails as usual.)
+    await page.mouse.move(b.x - 200, b.y, { steps: 16 });
+    await expect.poll(async () => (await petals(page)).emitted.trail).toBeGreaterThan(before);
+  });
+
   test('a drag across NEWT and the floor trails petals as it goes', async ({ page }) => {
     await toyUp(page);
     const at = await page.evaluate(() => window.__invitation.screen('body'));

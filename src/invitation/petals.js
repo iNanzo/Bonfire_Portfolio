@@ -887,7 +887,8 @@ export function createPetalFlow({ seed = 7, reduced = false } = {}) {
  * The cursor trail, in CSS px and seconds: a step every TRAIL.gap px moved (rolled each time, put
  * just where the distance came up), TRAIL.perStep petals a step, at most TRAIL.rate a second (a
  * step with none in hand is skipped); a press that holds (a finger), kept still, keeps TRAIL.hold
- * a second coming where it is.
+ * a second coming where it is. A move after a pause (or after lift(): it left the page) starts
+ * afresh where it is, shedding nothing along a jump it never made.
  * @param {{seed?: number}} [o]
  */
 export function createTrail({ seed = 1 } = {}) {
@@ -963,7 +964,18 @@ export function createTrail({ seed = 1 } = {}) {
       const dy = y - from.y;
       const d = Math.hypot(dx, dy);
       const dt = t - from.t;
-      if (dt > 0.3) fresh = true;
+      if (dt > 0.3) {
+        // (A pause, or the mouse back from outside the window somewhere else: start afresh here.)
+        last = { x, y, t };
+        dist = 0;
+        fresh = true;
+        if (d > 0) {
+          stillSince = t;
+          heldDue = 0;
+        }
+        refill(t);
+        return out;
+      }
       if (dt > 0 && d > 0) {
         if (fresh) {
           vx = dx / dt;
@@ -998,6 +1010,12 @@ export function createTrail({ seed = 1 } = {}) {
     /** The press let go (or lost). */
     up() {
       pressed = false;
+      fresh = true;
+    },
+    /** The pointer left the page (or the window lost focus): its next move starts afresh there. */
+    lift() {
+      last = null;
+      dist = 0;
       fresh = true;
     },
     /** Whether a press is down now. */

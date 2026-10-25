@@ -417,6 +417,31 @@ test('the cursor trail: a petal every 14–30 px, 1–3 a step, at most about 20
   assert.equal(tr.move(0.05, 8, 0).length + tr.move(0.1, 5, 0).length, 0);
 });
 
+test('a jump (the mouse gone a while and back somewhere else) sheds nothing along it; lifted off the page, nothing on its return', () => {
+  const tr = createTrail({ seed: 4 });
+  tr.move(0, 10, 10);
+  tr.move(0.01, 14, 10);
+  // (A second later, far across the page: nothing where it never went.)
+  assert.equal(tr.move(1, 700, 400).length, 0, 'nothing across a gap of a second');
+  // From there it trails as usual, only where it goes.
+  const on = [];
+  for (let i = 1; i <= 30; i++) on.push(...tr.move(1 + i / 120, 700 + i * 8, 400));
+  assert.ok(on.length > 0, 'it trails again');
+  assert.ok(
+    on.every((e) => e.x >= 700 - 1e-6 && e.y === 400),
+    'only along where it went',
+  );
+  // Lifted (it left the page), even a quick return elsewhere sheds nothing on the jump.
+  const tr2 = createTrail({ seed: 5 });
+  tr2.move(0, 10, 10);
+  tr2.move(0.01, 20, 10);
+  tr2.lift();
+  assert.equal(tr2.move(0.05, 600, 300).length, 0, 'nothing across the jump');
+  const back = [];
+  for (let i = 1; i <= 30; i++) back.push(...tr2.move(0.05 + i / 120, 600 - i * 8, 300));
+  assert.ok(back.length > 0 && back.every((e) => e.x <= 600 + 1e-6 && e.y === 300), 'then it trails from there');
+});
+
 test('a held finger (or button) keeps a few coming where it is; let go, none', () => {
   const tr = createTrail({ seed: 3 });
   tr.down(0, 50, 60, true);
