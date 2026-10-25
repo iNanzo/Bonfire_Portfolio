@@ -36,10 +36,11 @@ loading screen too: NEWT loads behind it.
   moving trails petals (one every 14–30 px, at most about 20 a second, thrown a little the way
   it moves, every shape and size, each about 10–16 px long whatever the screen, a little
   smaller on a phone, so they read as petals beside NEWT), and every click or tap bursts a ring
-  of 10–14 of them. On a
+  of 10–14 of them as it's let go: not as the button or finger goes down, and not when the press
+  turns into a drag (the camera, the letter, NEWT) or wanders more than about 8 px. On a
   phone a finger dragging trails them, and a finger held still keeps a few coming. None come
   over the UI (a button, the toolbar, the camera pad, Settings, or the intro's boxes), and none
-  trail while you carry NEWT (a ring where you grab him, then nothing till he's down). They're
+  come while you carry NEWT (no ring for picking him up or letting him go). They're
   drawn on a layer of their own over the toy and under its toolbar, Settings and the intro (over
   the envelope while that's up) that every press goes through. **Rose Petals**
   in Settings turns them all off (the envelope's too); it's on by default and kept with the
@@ -825,8 +826,10 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   width: how far they fly), each petal drawn `petalPx(w, h)` CSS px long (`PETAL_PX`: 12.5 on a
   desktop, 11 on a phone, its shorter side under 600 px; its sizes 0.75–1.3 of that), through
   petalScene.js's `size`, never by the screen's size (`petalPx` in its snapshot); passive capture-phase `pointerdown`, `pointermove`, `pointerup` and `pointercancel` on
-  the document (never `preventDefault`) drive the trail and a ring at each press, the primary
-  pointer only; it draws only while petals are up or a finger is held, then clears and stops;
+  the document (never `preventDefault`) drive the trail and a ring at each click or tap, the primary
+  pointer only (`createClick`: on the release, let go within `CLICK.tol`, 8 px, of where it went
+  down and never further on the way, so a drag of the camera, the letter or NEWT bursts none, nor
+  does a press a second finger turns into a pinch, one NEWT is picked up by, or a cancelled one); it draws only while petals are up or a finger is held, then clears and stops;
   `on()` false (Rose Petals off, `look.js petalsOn`, or reduced motion) launches none and shrinks
   any up away), `envelopeScene.js` (its own small WebGLRenderer in a fixed
   `.inv-envelope` layer at z-index 3, drawn at `TEXELS` texels along the screen's shorter side and

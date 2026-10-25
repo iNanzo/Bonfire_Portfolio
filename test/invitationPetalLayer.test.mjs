@@ -5,7 +5,16 @@
 // browser (node has no WebGL, so a context asked for is refused).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PETAL_PX, QUIET, createPetalLayer, petalPx, quietAt, texelPx } from '../src/invitation/petalLayer.js';
+import {
+  CLICK,
+  PETAL_PX,
+  QUIET,
+  createClick,
+  createPetalLayer,
+  petalPx,
+  quietAt,
+  texelPx,
+} from '../src/invitation/petalLayer.js';
 
 /** A page with a canvas that counts how often a context was asked of it (and refuses it). */
 function fakePage() {
@@ -223,4 +232,45 @@ test('the page’s petals are sized in CSS px, about 10–16 px long, a little s
     const long = (petalPx(w, h) * 0.75) / texelPx(w, h);
     assert.ok(long >= 5, `${w}×${h}: the smallest ${long.toFixed(1)} texels long`);
   }
+});
+
+test('a click is a press and release that moved under about 8 px: not the press itself, never a drag', () => {
+  assert.ok(CLICK.tol >= 6 && CLICK.tol <= 10, `about 8 px: ${CLICK.tol}`);
+  const c = createClick();
+  // (Down and up in place, or a hair off: a click, on the release.)
+  c.down(1, 100, 100);
+  assert.equal(c.up(1, 103, 98), true, 'a click');
+  assert.equal(c.up(1, 103, 98), false, 'once');
+  // (A drag: the camera, the letter, NEWT. Out past it and back to where it started is no click.)
+  c.down(1, 100, 100);
+  c.move(1, 100 + CLICK.tol + 1, 100);
+  assert.equal(c.up(1, 100, 100), false, 'out and back');
+  c.down(1, 100, 100);
+  c.move(1, 104, 104);
+  assert.equal(c.up(1, 106, 104), true, 'a wobble within it');
+  c.down(1, 100, 100);
+  assert.equal(c.up(1, 100, 100 + CLICK.tol + 2), false, 'let go further off');
+  // (Spoilt: NEWT picked up, a second finger landing (a pinch); cancelled: the press lost.)
+  c.down(1, 100, 100);
+  c.spoil();
+  assert.equal(c.up(1, 100, 100), false, 'spoilt');
+  c.down(1, 100, 100);
+  c.cancel();
+  assert.equal(c.up(1, 100, 100), false, 'cancelled');
+  // (Another pointer's release, or one with no press, is none.)
+  c.down(1, 100, 100);
+  c.move(2, 400, 400);
+  assert.equal(c.up(2, 100, 100), false, 'not its pointer');
+  assert.equal(c.up(1, 100, 100), true, 'its own still clicks');
+  assert.equal(createClick().up(1, 0, 0), false);
+});
+
+test('a still press bursts nothing as it goes down: the burst waits for the release', () => {
+  const page = fakePage();
+  // (Rose Petals on: the press may still make its renderer, refused here, but launches nothing.)
+  const layer = createPetalLayer(page.root, { on: () => true });
+  page.down();
+  assert.equal(layer.snapshot().emitted.ring, 0);
+  page.up();
+  layer.dispose();
 });

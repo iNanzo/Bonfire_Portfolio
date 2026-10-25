@@ -10,9 +10,11 @@
 // pointer listeners (never preventDefault, in the capture phase so nothing stops them) drive the
 // cursor trail (createTrail: a mouse moving, a finger dragging, a finger held still; lifted when
 // the pointer leaves the window or it loses focus, so a return elsewhere sheds nothing) and a burst
-// ring at every press, over the envelope and through the toy alike; none over the UI (QUIET: a
-// button, the toolbar, the pad, Settings, the dialogue's boxes), and no trail while NEWT is
-// carried (the grab's ring only). It draws only while petals are
+// ring at every click or tap (createClick: let go within CLICK.tol px of where it went down, on
+// the release, never as it goes down and never once the press turns into a drag of the camera,
+// the letter or NEWT), over the envelope and through the toy alike; none over the UI (QUIET: a
+// button, the toolbar, the pad, Settings, the dialogue's boxes), and nothing while NEWT is
+// carried. It draws only while petals are
 // up or a finger is held, and sleeps otherwise (cleared, no frames). Rose Petals off (Settings) or
 // reduced motion: none at all (any up shrink away). ?test reads snapshot().
 import * as THREE from 'three';
@@ -75,6 +77,46 @@ export const QUIET =
 export function quietAt(el) {
   const e = /** @type {{closest?: (sel: string) => unknown}|null} */ (el);
   return Boolean(e && typeof e.closest === 'function' && e.closest(QUIET));
+}
+
+/** A click or a tap may wander this far (CSS px) from where it went down; further, it's a drag. */
+export const CLICK = { tol: 8 };
+
+/**
+ * One press at a time, told apart as a click or not: `down` where it went down, `move` as it
+ * goes (past `tol` px from there it's a drag from then on, even back where it started), `spoil`
+ * when it's turned into something else (NEWT picked up, a second finger), `cancel` when it's
+ * lost; `up` at its release says whether it was a click (its own pointer, let go within `tol`).
+ * @param {{tol?: number}} [o]
+ */
+export function createClick({ tol = CLICK.tol } = {}) {
+  /** @type {{id: number, x: number, y: number, spoilt: boolean}|null} */
+  let press = null;
+  const far = (/** @type {{x: number, y: number}} */ p, /** @type {number} */ x, /** @type {number} */ y) =>
+    Math.hypot(x - p.x, y - p.y) > tol;
+  return {
+    /** @param {number} id @param {number} x @param {number} y */
+    down(id, x, y) {
+      press = { id, x, y, spoilt: false };
+    },
+    /** @param {number} id @param {number} x @param {number} y */
+    move(id, x, y) {
+      if (press && id === press.id && far(press, x, y)) press.spoilt = true;
+    },
+    spoil() {
+      if (press) press.spoilt = true;
+    },
+    cancel() {
+      press = null;
+    },
+    /** @param {number} id @param {number} x @param {number} y */
+    up(id, x, y) {
+      if (!press || id !== press.id) return false;
+      const p = press;
+      press = null;
+      return !p.spoilt && !far(p, x, y);
+    },
+  };
 }
 
 /**
@@ -246,6 +288,8 @@ export function createPetalLayer(root, { on, before = null, over = () => false, 
 
   // --- The pointer: the trail as it moves, a ring where it presses, a finger held still.
   const trail = createTrail({ seed: 29 });
+  /** The press as a click or a drag (its ring comes on a click's release). */
+  const click = createClick();
   /** The press the trail follows (the primary pointer's), and whether it holds (a finger). */
   /** @type {number|null} */
   let pressId = null;
@@ -265,7 +309,12 @@ export function createPetalLayer(root, { on, before = null, over = () => false, 
   const overUi = (e) => quietAt(doc.elementFromPoint?.(e.clientX, e.clientY) ?? e.target);
   /** @param {PointerEvent} e */
   const onDown = (e) => {
-    if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0) || !allowed()) return;
+    // (A second finger turns the press into a pinch: no click.)
+    if (!e.isPrimary) {
+      click.spoil();
+      return;
+    }
+    if ((e.pointerType === 'mouse' && e.button !== 0) || !allowed()) return;
     if (overUi(e)) {
       trail.lift();
       return;
@@ -273,15 +322,16 @@ export function createPetalLayer(root, { on, before = null, over = () => false, 
     pressId = e.pointerId;
     holds = e.pointerType !== 'mouse';
     trail.down(clock(), e.clientX, e.clientY, holds);
-    const g = ensure();
-    if (!g) return;
-    g.petals.emit('ring', g.toWorld(e.clientX, e.clientY));
-    wake();
+    click.down(e.pointerId, e.clientX, e.clientY);
+    // (Made now, so its ring on the release doesn't wait on it; a held finger keeps it drawing.)
+    if (ensure() && holds) wake();
   };
   /** @param {PointerEvent} e */
   const onMove = (e) => {
     if (!e.isPrimary) return;
+    click.move(e.pointerId, e.clientX, e.clientY);
     // (Over the UI or carrying NEWT: nothing, and the next move off it starts afresh there.)
+    if (ask(carrying)) click.spoil();
     if (ask(carrying) || overUi(e)) {
       trail.lift();
       return;
@@ -295,9 +345,18 @@ export function createPetalLayer(root, { on, before = null, over = () => false, 
     pressId = null;
     holds = false;
     trail.up();
+    // (A click or a tap: its ring where it was let go. Not over the UI, nor once NEWT's carried.)
+    const clicked = e.type !== 'pointercancel' && click.up(e.pointerId, e.clientX, e.clientY);
+    click.cancel();
+    if (!clicked || ask(carrying) || !allowed() || overUi(e)) return;
+    const g = ensure();
+    if (!g) return;
+    g.petals.emit('ring', g.toWorld(e.clientX, e.clientY));
+    wake();
   };
   /** A press lost outside the page must not keep the renderer awake waiting for pointerup. */
   const losePointer = () => {
+    click.cancel();
     pressId = null;
     holds = false;
     trail.up();
@@ -331,8 +390,11 @@ export function createPetalLayer(root, { on, before = null, over = () => false, 
     const dt = Math.min(0.05, Math.max(0, now - last));
     last = now;
     place();
-    // (A finger held still on NEWT while he's carried keeps none coming.)
-    if (ask(carrying)) trail.lift();
+    // (A finger held still on NEWT while he's carried keeps none coming, and its press is no tap.)
+    if (ask(carrying)) {
+      trail.lift();
+      click.spoil();
+    }
     const steps = trail.hold(now);
     if (allowed()) shed(steps);
     else g.petals.cut(0.2);
