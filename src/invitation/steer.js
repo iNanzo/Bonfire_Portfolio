@@ -12,8 +12,9 @@
 // (to its nearest point on a rounded box's rim, a disc's straight in toward its centre) and
 // centreOf is its middle. Where the play area is bigger than the screen it carries what's on
 // screen now (Bounds.sight, camera.js orbitSight): wander goals keep inside both, and a flee
-// keeps to what was on screen as it began (Body.fence). A play area shrunk under him (a resize)
-// eases him back in, STEER.backIn, never in one jump. Pure: no three.js. NEWT faces +z at yaw 0
+// keeps to what was on screen as it began (Body.fence). A play area shrunk under him (a resize):
+// the brain walks him back in (backInGoal: just inside it, on screen), a walk that's never slid;
+// standing, sitting or turning he's eased back in, STEER.backIn, never in one jump. Pure: no three.js. NEWT faces +z at yaw 0
 // (forward is (sin yaw, cos yaw)) and the camera looks in from the +z side.
 
 /** @typedef {import('./types.js').Body} Body */
@@ -31,8 +32,9 @@
  * less than fleeNear of room ahead, so he still turns off an edge in time), and fleeMinPace of
  * his speed is kept while he turns. wanderMin: a wander goal is at least this far;
  * wanderMargin: and this far inside the bounds. backIn: outside the bounds (shrunk under him by a
- * resize) he's eased back in with this time constant, s, at least backInMin and at most
- * backInMax units/s.
+ * resize) and not walking he's eased back in with this time constant, s, at least backInMin and
+ * at most backInMax units/s; backInPast: further out than this, the brain walks him back in, to
+ * backInDepth inside them.
  */
 export const STEER = {
   accel: 5,
@@ -57,6 +59,8 @@ export const STEER = {
   backIn: 0.3,
   backInMin: 0.15,
   backInMax: 2,
+  backInPast: 0.02,
+  backInDepth: 0.25,
 };
 
 const TAU = Math.PI * 2;
@@ -221,6 +225,25 @@ export function centreOf(b) {
 }
 
 /**
+ * Where he walks back in to from `p` once the bounds have shrunk under him (a resize) and he's
+ * more than STEER.backInPast outside them: their nearest point, STEER.backInDepth further in
+ * toward their middle, and on what's on screen (Bounds.sight) where they carry it; null while
+ * he's inside them.
+ * @param {Bounds} b
+ * @param {XZ} p
+ * @returns {XZ|null}
+ */
+export function backInGoal(b, p) {
+  const c = clampTo(b, p);
+  if (Math.hypot(c.x - p.x, c.z - p.z) <= STEER.backInPast) return null;
+  const m = centreOf(b);
+  const d = Math.hypot(m.x - c.x, m.z - c.z);
+  const k = d > 1e-9 ? Math.min(1, STEER.backInDepth / d) : 0;
+  const g = { x: c.x + (m.x - c.x) * k, z: c.z + (m.z - c.z) * k };
+  return b.sight ? clampTo(b, clampTo(b.sight, g)) : g;
+}
+
+/**
  * One frame of movement.
  * @param {Body} body
  * @param {{mode: 'stay'|'goto'|'flee'|'face', goal: XZ|null, speed: number}} move  BrainOut.move
@@ -268,7 +291,7 @@ export function steer(body, move, pointer, bounds, dt) {
   let nz = z + Math.cos(yaw) * step;
   if (fence) ({ x: nx, z: nz } = clampTo(fence, { x: nx, z: nz }));
   if (bounds) {
-    ({ x: nx, z: nz } = backInside(bounds, { x, z }, { x: nx, z: nz }, dt));
+    ({ x: nx, z: nz } = backInside(bounds, { x, z }, { x: nx, z: nz }, dt, mode === 'goto'));
     // Pressed against an edge, he only goes as fast as he really moves.
     if (dt > 0 && step > 0) speed = Math.min(speed, Math.hypot(nx - x, nz - z) / dt);
   }
@@ -329,21 +352,25 @@ function fenceFor(bounds, p) {
 /**
  * `to`, a step on from `from`, kept inside `b`: onto its edge; or, where `from` was already
  * outside (the bounds shrunk under him: a resize), no further out than it was less this frame's
- * easing back in (STEER.backIn), so he comes back in over a moment rather than in a jump.
+ * easing back in (STEER.backIn), so he comes back in over a moment rather than in a jump;
+ * `walking` (back in), no further out than it was, his walk alone bringing him in, never slid.
  * @param {Bounds} b
  * @param {XZ} from
  * @param {XZ} to
  * @param {number} dt
+ * @param {boolean} [walking]
  * @returns {XZ}
  */
-function backInside(b, from, to, dt) {
+function backInside(b, from, to, dt, walking = false) {
   const c = clampTo(b, to);
   const over = Math.hypot(to.x - c.x, to.z - c.z);
   if (over < 1e-12) return to;
   const f = clampTo(b, from);
   const was = Math.hypot(from.x - f.x, from.z - f.z);
   if (was < 1e-9 || !(dt > 0)) return c;
-  const back = clamp(was * (1 - Math.exp(-dt / STEER.backIn)), STEER.backInMin * dt, STEER.backInMax * dt);
+  const back = walking
+    ? 0
+    : clamp(was * (1 - Math.exp(-dt / STEER.backIn)), STEER.backInMin * dt, STEER.backInMax * dt);
   const allow = Math.max(0, was - back);
   if (over <= allow) return to;
   const k = allow / over;

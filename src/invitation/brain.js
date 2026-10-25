@@ -14,8 +14,9 @@
 // when he was grabbed. Give Device (the button 'Device') alternates: sitting down with the
 // tablet (SitDown, then DeviceSit; from Sit, DeviceSit where he sits), lying on his stomach with
 // it (LieDown, then DeviceLie), getting up (GetUp); any other input gets him up from either first
-// (StandUp from sitting, GetUp from lying), a grab picks him straight up. No three.js and no
-// clock: time comes in as t, randomness from rng.js.
+// (StandUp from sitting, GetUp from lying), a grab picks him straight up. Standing outside the
+// play area once a resize has shrunk it under him, he walks back in (steer.js backInGoal), calm
+// or not. No three.js and no clock: time comes in as t, randomness from rng.js.
 //
 // The intro, from the envelope or Replay Intro (BrainIn.dialogue, the box up while the intro runs) puts him in `talk`: he gets up
 // if he's sitting, walks in toward the middle of the view when he's out past TUNE.talkNear, and
@@ -33,7 +34,7 @@
 
 import { CLIPS, FACE_TRACK, GAIT } from './clips.js';
 import { createRng, between } from './rng.js';
-import { wanderGoal, clampTo, wrapAngle } from './steer.js';
+import { backInGoal, wanderGoal, clampTo, wrapAngle } from './steer.js';
 import { fadeOutDue } from './blend.js';
 
 /** @typedef {import('./types.js').BrainIn} BrainIn */
@@ -805,7 +806,10 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
   const TIMERS = {
     /** @param {number} age @param {BrainIn['newt']} n */
     idle(age, n) {
-      if (!calm && m.t - m.aloneSince >= T.sitAfter - EPS) sitDown();
+      // (The play area shrunk under him, a resize: he walks back in, calm or not.)
+      const back = bounds && n ? backInGoal(bounds, n) : null;
+      if (back) walk(back, false);
+      else if (!calm && m.t - m.aloneSince >= T.sitAfter - EPS) sitDown();
       else if (m.wander && bounds && n && age >= m.idleFor - EPS) walk(wanderGoal(rng, bounds, n), true);
     },
     /** @param {number} age @param {BrainIn['newt']} n */

@@ -13,7 +13,8 @@
 // (focusInsets, pixels.js clearInsets) and the orbit follows him all the way there. The floor
 // is endless (rays meet it anywhere) and his play area is one disc round the orbit's centre
 // holding all the floor the default view shows however it's turned (area.js viewArea), worked
-// out again on a resize (a shrink under him eases him back in: steer.js), its middle the
+// out again on a resize (the view eases onto its middle; a shrink under him walks him back in:
+// brain.js, steer.js backInGoal), its middle where the view rests at the default zoom, the
 // brain's and Reset Camera's; it carries what's on screen each frame (its `sight`, camera.js
 // orbitSight), so wander goals and a flee keep to the screen. The light's shadow camera goes
 // where he goes (floor.js fitShadow). Wander, a setting, is kept for the next visit (ui.js
@@ -110,6 +111,7 @@ import { depthAlong, levelAxes, squash } from './hold.js';
 import { createHold } from './holds/index.js';
 import { NEWT_HEIGHT, playArea, viewArea } from './area.js';
 import {
+  areaFits,
   createOrbit,
   orbitArea,
   orbitEvents,
@@ -1781,14 +1783,15 @@ function start(s) {
         texels: { w: s.grid.w, h: s.grid.h },
         // (CSS px he stands tall in the default view, where he starts.)
         newtTall: s.view ? (newtTexels(s.view, s.grid) * s.grid.pd) / s.grid.dpr : 0,
-        // (The camera's yaw, elevation and distance, the point it looks at on the floor, and
-        // whether a pan holds it.)
+        // (The camera's yaw, elevation and distance, the point it looks at on the floor, whether
+        // a pan holds it, and whether the play area fits the screen at this zoom: no following.)
         camera: {
           yaw: cam.yaw,
           elevation: cam.elevation,
           distance: cam.distance,
           target: { x: cam.target.x, z: cam.target.z },
           panned: cam.panned,
+          fits: areaFits(cam),
           turning: orbitTurning(cam),
         },
         // (Whether he wanders by himself, as the brain has it; the stage's cursor.)

@@ -817,7 +817,9 @@ test.describe('on a phone', () => {
     expect(errors).toEqual([]);
   });
 
-  test('running off to the rim never takes him off the screen: the camera follows him', async ({ page }) => {
+  test('running off to the rim never takes him off the screen: the run keeps to what the screen shows', async ({
+    page,
+  }) => {
     const errors = watch(page);
     await calm(page);
     const box = await page.locator('[data-stage]').boundingBox();
@@ -1171,6 +1173,44 @@ test.describe('on a phone', () => {
       );
     }
   });
+
+  test('a top tap after walking to the back still reaches the top: the view stays on the middle, so his feet end where the finger was, turned 90° too', async ({
+    page,
+  }) => {
+    test.setTimeout(240_000);
+    for (const turned of [false, true]) {
+      await calm(page);
+      if (turned) await turnLeft(page, 2);
+      const stage = await page.locator('[data-stage]').boundingBox();
+      const home = (await snapshot(page)).camera;
+      expect(home.fits, 'the play area fits the screen at the default zoom').toBe(true);
+      // To the back first (the top left corner), then along the top (its middle).
+      for (const [what, at] of [
+        ['the top left corner', { x: stage.x + 30, y: stage.y + 30 }],
+        ['the top middle', { x: stage.x + stage.width / 2, y: stage.y + 30 }],
+      ]) {
+        const where = `${what}${turned ? ', turned 90°' : ''}`;
+        const goal = await floorAt(page, at);
+        await page.touchscreen.tap(at.x, at.y);
+        await until(page, (s) => s.state === 'walk', `${where}: walking`);
+        await until(
+          page,
+          (s) => s.state === 'idle' && Math.hypot(s.pos.x - goal.x, s.pos.z - goal.z) < 0.1,
+          `${where}: there`,
+          90_000,
+        );
+        const s = await snapshot(page);
+        expect(
+          Math.hypot(s.camera.target.x - home.target.x, s.camera.target.z - home.target.z),
+          `${where}: the view stayed on the middle`,
+        ).toBeLessThan(1e-3);
+        const under = await floorAt(page, at);
+        expect(Math.hypot(under.x - s.pos.x, under.z - s.pos.z), `${where}: his feet under the finger`).toBeLessThan(
+          0.1,
+        );
+      }
+    }
+  });
 });
 
 test.describe('on a phone held sideways', () => {
@@ -1262,7 +1302,7 @@ test.describe('on a phone held sideways', () => {
 test.describe('on a desktop', () => {
   test.use({ viewport: { width: 1280, height: 800 } });
 
-  test('a window resize works the play area out again: every spot of floor in reach at 1280×800, turned too; narrower, it shrinks under him and he eases back inside, no jump', async ({
+  test('a window resize works the play area out again: every spot of floor in reach at 1280×800, turned too; narrower, it shrinks under him and he walks back inside, no jump, and the view comes back to the middle', async ({
     page,
   }) => {
     test.setTimeout(180_000);
@@ -1291,7 +1331,7 @@ test.describe('on a desktop', () => {
       window.__trail = [];
       const tick = () => {
         const s = window.__invitation.snapshot();
-        window.__trail.push({ x: s.pos.x, z: s.pos.z, r: s.area.r });
+        window.__trail.push({ x: s.pos.x, z: s.pos.z, r: s.area.r, state: s.state });
         if (window.__trail.length < 3000) requestAnimationFrame(tick);
       };
       requestAnimationFrame(tick);
@@ -1302,8 +1342,16 @@ test.describe('on a desktop', () => {
     const trail = await page.evaluate(() => window.__trail);
     const steps = trail.slice(1).map((q, i) => Math.hypot(q.x - trail[i].x, q.z - trail[i].z));
     expect(Math.max(...steps), 'eased back in, never in a jump').toBeLessThan(0.2);
-    const out = trail.filter((q) => Math.hypot(q.x, q.z) > q.r + 0.05).length;
-    expect(out, 'outside it for a few frames on the way in').toBeGreaterThan(2);
+    const out = trail.filter((q) => Math.hypot(q.x, q.z) > q.r + 0.05);
+    expect(out.length, 'outside it for a few frames on the way in').toBeGreaterThan(2);
+    expect(out.filter((q) => q.state === 'walk').length, 'walking back in, not slid').toBeGreaterThan(2);
+    // Back on what the smaller screen shows, the view comes back to the play area's middle.
+    await until(
+      page,
+      (s) => s.state === 'idle' && s.camera.fits && Math.hypot(s.camera.target.x, s.camera.target.z) < 0.02,
+      'the view back on the middle',
+      30_000,
+    );
   });
 
   test('loads to ready with no errors and draws', async ({ page }) => {
