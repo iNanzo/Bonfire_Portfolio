@@ -294,9 +294,10 @@ pure) and `armor.js` (the material); wired up in `scene.js` and `sceneKnight.js`
     fallen from it lies behind it (`RUINS.drum`: −2.75, −2.05; `DRUM_X, DRUM_Y`), out of
     his way and the dancers'; `tools/bonfire.py` moves any rubble off his place
     (`off_seat`, round `SEAT_X, SEAT_Y`) and from under the leg he stretches out resting
-    (out to its boot, `LEG_X, LEG_Y`). The model was rebuilt with the same seeded draws:
-    only the pillar, its candles, the drum and three rocks moved (and, with the leg's
-    keep-out, the rock under his knee 16 cm out to his right). Round 10's seat
+    (out to its boot, `LEG_X, LEG_Y`), pushing a rock from each in turn till it's out of
+    both. The model was rebuilt with the same seeded draws: only the pillar, its candles,
+    the drum and four rocks moved (and, with the leg's keep-out, the rock under his knee
+    16 cm further out to his right, and one by his boot about 1 cm). Round 10's seat
     drum (`Static_PillarDrum`, built by `scenery.js` and added to the model's pieces by
     `sceneModel.js`) is gone: the ruins are the model's own again.
   - *The other places* keep their seats: a low stump by the forge's anvil (0.21 m; its
@@ -406,7 +407,12 @@ pure) and `armor.js` (the material); wired up in `scene.js` and `sceneKnight.js`
     down (`floorOf`: a flagstone or a stone by him, up to 10 cm), its aim kept: turned up
     about the shoulder instead, an arm hanging all but straight down as he leans in to get
     up had its hand flung a third of a metre out to his side. At rest his wrists are 32 cm
-    up or more, so his rest is untouched. The ground poses' feet lie flat.
+    up or more, so his rest is untouched. The ground poses' feet lie flat. And there his
+    hips roll about the lower sitting bone, not their middle (`sitOnLowerHip`): as his
+    weight shifts (the idle rolls the hips up to 3° either way, every 12 s, on top of the
+    pose's) he's raised as far as that side would have sunk, the other side lifting.
+    Rolled about their middle, a thigh of Bonfire Live's knights resting on flat ground
+    went 1.8 cm into it.
   - *After the solve* (on steps with real motion; his resting pose is clear by its seat),
     each arm's pieces (the pauldron's lames, the arm, the gauntlet: its surface every
     3 cm, a gauntlet's every 2 cm, and its farthest corners) are checked against the
@@ -559,11 +565,11 @@ pure) and `armor.js` (the material); wired up in `scene.js` and `sceneKnight.js`
   turned in 50° toward the other foot (both the user's reference; the home view looks
   almost straight down that leg, so 35° read as the toe pointing at the camera), that
   forearm along the thigh and the hand on the knee; slumped toward the raised knee, his
-  weight on that side (the hips rolled 3° off the stretched leg, which keeps the back of
-  its rolled thigh off the ground), the chest leaning that way, the head sunk and tipped
-  to it. (No straighter: as his weight shifts the foot steps out, and a straighter leg
-  would lock, the back of the thigh dropping into the ground. The knee no further out:
-  past about 20° he comes within 10 px of a phone's frame.) *Watchful* is the FFXIV rest:
+  weight on that side (the hips rolled 3° off the stretched leg, about the lower hip,
+  which lifts the back of its rolled thigh off the ground), the chest leaning that way,
+  the head sunk and tipped to it. (No straighter: as his weight shifts the foot steps
+  out, and a straighter leg would lock, the back of the thigh dropping into the ground.)
+  *Watchful* is the FFXIV rest:
   sitting up, leaning back a little from the hips, both knees drawn up (the left the
   higher, its foot near him; the right a little further out), the left forearm over its
   knee and the right along its thigh, the hands hanging past them, the chest and head
