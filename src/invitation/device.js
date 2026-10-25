@@ -1,13 +1,15 @@
 // Give Device's tablet in the invitation toy: a procedural three.js pad NEWT holds in both hands
 // while he sits or lies with it (0 bytes to load, no glb change). clips.js DEVICE is its
 // contract with tools/newt.py's arm IK: its size, where his palms are along each ForeArm, and
-// per clip the tilt of its screen and how far his palms sit off its mid-plane. A cream toon
+// per clip the tilt of its screen, how far his palms sit off its mid-plane and where they grip
+// it (sitting its side edges; lying its near edge, so it sticks out past his face). A cream toon
 // bezel (his gradient, his texel snap) and an unlit screen showing a 16×12 pixel game,
 // nearest-filtered so it stays pixels, both marked as his (retro.js markId) so the retro pass
 // outlines them with him. character.js places it each frame at his palms' midpoint (less the
-// clip's lift along its screen's normal), its width along the line from palm to palm, at the
-// clips' tilt by their weights, and shows it while DeviceSit, LieDown and DeviceLie weigh 0.5 or
-// more (it stays in his hands as he lies down), until he starts to get up (StandUp or GetUp).
+// clip's lift along its screen's normal, moved its grip away from him along the screen), its
+// width along the line from palm to palm, at the clips' tilt by their weights, and shows it
+// while DeviceSit, LieDown and DeviceLie weigh 0.5 or more (it stays in his hands as he lies
+// down), until he starts to get up (StandUp or GetUp).
 // deviceFrame, deviceShown, deviceTilt and gameFrame are pure; createTablet builds the meshes.
 
 import * as THREE from 'three';
@@ -17,22 +19,24 @@ import { ID, markId } from './retro.js';
 /** @typedef {import('./types.js').XYZ} XYZ */
 
 const DEG = Math.PI / 180;
-/** The pad, model units: width (palm to palm), height, thickness, and the bezel round its screen. */
+/** The pad, model units: width, height (away from him), thickness, and the bezel round its screen. */
 export const TABLET = { w: DEVICE.size[0], h: DEVICE.size[1], d: DEVICE.size[2], bezel: 0.1 };
 /** The screen's pixels. */
 export const SCREEN = { w: 16, h: 12 };
 /** How far along each ForeArm bone his palm is, model units. */
 export const PALM = DEVICE.palm;
-/** The clips he holds it in. */
+/** The clips he holds it in: sitting with it, lying down with it, lying with it. */
 export const DEVICE_CLIPS = Object.keys(DEVICE.clips);
 /** Each clip's tilt of the screen from facing straight up toward his face, radians. */
 export const DEVICE_TILT = Object.fromEntries(DEVICE_CLIPS.map((k) => [k, DEVICE.clips[k].tilt * DEG]));
 /** Each clip's palms off the pad's mid-plane along its screen's normal, model units. */
 export const DEVICE_LIFT = Object.fromEntries(DEVICE_CLIPS.map((k) => [k, DEVICE.clips[k].lift]));
+/** Each clip's grip back toward him along the screen from its middle (0: by its sides), model units. */
+export const DEVICE_GRIP = Object.fromEntries(DEVICE_CLIPS.map((k) => [k, DEVICE.clips[k].grip[1]]));
 /** It shows once the clips he holds it in (HOLDING) weigh this much between them. */
 export const SHOW_AT = 0.5;
-/** The clips he holds it in: sitting with it, lying down with it, lying with it. */
-export const HOLDING = [...DEVICE_CLIPS, 'LieDown'];
+/** The clips he holds it in (LieDown among them: it stays in his hands as he lies down). */
+export const HOLDING = DEVICE_CLIPS;
 /** The clips that get him up: from their first frame it's put away. */
 export const RISING = ['StandUp', 'GetUp'];
 /** The bezel's cream. */
@@ -70,9 +74,12 @@ function mixed(per, weightOf) {
 export const deviceTilt = (weightOf) => mixed(DEVICE_TILT, weightOf);
 /** @param {(clip: string) => number} weightOf  his palms off its mid-plane, model units */
 export const deviceLift = (weightOf) => mixed(DEVICE_LIFT, weightOf);
+/** @param {(clip: string) => number} weightOf  its grip back toward him along the screen, model units */
+export const deviceGrip = (weightOf) => mixed(DEVICE_GRIP, weightOf);
 
 /**
- * Where the tablet goes, from his palms: at their midpoint less `lift` along its screen's normal,
+ * Where the tablet goes, from his palms: at their midpoint less `lift` along its screen's normal
+ * and moved `grip` away from him along the screen (held by its near edge, it sticks out in front),
  * its width along the line from his left palm to his right, its screen tilted `tilt` radians
  * from facing straight up toward his face (`forward`: the way he faces; he's behind it).
  * @param {XYZ} pL  his left palm
@@ -80,9 +87,10 @@ export const deviceLift = (weightOf) => mixed(DEVICE_LIFT, weightOf);
  * @param {XYZ} forward
  * @param {number} tilt
  * @param {number} [lift]
+ * @param {number} [grip]
  * @returns {{centre: XYZ, right: XYZ, normal: XYZ, forward: XYZ}}
  */
-export function deviceFrame(pL, pR, forward, tilt, lift = 0) {
+export function deviceFrame(pL, pR, forward, tilt, lift = 0, grip = 0) {
   const dot = (a, b) => a.x * b.x + a.y * b.y + a.z * b.z;
   const unit = (a) => {
     const l = Math.hypot(a.x, a.y, a.z) || 1;
@@ -102,11 +110,13 @@ export function deviceFrame(pL, pR, forward, tilt, lift = 0) {
   const c = Math.cos(tilt);
   const s = Math.sin(tilt);
   const normal = { x: up.x * c - ahead.x * s, y: up.y * c - ahead.y * s, z: up.z * c - ahead.z * s };
+  // Along the screen away from him: its far edge rises as it tips toward his face.
+  const away = { x: ahead.x * c + up.x * s, y: ahead.y * c + up.y * s, z: ahead.z * c + up.z * s };
   return {
     centre: {
-      x: (pL.x + pR.x) / 2 - normal.x * lift,
-      y: (pL.y + pR.y) / 2 - normal.y * lift,
-      z: (pL.z + pR.z) / 2 - normal.z * lift,
+      x: (pL.x + pR.x) / 2 - normal.x * lift + away.x * grip,
+      y: (pL.y + pR.y) / 2 - normal.y * lift + away.y * grip,
+      z: (pL.z + pR.z) / 2 - normal.z * lift + away.z * grip,
     },
     right,
     normal,

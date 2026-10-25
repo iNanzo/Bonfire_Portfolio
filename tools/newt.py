@@ -47,7 +47,7 @@ and Run from a few step parameters; Idle, Held, Fall, Sit, Talk and Think from a
 number along a monotone cubic (tween), so the legs' IK runs on each frame and a planted foot stays
 put. Loops end on an exact copy of frame 0; quaternion signs stay continuous. Held and Thrash pin
 the collar (the Neck bone's head) where it rests. DeviceSit and DeviceLie pin both palms to the
-tablet's side edges (DEVICE, the same numbers as clips.js DEVICE).
+tablet's grip (DEVICE, the same numbers as clips.js DEVICE).
 """
 
 import math
@@ -673,14 +673,14 @@ def thrash(t):
 
 # Give Device: the tablet (clips.js DEVICE; the page draws it from his palms) in both hands while he
 # sits (DeviceSit) and while he lies on his stomach (DeviceLie). Each palm (the ForeArm bone's
-# tip) is pinned by the arm IK to a side edge's midpoint, raised `lift` along the screen's normal.
-DEVICE_W = 1.6  # model units, palm to palm (DEVICE.size[0])
+# tip) is pinned by the arm IK to the clip's grip: `grip` = (across, back toward him along the
+# screen) from the tablet's middle, raised `lift` along the screen's normal.
 DEVICE = {
-    # held on his lap in front of the knees, tipped a little toward his face (more and the 36
-    # degree camera sees only its edge)
-    'DeviceSit': {'centre': (0, -0.85, 1.45), 'tilt': 12, 'lift': 0.0},
-    # lying flat on the floor in front of him, his palms on its edges
-    'DeviceLie': {'centre': (0, -2.15, 0.04), 'tilt': 0, 'lift': 0.3},
+    # held on his lap in front of the knees by its side edges, tipped a little toward his face
+    # (more and the 36 degree camera sees only its edge)
+    'DeviceSit': {'centre': (0, -0.85, 1.45), 'tilt': 12, 'lift': 0.0, 'grip': (0.8, 0.0)},
+    # lying flat on the floor in front of him, his palms on its side edges
+    'DeviceLie': {'centre': (0, -2.15, 0.04), 'tilt': 0, 'lift': 0.3, 'grip': (0.8, 0.0)},
 }
 
 
@@ -689,7 +689,12 @@ def palm(clip, dz=0.0):
     d = DEVICE[clip]
     t = math.radians(d['tilt'])
     cx, cy, cz = d['centre']
-    return (cx + DEVICE_W / 2, cy + d['lift'] * math.sin(t), cz + d['lift'] * math.cos(t) + dz)
+    gx, gy = d['grip']
+    return (
+        cx + gx,
+        cy + gy * math.cos(t) + d['lift'] * math.sin(t),
+        cz - gy * math.sin(t) + d['lift'] * math.cos(t) + dz,
+    )
 
 
 DEV_SIT = merge(

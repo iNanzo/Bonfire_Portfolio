@@ -4,8 +4,7 @@
 // (the page moves his root) and Held and Thrash keep the collar where it rests, so the page can
 // hang him from it; round 16's clips: Held hangs limp with no kick and his head down, Thrash kicks
 // from and back to Held's first pose, Give Device's DeviceSit and DeviceLie keep both palms on the
-// tablet's side edges (clips.js DEVICE), LieDown and GetUp join them to Idle, and lying he rests
-// on the floor without his back hair digging into his shirt; Walk and Run start on the same foot and their STRIDE values match what the
+// tablet's grip (clips.js DEVICE), LieDown and GetUp join them to Idle, and lying he rests on the floor without his back hair digging into his shirt; Walk and Run start on the same foot and their STRIDE values match what the
 // planted feet do, measured by forward kinematics; Run reaches both arms straight out in
 // front, leans forward and tips his face up to the camera (the user's reference); the dialogue's
 // gestures (round 15) start and end on Idle's pose, keep the hands and sleeves clear of his huge
@@ -417,24 +416,41 @@ test("the tablet's screen faces the default camera, 36 degrees up from his front
   }
 });
 
-test("DeviceSit and DeviceLie keep both palms on the tablet's side edges on every frame", () => {
-  const half = DEVICE.size[0] / 2;
+/**
+ * Where the contract (clips.js DEVICE) puts a clip's palms and the tablet's far edge, in glTF's
+ * space: Blender armature space (+X his left, -Y his front, +Z up) to glTF's is (x, z, -y). The
+ * palms sit `grip` from the tablet's middle (across it, and back toward him along its screen)
+ * and `lift` above its mid-plane along the screen's normal.
+ */
+function deviceGeometry(name) {
+  const { centre, tilt, lift, grip } = DEVICE.clips[name];
+  const [x, y, z] = centre;
+  const t = tilt * DEG;
+  const mid = new THREE.Vector3(x, z, -y);
+  const normal = new THREE.Vector3(0, Math.cos(t), -Math.sin(t));
+  // Along the screen, away from him (its far edge rises as it tips toward his face).
+  const ahead = new THREE.Vector3(0, Math.sin(t), Math.cos(t));
+  const palm = (sign) =>
+    mid
+      .clone()
+      .add(new THREE.Vector3(sign * grip[0], 0, 0))
+      .addScaledVector(ahead, -grip[1])
+      .addScaledVector(normal, lift);
+  return { palm: { L: palm(1), R: palm(-1) }, far: mid.clone().addScaledVector(ahead, DEVICE.size[1] / 2) };
+}
+
+test("DeviceSit and DeviceLie keep both palms on the tablet's grip every frame", () => {
+  assert.deepEqual(DEVICE.clips.DeviceSit.grip, [DEVICE.size[0] / 2, 0], 'sitting: the side edges’ middles');
   for (const name of ['DeviceSit', 'DeviceLie']) {
-    // Blender armature space (+X his left, -Y his front, +Z up) to glTF's: (x, z, -y); the palms
-    // sit `lift` above the side edges' midpoints, along the screen's normal
-    const { centre, tilt, lift } = DEVICE.clips[name];
-    const [x, y, z] = centre;
-    const up = new THREE.Vector3(0, Math.cos(tilt * DEG), -Math.sin(tilt * DEG)).multiplyScalar(lift);
-    const mid = new THREE.Vector3(x, z, -y).add(up);
-    const edge = { L: mid.clone().setX(x + half), R: mid.clone().setX(x - half) };
+    const { palm } = deviceGeometry(name);
     for (const [t, pose] of samples(clip(name), FPS)) {
       const w = glb.world(pose);
       for (const s of ['L', 'R']) {
         // (track()'s hand is 1.0 along the bone: transformDirection normalizes)
         const m = w(`ForeArm.${s}`);
         const along = new THREE.Vector3(0, 1, 0).transformDirection(m).multiplyScalar(DEVICE.palm);
-        const d = new THREE.Vector3().setFromMatrixPosition(m).add(along).distanceTo(edge[s]);
-        assert.ok(d <= 0.08, `${name} at ${t.toFixed(2)} s: the ${s} palm is ${d.toFixed(3)} from the edge`);
+        const d = new THREE.Vector3().setFromMatrixPosition(m).add(along).distanceTo(palm[s]);
+        assert.ok(d <= 0.08, `${name} at ${t.toFixed(2)} s: the ${s} palm is ${d.toFixed(3)} from the grip`);
       }
     }
   }

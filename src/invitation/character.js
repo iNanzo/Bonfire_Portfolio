@@ -100,7 +100,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { BONES, CLIPS, DEVICE, EXTRA_FACES, FACES, SCALE } from './clips.js';
 import { LIMP, limbStep, restLimb } from './carry.js';
-import { PALM, createTablet, deviceFrame, deviceLift, deviceShown, deviceTilt } from './device.js';
+import { PALM, createTablet, deviceFrame, deviceGrip, deviceLift, deviceShown, deviceTilt } from './device.js';
 import { EARLOBES, EARRING, makeEarring } from './earrings.js';
 import { FACE_FALLBACK, FACE_LAYOUT, faceSpan, layoutFor, pickFaceSize } from './faceSheets.js';
 import { LOOKS, DEFAULT_LOOK } from './look.js';
@@ -747,7 +747,14 @@ export function createCharacter(gltf, opts = {}) {
     r.localToWorld(palmR.set(0, PALM, 0));
     root.worldToLocal(palmL);
     root.worldToLocal(palmR);
-    const f = deviceFrame(palmL, palmR, { x: 0, y: 0, z: 1 }, deviceTilt(weightOf), deviceLift(weightOf));
+    const f = deviceFrame(
+      palmL,
+      palmR,
+      { x: 0, y: 0, z: 1 },
+      deviceTilt(weightOf),
+      deviceLift(weightOf),
+      deviceGrip(weightOf),
+    );
     g.position.set(f.centre.x, f.centre.y, f.centre.z);
     across.set(f.right.x, f.right.y, f.right.z);
     down.set(f.normal.x, f.normal.y, f.normal.z);
