@@ -78,8 +78,8 @@
 // clips.js FACE_NAMES on him, no blinks; null gives it back to the brain) and press(name) (a
 // toolbar button's press, as the brain gets it: types.js ButtonName); snapshot().motion is the
 // carry (his collar on screen, how long he's been held, the anchor and the drag plane, whether
-// he's pushed at the edge), the limp layer (its weight, the most a limb has swung) and Give
-// Device (the brain's device and label, the tablet shown and where, his turn off the camera);
+// he's pushed at the edge), the limp layer (its weight, the most a limb has swung) and Screen
+// Time (the brain's device and label, the tablet shown and where, his turn off the camera);
 // snapshot().drag is the hold's (its height controls, the collar's gap from where it's aimed, CSS px,
 // the hold height, the anchor's depth along the camera's level axis, the blob, his hips' floor
 // point and lowest foot, the ring, the drop line and Ground Cues as they play, the way his root
