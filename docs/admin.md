@@ -173,7 +173,8 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     lines says nothing. Tags style them (Text Effects), and a **Preview** under each shows
     it as his bubble does.
   - **Text Effects:** the **Colors** a tag can name (`invitation.text.colors`, each a **Name**
-    and a **Color**; as shipped red, gold, rose and ink). Tags go in the lines and the chat
+    and a **Color**; as shipped red, gold, rose and ink; each card shows its swatch and hex,
+    and can't be hidden: delete one instead). Tags go in the lines and the chat
     boxes' text: `{red|word}` colors it, `{#e44544|word}` takes a hex color, `{wave|…}`,
     `{shake|…}`, `{bold|…}` and `{big|…}` add an effect, `{red,wave|…}` combines them, a tag may
     hold one more, and `\{` `\}` are braces ([invitation.md](invitation.md#text-effects)). The

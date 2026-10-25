@@ -15,8 +15,10 @@ import { DEFAULT_TEXT_COLORS, paletteOf } from '../../src/invitation/markup.js';
 import { LINE_MAX, TRIGGERS } from '../../src/invitation/speech.js';
 import {
   ADD_LABELS,
+  CARD_META,
   HELP,
   LABELS,
+  NO_HIDING,
   PAGES,
   PREVIEWS,
   STARTERS,
@@ -164,6 +166,9 @@ test('it starts from the toy’s own colours, and a colour is added with a name 
   assert.deepEqual(Object.keys(added).sort(), ['color', 'name']);
   assert.match(added.color, /^#[0-9a-f]{6}$/);
   assert.equal(ADD_LABELS['invitation.text.colors'], 'color');
+  // (Each card says its color under its name, and can't be hidden: the toy has no hidden colors.)
+  assert.equal(CARD_META['invitation.text.colors']({ name: 'red', color: '#c8323c' }), '#c8323c');
+  assert.ok(NO_HIDING.has('invitation.text.colors'));
 });
 
 test('a live preview under each intro box’s text and each line, with the draft’s colours', () => {

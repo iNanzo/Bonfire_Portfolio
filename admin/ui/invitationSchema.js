@@ -403,8 +403,8 @@ export const INVITATION_TEMPLATES = {
 export const INVITATION_FIELDS = {
   [BOX]: () => ({ ...introBox({}), face: '', animation: '', camera: '' }),
 };
-/** Lists whose entries can't be hidden (◉): the toy has no way to skip a box or a choice. */
-export const INVITATION_NO_HIDING = ['invitation.intro.boxes', `${BOX}.choices`];
+/** Lists whose entries can't be hidden (◉): the toy has no way to skip a box, a choice or a color. */
+export const INVITATION_NO_HIDING = ['invitation.intro.boxes', `${BOX}.choices`, 'invitation.text.colors'];
 /** The most entries a list takes: “+ Add” goes once it has them. */
 export const INVITATION_MAX_ENTRIES = { [`${BOX}.choices`]: INTRO_CHOICES_MAX };
 
@@ -418,7 +418,8 @@ function flowOf(b, list, i) {
 }
 /**
  * The line under a card's title (its line, for a box; its words, for a choice): (entry, its list,
- * its index) → text. A box: its id, face, move, shot and where it goes; a choice: its box.
+ * its index) → text. A box: its id, face, move, shot and where it goes; a choice: its box; a
+ * text color: its hex (form.js shows its swatch too).
  */
 export const INVITATION_CARD_META = {
   'invitation.intro.boxes': (b, list, i) =>
@@ -432,6 +433,7 @@ export const INVITATION_CARD_META = {
       .filter(Boolean)
       .join(' · '),
   [`${BOX}.choices`]: (c) => `→ ${c.next || '?'}`,
+  'invitation.text.colors': (c) => (typeof c.color === 'string' ? c.color : ''),
 };
 
 /** The style the toy's built-in Default is built on (looks/default.js spreads Soft). */

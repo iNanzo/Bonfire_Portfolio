@@ -498,7 +498,10 @@ function update(path, value, ctx) {
       t.textContent = titleOf(parent, 0);
   }
   if (path[0] === 'effects' && path[1] === 'elements' && (key === 'weight' || key === 'rotation')) refreshChances(ctx);
-  if (SWATCH_KEYS.includes(key) && HEX_RE.test(value)) {
+  if (
+    (SWATCH_KEYS.includes(key) || (key === 'color' && isTextColorPath(parentPath.slice(0, -1)))) &&
+    HEX_RE.test(value)
+  ) {
     const sw = /** @type {HTMLElement | null} */ (document.querySelector(`[data-swatch="${CSS.escape(keyOf(path))}"]`));
     if (sw) sw.style.setProperty('background', value);
   }
@@ -646,6 +649,8 @@ function renderCollection(list, path, ctx, level = 3) {
 const isProjectPath = (path) => path.length === 1 && (path[0] === 'projects' || path[0] === 'archive');
 const isFlamePath = (path) => patternOf(path) === 'effects.flames';
 const isScenePath = (path) => patternOf(path) === 'scenes';
+/** The invitation's text colors: a card's swatch is its color. */
+const isTextColorPath = (path) => patternOf(path) === 'invitation.text.colors';
 
 function cardMeta(item, path, list = [], i = 0) {
   const own = hint(CARD_META, patternOf(path));
@@ -665,11 +670,11 @@ function cardMeta(item, path, list = [], i = 0) {
   return '';
 }
 
-function swatches(item, ipath) {
+function swatches(item, ipath, keys = SWATCH_KEYS) {
   return el(
     'span',
     { class: 'swatches', 'aria-hidden': 'true' },
-    SWATCH_KEYS.map((k) =>
+    keys.map((k) =>
       el('span', {
         class: 'swatch',
         'data-swatch': keyOf([...ipath, k]),
@@ -771,9 +776,11 @@ function renderCard(list, i, path, ctx, fixed, level = 3) {
         ? el('img', { class: 'card-thumb', alt: '', src: ctx.thumb(cover.src), loading: 'lazy' })
         : isFlame
           ? swatches(item, ipath)
-          : isScene
-            ? sceneThumb(item)
-            : null,
+          : isTextColorPath(path)
+            ? swatches(item, ipath, ['color'])
+            : isScene
+              ? sceneThumb(item)
+              : null,
     lead: fixed
       ? null
       : el('span', {
