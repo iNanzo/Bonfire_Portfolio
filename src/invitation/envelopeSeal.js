@@ -47,8 +47,7 @@ function strokesOf(d) {
 /** The monogram's six strokes, in the path's units (logo.js LOGO_STROKES). */
 export const MONOGRAM_STROKES = strokesOf(MONOGRAM_PATH);
 
-/** The seal's radius, a share of the letter's width (a little bigger, for its stamp's room). */
-export const SEAL_SIZE = 0.2;
+export { SEAL_SIZE } from './envelopeLook.js';
 
 /**
  * The stamp: its height a share of the seal's radius (it stays inside the rim), its strokes'

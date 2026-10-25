@@ -17,8 +17,11 @@ pixels so it reads as the logo on a phone and a desktop: each stroke a solid dar
 N's diagonal a pixel wider than the stems, with a lighter lip under the crossbar and the stems'
 feet where the light from above catches it), floating on a plain white page (white, not the toy's own
 off-white, so it fades into the toy as the letter opens). It's drawn in the toy's
-own pixel look, with a dark one-texel line round it and down every fold of its flap and pocket,
-so it reads as a letter, and it's the loading screen too: NEWT loads behind it.
+own pixel look, with a dark one-texel line round it, along its flap's straight V (from the top
+corners to a tip under the seal's middle) and up the bottom fold's two edges, its only lines, as
+a real envelope's back shows them; each face of it is one flat tone of the paper's three (the
+flap light, the pocket mid, its inside shade), lit by one light and kept through the sway, so it
+reads as a letter, and it's the loading screen too: NEWT loads behind it.
 
 - **Rose petals:** plain petals (never the monogram) in three shapes (rounded, cupped and
   curled), a few sizes and three reds, each tumbling, fluttering side to side and drifting its
@@ -686,8 +689,13 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   dissolving rim; the petals as one instanced mesh a shape, ids `IDS.petal` and the two after,
   on their own clock that a loading stall holds still; the specks as square points on layer 1
   on top, with no line; disposed, its context lost and its layer removed once it's done and its
-  last petals have gone), `envelopeLook.js` (the palette, `IDS` and the toon material: three
-  tones with dithered band edges, its id pass, and the dissolve with its burning rim, copied
+  last petals have gone), `envelopeLook.js` (the palette, three tones a material;
+  `envelopeLayout`, the envelope's parts as flat polygons, each fold's hidden corners under the
+  parts in front of it so the only lines are the outline, the flap's V and the bottom fold's
+  edges; `IDS`; the light, `LIGHT`, its bands, `SHADES` and `bandOf`, and each paper face's
+  `LEAN`; and the toon material: three tones, the paper's one flat tone a face (`FLAT`, no
+  dither, leaning into the light by its `LEAN` so it keeps its band through the sway), the
+  others' band edges dithered, its id pass, and the dissolve with its burning rim, copied
   from the Bonfire site's weapon dissolve, not imported; `PETAL`, never dissolved, its bands
   stepped by each petal's `aShade`), `envelopeSeal.js` (the seal, one piece: `sealGeometry`, a
   blob with a wobbling outline (`sealEdge`), an uneven raised rim and a domed face; beads of wax

@@ -1,13 +1,18 @@
-// The envelope's look (envelopeScene.js, envelopeSeal.js): the reference's palette, the toy's ink
-// for its lines, the parts' order for those lines (IDS), and the one toon material everything on
-// it is drawn with: flat-shaded in three tones with dithered band edges, drawn either in its
-// colours or as its part's id (the scene draws both and lines the borders between parts), and
-// dissolving as the letter goes: a smooth noise and a screen-locked 4×4 Bayer dither over how
-// far up the letter it is (envelope.js DISSOLVE runs the same sums), with a burning rim, hot to
-// glowing to charred, at the edge, like a weapon's on the Bonfire site (copied, not imported:
-// the page takes no shared modules). The wax seal's material also stamps the monogram into it
-// (SEAL: envelopeSeal.js); the petals' (PETAL) never dissolve, and each petal's `aShade` steps
-// its bands lighter or darker through the three reds, so they're a mix.
+// The envelope's look (envelopeScene.js, envelopeSeal.js): the reference's palette (three tones a
+// material), the toy's ink for its lines, the envelope's shape (envelopeLayout: a rectangle, a
+// straight flap V to a tip under the seal's middle, and the pocket's folds tucked under it as a
+// real envelope's back has them, so its only lines are the outline, the V and the bottom fold's
+// two edges), the parts' order for those lines (IDS), the light, and the one toon material
+// everything on it is drawn with: flat-shaded in three tones (the paper one flat tone a face, each
+// face leaning into the light by its LEAN so it keeps one band through the sway; the petals' band
+// edges dithered), drawn either in its colours or as its part's id (the scene draws both and
+// lines the borders between parts), and dissolving as the letter goes: a smooth noise and a
+// screen-locked 4×4 Bayer dither over how far up the letter it is (envelope.js DISSOLVE runs the
+// same sums), with a burning rim, hot to glowing to charred, at the edge, like a weapon's on the
+// Bonfire site (copied, not imported: the page takes no shared modules). The wax seal's material
+// stamps the monogram into it (SEAL: envelopeSeal.js); the petals' (PETAL) never dissolve, and
+// each petal's `aShade` steps its bands lighter or darker through the three reds, so they're a
+// mix.
 import * as THREE from 'three';
 import { DISSOLVE } from './envelope.js';
 
@@ -17,9 +22,8 @@ import { DISSOLVE } from './envelope.js';
  */
 export const rgb = (hex) => new THREE.Vector3(((hex >> 16) & 255) / 255, ((hex >> 8) & 255) / 255, (hex & 255) / 255);
 
-/** The reference's palette: light, mid, shade. */
+/** The reference's palette, three tones a material: light, mid, shade. */
 export const PAPER = [0xf1d786, 0xe4b85d, 0xd3983d];
-export const INSIDE = [0xc99a48, 0xb0803a, 0x8f6127];
 export const WAX = [0xcd5e58, 0xa13a25, 0x6e1511];
 export const PETAL = [0xe44544, 0xac2e29, 0x851d1b];
 /** The toy's ink (invitation.css --inv-ink): the lines round it and down its folds. */
@@ -33,6 +37,102 @@ const RIM = [0xffb43c, 0xe0582a, 0x5a3418];
  * petals' shapes take `petal` and the two after it, so a line runs where two shapes overlap.
  */
 export const IDS = { body: 1, inside: 2, left: 3, right: 4, bottom: 5, flap: 6, seal: 7, petal: 8 };
+
+/** How the envelope leans, radians: clockwise (the reference's lean), and its top tipped back. */
+export const TILT = -0.36;
+export const PITCH = -0.12;
+
+/** The light (view space, a unit vector): from the upper left, in front. */
+export const LIGHT = (() => {
+  const [x, y, z] = [-0.5, 0.62, 0.6];
+  const n = Math.hypot(x, y, z);
+  return [x / n, y / n, z / n];
+})();
+/** The bands: a face lit more than `light` takes the light tone, more than `mid` the mid, else the shade. */
+export const SHADES = { light: 0.74, mid: 0.4 };
+/**
+ * The band (0 light, 1 mid, 2 shade) of a face lit `v` (its normal on the light). The seal's
+ * face (envelopeSeal.js) and the toon material run the same sums.
+ * @param {number} v
+ */
+export const bandOf = (v) => (v > SHADES.light ? 0 : v > SHADES.mid ? 1 : 2);
+/**
+ * How far each paper face leans into the light, as drawn (added to its lighting): the paper's
+ * faces are nearly flat to the screen, so each is given its tone (the flap light, the pocket mid,
+ * the inside, in the pocket's shadow, shade) and keeps it, well inside its band, all through the
+ * sway. The back of the paper (the flap's, once it's open) takes the inside's.
+ */
+export const LEAN = { body: -0.1, inside: -0.42, left: -0.1, right: -0.1, bottom: -0.1, flap: 0.2 };
+
+/** The seal's radius, a share of the letter's width (big enough for its stamp to read). */
+export const SEAL_SIZE = 0.2;
+
+/** The envelope's shape: its aspect, the flap's depth (of its height), where the bottom fold's edges meet the flap's (of the half width). */
+const SHAPE = { aspect: 1.45, flap: 0.58, slant: 0.5 };
+
+/**
+ * The envelope's parts as flat polygons (each counter-clockwise, [x, y]), built to a width of 2
+ * with the flap closed: the body; the inside of the pocket (it shows as the flap lifts); the
+ * pocket's two side folds, meeting under the flap; its bottom fold, lapping over them, its two
+ * edges running up from the bottom corners to the flap's and its top tucked under the flap; and
+ * the flap, a straight V from the top corners to its `tip`. Each fold's hidden corners lie under
+ * the parts in front of it, so no line runs anywhere but the outline, the flap's V and the bottom
+ * fold's two edges (`slant`: where they meet the flap's, on the right). The seal sits on the tip.
+ */
+export function envelopeLayout() {
+  const W = 2;
+  const H = W / SHAPE.aspect;
+  const w = W / 2;
+  const h = H / 2;
+  const tip = [0, h - H * SHAPE.flap];
+  /** The flap's edge's height at x. */
+  const edgeY = (/** @type {number} */ x) => tip[1] + ((h - tip[1]) * Math.abs(x)) / w;
+  const slant = [w * SHAPE.slant, edgeY(w * SHAPE.slant)];
+  // (The bottom fold's edges go on up past the flap's a little, to its top, under the flap.)
+  const top = slant[1] + H * 0.1;
+  const k = (top + h) / (slant[1] + h);
+  const topX = w - k * (w - slant[0]);
+  // (The side folds meet under the flap, above the bottom fold's edges; the inside reaches past them.)
+  const meet = top - H * 0.06;
+  return {
+    W,
+    H,
+    T: 0.03,
+    tip,
+    slant,
+    seal: { x: tip[0], y: tip[1], r: SEAL_SIZE * W },
+    parts: {
+      body: [
+        [-w, -h],
+        [w, -h],
+        [w, h],
+        [-w, h],
+      ],
+      inside: [
+        [-w, h],
+        [0, meet - H * 0.05],
+        [w, h],
+      ],
+      left: [
+        [-w, h],
+        [-w, -h],
+        [0, meet],
+      ],
+      right: [
+        [w, h],
+        [0, meet],
+        [w, -h],
+      ],
+      bottom: [
+        [-w, -h],
+        [w, -h],
+        [topX, top],
+        [-topX, top],
+      ],
+      flap: [[-w, h], tip, [w, h]],
+    },
+  };
+}
 
 export const BAYER = /* glsl */ `
   float bayer(vec2 p) {
@@ -69,7 +169,7 @@ const vec3Of = (hex) => {
  * ids (1) or colours (0).
  */
 export const shared = () => ({
-  uLight: { value: new THREE.Vector3(-0.5, 0.62, 0.6).normalize() },
+  uLight: { value: new THREE.Vector3(...LIGHT) },
   uDissolve: { value: 0 },
   uEdge: { value: 0 },
   uToLetter: { value: new THREE.Matrix4() },
@@ -79,16 +179,24 @@ export const shared = () => ({
 /**
  * The toon material: three tones, flat-shaded, band edges dithered on the texel grid; drawn as
  * its colours or as `id`; dissolving with the letter. `extra` adds uniforms, `defines` (SEAL,
- * PETAL) and GLSL for the seal's stamp.
+ * PETAL) and GLSL (the seal's stamp); `lean` makes it the
+ * paper's: FLAT, one tone a face and no dither, leaning into the light by that much (LEAN).
  * @param {number[]} tones  light, mid, shade (sRGB hex)
  * @param {ReturnType<typeof shared>} u
  * @param {number} id  IDS
- * @param {{uniforms?: Record<string, {value: any}>, defines?: Record<string, string>, glsl?: string}} [extra]
+ * @param {{uniforms?: Record<string, {value: any}>, defines?: Record<string, string>, glsl?: string, lean?: number}} [extra]
  */
 export function toon(tones, u, id, extra = {}) {
+  const flat = extra.lean !== undefined;
   return new THREE.ShaderMaterial({
-    uniforms: { ...u, uTones: { value: tones.map(rgb) }, uId: { value: id }, ...extra.uniforms },
-    defines: extra.defines ?? {},
+    uniforms: {
+      ...u,
+      uTones: { value: tones.map(rgb) },
+      uId: { value: id },
+      ...(flat ? { uLean: { value: extra.lean } } : {}),
+      ...extra.uniforms,
+    },
+    defines: { ...(flat ? { FLAT: '' } : {}), ...extra.defines },
     vertexShader: /* glsl */ `
       uniform mat4 uToLetter;
       varying vec3 vView;
@@ -121,6 +229,9 @@ export function toon(tones, u, id, extra = {}) {
       uniform float uEdge;
       uniform float uIdPass;
       uniform float uId;
+      #ifdef FLAT
+      uniform float uLean;
+      #endif
       varying vec3 vView;
       varying vec2 vLetter;
       varying vec3 vLocal;
@@ -143,8 +254,13 @@ export function toon(tones, u, id, extra = {}) {
           return;
         }
         vec3 n = normalize(cross(dFdx(vView), dFdy(vView)));
+        #ifdef FLAT
+        // (The paper's back, once the flap's open, takes the inside's shade.)
+        float v = dot(n, uLight) + (gl_FrontFacing ? uLean : ${LEAN.inside.toFixed(4)});
+        #else
         float v = dot(n, uLight) + (b - 0.5) * 0.06;
-        float band = v > 0.74 ? 0.0 : v > 0.4 ? 1.0 : 2.0;
+        #endif
+        float band = v > ${SHADES.light.toFixed(4)} ? 0.0 : v > ${SHADES.mid.toFixed(4)} ? 1.0 : 2.0;
         #ifdef PETAL
         band = clamp(band + vShade, 0.0, 2.0);
         #endif
