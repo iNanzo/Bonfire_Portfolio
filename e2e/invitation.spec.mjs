@@ -51,7 +51,7 @@ function watch(page, errors = []) {
 async function picture(page, frames = 3) {
   const sum = new Float64Array(36 * 64 * 3);
   for (let i = 0; i < frames; i++) {
-    const png = await page.locator('[data-stage] canvas').screenshot();
+    const png = await page.locator('[data-stage] canvas.inv-canvas').screenshot();
     const raw = await sharp(png).resize(36, 64, { fit: 'fill' }).removeAlpha().raw().toBuffer();
     for (let k = 0; k < raw.length; k++) sum[k] += raw[k] / frames;
     await page.waitForTimeout(120);
@@ -551,7 +551,7 @@ test.describe('on a phone', () => {
     const snap = await snapshot(page);
     expect(snap.faceSheet).toBe('smooth');
     const dpr = snap.pass.pd / snap.pixelScale;
-    const canvas = await page.locator('[data-stage] canvas').boundingBox();
+    const canvas = await page.locator('[data-stage] canvas.inv-canvas').boundingBox();
     /**
      * Dark texels inside his face (between skin on either side), in the middle half of its rows:
      * each texel read at its middle (the canvas's grid, `pd` device px a texel from its corner).
@@ -673,7 +673,7 @@ test.describe('on a phone', () => {
     await expect(sheet.getByRole('switch', { name: 'Outlines' })).toBeEnabled();
     await expect(sheet.locator('[data-off-hint]')).toBeHidden();
     const canvas = await page
-      .locator('[data-stage] canvas')
+      .locator('[data-stage] canvas.inv-canvas')
       .evaluate((c) => [c.width, c.height, getComputedStyle(c).imageRendering]);
     expect(canvas).toEqual([1170, 2532, 'pixelated']);
     await page.reload();
@@ -1451,7 +1451,7 @@ test.describe('on a desktop', () => {
     // (The smooth face shows at Off, and the snapshot says so: not the pixel sheet his size picks.)
     expect((await snapshot(page)).faceSheet).toBe('smooth');
     const size = await page
-      .locator('[data-stage] canvas')
+      .locator('[data-stage] canvas.inv-canvas')
       .evaluate((c) => [c.width, c.height, Math.min(devicePixelRatio, 2), innerWidth, innerHeight]);
     expect(size[0]).toBe(Math.ceil(size[3] * size[2]));
     expect(size[1]).toBe(Math.ceil(size[4] * size[2]));
@@ -1721,8 +1721,8 @@ test.describe('on a desktop', () => {
     }
     // Done, Pixel Size (its slider and the buttons at its two ends), Dithering, Outlines, Style,
     // Motion, the 17 Shader options (Reset To Style rests until one is the user's own), Ground
-    // Cues and Wander (no Drag row: the bead hold is the only carry).
-    expect(stops.size, [...stops].join(', ')).toBe(27);
+    // Cues, Rose Petals and Wander (no Drag row: the bead hold is the only carry).
+    expect(stops.size, [...stops].join(', ')).toBe(28);
     // Focus on the page (a click on empty space): Tab comes back into the sheet.
     await page.mouse.click(200, 120);
     await page.keyboard.press('Tab');
@@ -1893,7 +1893,7 @@ test.describe('on a desktop', () => {
     page,
   }) => {
     await calm(page);
-    const canvas = page.locator('[data-stage] canvas');
+    const canvas = page.locator('[data-stage] canvas.inv-canvas');
     const kind = () => page.evaluate(() => document.querySelector('[data-stage]').dataset.cursor);
     const cursorOf = (loc) => loc.evaluate((el) => getComputedStyle(el).cursor);
     // (Headless screenshots draw no cursor: what the CSS gives is what's checked.)
@@ -2146,7 +2146,7 @@ test.describe('on a desktop', () => {
     // No context menu over the canvas: its default is turned down.
     const menu = await page.evaluate(() => {
       const e = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 200, clientY: 200 });
-      document.querySelector('[data-stage] canvas').dispatchEvent(e);
+      document.querySelector('[data-stage] canvas.inv-canvas').dispatchEvent(e);
       return e.defaultPrevented;
     });
     expect(menu, 'no context menu').toBe(true);
@@ -2519,7 +2519,7 @@ test.describe('on a small window', () => {
     });
     await calm(page);
     const base = await snapshot(page);
-    const canvas = page.locator('[data-stage] canvas');
+    const canvas = page.locator('[data-stage] canvas.inv-canvas');
     const box = await canvas.boundingBox();
     await page.mouse.move(box.x + 60, box.y + 60);
     for (let i = 0; i < 6; i++) await page.mouse.wheel(0, -240);
