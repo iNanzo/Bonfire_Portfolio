@@ -20,6 +20,7 @@ import {
   lineMode,
   lineShare,
   mixWants,
+  ringFloor,
   ringStrength,
 } from '../src/invitation/cues.js';
 import { NEWT_HEIGHT } from '../src/invitation/area.js';
@@ -114,6 +115,15 @@ test('a drag kind can keep the drop line out of In the Mix (HoldCues.line false)
     assert.equal(lineMode(mode, undefined), mode, `${mode}: the kind says nothing`);
     assert.equal(lineMode(mode, true), mode, `${mode}: the kind lets it be`);
   }
+});
+
+test('a drag kind can keep the ring In the Mix at a floor while he’s held (HoldCues.floor), eased in over CUES.fade from the grab; Always and Off are left as they are', () => {
+  close(ringFloor(0, 'mix', 0.35, 1), 0.35);
+  close(ringFloor(0.8, 'mix', 0.35, 1), 0.8);
+  close(ringFloor(0, 'mix', 0.35, CUES.fade / 2), 0.175);
+  close(ringFloor(0, 'mix', undefined, 1), 0);
+  close(ringFloor(0, 'off', 0.35, 1), 0);
+  close(ringFloor(0.4, 'always', 0.35, 1), 0.4);
 });
 
 test('the brain’s drag speed is his collar’s speed on screen, px a second over 110 (a vertical flick no longer counts for more than one across)', () => {

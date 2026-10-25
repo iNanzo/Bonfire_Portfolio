@@ -440,6 +440,8 @@ export function squash(sinceGrab, sinceLand) {
  * @property {boolean} [line]  false: no drop line In the Mix (Always still shows it: cues.js
  *   lineMode)
  * @property {boolean} [pulse]  a wall clamp this frame: the ring pulses to full
+ * @property {number} [floor]  In the Mix, the ring's least strength while he's held (cues.js
+ *   ringFloor)
  */
 /**
  * @typedef {object} HoldStep  a kind's frame

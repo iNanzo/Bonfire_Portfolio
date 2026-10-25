@@ -418,13 +418,16 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     (`BEAD.depth`: a 100 px up flick lands about 1.1 away, half as far as one across), at most
     4 u/s, and a lob of 0.35 of its speed across
     (`beadThrow`), the ring at the landing point while he's moving fast and, once he's let go,
-    until he lands (`landingPoint`, `Hold.landing`); `cues.js` has the ground cues' numbers
+    until he lands (`landingPoint`, `Hold.landing`), else under his collar, eased, not his
+    swinging hips (let go still, he falls there), In the Mix never under 0.35 while he's held
+    (`HoldCues.floor`), the drop line In the Mix as the shared rule has it; `cues.js` has the ground cues' numbers
     (`blobLook`: radius 0.35 of his height on contact to 0.6 of that, strength 0.45 to 0.20 times
     the look's lifted over 0.34, soft edge 0.15 to 0.5 of the radius, as his lowest foot rises to
     two heights; Ground Cues' `cueStep`, `mixWants`: his lowest foot over half his height or 1
     u/s across the floor, `ringStrength`: the 0.12 s pulse on a wall clamp, `lineShare`,
     `lineMode`: a kind's `HoldCues.line` false keeps the line out of In the Mix, never out of
-    Always; and
+    Always; `ringFloor`: a kind's `HoldCues.floor`, the ring's least strength In the Mix while
+    he's held, eased in over 0.15 s; and
     `dragSpeedOf`, the brain's drag speed as his collar's screen px a second over 110); `carry.js`
     drags him, today, on the upright plane facing the camera through where he was grabbed
     (`dragPlane`, `gripFor`, `dragTarget`: the grab offset from where the press began, easing

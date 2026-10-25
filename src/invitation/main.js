@@ -99,6 +99,7 @@ import {
   lineMode,
   lineShare,
   mixWants,
+  ringFloor,
   ringStrength,
 } from './cues.js';
 import { depthAlong, squash } from './hold.js';
@@ -1503,7 +1504,8 @@ function start(s) {
     const pushed = Boolean(carry?.push);
     if (isHeld && (cues.pulse || (pushed && !cue.pushed))) cue.pulse = t;
     cue.pushed = pushed;
-    const ring = isHeld || flying ? ringStrength(cue.ring, cue.pulse === null ? null : t - cue.pulse, mode) : 0;
+    const pulsed = ringStrength(cue.ring, cue.pulse === null ? null : t - cue.pulse, mode);
+    const ring = isHeld ? ringFloor(pulsed, mode, cues.floor, t - holdT0) : flying ? pulsed : 0;
     const at = cues.ring ?? { x: hips.x, z: hips.z };
     cue.mode = mode;
     cue.ringAt = ring > 0 ? at : null;

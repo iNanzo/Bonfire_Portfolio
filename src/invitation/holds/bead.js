@@ -42,7 +42,8 @@ const RAD = Math.PI / 180;
  * velocity plus `bob` of the rope's, `depth` of its part toward or away from the camera, at most
  * `maxLevel` u/s, lobbed by `lob` of its speed across over `lobFrom` u/s, `up`/`down` at most up
  * and down. The ring: where he'd land while he's carried faster than `ringSpeed` u/s across,
- * eased there with a `ringHalf` s halflife. A height change keeps his spot on the floor till the
+ * eased there with a `ringHalf` s halflife, else under his collar; In the Mix never under
+ * `ringFloor` while he's held. A height change keeps his spot on the floor till the
  * pointer moves `pinMove` CSS px; its gap to the cursor then eases out over HOLD.offsetEase, or at
  * `pinRate` CSS px a second for a bigger one.
  */
@@ -80,6 +81,7 @@ export const BEAD = {
   down: -3,
   ringSpeed: 1,
   ringHalf: 0.06,
+  ringFloor: 0.35,
   pinMove: 1,
   pinRate: 300,
 };
@@ -578,23 +580,24 @@ export function createBeadHold(deps = {}) {
       tilt = { x: tilt.x + dx * share, z: tilt.z + dz * share };
       const vel = carry?.vel ?? { x: 0, y: 0, z: 0 };
       const speed = Math.hypot(vel.x, vel.z);
-      // (The ring: where he'd land if let go now while he's moving fast, else back under him.)
+      // (The ring: where he'd land if let go now while he's moving fast, else under his collar
+      // (eased, so not his swinging hips: a still let-go lands him there, release).)
       const fast = speed > BEAD.ringSpeed;
-      const f = feet();
       const spot =
         carry && fast
-          ? landingPoint(f, beadThrow(carry.samples, t, ropeVelocity(rope), carry.push, axes.toward), bounds)
-          : f;
+          ? landingPoint(feet(), beadThrow(carry.samples, t, ropeVelocity(rope), carry.push, axes.toward), bounds)
+          : anchor;
       const k = dt > 0 ? 1 - Math.pow(0.5, dt / BEAD.ringHalf) : 0;
-      ring = ring ? { x: ring.x + (spot.x - ring.x) * k, z: ring.z + (spot.z - ring.z) * k } : { x: f.x, z: f.z };
-      const apart = Math.hypot(ring.x - f.x, ring.z - f.z) > 0.02;
+      ring = ring
+        ? { x: ring.x + (spot.x - ring.x) * k, z: ring.z + (spot.z - ring.z) * k }
+        : { x: anchor.x, z: anchor.z };
       return {
         anchor: { ...anchor },
         plane: null,
         push: side ? at.push : null,
         holdY,
         tilt: { ...tilt },
-        cues: { ...(fast || apart ? { ring: { ...ring } } : {}), line: false, pulse },
+        cues: { ring: { ...ring }, floor: BEAD.ringFloor, pulse },
       };
     },
     grabbedAt(t, collar, project) {
@@ -611,7 +614,19 @@ export function createBeadHold(deps = {}) {
         carry.push,
         view ? levelAxes(view.yaw).toward : undefined,
       );
-      landing = landingPoint(feet(), v, area);
+      const f = feet();
+      // (Let go still: he falls to the ring, under his collar, wherever his swing had his feet.)
+      if (ring && Math.hypot(carry.vel.x, carry.vel.z) <= BEAD.ringSpeed) {
+        const y0 = Math.max(0, f.y - CARRY.floorY);
+        const g = CARRY.fallGravity;
+        const fall = (v.y + Math.sqrt(v.y * v.y + 2 * g * y0)) / g;
+        if (fall > 1e-3) {
+          const p = landingPoint(f, v);
+          v.x += (ring.x - p.x) / fall;
+          v.z += (ring.z - p.z) / fall;
+        }
+      }
+      landing = landingPoint(f, v, area);
       return v;
     },
     onWheel(dy) {

@@ -5,7 +5,7 @@
 // him and the dashed drop line from his collar to it while he's held, the Ground Cues setting
 // (Off / In the Mix / Always, look.js: 'auto' takes the drag kind's own default, groundCueMode;
 // In the Mix shows them while he's high or moving fast, mixWants, faded in and out, cueStep), the
-// ring pulsing to full on a wall clamp, the line fading in with his height (lineShare); and the
+// ring pulsing to full on a wall clamp or kept at a kind's floor In the Mix (ringFloor), the line fading in with his height (lineShare); and the
 // brain's drag speed in screen px a second, so a stress threshold reads the same however deep he
 // is (dragSpeedOf). Pure: no three.js, no DOM.
 
@@ -112,6 +112,18 @@ export function cueStep(k, { mode, want, held, dt }) {
  */
 export const ringStrength = (k, sincePulse, mode) =>
   mode !== 'off' && sincePulse !== null && sincePulse >= 0 && sincePulse < CUES.pulse ? 1 : k;
+
+/**
+ * The ring's strength while he's held: In the Mix, never under the kind's `floor` (hold.js
+ * HoldCues.floor), that eased in over CUES.fade from the grab (`heldFor` s ago); Always and Off as
+ * they are.
+ * @param {number} k
+ * @param {CueMode} mode
+ * @param {number|undefined} floor
+ * @param {number} heldFor
+ */
+export const ringFloor = (k, mode, floor, heldFor) =>
+  mode === 'mix' && floor ? Math.max(k, floor * clamp01(CUES.fade > 0 ? heldFor / CUES.fade : 1)) : k;
 
 /**
  * The drop line's mode: Ground Cues' `mode`, except that a drag kind can keep it out of In the Mix

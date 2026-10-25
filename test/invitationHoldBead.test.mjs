@@ -624,6 +624,37 @@ test('bead, the throw: the landing preview is within 0.15 of where he lands for 
   }
 });
 
+test('bead, the ring held still: under his collar, not his swinging hips (within 0.05 from 0.5 s after he’s stopped, while his feet swing 0.1 or more), and let go still he lands within 0.08 of it', () => {
+  for (const screen of ['phone', 'desktop']) {
+    const r = rig(screen);
+    const c = centrePx(r);
+    const run = sim(r, { path: ramp(c, { x: c.x + 150, y: c.y }, 1.2, 1.5), until: 2.4, release: true });
+    const swing = Math.max(
+      ...run.frames.filter((f) => f.t >= 1.5).map((f) => Math.hypot(f.feet.x - f.anchor.x, f.feet.z - f.anchor.z)),
+    );
+    assert.ok(swing >= 0.1, `${screen}: his feet swung ${swing.toFixed(3)}`);
+    for (const f of run.frames.filter((g) => g.t >= 2)) {
+      const ring = f.step.cues.ring;
+      assert.ok(ring, `${screen}: a ring at ${f.t.toFixed(2)} s`);
+      const off = Math.hypot(ring.x - f.anchor.x, ring.z - f.anchor.z);
+      assert.ok(off <= 0.05, `${screen}: the ring ${off.toFixed(3)} off his collar at ${f.t.toFixed(2)} s`);
+    }
+    const ring = run.frames[run.frames.length - 1].step.cues.ring;
+    const miss = Math.hypot(ring.x - run.landed.x, ring.z - run.landed.z);
+    assert.ok(miss <= 0.08, `${screen}: let go still, he landed ${miss.toFixed(3)} off the ring`);
+    assert.ok(Math.hypot(run.landing.x - ring.x, run.landing.z - ring.z) <= 0.02, `${screen}: the ring waits there`);
+  }
+});
+
+test('bead, its cues: In the Mix the ring never under 0.35 while he’s held, and the drop line as the shared rule has it (In the Mix once he’s high)', () => {
+  const r = rig('desktop');
+  const { frames } = sim(r, { path: still(centrePx(r)), until: 0.5 });
+  for (const f of frames) {
+    assert.equal(f.step.cues.floor, 0.35);
+    assert.ok(!('line' in f.step.cues), 'no line of its own');
+  }
+});
+
 test('bead, the up flick throw: 100 px in 0.1 s at 36° lands 0.8-1.6 further away with a lob of 0.25 or more, at yaw 0 and 90, not as far as the same flick across throws him', () => {
   for (const screen of ['phone', 'desktop']) {
     for (const yaw of [0, 90]) {

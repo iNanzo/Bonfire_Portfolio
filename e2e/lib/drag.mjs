@@ -196,14 +196,19 @@ export function dragDescribe(kind, { baseline = [] } = {}) {
       expect(most, `turned ${((most * 180) / Math.PI).toFixed(2)}° off the way he faced`).toBeLessThan(Math.PI / 180);
     });
 
-    test(`${kind}: Ground Cues Always shows the ring under his hips while he's held and the drop line once he's high`, async ({
+    test(`${kind}: Ground Cues Always shows the ring under him while he's held and the drop line once he's high`, async ({
       page,
     }) => {
       await calm(page, kind, { groundCues: 'always' });
       const cursor = await grab(page, 'head');
       await until(page, (s) => s.drag.groundCues === 'always' && s.drag.ring?.alpha > 0.99, 'the ring in');
       const d = (await snapshot(page)).drag;
-      expect(gap({ x: d.ring.x, y: d.ring.z }, { x: d.hips.x, y: d.hips.z }), 'under his hips').toBeLessThan(0.03);
+      // (Under his hips, or under his collar for a kind that keeps it off his swing: bead's.)
+      const under = Math.min(
+        gap({ x: d.ring.x, y: d.ring.z }, { x: d.hips.x, y: d.hips.z }),
+        gap({ x: d.ring.x, y: d.ring.z }, { x: d.anchor.x, y: d.anchor.z }),
+      );
+      expect(under, 'under him').toBeLessThan(0.03);
       await lift(page, cursor);
       await until(
         page,
