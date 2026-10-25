@@ -144,7 +144,64 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     optional, holds up to 48 scenes, and ids must be unique. A problem deep inside a scene
     is listed on its card with where it is (`look.name: …`). The commit message says
     "edit scenes". There's no live preview for scenes; **Open in Painter** is the preview.
-- **Hide / show** any entry (◉), and **reorder** any list by dragging ⋮⋮ or with ↑/↓.
+- **Invitation** (under Toys): NEWT's toy at `/invitation/` (`content.json` `invitation`;
+  [invitation.md](invitation.md) has the toy). The page's schema is
+  `admin/ui/invitationSchema.js`, gathered into `schema.js`.
+  - **Default Look:** the Default style a first visit gets, before anyone touches the Look
+    menu: Pixel Size (16×16 to 256×256, Native or Off), Dithering, Outlines, the style it's
+    **Built On** (DS or Soft: its own colors carry over), Motion, and every Shader option
+    the Look menu shows, by the same names, with the same ranges and choices. Visitors'
+    own picks stay in their browser, over these.
+  - **Speech:** the shortest and longest quiet spell before an idle line (seconds), and each
+    moment's **Chance** (0 never, 1 every time) and **Cooldown** (seconds), under the
+    plan's kinds: Reactions, Running, Carried, Moving, Sitting, Passive and Camera.
+  - **Lines:** what he says at each moment, under the same kinds. Add, remove, reorder or
+    drag them; one is picked at random, never the one he just said, and a moment with no
+    lines says nothing.
+  - **Intro:** the chat **Play Intro** opens (`invitation.intro`, `types.js`
+    `DialogueScript`): the **Speaker** on every box's name tab, the **Start Box** (every Play
+    Intro starts there) and the **Chat Boxes**, in order, dragged or moved with ↑/↓. Each
+    box's card is titled by its line, with its id, face, move, shot and where it goes under
+    it. A box has its **ID** (how Next and the choices point to it), a **Speaker Override**
+    (such as ??? before he's said his name; empty: the intro's Speaker), its **Text** (typed
+    out letter by letter, up to 240 characters; past 100 it outgrows the box's three lines on
+    a phone), a **Face** (every face he has; he still blinks on Neutral), an **Animation** (any
+    of his: Once plays and then he talks, Loops keeps going, In Place walks or runs on the spot,
+    Dangling holds him up off the floor, sitting or lying down gets him down first; None: as he was), a **Camera**
+    (Close: head and shoulders, too tight for a Cheer's fists on a phone; Medium: his whole
+    body; Wide: the default view; Keep: as it was), its **Next Box** (empty: the box after
+    it), **Ends the Intro**, an **Auto Wait** (seconds Auto waits once the line is typed; 0:
+    by its length) and 2 or 3 **Choices**, each a **Label** and the box it **Leads To**.
+    Choices come first, then End, then Next; the last box ends the intro. The start, a
+    Next and a choice's box are picked from the boxes there are, each by its id and how its
+    line starts; the lists follow a box renamed as it's typed, and one that's gone still
+    shows, marked "(No Such Box)", to be put right. **+ Add Box** makes a box with every
+    field and an id of its own (`box`, `box-2`…; edit it to something readable), and a box
+    that lacks some (written by hand, or copied from `content.js`) shows them all the same,
+    blank where it needs a pick, to fill in (`INVITATION_FIELDS`, schema.js `FIELDS`; the
+    draft changes only once one is edited); **+ Add Choice** goes once a box has 3. Boxes and choices can't be hidden (the toy has no way to
+    skip one): delete one instead. The toy reads it through `content.js` `introScript()`,
+    each box's flow spelled out; a broken part is mended on its own (a face off the list
+    is Neutral, a Next to nowhere the box after it), and an intro it can't play at all is
+    the toy's own short one (`FALLBACK_INTRO`).
+  - **Checks:** at most 20 lines a moment, each up to 120 characters (a warning past 80,
+    where his bubble wraps a lot); every value within its list or range. The intro's ids are
+    unique (lowercase letters, numbers and dashes), its start, every Next and every choice
+    a box that's there, its text up to 240 characters (a warning past 100, measured at
+    390×844: the box's three lines on a phone), a choice's label up to 60 and a speaker up to
+    24, at most 3 choices a box, its faces, animations and cameras from the toy's lists, and
+    Auto between 0 and 15 seconds; a box nothing leads to, boxes that go round with no choice
+    to leave, a Next or End a box's choices or End override, and a box with a single choice
+    (only a tap that looks like one) are warnings, each naming its box. The section is
+    optional, so content from before the toy still passes, and each of its four parts it
+    lacks shows **Start From the Toy’s Own**, which fills that part in with the toy's built-in
+    values (the built-in Default look, its speech settings, every moment with no lines yet,
+    its own short intro) to edit from (`INVITATION_STARTERS`, schema.js `STARTERS`). The toy reads it through
+    `virtual:invitation-content` (`vite.config.js`), never `content.json` itself, and the
+    other pages' copy of the content leaves it out. A change to its shape needs
+    `npm run admin:deploy` after the merge. There's no live preview: open `/invitation/`.
+- **Hide / show** any entry (◉; not the invitation intro's boxes and choices), and
+  **reorder** any list by dragging ⋮⋮ or with ↑/↓.
 - **Rename** any sidebar page or section heading with ✎ (empty resets it). Renames are
   stored in `content.admin.labels`, which the site ignores. Help that names another
   page or section ("Interface › Starting Equipment") follows the rename.
@@ -162,7 +219,8 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
   Strength, Gestures On Click…). Each field's help sits under it, a sentence or two, and
   is what its input reads out to a screen reader; anything longer folds under **More**.
   Big sections are split under sub-headings: Interface Text into Header & Menu, Inventory
-  & Projects, About, Render Settings, Pack and Key Prompts; Pixel Art; the Knight. A
+  & Projects, About, Render Settings, Pack and Key Prompts; Pixel Art; the Knight; the
+  Invitation's Speech and Lines, by the kind of moment. A
   project's image fields (Alt Text, Caption, Pixel Art, Video Clip) and the featured
   project's fields go by the same names as any project's, on the page and in the search.
   Icon buttons
@@ -287,3 +345,57 @@ and validates them first; nothing is stored.
    tag of `public/admin/index.html`, so `nhoang.dev/admin` forwards to it. If you ever
    move `nhoang.dev`'s DNS to Cloudflare, you can route the Worker at
    `nhoang.dev/admin*` directly instead.
+
+## Automatic admin updates
+
+`.github/workflows/deploy-admin.yml` reconciles the current `main` checkout when
+**Deploy to GitHub Pages** completes for a push to main. It reuses that
+workflow's full CI (lint/types, Node 22/24 coverage, build, all five browser shards)
+and waits for its Pages deployment too; it does not launch a second CI suite.
+
+Every main completion is a wake-up, including failed runs and documentation-only changes.
+There is deliberately no path filter or last-commit diff: an admin change in a failed
+push must still ship when a later unrelated change restores CI. This also covers
+shared content rules, settings, scenes, UI, fonts, lockfiles and future transitive
+dependencies without maintaining an incomplete allowlist. The tradeoff is an admin
+build/deploy for each successful current main, even when admin output is unchanged.
+
+The workflow checks out current main, resolves its full SHA, and requires the newest
+existing push run of `deploy.yml` for that exact SHA to be completed and successful.
+It validates the source repository, branch and workflow path, and fetches the run's
+current status so a failed or active rerun cannot reuse an earlier success. Missing,
+pending, failed, cancelled or skipped CI prevents publishing; API errors fail closed.
+PRs, forks and manual dispatches on other branches cannot deploy.
+
+One job-level `admin-production` concurrency group serializes checkout through publication;
+running deployments are not cancelled. A queued old completion or manual rerun
+reconciles today's main, never its historical event SHA. If main moves during the
+build, the final SHA/CI check skips publication; the newer successful main completion
+will reconcile again. Replacing queued events cannot lose a change because each
+surviving run checks the whole current tree. A delayed failed event also reconciles
+current main, so it cannot displace a queued success without doing that work. Ineligible
+jobs (such as a non-main dispatch) never join the lock. No previously deployed SHA marker or
+GitHub write permission is needed.
+
+The last freshness check runs immediately before Wrangler publishes the already-built
+admin. GitHub and Cloudflare do not share a transaction: main can still advance while
+the Cloudflare request is in flight. Serialization prevents an older workflow from
+overwriting a newer deployment from this workflow; it cannot lock GitHub main or
+coordinate a separate local/operator deployment. A new main commit is reconciled
+after its own CI succeeds. This is convergence, not atomic synchronization.
+
+A manual **Run workflow** on main or rerun retries deployment of current main using
+its existing successful push CI; it never bypasses CI or rolls back to an old run's
+SHA. If no qualifying CI exists, the job reports a skip reason. After a Cloudflare
+failure, use this manual retry or wait for the next successful main push. Summaries
+record the selected SHA, CI run ID and gate decision. The workflow must be merged
+onto the default branch before completion events can trigger it.
+
+Activation requires a repository secret `CLOUDFLARE_API_TOKEN` authorized
+to deploy the intended Worker and repository variable `CLOUDFLARE_ACCOUNT_ID` for its
+account. Neither is created by this change. Missing configuration fails visibly.
+The token is available only to the publication step, not dependency installation or
+the admin build. GitHub permissions are only `contents: read` and `actions: read`.
+Keep Cloudflare Access and the Worker's runtime secrets unchanged. Review authorization
+separately before creating credentials or expanding access. `npm run admin:deploy`
+remains the separately authorized local manual route, outside the workflow lock.

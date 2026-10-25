@@ -6,9 +6,96 @@ format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and ver
 
 ## [Unreleased]
 
-Round 11: the knight at home in every place, a campfire game on the bonfire, every module
-type-checked, and a cleanup for what agents and test runs leave running. Round 10, below
-it: menus and search, the knight's fixes, hygiene and performance.
+Round 15: an Uma Musume-style intro dialogue for NEWT. Round 14, below it: his second
+wave (a Default look, new controls, speech bubbles, the admin's Invitation page). Round
+13, below that: NEWT's toy at `/invitation/`. Round 11: the knight at home in every place,
+a campfire game on the bonfire, every module type-checked, and a cleanup for what agents
+and test runs leave running.
+Round 10: menus and search, the knight's fixes, hygiene and performance.
+
+### NEWT's intro (round 15)
+
+- A Play Intro button starts a story scene with NEWT, laid out like Uma Musume's in the
+  toy's own style: a box along the bottom with his name on a tab, each line typed out
+  with a bouncing ▼ when it's done, Auto, Skip and Log at the top right, and replies to
+  pick that lead to their own lines. He walks in and turns to you first; free play, the
+  toolbar and the camera come back when it ends.
+- Each line sets his face, plays a gesture and moves the camera (close, medium or wide).
+  New gestures, made in Blender: Talk, Nod, Shrug, Point, Think and Cheer. New faces: sad,
+  angry, shy and smug, each in a smooth and a pixel version.
+- The admin's Invitation page gains an Intro section: every line's text, face, gesture,
+  camera, Auto wait, next line, replies and speaker, checked so a broken link between
+  lines can't be saved. A placeholder intro in his voice is there to rewrite.
+
+### NEWT's second wave (round 14)
+
+- A new Default style is what a first visit shows: 128×128, 6 colors, full dither, tinted
+  outlines with an outer ring, two toon bands and a soft shadow. Pixel Shirt (off) and
+  Pixel Face (on) choose his real plaid or the bold pixel one, and his pixel faces are
+  redrawn after his own face at every size.
+- On a desktop a right-drag turns the camera, a left-drag on the page pans it and the
+  wheel zooms; the floor is endless, his play area the floor a fully zoomed-out view
+  shows. The pixel size follows the zoom, so he keeps his sprite resolution, and a
+  frame-time governor steps the resolution down while frames are slow.
+- Dragging him keeps the spot you grabbed under the cursor and lifts him higher. His head
+  aims at the cursor on screen (down at a low one, up at a high one, his chest turning for
+  big looks), and running away he faces where he runs, glancing back at whoever chases him.
+  His scared run now holds both arms straight out in front.
+- He talks: a speech bubble in the page's style says a line on taps, pick-ups, drops,
+  chases, walks, sitting, idle moments and camera tricks. The admin's new Invitation page
+  edits his default look, how often he talks, and every line.
+
+### The NEWT toy (round 13)
+
+- A new page, `/invitation/`, apart from the bonfire's look: NEWT, a low-poly chibi,
+  wanders a plain white page whose floor shows only his shadows. It's `noindex` and
+  linked from nowhere, for sharing by link.
+- Tap him and he waves or startles. Tap him a few times, or drag him roughly, and he runs
+  off with his arms out in front, slow enough to catch. Press and drag to pick him up by
+  the collar: he dangles and swings with the drag, then falls and lands on his feet. Tap
+  the floor and he walks there; leave him alone and he turns to you and sits, legs out.
+- His head follows the cursor, or a finger on a phone, and his face goes with what he
+  does: happy for a wave or a sit, surprised when startled, carried or running, and he
+  blinks.
+- Drag the empty page to turn the camera round him and tilt it; zoom with the wheel or two
+  fingers. The light turns with the camera, so his shadow keeps its side. Buttons: Wave,
+  Spook, Sit, Run, Wander and Look.
+- The Look menu: Pixel Size, Dithering, Outlines, Motion (Smooth, or Choppy at 15 fps),
+  Style, Shader and Reset Camera, remembered for the next visit. Pixel Size is NEWT's sprite
+  resolution, a slider from 16×16 to 256×256 (he's drawn about that many pixels tall on any
+  screen; 96×96 by default), then Native, a pixel for every one of the screen's own, the
+  pixel look kept, and Off, smooth with no pixel look. DS, the default style, draws him like
+  an old handheld: 15-bit colour with a fine dither, 1-pixel outlines, toon bands and a hard
+  shadow. Soft is warmer, with a dithered shadow. Shader shows the look's own values
+  (colours, dither and outline strength, outline colour and ring, toon bands and highlight,
+  the shadow's edge and strength, the light's angle and strength, and the grade); a change
+  makes the style Custom, and Reset To Style brings it back. At the coarser resolutions his
+  plaid shirt and his face are drawn as pixel art so they still read; at the finest, his
+  real plaid and smooth face return.
+- Phones first: he's drawn about 30% bigger there and the camera keeps him in frame; the
+  page keeps clear of the notch and home bar, and never zooms or scrolls under a finger.
+- How it works and how to rebuild it: [docs/invitation.md](docs/invitation.md).
+
+### NEWT's animations (round 13)
+
+- Eleven clips made in Blender and kept as a script: Idle, Walk, Run, Wave, Spook, Held,
+  Fall, Land, SitDown, Sit and StandUp (`tools/newt.py`; `npm run model -- newt` rebuilds
+  `public/models/newt.glb`). The page blends them itself: Walk and Run share one step so
+  his feet hold the floor, every change fades, and his head turns on top of them.
+
+### Tooling (round 13)
+
+- `tools/capture-invitation.mjs` records the toy at real speed on phone and desktop sizes
+  (taps, drags, chases, the camera, every clip) as WebP clips and contact sheets.
+- `tools/newt-face.mjs` and `tools/newt-atlas.mjs` make NEWT's pixel face sheets and his
+  pixel plaid from the model's own textures.
+
+### Admin deployment
+
+- Add an automatic admin deployment workflow that publishes current main only after
+  its existing Pages CI and deployment succeed. It rechecks main before publishing,
+  serializes deployments, and recovers changes from earlier failed pushes. Activation
+  requires the documented Cloudflare configuration; manual deployment remains available.
 
 ### The knight at home (round 11)
 

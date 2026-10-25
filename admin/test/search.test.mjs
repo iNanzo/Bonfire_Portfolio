@@ -12,6 +12,7 @@ globalThis.document ??= /** @type {any} */ ({
 });
 const { buildIndex, crumbsOf, matcherFor, pageById, pageOf, revealPlan, snippetOf } = await import('../ui/search.js');
 const { PAGES } = await import('../ui/schema.js');
+const { getAt, parsePath } = await import('../ui/paths.js');
 
 // The site's content as it is now, with the few words these tests search for set on it: the
 // admin can rename any of them, so they're the tests' own, never content.json's pinned.
@@ -33,9 +34,10 @@ test('the index holds every page’s sections, groups, entries and fields, each 
   const index = buildIndex(draft);
   const ids = new Set(index.map((e) => e.id));
   assert.equal(ids.size, index.length, 'one entry per path');
+  // (Each section the content has: one it lacks shows a way to start it instead.)
   for (const p of PAGES)
     for (const key of p.keys)
-      if (draft[key.split('.')[0]] !== undefined) assert.ok(ids.has(key), `${key}: its section`);
+      if (getAt(draft, parsePath(key)) !== undefined) assert.ok(ids.has(key), `${key}: its section`);
   for (const e of index) assert.equal(pageOf(e.id).id, e.page, `${e.id} is on ${e.page}`);
   const dither = entry(index, 'effects.render.dither');
   assert.equal(dither.page, 'picture');

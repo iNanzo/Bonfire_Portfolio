@@ -1,4 +1,5 @@
-# The admin panel Worker. Deploy with `npm run admin:deploy` (builds the page first).
+# The admin panel Worker. deploy-admin.yml updates it after current main passes its existing CI.
+# Manual fallback: `npm run admin:deploy` (builds the page first).
 # One-time setup (Cloudflare Access, GitHub App, secrets): "Put it online" in docs/admin.md.
 name = "nhoang-admin"
 main = "worker.js"

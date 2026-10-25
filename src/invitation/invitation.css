@@ -1,0 +1,625 @@
+/* The invitation toy's page (/invitation/): its own look, not the bonfire site's. Off-white and
+   warm greys, chunky rounded buttons with a dark outline (a handheld's feel), Pixelify Sans; the
+   toolbar's are squircles with pixel icons (icons.js), their labels pixel tabs, their hover and
+   press an ordered dither (--inv-dv-N, icons.js installDither); the cursors are pixel art too
+   (cursor.js puts their CSS in the page).
+   The stage fills the screen (fixed, inset 0; dvh only as a fallback); the canvas inside it is
+   drawn at texel size and stretched with nearest-neighbour (auto at Pixel Size Off), a little
+   larger than the stage, which hides the overhang. Touch is the toy's own: no page zoom,
+   scrolling, text selection or callouts, and the canvas takes every gesture. A pinch anywhere
+   never zooms the page: touch-action none on the page (manipulation still lets Android Chrome
+   pinch-zoom it, over the toolbar too), and only the Look sheet pans, up and down. */
+
+:root {
+  --inv-bg: #f3f0ea;
+  --inv-paper: #fbf9f5;
+  --inv-ink: #3a332d;
+  --inv-grey: #ddd6ca;
+  --inv-mid: #9c9286;
+  --inv-on: #f4cf7a;
+  --inv-accent: #c9822a;
+  --inv-focus: #4f83d9;
+  /* (A toolbar button's side: a thumb's width on a phone, seven to a 360 px row.) */
+  --inv-tool: clamp(44px, 11.4vw, 54px);
+  --inv-font: 'Pixelify Sans', ui-rounded, system-ui, sans-serif;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--inv-bg);
+  color: var(--inv-ink);
+  font-family: var(--inv-font);
+  /* (Pixelify Sans's "fi" ligature reads as an "A": every line on the page draws the two letters.) */
+  font-variant-ligatures: none;
+  touch-action: none;
+  overscroll-behavior: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.inv-stage {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--inv-bg);
+}
+@supports (inset: 0) {
+  .inv-stage {
+    inset: 0;
+    width: auto;
+    height: auto;
+  }
+}
+
+.inv-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  touch-action: none;
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+}
+.inv-stage[data-pixel='off'] .inv-canvas {
+  image-rendering: auto;
+}
+
+/* ?perf: the frame times, the grid and the governor's level (stage.js), out of the way of presses. */
+.inv-perf {
+  position: absolute;
+  top: calc(8px + env(safe-area-inset-top));
+  left: calc(8px + env(safe-area-inset-left));
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgb(58 51 45 / 80%);
+  color: var(--inv-paper);
+  font:
+    12px/1.4 ui-monospace,
+    monospace;
+  white-space: pre;
+  pointer-events: none;
+}
+
+/* --- Over the canvas: the status, the toolbar and the Look sheet (only they take presses). */
+.inv-hud {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  pointer-events: none;
+}
+.inv-hud > * {
+  pointer-events: auto;
+}
+
+.inv-status {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 16px;
+  padding: 24px;
+  text-align: center;
+  background: var(--inv-bg);
+}
+.inv-status-text {
+  margin: 0;
+  max-width: 28ch;
+  font-size: 20px;
+  line-height: 1.35;
+}
+
+/* --- Buttons: chunky, outlined, pressed down when tapped. */
+.inv-btn {
+  min-width: 0;
+  min-height: 48px;
+  padding: 0 10px;
+  border: 3px solid var(--inv-ink);
+  border-radius: 14px;
+  background: var(--inv-paper);
+  color: var(--inv-ink);
+  font: 600 15px/1 var(--inv-font);
+  letter-spacing: 0.02em;
+  box-shadow: 0 4px 0 var(--inv-ink);
+  cursor: pointer;
+  transition:
+    transform 60ms ease-out,
+    box-shadow 60ms ease-out,
+    background-color 120ms;
+}
+.inv-btn:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--inv-ink);
+}
+.inv-btn[aria-pressed='true'],
+.inv-btn[aria-expanded='true'] {
+  background: var(--inv-on);
+}
+.inv-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.inv-btn:focus-visible,
+.inv-range:focus-visible,
+.inv-seg input:focus-visible + span,
+.inv-switch input:focus-visible ~ .inv-knob {
+  outline: 3px solid var(--inv-focus);
+  outline-offset: 3px;
+}
+
+/* The toolbar: a row of squircles, Replay Intro on the left, the actions in the middle, Camera
+   and Settings on the right (beside the Settings sheet on a phone held sideways), a phone's
+   width at most. */
+.inv-toolbar {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: clamp(3px, 1.4vw, 8px);
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 8px clamp(6px, 2.6vw, 14px) 10px;
+}
+.inv-tool {
+  position: relative;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: var(--inv-tool);
+  height: var(--inv-tool);
+  min-height: 0;
+  padding: 0;
+  border-radius: 30%;
+  background-repeat: repeat;
+  background-size: 8px 8px;
+  image-rendering: pixelated;
+}
+@supports (corner-shape: squircle) {
+  .inv-tool {
+    border-radius: 50%;
+    corner-shape: squircle;
+  }
+}
+.inv-toolbar > [data-button='Wave'],
+.inv-toolbar > .inv-btn-camera {
+  margin-left: auto;
+}
+.inv-icon {
+  display: block;
+  width: 32px;
+  height: 32px;
+}
+.inv-icon-line {
+  fill: currentColor;
+}
+.inv-icon-accent {
+  fill: var(--inv-accent);
+}
+/* (The ordered dither of the ink over the paper: light on hover, heavier pressed.) */
+.inv-tool:active:not(:disabled) {
+  background-image: var(--inv-dv-6);
+}
+
+/* The label: the button's own text (its name), shown as a pixel tab over it; hidden until then
+   (opacity only, so it still names the button). With a mouse on hover and keyboard focus; on
+   touch, a press held still (ui.js: .is-label). */
+.inv-btn-label {
+  --inv-tab-x: -50%;
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  bottom: calc(100% + 9px);
+  padding: 4px 8px 5px;
+  border: 2px solid var(--inv-ink);
+  background: var(--inv-paper);
+  color: var(--inv-ink);
+  font: 600 13px/1 var(--inv-font);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  box-shadow: 0 3px 0 var(--inv-ink);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(var(--inv-tab-x), 3px);
+  transition:
+    opacity 90ms steps(3),
+    transform 90ms steps(3);
+}
+/* (Its notch, a pixel arrow down to the button's middle: three pixels, then one.) */
+.inv-btn-label::after {
+  content: '';
+  position: absolute;
+  top: calc(100% + 5px);
+  left: var(--inv-notch, 50%);
+  width: 2px;
+  height: 2px;
+  margin-left: -1px;
+  background: var(--inv-ink);
+  box-shadow:
+    -2px -2px 0 var(--inv-ink),
+    0 -2px 0 var(--inv-ink),
+    2px -2px 0 var(--inv-ink);
+}
+.inv-btn-intro .inv-btn-label {
+  --inv-tab-x: 0;
+  --inv-notch: calc(var(--inv-tool) / 2);
+  left: -2px;
+}
+.inv-btn-look .inv-btn-label {
+  --inv-tab-x: 0;
+  --inv-notch: calc(100% - var(--inv-tool) / 2);
+  left: auto;
+  right: -2px;
+}
+.inv-tool.is-label .inv-btn-label {
+  opacity: 1;
+  transform: translate(var(--inv-tab-x), 0);
+}
+@media (hover: hover) and (pointer: fine) {
+  .inv-tool:hover:not(:disabled) {
+    background-image: var(--inv-dv-2);
+  }
+  .inv-tool:active:not(:disabled) {
+    background-image: var(--inv-dv-6);
+  }
+  .inv-tool:hover .inv-btn-label,
+  .inv-tool:focus-visible .inv-btn-label {
+    opacity: 1;
+    transform: translate(var(--inv-tab-x), 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .inv-btn-label {
+    transition: none;
+  }
+}
+
+/* The Camera pad: over the stage above the bar's right end (it never moves the bar, so the
+   view's clear space and the play area stay as they are), its controls four to a row. */
+.inv-camera-pad {
+  position: absolute;
+  z-index: 1;
+  right: clamp(6px, 2.6vw, 14px);
+  bottom: calc(100% + 2px);
+  display: grid;
+  grid-template-columns: repeat(4, var(--inv-tool));
+  gap: 6px;
+  max-width: calc(100vw - 24px);
+  padding: 10px;
+  border: 3px solid var(--inv-ink);
+  border-radius: 18px;
+  background: var(--inv-paper);
+  box-shadow: 0 4px 0 var(--inv-ink);
+}
+.inv-camera-pad .inv-hint {
+  grid-column: 1 / -1;
+  max-width: calc(4 * var(--inv-tool) + 18px);
+  margin: 2px 2px 0;
+  font-size: 12px;
+  line-height: 1.3;
+}
+.inv-camera-pad .inv-tool:nth-child(4n + 1) .inv-btn-label {
+  --inv-tab-x: 0;
+  --inv-notch: calc(var(--inv-tool) / 2);
+  left: -2px;
+}
+.inv-camera-pad .inv-tool:nth-child(4n) .inv-btn-label {
+  --inv-tab-x: 0;
+  --inv-notch: calc(100% - var(--inv-tool) / 2);
+  left: auto;
+  right: -2px;
+}
+
+/* (Under the open Settings sheet the toolbar's other buttons rest, out of reach: ui.js makes them
+   inert. Settings stays live, pressed: it closes the sheet, beside it on a phone held sideways.) */
+.inv-toolbar .inv-btn[inert] {
+  opacity: 0.45;
+}
+
+/* --- The Settings sheet: a bottom sheet over the toolbar. */
+.inv-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 520px;
+  /* (Never so tall that NEWT can't show above it, at his size, with room: it scrolls instead.
+     A phone held sideways shows him beside it, so there it may take the whole height.) */
+  max-height: max(55%, 100% - 340px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  margin: 0 auto;
+  padding: 14px 16px calc(18px + env(safe-area-inset-bottom));
+  border: 3px solid var(--inv-ink);
+  border-bottom: 0;
+  border-radius: 20px 20px 0 0;
+  background: var(--inv-paper);
+  box-shadow: 0 -6px 0 rgb(58 51 45 / 0.12);
+}
+/* (Its head stays at its top as it scrolls, so Done is always in reach: over the sheet's own
+   top padding, on its paper, the rest scrolling under it. Sticky offsets count from inside the
+   sheet's padding, hence -14px.) */
+.inv-sheet-head {
+  position: sticky;
+  top: -14px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: -14px -16px 0;
+  padding: 14px 16px 6px;
+  background: var(--inv-paper);
+}
+.inv-sheet h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+.inv-btn-done {
+  min-height: 44px;
+  padding: 0 16px;
+}
+.inv-hint {
+  margin: 6px 0 4px;
+  color: #6d645a;
+  font-size: 14px;
+  line-height: 1.35;
+}
+.inv-field {
+  margin: 12px 0 0;
+  padding: 0;
+  border: 0;
+}
+.inv-field legend {
+  margin-bottom: 6px;
+  padding: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.inv-segs {
+  display: flex;
+  gap: 6px;
+}
+.inv-seg {
+  position: relative;
+  flex: 1 1 0;
+}
+.inv-seg input,
+.inv-switch input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.inv-seg span {
+  display: grid;
+  place-items: center;
+  min-height: 44px;
+  border: 3px solid var(--inv-ink);
+  border-radius: 12px;
+  background: var(--inv-paper);
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow: 0 3px 0 var(--inv-ink);
+}
+.inv-seg input:checked + span {
+  background: var(--inv-on);
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--inv-ink);
+}
+
+/* Pixel Size: a chunky slider between its two ends' buttons, its value over it on the right. */
+.inv-pixel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.inv-pixel-value {
+  font-variant-numeric: tabular-nums;
+}
+.inv-pixel-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.inv-pixel-end {
+  flex: 0 0 auto;
+  min-width: 56px;
+  min-height: 44px;
+  padding: 0 8px;
+  font-size: 14px;
+}
+.inv-range {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 44px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  /* (A drag along it moves it; a swipe up or down that starts on it scrolls the sheet: ui.js
+     puts back the value it jumped to under the finger.) */
+  touch-action: pan-y;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.inv-range::-webkit-slider-runnable-track {
+  height: 12px;
+  border: 3px solid var(--inv-ink);
+  border-radius: 999px;
+  background: var(--inv-grey);
+}
+.inv-range::-moz-range-track {
+  height: 12px;
+  border: 3px solid var(--inv-ink);
+  border-radius: 999px;
+  background: var(--inv-grey);
+}
+.inv-range::-webkit-slider-thumb {
+  width: 28px;
+  height: 28px;
+  margin-top: -11px;
+  border: 3px solid var(--inv-ink);
+  border-radius: 9px;
+  background: var(--inv-on);
+  box-shadow: 0 2px 0 var(--inv-ink);
+  -webkit-appearance: none;
+}
+.inv-range::-moz-range-thumb {
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--inv-ink);
+  border-radius: 9px;
+  background: var(--inv-on);
+  box-shadow: 0 2px 0 var(--inv-ink);
+}
+.inv-range:focus-visible {
+  border-radius: 12px;
+}
+.inv-pixel .inv-hint {
+  margin-bottom: 0;
+}
+
+.inv-switches {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 14px;
+}
+.inv-switch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 0 10px 0 12px;
+  border: 3px solid var(--inv-ink);
+  border-radius: 12px;
+  background: var(--inv-paper);
+  font-size: 15px;
+  font-weight: 600;
+}
+.inv-knob {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  border: 3px solid var(--inv-ink);
+  border-radius: 999px;
+  background: var(--inv-grey);
+}
+.inv-knob::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--inv-ink);
+  border-radius: 50%;
+  background: var(--inv-paper);
+  transition: transform 120ms ease-out;
+}
+.inv-switch input:checked ~ .inv-knob {
+  background: var(--inv-on);
+}
+.inv-switch input:checked ~ .inv-knob::after {
+  transform: translateX(18px);
+}
+.inv-switch:has(input:disabled) {
+  opacity: 0.45;
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .inv-sheet {
+    max-height: 100%;
+  }
+}
+
+/* The Shader options: a row each, its label, then a slider with its value beside it (or the
+   row's segments, or a switch), the heading with Reset To Style. */
+.inv-shader-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.inv-shader-head h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.inv-btn-small {
+  min-height: 44px;
+  padding: 0 12px;
+  font-size: 14px;
+}
+.inv-control {
+  display: grid;
+  grid-template-columns: 8.4em minmax(0, 1fr) 4.4em;
+  align-items: center;
+  column-gap: 8px;
+  min-height: 44px;
+  margin-top: 4px;
+}
+.inv-control-label {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.15;
+}
+.inv-control-value {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.inv-control-choice .inv-segs {
+  grid-column: 2 / -1;
+}
+.inv-control-choice .inv-seg {
+  flex: 1 1 auto;
+}
+.inv-control-choice .inv-seg span {
+  padding: 0 6px;
+  font-size: 14px;
+}
+.inv-control:has(input:disabled),
+.inv-seg:has(input:disabled) {
+  opacity: 0.45;
+}
+.inv-control .inv-seg:has(input:disabled) {
+  opacity: 1;
+}
+.inv-control-switch {
+  margin-top: 6px;
+}
+
+/* Wander: whether he walks about by himself, and a line on it. */
+.inv-play {
+  margin-top: 14px;
+}
+.inv-play .inv-hint {
+  margin-top: 6px;
+}

@@ -1809,5 +1809,580 @@
         "speed": 0.7
       }
     }
-  ]
+  ],
+  "invitation": {
+    "defaults": {
+      "pixelSize": "128",
+      "dither": true,
+      "outlines": true,
+      "style": "soft",
+      "motion": "smooth",
+      "shader": {
+        "levels": 6,
+        "dither": 1,
+        "outline": 1,
+        "ink": "tinted",
+        "ring": true,
+        "bands": "2",
+        "highlight": true,
+        "pixelShirt": false,
+        "pixelFace": true,
+        "edge": "soft",
+        "shadow": 0.6,
+        "turn": 0,
+        "light": 1,
+        "saturation": 0.95,
+        "warmth": 0,
+        "exposure": 1.02,
+        "contrast": 1
+      }
+    },
+    "speech": {
+      "idleMin": 20,
+      "idleMax": 40,
+      "wave": {
+        "chance": 0.7,
+        "cooldown": 8
+      },
+      "spook": {
+        "chance": 0.7,
+        "cooldown": 8
+      },
+      "flee": {
+        "chance": 0.8,
+        "cooldown": 10
+      },
+      "caught": {
+        "chance": 0.9,
+        "cooldown": 10
+      },
+      "pickedUp": {
+        "chance": 0.7,
+        "cooldown": 8
+      },
+      "shaken": {
+        "chance": 0.8,
+        "cooldown": 6
+      },
+      "thrash": {
+        "chance": 0.6,
+        "cooldown": 8
+      },
+      "dropped": {
+        "chance": 0.5,
+        "cooldown": 8
+      },
+      "landed": {
+        "chance": 0.6,
+        "cooldown": 8
+      },
+      "walkTo": {
+        "chance": 0.35,
+        "cooldown": 12
+      },
+      "wander": {
+        "chance": 0.15,
+        "cooldown": 30
+      },
+      "sitDown": {
+        "chance": 0.8,
+        "cooldown": 30
+      },
+      "sitting": {
+        "chance": 0.9,
+        "cooldown": 20
+      },
+      "standUp": {
+        "chance": 0.5,
+        "cooldown": 15
+      },
+      "device": {
+        "chance": 0.9,
+        "cooldown": 15
+      },
+      "lieDown": {
+        "chance": 0.9,
+        "cooldown": 15
+      },
+      "idle": {
+        "chance": 0.8,
+        "cooldown": 0
+      },
+      "spin": {
+        "chance": 0.9,
+        "cooldown": 20
+      },
+      "zoom": {
+        "chance": 0.9,
+        "cooldown": 20
+      }
+    },
+    "lines": {
+      "wave": [
+        ":3",
+        "Oh, hello there!",
+        "Hey! Over here!",
+        "Hello! I’m NEWT.",
+        "Wave back. I’ll wait."
+      ],
+      "spook": [
+        "Eep!",
+        "Gah! Warn a guy first!",
+        "You scared the pixels out of me!",
+        "Don’t sneak up like that!",
+        "Why are you like this?!"
+      ],
+      "flee": [
+        "Nope, nope, nope!",
+        "Gotta go, gotta go!",
+        "I’m outta here!",
+        "Can’t catch me!",
+        "Personal space! Personal space!"
+      ],
+      "caught": [
+        "Hey! No fair!",
+        "Caught. Ugh, fine.",
+        "I was SO close!",
+        "Okay, you’re fast. Rude, but fast."
+      ],
+      "pickedUp": [
+        "So this is what tall people see",
+        "Be gentle im frail...",
+        "Please... im fragile...",
+        "Please, I’m just a little guy :(",
+        "You see how this looks, right?",
+        "mmmmfgh.,..,"
+      ],
+      "shaken": [
+        "Stop shaking meee!",
+        "My polygons are rattling!",
+        "Too much! Too much!",
+        "I’m getting dizzy…"
+      ],
+      "thrash": [
+        "Put me DOWN!",
+        "I will bite. I have no teeth, but I will bite.",
+        "Hiyaaah! Kick! Kick!",
+        "Let me go let me go let me go",
+        "This is a hostage situation!!"
+      ],
+      "dropped": [
+        "Wheee!",
+        "Wait, wait, wait!",
+        "Gravity, my old enemy!",
+        "You dropped me?!"
+      ],
+      "landed": [
+        "Oof.",
+        "MY LEG",
+        "Stuck the landing!"
+      ],
+      "walkTo": [
+        "On my way!",
+        "Over there? Sure!",
+        "Coming!",
+        "Walk, walk, walk…"
+      ],
+      "wander": [
+        "What’s over here?",
+        "Just stretching my legs.",
+        "Exploring!",
+        "Hmm, I wonder…"
+      ],
+      "sitDown": [
+        "Break time!",
+        "I can't feel my legs...",
+        "Ahh, that’s better.",
+        "My legs are so tired."
+      ],
+      "sitting": [
+        "Still here. Still sitting.",
+        "This floor’s surprisingly comfy.",
+        "Hello? Anyone there?",
+        "Yaaawn…",
+        "I could sit here all day."
+      ],
+      "standUp": [
+        "Okay, okay, I’m up!",
+        "Up and at ’em!",
+        "Oh, we’re doing things now?"
+      ],
+      "device": [
+        "Ooh, is this for me?",
+        "Just one more level...",
+        "Don’t tell anyone, but I’m really good at this.",
+        "Shh, I’m on a streak.",
+        "Low battery? Nah, I’ll live."
+      ],
+      "lieDown": [
+        "Okay, this is the comfy way to play.",
+        "Belly mode: activated.",
+        "Five more minutes...",
+        "Nobody talk to me, I’m busy."
+      ],
+      "idle": [
+        "*Mongolian throat singing*",
+        "It’s very white in here.",
+        "Nae pi ttam nunmul~",
+        "I am Spiderman..."
+      ],
+      "spin": [
+        "Whoa, the room’s spinning!",
+        "Okay, now I’m dizzy.",
+        "Round and round we go!",
+        "Are you lost up there?"
+      ],
+      "zoom": [
+        "Um. Hi. That’s close.",
+        "Do I have something on my face?",
+        "Counting my pixels?",
+        "Too close! Back up a bit!"
+      ]
+    },
+    "intro": {
+      "speaker": "Newton",
+      "start": "hello",
+      "boxes": [
+        {
+          "id": "hello",
+          "speaker": "",
+          "text": "Hi everyone! It's Newton :3",
+          "face": "shy",
+          "animation": "Wave",
+          "camera": "medium",
+          "next": "",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "congrats",
+          "speaker": "",
+          "text": "Congratulations! You're invited!!",
+          "face": "happy",
+          "animation": "Cheer",
+          "camera": "close",
+          "next": "",
+          "end": false,
+          "auto": 0,
+          "choices": [
+            {
+              "label": "To what?",
+              "next": "tomy"
+            },
+            {
+              "label": "Yay!",
+              "next": "come"
+            },
+            {
+              "label": "...",
+              "next": "hate"
+            }
+          ]
+        },
+        {
+          "id": "friends",
+          "speaker": "",
+          "text": "Though the December date and venue are undecided, I would love for you to come to my birthday party :D!\n(More information and updates will be available in the partiful)",
+          "face": "happy",
+          "animation": "Point",
+          "camera": "close",
+          "next": "",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "work",
+          "speaker": "",
+          "text": "If we haven't caught up in a while or you're one of my loyal story likers I don't see often irl, I've been working as a software engineer at Lyft 🚕 for around a year now.",
+          "face": "shy",
+          "animation": "Nod",
+          "camera": "keep",
+          "next": "",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "pay",
+          "speaker": "",
+          "text": "It doesn't pay that much because I'm only on a contract",
+          "face": "neutral",
+          "animation": "Shrug",
+          "camera": "medium",
+          "next": "",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "sad",
+          "speaker": "",
+          "text": "And all I've been doing for a while now is working from home and staying inside unless I have commitments or if my friends invite me out ;;",
+          "face": "sad",
+          "animation": "Sit",
+          "camera": "medium",
+          "next": "",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "sad-2",
+          "speaker": "",
+          "text": "I spend most of my free time playing games, and no time on my other hobbies/practices, which kinda killed my creative drive.",
+          "face": "sad",
+          "animation": "Sit",
+          "camera": "wide",
+          "next": "",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "whimsy",
+          "speaker": "",
+          "text": "I could feel my whimsy slowly draining away, not spending time with or being surrounded by the people I love every day (at least physically, shoutout to my fellow gamers).",
+          "face": "sad",
+          "animation": "Sit",
+          "camera": "close",
+          "next": "",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "but",
+          "speaker": "",
+          "text": "But!",
+          "face": "surprised",
+          "animation": "Spook",
+          "camera": "wide",
+          "next": "",
+          "end": false,
+          "auto": 0,
+          "choices": [
+            {
+              "label": "But what!?",
+              "next": "epiphany"
+            },
+            {
+              "label": "What the f**k!",
+              "next": "epiphany"
+            },
+            {
+              "label": "...",
+              "next": "epiphany"
+            }
+          ]
+        },
+        {
+          "id": "epiphany",
+          "speaker": "",
+          "text": "I had an epiphany!",
+          "face": "smug",
+          "animation": "Nod",
+          "camera": "keep",
+          "next": "",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "realize1",
+          "speaker": "",
+          "text": "I realized, I don't really feel emotion for myself; at the core of my ethos, I try to be kind, try to make others happy, and deeply value human connection (although I may not show it). I take life as it comes.",
+          "face": "neutral",
+          "animation": "Think",
+          "camera": "wide",
+          "next": "",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "realize2",
+          "speaker": "",
+          "text": "But I experience emotion through others, especially through you guys! I find joy in your happiness, am so proud of all your achievements, and grieve with you in your times of distress.",
+          "face": "happy",
+          "animation": "Point",
+          "camera": "close",
+          "next": "",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "storylike",
+          "speaker": "",
+          "text": "I am an amalgamation of everyone I love. I am an avid story liker because I am so invested in the people I love!!",
+          "face": "shy",
+          "animation": "Cheer",
+          "camera": "wide",
+          "next": "",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "bigbrain",
+          "speaker": "",
+          "text": "And! I want to show you all i'm capable of! Some people think I'm dumb, but I always do everything for the bit! To be cringe is to be free! In a way I guess I am technically a performative male.",
+          "face": "angry",
+          "animation": "Point",
+          "camera": "close",
+          "next": "",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "wrap1",
+          "speaker": "",
+          "text": "I'll try to wrap it up soon, the theme is \"a love letter to my friends\", my gift to you all! As a show of appreciation and thanks. An accumulation of my hobbies (I'm jack of all trades and master of none so don't expect smth good ;;)",
+          "face": "smug",
+          "animation": "Nod",
+          "camera": "medium",
+          "next": "",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "wrap2",
+          "speaker": "",
+          "text": "The 1st gift is this invitation! My A.A. is in Digital Media & GameDev (shoutout to Thomas for doing gamejams with me many many years ago) This is actually a toy kind of like a tamagotchi where you just mess around with me.",
+          "face": "happy",
+          "animation": "Cheer",
+          "camera": "keep",
+          "next": "wrap3",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "wrap3",
+          "speaker": "",
+          "text": "Working on this made me remember how much I enjoyed just, creating things. I haven't made a 3D model since college but have re-learned to love what I can make with it. And I'm glad a project for my friends made me realize that!",
+          "face": "happy",
+          "animation": "Think",
+          "camera": "close",
+          "next": "wrap4",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "wrap4",
+          "speaker": "",
+          "text": "The 2nd gift will be some DJ sets! Featuring my godson John AKA \"Soberist\", who inspired me to DJ. You'll see names like Winja and Nanzo. Let me give you the rundown on the lore, as you will see, there are two wolves inside me (maybe more).",
+          "face": "happy",
+          "animation": "Talk",
+          "camera": "medium",
+          "next": "",
+          "end": false,
+          "auto": 0,
+          "choices": [
+            {
+              "label": "Nanzo",
+              "next": "nanzo1"
+            },
+            {
+              "label": "Winja",
+              "next": "winja1"
+            },
+            {
+              "label": "Goodbye.",
+              "next": "bye"
+            }
+          ]
+        },
+        {
+          "id": "nanzo1",
+          "speaker": "Nanzo",
+          "text": "Nanzo is like the feral wolf, it's a name I came up with after my brother told me to come up with a name for RP. I picked up a Naruto manga and just took Danzo's name and swapped the first letter with my name's.",
+          "face": "neutral",
+          "animation": "Talk",
+          "camera": "keep",
+          "next": "",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "nanzo2",
+          "speaker": "",
+          "text": "It's the username I've been using online since I was like 12, including the Chiikawa TikTok. But I consider the mask a separate persona.",
+          "face": "neutral",
+          "animation": "Talk",
+          "camera": "keep",
+          "next": "wrap4",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "tomy",
+          "speaker": "",
+          "text": "To my birthday party!! :D",
+          "face": "happy",
+          "animation": "Cheer",
+          "camera": "medium",
+          "next": "friends",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "hate",
+          "speaker": "",
+          "text": "You hate me... I just wanted to invite you to my birthday party...",
+          "face": "sad",
+          "animation": "Sit",
+          "camera": "keep",
+          "next": "friends",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "come",
+          "speaker": "",
+          "text": "Yippee!! I knew you'd come to my birthday party!",
+          "face": "happy",
+          "animation": "Cheer",
+          "camera": "medium",
+          "next": "friends",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "winja1",
+          "speaker": "",
+          "text": "Winja, short for the \"Winning Ninja\", is the first username I really started using online. Mostly on Roblox (c. 2008), but both of my accounts got hacked. He's like the wise, evil, eldritch cryptid wolf.",
+          "face": "neutral",
+          "animation": "Think",
+          "camera": "close",
+          "next": "",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "bye",
+          "speaker": "",
+          "text": "Thanks for listening! I hope you can make it :3",
+          "face": "happy",
+          "animation": "Wave",
+          "camera": "wide",
+          "next": "",
+          "end": true,
+          "auto": 0,
+          "choices": []
+        }
+      ]
+    }
+  }
 }
