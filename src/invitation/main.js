@@ -66,7 +66,8 @@
 // his free play, the toolbar and the bubble come back.
 //
 // Without WebGL the stage gets data-webgl="off" and a plain message. `?test` exposes
-// window.__invitation for the specs and tools/capture-invitation.mjs: snapshot(), screen(part)
+// window.__invitation for the specs and tools/capture-invitation.mjs: snapshot(), petals() (the
+// page's petal layer, petalLayer.js), screen(part)
 // (a point on NEWT in client px: his head, middle or feet), floorAt(x, y), feet() and bones()
 // (his ankles in the world, his bones from his root), grabbed() (while he's held, where the
 // point he was grabbed by shows), say(text) (a line in his bubble now), play(clip) (forces a
@@ -140,6 +141,7 @@ import { ANKLE_HEIGHT, BONES, COLLAR, DIALOGUE_WAYS, FACE_NAMES, FACE_TRACK, SCA
 import { createDialogue, lookSway, normalizeScript } from './dialogue.js';
 import { REPLY_SETTLE, createDialogueUi } from './dialogueUi.js';
 import { createEnvelopeScene } from './envelopeScene.js';
+import { createPetalLayer } from './petalLayer.js';
 import { createFaceState, faceStep } from './faces.js';
 import { fitShadow, shadowTop } from './floor.js';
 import { createGesture, pickScreen, rayPlaneY } from './gesture.js';
@@ -274,6 +276,8 @@ const ui = bindUi(stageEl, {
 });
 installCursors();
 stageEl.dataset.cursor = 'arrow';
+/** The page's rose petals (the cursor trail and a ring at every press), over everything, for good. */
+const petalLayer = createPetalLayer(stageEl, { on: () => petalsOn(look) && !prefersReduced() });
 
 /** Whether the visitor asked for less motion (false where it can't be read). */
 function prefersReduced() {
@@ -1837,6 +1841,8 @@ function start(s) {
       clock: () => t,
       /** The envelope's state, reduced motion, pose and frames drawn; null without one. */
       envelope: () => envelope?.snapshot() ?? null,
+      /** The page's petal layer (petalLayer.js snapshot): drawing, on, up, launched; null without one. */
+      petals: () => petalLayer?.snapshot() ?? null,
       /** @param {'head'|'body'|'feet'} part */
       screen(part) {
         const sh = shape();
