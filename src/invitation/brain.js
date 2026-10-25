@@ -2,8 +2,8 @@
 // land, sitDown, sit, standUp, and Give Device's deviceSit, lieDown, deviceLie, getUp) that owns
 // every timer and every change of state. Each frame it
 // turns gestures and buttons into what he does, keeps his stress (taps, rough handling: a hard
-// shake, fast flings, a drop from high, never a gentle carry; it decays), and says which clip plays, how he moves, his face, where he looks and what the
-// buttons show. A reaction first turns him to face the camera, so his face shows; a sit (by the
+// shake, fast flings, a drop from high, never a gentle carry; it decays), and says which clip
+// plays, how he moves, his face, where he looks and what the buttons show. A reaction first turns him to face the camera, so his face shows; a sit (by the
 // button or by himself) and the tablet's sit and lie keep the way he faces. Held, he hangs his
 // head (a light look aimed down, the sad face), glances up at you every TUNE.lookUpMin–lookUpMax
 // s for TUNE.lookUpForMin–lookUpForMax s (BrainOut.look.up, eased in and out; never during a

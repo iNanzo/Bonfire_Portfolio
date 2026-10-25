@@ -4,8 +4,8 @@
 // at the default zoom, turned any way round that centre, so a tap anywhere on the screen reaches
 // it (and walks him to the point under the finger, but near the top, where it stops short by his
 // height there so his head stays on the screen: tapReach). The floor that view shows is a
-// trapezoid widening toward the back (perspective: its top corners are the farthest), and turned it sweeps a disc, so the disc's rim is his radius past
-// those corners: a tall phone's is the biggest, as it sees furthest back. That's more floor
+// trapezoid widening toward the back (perspective: its top corners are the farthest), and turned
+// it sweeps a disc, so the disc's rim is his radius past those corners: a tall phone's is the biggest, as it sees furthest back. That's more floor
 // than the screen shows at any one yaw, so wander goals keep to what's on screen when they're
 // picked and a flee to what was on screen as it began (steer.js, Bounds.sight from camera.js
 // orbitSight), and the camera's soft follow keeps him in view. The walls stay where they are
