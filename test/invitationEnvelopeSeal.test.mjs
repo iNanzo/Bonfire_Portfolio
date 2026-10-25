@@ -91,40 +91,55 @@ for (const [screen, radius] of [
       [0.75, 0.75],
     ]) {
       const { rows, t } = stampTexels(radius, ox, oy);
-      // A row through the four stems and the diagonal (logo y 56–64): five dark runs, each two
-      // texels or more, none with a lit texel in it.
+      // A row through the four stems and the diagonal (logo y 56 to 64): dark runs two texels or
+      // more wide, none with a lit texel in it (at this size the N's diagonal meets its stems, as
+      // the logo's does at the favicon's: the N, then H's two stems).
       for (const ly of [56, 60, 64]) {
         const [, sy] = fromLogo(0, ly);
         const row = rows.reduce((a, b) => (Math.abs(b.y - sy) < Math.abs(a.y - sy) ? b : a));
         const line = row.cells.map((c) => (c === 'deep' ? '#' : c === 'lip' ? '+' : '.')).join('');
         assert.ok(!line.includes('+'), `(${ox}, ${oy}) logo y ${ly}: no lit texel across the stems: ${line}`);
         const runs = line.split(/\.+/).filter(Boolean);
-        assert.equal(runs.length, 5, `(${ox}, ${oy}) logo y ${ly}: four stems and the diagonal: ${line}`);
+        assert.ok(runs.length >= 3, `(${ox}, ${oy}) logo y ${ly}: the N and H's two stems apart: ${line}`);
         for (const r of runs)
           assert.ok(r.length >= 2, `(${ox}, ${oy}) logo y ${ly}: a stroke ${r.length} wide: ${line}`);
       }
+      // The face shows between the middle stems all the way down them (over and under the
+      // crossbar), and inside H above and below it (at the texel nearest each spot).
+      const near = (lx, ly) => {
+        const [x, y] = fromLogo(lx, ly);
+        const row = rows.reduce((a, b) => (Math.abs(b.y - y) < Math.abs(a.y - y) ? b : a));
+        return row.cells[Math.round((x - row.x0) / t)];
+      };
+      for (const ly of [8, 14, 20, 26, 32, 38, 56, 62])
+        assert.equal(near(0, ly), null, `(${ox}, ${oy}) between the middle stems at ${ly}`);
+      for (const ly of [32, 38, 56, 62]) assert.equal(near(9.75, ly), null, `(${ox}, ${oy}) inside H at ${ly}`);
       // The diagonal's middle line: never lit.
       for (let k = 0.1; k <= 0.9; k += 0.05) {
         const [x, y] = fromLogo(-15 + 10.5 * k, 27 + 41 * k);
         const c = stampAt(monogramSegments(STAMP.height), STAMP.height * STAMP.stroke, t, x, y);
         assert.equal(c, 'deep', `(${ox}, ${oy}) the diagonal at ${k.toFixed(2)}`);
       }
-      // The crossbar's lower edge: lit along most of it, one texel deep.
+      // The crossbar's lower edge, where the face shows under it (not where a stem goes on down):
+      // lit, one texel high, the rest of the bar dark.
       let lit = 0;
-      let all = 0;
+      let open = 0;
+      const [, top] = fromLogo(0, 47 - (STAMP.stroke * 76) / 2);
       for (let lx = -26; lx <= 26; lx += 1) {
         const [x] = fromLogo(lx, 47);
         const col = rows.map((r) => r.cells[Math.round((x - r.x0) / t)]);
-        const at = rows.map((r) => r.y);
-        // (The crossbar's texels in this column: from its top edge down to its bottom.)
-        const [, top] = fromLogo(0, 47 - (STAMP.stroke * 76) / 2);
-        const [, bottom] = fromLogo(0, 47 + (STAMP.stroke * 76) / 2);
-        const inBar = col.filter((c, i) => at[i] <= top && at[i] >= bottom && c);
-        if (!inBar.length) continue;
-        all++;
-        if (inBar.at(-1) === 'lip' && inBar.filter((c) => c === 'lip').length === 1) lit++;
+        const first = rows.findIndex((r, i) => r.y <= top + t && col[i]);
+        if (first < 0) continue;
+        let last = first;
+        while (col[last + 1]) last++;
+        // (A stem going on down under the bar: no lower edge here.)
+        if (rows[last].y < fromLogo(0, 47 + STAMP.stroke * 76)[1]) continue;
+        open++;
+        const bar = col.slice(first, last + 1);
+        if (bar.at(-1) === 'lip' && bar.filter((c) => c === 'lip').length === 1) lit++;
       }
-      assert.ok(lit >= all * 0.6, `(${ox}, ${oy}) the crossbar lit along ${lit} of ${all} columns`);
+      assert.ok(open >= 10, `(${ox}, ${oy}) ${open} columns with the face under the crossbar`);
+      assert.ok(lit >= open * 0.9, `(${ox}, ${oy}) the crossbar lit along ${lit} of ${open} columns`);
     }
   });
 }

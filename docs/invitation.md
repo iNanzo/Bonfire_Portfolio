@@ -12,8 +12,8 @@ unlisted: nothing links to it and search engines are asked not to index it.
 ## The Envelope
 
 Every visit opens on an envelope: a gold, low-poly envelope seen from the back, its flap sealed
-with a lumpy blob of red wax with the NH monogram pressed into it (a darker recess with a lighter
-lip where the light catches it), floating on a plain white page (white, not the toy's own
+with a lumpy blob of red wax with the NH monogram pressed into it (each stroke a solid darker
+recess, with a lighter lip along its lower edge where the light from above catches it), floating on a plain white page (white, not the toy's own
 off-white, so it fades into the toy as the letter opens). It's drawn in the toy's
 own pixel look, with a dark one-texel line round it and down every fold of its flap and pocket,
 so it reads as a letter, and it's the loading screen too: NEWT loads behind it.
@@ -662,7 +662,11 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   stepped by each petal's `aShade`), `envelopeSeal.js` (the seal, one piece: `sealGeometry`, a
   blob with a wobbling outline (`sealEdge`), an uneven raised rim and a domed face; beads of wax
   at its edge; the NH monogram from logo.js's strokes, copied in as `monogramSegments`, debossed
-  in the shader (`STAMP`)) and
+  in the shader (`STAMP`: strokes 0.085 of its height, three texels or more at a desktop's seal,
+  about 28 texels across its radius; `stampAt` runs the shader's sums: a solid dark recess, a
+  one-texel lit lip only along a stroke's lower edge and never on the N's diagonal, since a lip
+  down every wall showed each stem as a dark bar beside a light one, a hash mark rather than NH))
+  and
   `envelope.css` (the focus ring only under `.is-keyboard`, set once a key is pressed). main.js
   makes it right after `bindUi`, sets the HUD inert under it, lets the toy draw its first frame
   and then holds the loop while it covers him (`sync`), and on its way out either sets

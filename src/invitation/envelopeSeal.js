@@ -1,8 +1,11 @@
 // The envelope's wax seal (envelopeScene.js): a lumpy round blob of red wax, as if pressed by
 // hand, its outline wobbling with a few overtones, a raised and uneven rim round a softly domed
 // face, and a few small beads of wax squeezed out at its edge. The NH monogram is stamped into the
-// face (logo.js's strokes, copied: the page takes no shared modules): debossed, a darker recess
-// with a lighter lip, one texel wide, on the wall that faces the light. It's one piece: opened,
+// face (logo.js's strokes, copied: the page takes no shared modules): debossed, each stroke a
+// solid darker recess three texels or more wide on a desktop, with a lighter lip one texel wide
+// only along its lower edge (the wall that faces the light from above: under the crossbar, at
+// the stems' feet), never on the N's diagonal, so no stroke shows as a dark bar beside a light
+// one and it reads as NH, not a hash mark, at the seal's size (stampAt runs the shader's sums). It's one piece: opened,
 // it blooms (envelope.js sealBloom), shrinking away while plain rose petals (petals.js) unfurl
 // out of it, so the monogram never rides on a petal.
 import * as THREE from 'three';
@@ -29,8 +32,60 @@ export function monogramSegments(height) {
   return STROKES.map(([ax, ay, bx, by]) => [ax * k, (cy - ay) * k, bx * k, (cy - by) * k]);
 }
 
-/** The monogram's height and its strokes' width, as shares of the seal's radius. */
-export const STAMP = { height: 1.28, stroke: 0.07 };
+/**
+ * The monogram's height, a share of the seal's radius, and its strokes' width, a share of that
+ * (at the seal's smallest, about 28 texels across its radius on a desktop, three texels wide).
+ */
+export const STAMP = { height: 1.28, stroke: 0.085 };
+/** Which of STROKES is the N's diagonal: it takes no lip (on a steep line it's a dotted one). */
+const DIAGONAL = 1;
+
+/**
+ * A stroke `stroke` wide as a box with square ends, like the logo's: how far (x, y) is outside it
+ * (negative inside). The shader's strokeAt.
+ * @param {number} x
+ * @param {number} y
+ * @param {number[]} seg  [x0, y0, x1, y1]
+ * @param {number} stroke
+ */
+function strokeAt(x, y, [ax, ay, bx, by], stroke) {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const len = Math.hypot(dx, dy);
+  const qx = x - ax;
+  const qy = y - ay;
+  const along = (qx * dx + qy * dy) / len;
+  const across = Math.abs(qy * dx - qx * dy) / len;
+  return Math.max(across - stroke / 2, Math.max(-along, along - len) - stroke / 2);
+}
+
+/**
+ * What the stamp shows at (x, y) of the seal's face (its own units), its strokes `segs`
+ * (monogramSegments) `stroke` wide and a texel `texel`: 'deep' in a stroke's recess, 'lip' on its
+ * lit wall (a stroke's texel, the N's diagonal's aside, with the face one texel under it), else
+ * null. The shader (SEAL_GLSL's sealStamp) runs the same sums.
+ * @param {number[][]} segs
+ * @param {number} stroke
+ * @param {number} texel
+ * @param {number} x
+ * @param {number} y
+ * @returns {'deep'|'lip'|null}
+ */
+export function stampAt(segs, stroke, texel, x, y) {
+  let inside = false;
+  let lipped = false;
+  let below = Infinity;
+  segs.forEach((g, i) => {
+    const d = strokeAt(x, y, g, stroke);
+    if (d < 0) {
+      inside = true;
+      if (i !== DIAGONAL) lipped = true;
+    }
+    below = Math.min(below, strokeAt(x, y - texel, g, stroke));
+  });
+  if (!inside) return null;
+  return lipped && below >= 0 ? 'lip' : 'deep';
+}
 /** The rings of the blob from its middle out: [share of the radius, height as a share of it]. */
 const RINGS = [
   [0.3, 0.3],
@@ -115,11 +170,20 @@ const SEAL_GLSL = /* glsl */ `
     for (int i = 0; i < 6; i++) d = min(d, strokeAt(p, uSeg[i]));
     return d;
   }
+  // (Every stroke but the N's diagonal, index ${DIAGONAL}: the ones with a lip.)
+  float lipped(vec2 p) {
+    float d = 1e3;
+    for (int i = 0; i < 6; i++) {
+      if (i == ${DIAGONAL}) continue;
+      d = min(d, strokeAt(p, uSeg[i]));
+    }
+    return d;
+  }
   vec3 sealStamp(vec2 p, vec3 c) {
     if (monogram(p) >= 0.0) return c;
-    // (The recess's wall away from the light faces it: a lighter lip there, one texel wide.)
-    vec2 toLight = normalize(vec2(-0.5, 0.62));
-    return monogram(p - toLight * uTexelS) >= 0.0 ? uLip : uDeep;
+    // (The recess's lower wall faces the light from above: a lighter lip along it, one texel
+    // high, the face a texel under it; never on the diagonal. Else the dark recess.)
+    return lipped(p) < 0.0 && monogram(p - vec2(0.0, uTexelS)) >= 0.0 ? uLip : uDeep;
   }
 `;
 
