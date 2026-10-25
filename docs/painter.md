@@ -43,8 +43,8 @@ click to pin*).
 Bonfire Live keeps the same setting, the Painter's own rows beside it; `src/painter/layout.js`)
 
 - **Place & Atmosphere:** the place (the ruins, the forge, the shrine, the cathedral's
-  altar, the cult's circle; click only, a place takes a moment to build), fog, exposure,
-  vignette and the fire's shadows.
+  altar, the cult's circle; click only, a place takes a moment to build), fog, exposure
+  and the fire's shadows.
 - **Colors:** the flame's: the site's flames, *Make a Flame* (*Harmonious*, in the
   *Harmony* picked beside it, or *Fully Random*), *Flame From a Color* (pick any color: flames
   built round it, one per harmony), each flame color by hand (the tips are kept readable as

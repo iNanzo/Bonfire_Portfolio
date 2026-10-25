@@ -23,7 +23,6 @@ const SETTINGS = () => ({
   outlines: 'on',
   palette: 'flame',
   fewColors: 'off',
-  vignette: 0.85,
   exposure: 1.45,
   fog: 'light',
   shadows: true,

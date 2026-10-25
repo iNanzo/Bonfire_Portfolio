@@ -1,6 +1,6 @@
 // Final composite pass (low resolution):
-//   solid geometry → outlines → + additive fire/spark layer → vignette →
-//   ordered Bayer dither → quantize to the palette.
+//   solid geometry → outlines → + additive fire/spark layer → ordered Bayer dither →
+//   quantize to the palette.
 // The canvas is upscaled by CSS with nearest-neighbor filtering.
 //
 // The knight's steel has a ramp of its own (setSteel: five greys, steel.js; the palette has
@@ -79,7 +79,6 @@ const fragmentShader = /* glsl */ `
   uniform float ditherStrength;
   uniform float ditherScale;
   uniform float outlines;
-  uniform float vignette;
   uniform float exposure;
   uniform vec3 uCore;              // the flame's pale core color (linear)
   // Below this, the color's alpha is the knight's armor's mark (armor.js): for his steel
@@ -356,7 +355,7 @@ const fragmentShader = /* glsl */ `
   }
   #endif
 
-  // The scene at one texel: outlined geometry plus the fire, in sRGB (before vignette).
+  // The scene at one texel: outlined geometry plus the fire, in sRGB.
   vec3 shade(vec2 px) {
     vec2 texel = 1.0 / resolution;
     vec2 uv = (clamp(px, vec2(0.0), resolution - 1.0) + 0.5) * texel;
@@ -663,8 +662,6 @@ const fragmentShader = /* glsl */ `
     }
   #endif
 
-    vec2 v = ((px + 0.5) / resolution - 0.5) * vec2(resolution.x / resolution.y, 1.0);
-    col *= 1.0 - smoothstep(0.45, 1.05, length(v) * 1.15) * vignette;
   #ifdef FX
     if (uIris < 1.99) {
       float edge = length(px - uCenter) / resolution.y - uIris;
@@ -832,7 +829,6 @@ export function createPixelPass({ effects = false } = {}) {
     ditherStrength: { value: 0.16 },
     ditherScale: { value: 4 },
     outlines: { value: 1 },
-    vignette: { value: 0.85 },
     exposure: { value: 1 },
     uTime: { value: 0 },
     uSlice: { value: 0 },

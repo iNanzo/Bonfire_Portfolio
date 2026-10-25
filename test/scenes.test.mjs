@@ -398,7 +398,7 @@ test('fuzz: names every object inherits (constructor, __proto__…) are reported
 
 test('normalizing: fills, clamps, drops unknown keys, fixes colors and the camera', () => {
   const raw = JSON.parse(
-    '{"__proto__": {"polluted": true}, "name": " Frozen\\nShrine ", "bogus": 1, "hidden": true, "fire": {"level": 5, "extra": 1}, "layers": {"paint": "on", "wash": "on", "glow": true, "nope": "on"}, "look": {"name": "kaleido", "amount": 9, "params": {"segments": 8, "zoomIn": true, "turn": 1}}, "details": {"glowSize": 99, "grad": [0, 6, 8], "styleFlip": true, "segments": 4, "wat": 1}, "knights": {"count": 3, "helmets": ["armet", "tophat"]}, "render": {"ditherMatrix": "8", "palette": [8, 6, 8, 0, 2, 3]}}',
+    '{"__proto__": {"polluted": true}, "name": " Frozen\\nShrine ", "bogus": 1, "hidden": true, "fire": {"level": 5, "extra": 1}, "layers": {"paint": "on", "wash": "on", "glow": true, "nope": "on"}, "look": {"name": "kaleido", "amount": 9, "params": {"segments": 8, "zoomIn": true, "turn": 1}}, "details": {"glowSize": 99, "grad": [0, 6, 8], "styleFlip": true, "segments": 4, "wat": 1}, "knights": {"count": 3, "helmets": ["armet", "tophat"]}, "render": {"ditherMatrix": "8", "palette": [8, 6, 8, 0, 2, 3], "vignette": 0.85}}',
   );
   const s = normalizeScene(raw);
   clean(s);
@@ -417,6 +417,7 @@ test('normalizing: fills, clamps, drops unknown keys, fixes colors and the camer
   );
   assert.deepEqual(s.knights.helmets, ['armet', null, null], 'one helmet per knight, null where it’s drawn');
   assert.equal(s.render.ditherMatrix, 8);
+  assert.equal('vignette' in s.render, false, 'the vignette, since removed, is dropped');
   assert.deepEqual(s.render.palette, [0, 8, 6, 2], 'slots: the void first, each once, at most 4');
   assert.equal(normalizeScene({ hidden: false }).hidden, undefined, 'only hidden: true is kept');
 

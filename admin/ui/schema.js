@@ -716,7 +716,7 @@ export const SUBGROUPS = {
   // The canonical sections the other apps use (settingsMap.js SECTIONS).
   'effects.render': [
     { label: 'Pixel art', keys: ['pixelSize', 'pixelSizeSmall', 'dither', 'ditherMatrix', 'outlines'] },
-    { label: 'Place & atmosphere', keys: ['vignette', 'exposure'] },
+    { label: 'Place & atmosphere', keys: ['exposure'] },
     // (Bonfire Live files it under Colors; here that's another page's name.)
     { label: 'Color change', keys: ['colorChange'] },
     { label: 'Camera', keys: ['shake'] },

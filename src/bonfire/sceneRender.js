@@ -78,7 +78,6 @@ export function createSceneRender(ctx) {
     pass.uniforms.ditherStrength.value = r.dither;
     pass.uniforms.ditherScale.value = r.ditherMatrix;
     pass.uniforms.outlines.value = r.outlines ? 1 : 0;
-    pass.uniforms.vignette.value = r.vignette;
     pass.uniforms.exposure.value = r.exposure;
     for (const [key, [section, name]] of Object.entries(WRITE_THROUGH)) {
       const live = effects[section];
@@ -95,7 +94,7 @@ export function createSceneRender(ctx) {
   /**
    * Render options over the settings, as a partial: a value sets one, null clears it back to
    * the settings', and anything left out stays as it is. dither (0..0.5), ditherMatrix (4 | 8),
-   * outlines, vignette (0..1.5), exposure, colorChange (seconds), flameFps (the flame's
+   * outlines, exposure, colorChange (seconds), flameFps (the flame's
    * frame rate), pixelSize (CSS px, the same as setPixelSize but redrawn only when it
    * changes), and how hits land: hitStop (seconds of freeze), hitFlash (0..1), debris
    * (×), marks, each also true (the settings') or false (none).

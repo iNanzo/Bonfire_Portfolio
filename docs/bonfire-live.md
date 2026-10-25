@@ -251,7 +251,7 @@ the Painter and the admin use. The header stays put as the tab scrolls: the sear
 | Sound | Source (sensitivity, visual lead, playback volume) · Beat (Beat From, the Link bridge's port and its setup) · MIDI Controller |
 | Show | Reaction (reactivity, the song's shape, build-ups in stages, hi-hat sparks, color temperature, sub-bass breathing) · Weapons (forge and strike on drops, how often a new weapon comes, its elements, extra rings, the outline burst) · Living Weapon (how often it comes out and for how long, its attacks, its rhythm, alive between attacks) |
 | Drops | The Drop (the black beat, the negative flash, the drop hits, how many at once) · Hits (hit-stop, hit flash, debris, ground marks) |
-| Picture | Place & Atmosphere (place, fog, exposure, vignette, fire shadows) · Colors (flame colors, harmony, place colors, blend time, palette, few colors) · Pixel Art (below) · Performance (**Frame Rate**, particles, **Stats Overlay**) |
+| Picture | Place & Atmosphere (place, fog, exposure, fire shadows) · Colors (flame colors, harmony, place colors, blend time, palette, few colors) · Pixel Art (below) · Performance (**Frame Rate**, particles, **Stats Overlay**) |
 | Effects | Strength & Pace (effects strength, how often the look changes) · Looks · Layers (all 14, and the mirror kinds) · X-Ray (the flips and their views) |
 | Camera | Camera (movement, starting shot, zoom punch & shake) · Cuts (cut every, between shots, knight shots) · Weapon Shots (while it fights, camera feel, while it's held) |
 | Cast | Knights · Armor · Dancing · Behavior (below) · Fireflies (blink and dance on the beat, their dances and how often they change, light trails) |

@@ -163,7 +163,6 @@ export const DEFAULT_SETTINGS = {
   outlines: 'mix', // the outlines come and go
   palette: 'flame', // flame | ashen | moonlit (render.js PALETTES)
   fewColors: 'mix', // the palette drops to a few colors (rolled which)
-  vignette: effects.render.vignette,
   exposure: effects.render.exposure,
   fog: 'light', // off | light | thick | mix
   shadows: true, // the fire's shadow

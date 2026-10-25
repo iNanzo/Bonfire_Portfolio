@@ -97,7 +97,6 @@ export const NUMERIC = new Set([
   'dropCount',
   'linkPort',
   'dither',
-  'vignette',
   'exposure',
   'flameFps',
   'colorChange',
