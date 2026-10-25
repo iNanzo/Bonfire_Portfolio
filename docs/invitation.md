@@ -683,9 +683,11 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   it, at most `TRAIL.maxLaunch`, with a sideways spread; a still finger's a soft puff), wake and
   spill. `letter(frame)` each frame (`LetterFrame`: its middle, axes, height, `opening` and
   `floating`) runs the rest: the swirl (`SWIRL`: 3 strands a third of a turn apart, `swirlSlot`
-  on an ellipse 0.7 × 0.3 letter widths times `swirlRadius(s)`, 2.2 turns up 1.3 of its height,
-  spinning 0.5–0.8 rad/s and climbing 0.04–0.08 a second, 18 petals filling in after 0.5 s, every
-  fourth falling in from 1.5–2.1 times out, each pulled to its slot, drawn small at the ends)
+  on an ellipse 0.7 × 0.3 letter widths times `swirlRadius(s)`, seen from a little above (its
+  back raised by `tilt` of its depth, so it reads as a loop), 2.2 turns up 1.3 of its height,
+  spinning 0.5–0.6 rad/s and climbing 0.04–0.06 a second (the slow end), 24 petals filling in
+  after 0.5 s, each strand's in a close run (`gap`) a whole turn up from the last, every fourth
+  falling in from 1.5–2.1 times out, each pulled to its slot, drawn small at the ends)
   while it floats, flung outward once it doesn't; the pour (16 born across its inside below the
   mouth at the pocket's depth, launched up and out along its axes, in step with the flap); and
   the wake (`WAKE`: the edge moving fastest away from its outward side sheds petals at a rate
