@@ -4,12 +4,13 @@
 // line typed out with its tags in the colours sent, the camera at the box's shot, NEWT in his talk
 // state with the box's face; it says which box is playing and where Next goes, follows a reply to
 // its box, and a restart plays the box again from the start. A message from another origin (a
-// frame of another site inside the same page) is ignored, and so is everything when the address
-// it's given isn't its framer's. Every wait is on a state.
+// window of the site's own, opened from the admin page) is ignored, and so is everything when the
+// address it's given isn't its framer's. Every wait is on a state. (The stand-in admin page is a
+// page of the real local admin server, playwright.config.mjs's, at its own origin: Chrome blocks a
+// made-up public origin from framing a local server.)
 import { test, expect } from '@playwright/test';
 
-const ADMIN = 'http://admin.test';
-const OTHER = 'http://other.test';
+const ADMIN = process.env.PW_ADMIN_ORIGIN;
 /** A box as the admin stores one (the test's own words). */
 const box = (id, o = {}) => ({
   id,
@@ -54,20 +55,26 @@ const message = (o = {}) => ({
 });
 
 /**
- * A stand-in admin page at `origin` framing the toy (its `admin` address `admin`), keeping what
- * the toy says to it; with `rogue`, a frame of another site beside it.
+ * A stand-in admin page: a page of the admin server with the toy framed in it (`admin`: the
+ * address it's given), keeping what the toy says to it. (The admin's own app on #projects has no
+ * frame of its own; the toy's is the page's first.)
  */
-async function host(page, baseURL, { origin = ADMIN, admin = ADMIN, rogue = false } = {}) {
+async function host(page, baseURL, { admin = ADMIN } = {}) {
+  // (From a blank page, so a second call loads the admin afresh rather than only its hash.)
+  await page.goto('about:blank');
+  await page.goto(`${ADMIN}/#projects`);
+  await expect(page.locator('.page-title')).toBeVisible();
   const src = `${baseURL}/invitation/?preview&test&seed=3&admin=${encodeURIComponent(admin)}`;
-  const body = `<!doctype html><meta charset="utf-8"><body style="margin:0">
-    <iframe id="toy" src="${src}" width="1280" height="800" style="border:0"></iframe>
-    ${rogue ? `<iframe id="rogue" src="${OTHER}/rogue" width="10" height="10"></iframe>` : ''}
-    <script>window.said = []; addEventListener('message', (e) => said.push({ origin: e.origin, data: e.data }));</script>`;
-  await page.route(`${origin}/host`, (r) => r.fulfill({ contentType: 'text/html', body }));
-  await page.route(`${OTHER}/rogue`, (r) =>
-    r.fulfill({ contentType: 'text/html', body: '<!doctype html><p>elsewhere</p>' }),
-  );
-  await page.goto(`${origin}/host`);
+  await page.evaluate((url) => {
+    window.said = [];
+    addEventListener('message', (e) => window.said.push({ origin: e.origin, data: e.data }));
+    const f = document.createElement('iframe');
+    f.id = 'toy';
+    f.src = url;
+    f.width = '1280';
+    f.height = '800';
+    document.body.prepend(f);
+  }, src);
   await expect.poll(() => Boolean(toyFrame(page)), { message: 'the toy’s frame', timeout: 30_000 }).toBe(true);
   const toy = toyFrame(page);
   await expect(toy.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
@@ -140,19 +147,23 @@ test('a message from another origin is ignored; so is all of it when the address
   baseURL,
 }) => {
   test.slow();
-  const toy = await host(page, baseURL, { rogue: true });
-  const rogue = page.frames().find((f) => f.url().startsWith(OTHER));
-  // (Another site's frame in the same page posts first; the admin's message after it.)
-  await rogue.evaluate((m) => parent.frames[0].postMessage(m, '*'), message({ box: 'd' }));
+  const toy = await host(page, baseURL);
+  // (A window of the site's own, opened from the admin page, posts first; the admin after it.)
+  const [other] = await Promise.all([
+    page.waitForEvent('popup'),
+    page.evaluate((url) => window.open(url), `${baseURL}/robots.txt`),
+  ]);
+  await other.waitForLoadState();
+  await other.evaluate((m) => window.opener.frames[0].postMessage(m, '*'), message({ box: 'd' }));
   await post(page, message({ box: 'c' }));
   await until(toy, (s) => s.dialogue?.id === 'c' && s.dialogue.typed, 'the admin’s box');
   const boxes = (await said(page)).filter((m) => m.data.state === 'playing').map((m) => m.data.box);
-  expect(boxes, 'never the other site’s box').not.toContain('d');
+  expect(boxes, 'never the other origin’s box').not.toContain('d');
   expect(boxes[0]).toBe('c');
+  await other.close();
 
-  // Framed by one site with another's address: it listens to nobody and says nothing.
-  await page.unrouteAll();
-  const lost = await host(page, baseURL, { origin: OTHER, admin: ADMIN });
+  // Given an address that isn't its framer's: it listens to nobody and says nothing.
+  const lost = await host(page, baseURL, { admin: 'http://127.0.0.1:1' });
   expect((await snapshot(lost)).preview.origin).toBeNull();
   await post(page, message());
   const t0 = await lost.evaluate(() => window.__invitation.clock());
