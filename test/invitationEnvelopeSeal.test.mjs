@@ -399,9 +399,12 @@ function faceColour(/** @type {number} */ t) {
   return [Math.round(c.x * 255), Math.round(c.y * 255), Math.round(c.z * 255)];
 }
 
-test('the parts’ order lines every fold on its lower side; the seal is one piece, drawn with the toon material', () => {
-  assert.ok(IDS.body < IDS.inside && IDS.inside < IDS.left && IDS.left < IDS.bottom && IDS.right < IDS.bottom);
-  assert.ok(IDS.bottom < IDS.flap && IDS.flap < IDS.seal && IDS.seal < IDS.petal);
+test('the parts’ order lines the pocket’s mouth over the inside; the seal is one piece, drawn with the toon material', () => {
+  assert.ok(
+    IDS.body < IDS.inside && IDS.inside < IDS.pocket && IDS.pocket < IDS.flap,
+    'the mouth lined over the inside',
+  );
+  assert.ok(IDS.flap < IDS.seal && IDS.seal < IDS.petal);
   assert.ok(
     Object.values(IDS).every((v) => v > 0 && v < 256),
     'none is the empty paper (0)',

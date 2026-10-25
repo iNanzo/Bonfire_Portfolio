@@ -2,12 +2,12 @@
 // timeline and dissolve; petals.js its rose petals): its own small three.js canvas in a fixed
 // overlay over the toy (envelope.css, z-index 3) on a plain white page, made as the page
 // boots, so it's also the loading screen. Low-poly and flat, in the reference's palette in three
-// toon bands: a thin gold envelope seen from the back (its flap hinged on its top edge over the
-// side and bottom folds of its pocket), a red wax seal on the flap's tip (envelopeSeal.js), and rose petals in
+// toon bands: a thin gold envelope seen from the back (its flap hinged on its top edge over its
+// pocket), a red wax seal on the flap's tip (envelopeSeal.js), and rose petals in
 // three shapes and three reds, instanced (one mesh a shape), each tumbling, fluttering and
 // drifting its own way. It's drawn at low resolution, twice (its colours, then which part each
 // texel is), and put together with a one-texel line in the toy's ink round its silhouette, round
-// every petal and along every fold where one part meets another, then scaled up pixelated, like
+// every petal and along the flap's V (and the pocket's mouth, open), then scaled up pixelated, like
 // the toy. It settles in under a soft flurry of petals as it appears, and bobs and sways until
 // it's opened, a petal trickling now and then; the mouse over it, or a touch, stirs a few. Opened,
 // the seal blooms first: it swells, then shrinks away as a ring of petals unfurls out of it and
@@ -109,9 +109,9 @@ function piece(pts, mat, z) {
 /**
  * The envelope's parts (envelopeLook.js envelopeLayout), built to a width of 2 (the group scales
  * it to the screen), each a flat piece a little in front of the last: the body, the inside of the
- * pocket where the flap opens, the pocket's two side folds and its bottom fold (each its own
- * part, so a line runs where one shows over another), and the flap hinged on the top edge. Each
- * is one flat tone of the paper's three (LEAN).
+ * pocket where the flap opens, the pocket in one piece (a little way in front of the inside, so
+ * petals pouring from inside it hide behind it until they rise out of its mouth), and the flap
+ * hinged on the top edge. Each is one flat tone of the paper's three (LEAN).
  * @param {ReturnType<typeof shared>} u
  */
 function buildEnvelope(u) {
@@ -122,9 +122,7 @@ function buildEnvelope(u) {
   const paper = (/** @type {keyof typeof LEAN} */ part) => toon(PAPER, u, IDS[part], { lean: LEAN[part] });
   group.add(piece(L.parts.body, paper('body'), T / 2));
   group.add(piece(L.parts.inside, paper('inside'), T / 2 + 0.004));
-  group.add(piece(L.parts.left, paper('left'), T / 2 + 0.01));
-  group.add(piece(L.parts.right, paper('right'), T / 2 + 0.01));
-  group.add(piece(L.parts.bottom, paper('bottom'), T / 2 + 0.02));
+  group.add(piece(L.parts.pocket, paper('pocket'), T / 2 + 0.05));
   // The flap, hinged on the top edge (its points from the hinge).
   const hinge = new THREE.Group();
   hinge.position.set(0, h, T / 2 + 0.1);
