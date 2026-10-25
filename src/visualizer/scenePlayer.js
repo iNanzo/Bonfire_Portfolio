@@ -131,7 +131,6 @@ export function sceneOverrides(scene, mode, user = {}, clamp = {}) {
     dither: r.dither,
     ditherMatrix: String(r.ditherMatrix),
     outlines: r.outlines,
-    vignette: r.vignette,
     exposure: r.exposure,
     fog: r.fog,
     shadows: r.shadows,

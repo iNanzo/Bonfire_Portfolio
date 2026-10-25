@@ -3,7 +3,7 @@
 //   2. color   — solid geometry + "ghost" emissives (candle flames, dissolving weapons)
 //                → linear color + depth
 //   3. fx      — particle fire + sparks, additive, depth-tested by hand against pass 2's depth
-//   4. pixel   — outlines, + fx, vignette, Bayer dither, palette → canvas (pixelPass.js)
+//   4. pixel   — outlines, + fx, Bayer dither, palette → canvas (pixelPass.js)
 //
 // With `effects` (the visualizer) the pixel pass carries its effects layer and the stages
 // the heavier effects need: frame feedback for the echo (the pass reads the last frame

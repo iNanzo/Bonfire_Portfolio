@@ -671,7 +671,7 @@ test('search: a row found only in its hint gives way to rows found by name; a gr
   // "fire": the Fire section's sliders and what's named for the fire, not every hint.
   const fire = find('fire', s);
   for (const id of ['fireLevel', 'fireSize', 'windX', 'fireGlow']) assert.ok(fire.rows.has(id), id);
-  for (const id of ['fog', 'vignette', 'knightSeat', 'dropFx.shock'])
+  for (const id of ['fog', 'knightSeat', 'dropFx.shock'])
     assert.ok(!fire.rows.has(id) && !fire.hidden.some((h) => h.id === id), id);
   // With nothing found by name, the hints still find it.
   const hintOnly = find('outlines take', s);

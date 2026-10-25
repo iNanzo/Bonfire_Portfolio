@@ -127,6 +127,13 @@ bonfire's design, assets and code, then three rounds of feedback:
   end, so any blend mode comes out in the scene's own colors.
 - **In the mix stays readable.** At most two heavy layers come in at once, and only one
   repaint. Layers set to Always don't count toward that limit.
+- **The mirror folds on the fire** (round 17), not on the screen's middle: the seam runs
+  through the flames, so the fire stays whole and what sits either side of it comes back
+  whole. Folding on the middle threw the fire away whenever the camera had it off center,
+  leaving a half-empty picture. The fold keeps to the middle half of the screen and folds
+  back again at the edge, so it never reads off the picture.
+- **No vignette** (round 17): the darkened corners read as a black ring round the scene,
+  on the site and in Bonfire Live, so the effect and its setting were taken out.
 
 - **Link through a bridge, not in the browser.** Link is UDP multicast, which pages can't
   do. Carabiner (a small free app) joins the session and speaks plain text over TCP; the

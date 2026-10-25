@@ -337,7 +337,6 @@ const ROWS = {
     ),
   fog: (id, s, c) => selectRow(id, c),
   exposure: rangeRow,
-  vignette: rangeRow,
   shadows: (id) => {
     const r = rowText(id);
     return row(id, sc(check(r.path, hl(r.label), { hint: r.hint })));

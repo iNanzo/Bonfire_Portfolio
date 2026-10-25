@@ -153,8 +153,8 @@ notes: `docs/design/visualizer.md`.
     ruins' pillar, the forge's anvil, the shrine's back lantern, the cathedral's nave, the
     cult's stones), the knight on it and the fire, all three in a 16:9 frame however far
     it has swayed (0.15 rad either way) and pushed in, in every place. From further round
-    to the left, the front-left piece (the shrine's front lantern, the cathedral's pew, the
-    cult's watcher) would come between it and him.
+    to the left, the front-left piece (the shrine's front lantern, the cathedral's pew)
+    would come between it and him.
 - **Colors** (`colors.js`): each new flame is one of the site's palettes, or one made on
   the spot with the admin's palette generator (`src/paletteGen.js`): harmonious (any
   scheme, or the one picked) or fully random, named for its hue ("Cobalt Lightning").
@@ -183,9 +183,10 @@ notes: `docs/design/visualizer.md`.
   flicker, film grain, cinema bars, a spotlight round the fire and a chroma split. Each
   time a look comes round, the layers in the mix are rolled again (at most two heavy ones
   at once), each with new details: the echo's direction, the glow's size, the gradient's
-  colors, the brush's angle, the grain's amount, the bars' height, the spotlight's size. Mirrors come in three kinds, each switchable:
-  horizontal (either half copied onto the other), vertical (the top reflected down like
-  a pool, or the bottom up) and quarter (one quarter, four ways). Every drop also throws
+  colors, the brush's angle, the grain's amount, the bars' height, the spotlight's size.
+  Mirrors come in three kinds, each switchable, all folded on the fire: horizontal (either
+  side copied onto the other), vertical (the top reflected down like a pool, or the bottom
+  up) and quarter (one quarter, four ways). Every drop also throws
   **drop hits**: those set to always, plus one to three drawn from the mix, never the
   same set twice running: shatter, shockwaves, an echo burst, a spiral, a kaleidoscope,
   mirror flips, a color cycle (with Color Cycle Off, no palette cycling at all: the Echo
@@ -251,7 +252,7 @@ the Painter and the admin use. The header stays put as the tab scrolls: the sear
 | Sound | Source (sensitivity, visual lead, playback volume) · Beat (Beat From, the Link bridge's port and its setup) · MIDI Controller |
 | Show | Reaction (reactivity, the song's shape, build-ups in stages, hi-hat sparks, color temperature, sub-bass breathing) · Weapons (forge and strike on drops, how often a new weapon comes, its elements, extra rings, the outline burst) · Living Weapon (how often it comes out and for how long, its attacks, its rhythm, alive between attacks) |
 | Drops | The Drop (the black beat, the negative flash, the drop hits, how many at once) · Hits (hit-stop, hit flash, debris, ground marks) |
-| Picture | Place & Atmosphere (place, fog, exposure, vignette, fire shadows) · Colors (flame colors, harmony, place colors, blend time, palette, few colors) · Pixel Art (below) · Performance (**Frame Rate**, particles, **Stats Overlay**) |
+| Picture | Place & Atmosphere (place, fog, exposure, fire shadows) · Colors (flame colors, harmony, place colors, blend time, palette, few colors) · Pixel Art (below) · Performance (**Frame Rate**, particles, **Stats Overlay**) |
 | Effects | Strength & Pace (effects strength, how often the look changes) · Looks · Layers (all 14, and the mirror kinds) · X-Ray (the flips and their views) |
 | Camera | Camera (movement, starting shot, zoom punch & shake) · Cuts (cut every, between shots, knight shots) · Weapon Shots (while it fights, camera feel, while it's held) |
 | Cast | Knights · Armor · Dancing · Behavior (below) · Fireflies (blink and dance on the beat, their dances and how often they change, light trails) |

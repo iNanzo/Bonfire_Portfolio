@@ -66,8 +66,8 @@ export function hidesFire(pos, heads) {
 // cathedral's nave, the cult's stones; the wall, hearth, torii, chancel or altar
 // back-right). Pillar Side looks from the front left at that piece, him on his seat and the
 // fire, all three in a 16:9 frame however far it has swayed and pushed in. (From further
-// round to the left, what stands at the front left, the shrine's front lantern, the
-// cathedral's pew or the cult's watcher, comes between it and him.)
+// round to the left, what stands at the front left, the shrine's front lantern or the
+// cathedral's pew, comes between it and him.)
 //   yaw    sway around the target (radians either side), over 16 beats
 //   spin   keep turning (radians per beat) instead
 //   push   dolly in by this fraction over the shot

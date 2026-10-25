@@ -126,6 +126,7 @@ const OLD = {
   sceneColors: 'mix',
   camera: 'drift',
   elements: { fire: true, lightning: false, ice: true },
+  vignette: 0.6, // (a setting since removed)
 };
 
 test('settings saved by older rounds load, and the new keys take their defaults', () => {
@@ -144,7 +145,6 @@ test('settings saved by older rounds load, and the new keys take their defaults'
     'outlines',
     'palette',
     'fewColors',
-    'vignette',
     'exposure',
     'fog',
     'shadows',
@@ -164,6 +164,7 @@ test('settings saved by older rounds load, and the new keys take their defaults'
     assert.deepEqual(s[k], DEFAULT_SETTINGS[k], `${k}: the default`);
   }
   assert.equal(s.frameRate, 'display', 'Frame Rate: every frame the display shows, to begin with');
+  assert.equal('vignette' in s, false, 'a removed setting is left behind');
   assert.deepEqual(s.xrayViews, { normals: true, lighting: true, particles: true, flow: true });
   // The scenery recolor's old "off" was its old default: it takes the new one.
   assert.equal(mergeInto(defaults(), { sceneColors: false }).sceneColors, DEFAULT_SETTINGS.sceneColors);

@@ -34,7 +34,7 @@ export const PANEL_SECTIONS = PAINTER_SECTIONS.map(({ id, label, from }) => ({ i
  * @type {Record<string, string[]>}
  */
 export const LAYOUT = {
-  place: ['scenery', 'fog', 'exposure', 'vignette', 'shadows'],
+  place: ['scenery', 'fog', 'exposure', 'shadows'],
   colors: [
     'colors',
     'flameMake',
