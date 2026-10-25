@@ -105,20 +105,25 @@ so it reads as a letter, and it's the loading screen too: NEWT loads behind it.
   falls behind him and to one side.
 - **The Camera pad:** **Camera** on the toolbar opens it over the stage: **Turn Left** and **Turn
   Right** (45° round), **Tilt Up** and **Tilt Down** (12°, from 12° to 70° up), **Zoom In** and
-  **Zoom Out**, **Follow NEWT** (back onto him) and **Reset Camera** (back to where it started).
-  Camera again or Escape closes it.
-- **He stays on screen:** the camera holds still while he's well inside the screen and moves on
-  with him as he nears an edge, however it's turned. On a phone he's drawn about 30% bigger than
-  on a computer and the camera follows him softly too; zoomed in, it follows him everywhere.
-  Once you've slid the camera, or zoomed it about a spot, it stays where you put it however he
-  moves, until you tap or grab him, press Follow NEWT, or Reset Camera (which clears the zoom
-  too).
+  **Zoom Out**, **Follow NEWT** (back to him: the middle at the default zoom, onto him zoomed
+  in) and **Reset Camera** (back to where it started). Camera again or Escape closes it.
+- **He stays on screen:** at the default zoom (and further out) the camera doesn't follow him,
+  on a phone or a computer: it stays on the middle of where he can go, which fills the screen,
+  so a tap anywhere on the floor walks him to just where your finger was, the top of the screen
+  too, however many times in a row. It moves only to keep his feet on the screen (turned away
+  from him, or tossed past an edge), only as far as that, and comes back to the middle as he
+  walks back on. Zoomed in, it follows him softly (all the way at the closest) and keeps him
+  well inside the screen; zoomed back out, it eases back to the middle. Once you've slid the
+  camera, or zoomed it about a spot, it stays where you put it while he's on the screen it
+  shows; if he walks off it, it moves on with him, his feet at its edge, until you tap or grab
+  him, press Follow NEWT (back to the middle, or onto him zoomed in), or Reset Camera (which
+  clears the zoom too).
 - **Where he can go** fills the screen: tap anywhere on the floor at the default zoom, on any
   phone or window and however the camera's turned, and he walks all the way there. It's one
   round patch of floor round the middle, the same however the camera turns (so its edges never
   move as you go round), big enough to hold everything the screen shows turned any way; it's
-  worked out again when the window changes size (if it shrinks under him he eases back in;
-  a phone's URL bar showing or hiding doesn't move him). As that's more floor than the screen
+  worked out again when the window changes size, the camera easing onto its middle (if it
+  shrinks under him he eases back in; a phone's URL bar showing or hiding doesn't move him). As that's more floor than the screen
   shows, he wanders where you can see him and runs off within what was on screen.
 - **Leave him alone** for about 20 seconds and he sits down where he is, facing the way he was
   (the Sit button too: no turn to the camera).
@@ -342,15 +347,21 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     px) and, let go, eases back at `bandBack` (0.18 s); `orbitZoom` and `orbitWheel` with a
     point zoom about it (the cursor, a pinch's middle: the floor there kept there as it eases,
     the view a pan from then on); `orbitNudge` turns and tilts it for the Camera pad at
-    `nudgeEase` (0.25 s); the point it orbits rests where
-    it is and follows NEWT as it zooms in, 0.8 of the way at the default zoom on a phone, all
-    the way while the Settings sheet is open, and moves on with him as he nears the edge of the
-    clear space, `ORBIT.keepIn` (0.6) of it, never letting him past `keepOut` (0.94) once he's
-    on screen, from where `screenOf` puts him; a pan holds it however he moves, until
-    `orbitFollow` (a tap or a grab on him, Follow NEWT) or `orbitReset`;
-    `orbitHold` holds it still while he's held, and once he's let go out past `keepOut` (carried
-    to the screen's edge) it eases him back inside at `ORBIT.settle` (0.25 s) rather than
-    jumping there in a frame; `orbitSight`, what's on screen now: the floor where he shows
+    `nudgeEase` (0.25 s); at the default zoom and further out (`areaFits`) the point it orbits
+    stays on the play area's middle, on a phone and a desktop alike, moved on only as far as
+    keeps his feet on the screen (`feetShift`, solved exactly: the clear space and
+    `ORBIT.slack`, 8 CSS px, past it), so a tap anywhere on the floor it shows leaves his feet
+    where the finger was; zoomed in (`followShare`: none at the default zoom, all at the
+    closest) its rest point follows NEWT, all the way while the Settings sheet is open, and moves
+    on with him as he nears the edge of the clear space, `ORBIT.keepIn` (0.6) of it, never
+    letting him past `keepOut` (0.94) once he's on screen, from where `screenOf` puts him
+    (zoomed in from the default it eases there, no jump); a pan holds it while his feet are on
+    the screen it shows, and moves it on with them once he walks off, until `orbitFollow` (a tap
+    or a grab on him, Follow NEWT) or `orbitReset`; a resize (`orbitArea`) is never him walking
+    off: left off the smaller screen, it eases round to his feet; `orbitHold` holds it still
+    while he's held, and once he's let go out past where it keeps him (carried to the screen's
+    edge) it eases him back inside at `ORBIT.settle` (0.25 s) rather than jumping there in a
+    frame; `orbitSight`, what's on screen now: the floor where he shows
     whole `AREA_MARGIN` (8) CSS px inside the clear space at the view as it is, a trapezoid in
     the camera's frame turned with it, `Bounds.turn`, which main.js hands the play area every
     frame as its `sight`; `lightDir` turns the look's sun with the

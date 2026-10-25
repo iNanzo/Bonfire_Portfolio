@@ -10,8 +10,8 @@
 // The default view's own disc is its framing: a desktop's default view (pixels.js frameView)
 // shows all of it, at every Pixel Size, with NEWT still about a fifth of the screen's short side
 // tall; on a phone he's drawn about 30% bigger, the disc no longer all fits, and the camera
-// follows him softly (camera.js) so a dash to its rim, or round it, never takes him off the
-// screen. A disc's Bounds work everywhere (steer.js and carry.js read a disc's radius from its
+// moves on just far enough (camera.js) that a dash to its rim, or round it, never takes his feet
+// off the screen. A disc's Bounds work everywhere (steer.js and carry.js read a disc's radius from its
 // Bounds: walking, wandering, fleeing, sliding along the rim when cornered with no zig-zag,
 // carrying, the toss and the fall's bounces). The light's shadow camera (floor.js fitShadow)
 // covers the disc up to the highest he's lifted, wherever the camera has turned the light
@@ -338,25 +338,29 @@ function onScreen(view, o, p) {
   );
 }
 
-test('on a phone, at the default zoom, running to the rim, across the disc and round its rim never takes NEWT off the screen: the camera follows him softly', () => {
+test('on a phone, at the default zoom, running to the rim, across the disc and round its rim never takes NEWT’s feet off the screen: the camera moves on only as far as keeps them on it', () => {
   // Portrait and landscape phones, the camera turned three ways.
   for (const [cssW, cssH, dpr] of [...SIZES.filter(([w]) => w < 600), [360, 740, 3], [844, 390, 3]]) {
     const { view } = viewFor(cssW, cssH, dpr);
+    const frame = { hw: (cssW - INSETS.left - INSETS.right) / 2, hh: (cssH - INSETS.top - INSETS.bottom) / 2 };
+    /** The toolbar's top: the clear space's bottom is 8 CSS px over it. */
+    const bar = cssH - INSETS.bottom + 8;
     for (const yaw of [0, 1, 2.6]) {
       const at = `${cssW}x${cssH}@${dpr} at yaw ${yaw}`;
-      /** His body (his width across the screen, feet to head) is on the stage and over the toolbar. */
+      /** His feet are on the stage and over the toolbar. */
       const check = (o, n, when) => {
-        const right = { x: Math.cos(o.yaw), z: -Math.sin(o.yaw) };
-        for (const y of [0, NEWT_HEIGHT])
-          for (const k of [-1, 1]) {
-            const p = onScreen(view, o, { x: n.x + k * NEWT_RADIUS * right.x, y, z: n.z + k * NEWT_RADIUS * right.z });
-            const ok = p.x >= 0 && p.x <= cssW && p.y >= 0 && p.y <= cssH - INSETS.bottom;
-            assert.ok(ok, `${at}, ${when}: his ${y ? 'head' : 'feet'} at (${p.x.toFixed(0)}, ${p.y.toFixed(0)})`);
-          }
+        const p = onScreen(view, o, { x: n.x, y: 0, z: n.z });
+        const ok = p.x >= 0 && p.x <= cssW && p.y >= 0 && p.y <= bar + 0.5;
+        assert.ok(ok, `${at}, ${when}: his feet at (${p.x.toFixed(0)}, ${p.y.toFixed(0)})`);
+      };
+      const make = () => {
+        const o = createOrbit({ distance: view.distance, yaw, span: { w: cssW, h: cssH } });
+        orbitSpan(o, { w: cssW, h: cssH, ch: view.canvasH, ...frame });
+        return o;
       };
       /** A run at running speed from `a` to `b` (the camera settled on `a`), then 2 s standing. */
       const run = (a, b, when) => {
-        const o = createOrbit({ distance: view.distance, yaw, span: { w: cssW, h: cssH } });
+        const o = make();
         for (let i = 0; i < 6 * 60; i++) orbitStep(o, DT, a);
         const T = dist(a, b) / GAIT.run;
         for (let t = 0; t < T + 2; t += DT) {
@@ -374,7 +378,7 @@ test('on a phone, at the default zoom, running to the rim, across the disc and r
       }
       // Round the rim, both ways, for two turns.
       for (const way of [1, -1]) {
-        const o = createOrbit({ distance: view.distance, yaw, span: { w: cssW, h: cssH } });
+        const o = make();
         for (let i = 0; i < 6 * 60; i++) orbitStep(o, DT, { x: 0, z: R });
         for (let t = 0; t < (4 * Math.PI * R) / GAIT.run; t += DT) {
           const a = (way * GAIT.run * t) / R;
@@ -672,7 +676,7 @@ test('turned bounds (Bounds.turn: what’s on screen, in the camera’s frame) a
   }
 });
 
-test('where the play area is bigger than the screen, a wander goal is on screen when it’s picked and a flee keeps to what was on screen as it began (orbitSight; the camera’s soft follow does the rest)', () => {
+test('where the play area is bigger than the screen, a wander goal is on screen when it’s picked and a flee keeps to what was on screen as it began (orbitSight; the camera keeps his feet on screen beyond that)', () => {
   for (const [cssW, cssH, dpr] of [
     [390, 844, 3],
     [1280, 800, 1],
