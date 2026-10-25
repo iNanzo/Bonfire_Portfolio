@@ -6,7 +6,8 @@ format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and ver
 
 ## [Unreleased]
 
-Round 17: a plainer cult altar, no vignette, and a cleaner mirror in Bonfire Live. Round
+Round 17: NEWT's envelope reworked, rose petals all through his toy, text effects for
+his words, and a plainer cult altar, no vignette and a cleaner mirror in Bonfire Live. Round
 16, below it: a password lock for the site, and NEWT's toy opened from an envelope, with a
 new toolbar, a new way to carry him and more to do. Round 15: an Uma Musume-style
 intro dialogue for NEWT. Round 14, below that: his second wave (a Default look, new
@@ -14,6 +15,43 @@ controls, speech bubbles, the admin's Invitation page). Round 13: NEWT's toy at
 `/invitation/`. Round 11: the knight at home in every place, every module type-checked, and
 a campfire game on the bonfire, and a cleanup for what agents and test runs leave running.
 Round 10: menus and search, the knight's fixes, hygiene and performance.
+
+### NEWT's envelope (round 17)
+
+- The wax seal sits glued to the flap and lifts with it, and the pocket is drawn plain, with
+  no fold lines across it. Hovering over the letter brings a soft gold pulse that comes and
+  goes.
+- The letter leans toward the cursor, its top tipping the same way, and a sideways drag
+  turns it further before it springs back, still floating.
+- A reload no longer flashes a red box where the letter should be.
+- Replay Intro resets the scene and brings the envelope back, so the whole opening plays
+  again; if no envelope can be made, it plays the intro.
+
+### Rose petals (round 17)
+
+- Petals swirl round the letter in ribbons on a tilted loop, and opening it pours them out
+  of the pocket's mouth.
+- A click sends a ring of petals out from the cursor, the cursor sheds a trail of them as it
+  moves, and moving the letter sheds more.
+- The petals fall on the page under the toolbar and the other controls, all through the toy,
+  and a touch scatters them the same as a mouse.
+- The Settings sheet's new Rose Petals switch (On or Off, on by default) turns them all off.
+
+### NEWT's toolbar and floor (round 17)
+
+- The toolbar's icons are now Phosphor icons (MIT licensed).
+- Turn Left and Turn Right turn the view the way they say again.
+- Give Device is now Screen Time, on the toolbar, in Speech and in the admin.
+- The floor ring is redrawn with a smooth edge that never chips, at any view.
+- Lying down with the tablet, NEWT lies flatter on the floor.
+
+### NEWT's words (round 17)
+
+- Intro and speech lines can carry text effects: tags that shake, wave or colour a word, and
+  hex colours. The admin's Invitation page has a palette of named colours to use in them and
+  a live preview of the line as you type.
+- The dialogue's Next moves on to the next box, and a line that is only a styled blank
+  counts as empty.
 
 ### The bonfire's look (round 17)
 
