@@ -48,7 +48,21 @@ import {
 } from './envelope.js';
 import { buildSeal, sealTexel } from './envelopeSeal.js';
 import { PETAL_SHAPES, POOL, createPetalFlow, petalGrid } from './petals.js';
-import { BAYER, IDS, INK, LEAN, PAPER, PETAL, PITCH, TILT, envelopeLayout, rgb, shared, toon } from './envelopeLook.js';
+import {
+  BAYER,
+  IDS,
+  INK,
+  LEAN,
+  PAPER,
+  PETAL,
+  PITCH,
+  TILT,
+  WAX,
+  envelopeLayout,
+  rgb,
+  shared,
+  toon,
+} from './envelopeLook.js';
 
 /** Where veils looks on each of NEWT's spots: its middle and four points its radius round it. */
 const SPOT_POINTS = [
@@ -75,7 +89,7 @@ const SPECKS = 220;
 const SPECK_TONES = {
   paper: [0xe4b85d, 0xd3983d, 0x7a4a24, 0x5a3418],
   ember: [0xffe7a0, 0xf59a32, 0xe8662a],
-  wax: [0xa13a25, 0x6e1511],
+  wax: [WAX[1], WAX[2]],
 };
 
 /**
@@ -349,7 +363,7 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
   const letterScale = new THREE.Matrix4().makeScale(2 / envl.W, 2 / envl.H, 1);
 
   /** The view's height at the envelope, world units, and the screen's CSS size. */
-  const view = { h: 1, w: 1, cssW: 1, cssH: 1, scale: 1, th: 1 };
+  const view = { h: 1, w: 1, cssW: 1, cssH: 1, scale: 1, tw: 1, th: 1 };
   function resize() {
     const cssW = Math.max(1, layer.clientWidth || win.innerWidth);
     const cssH = Math.max(1, layer.clientHeight || win.innerHeight);
@@ -366,20 +380,18 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     view.w = view.h * camera.aspect;
     view.cssW = cssW;
     view.cssH = cssH;
+    view.tw = tw;
     view.th = th;
     const c = Math.cos(-TILT);
     const s = Math.sin(-TILT);
     const aspect = envl.W / envl.H;
     const w = Math.min((0.82 * view.w) / (c + s / aspect), (0.52 * view.h) / (s + c / aspect));
     view.scale = w / envl.W;
-    // (A texel at the seal's face, in its own units, at rest: its stamp is drawn on that grid,
-    // so its strokes keep their widths. The face is nearer the camera than the letter.)
+    // (The seal's radius on the screen, texels, at rest: its face is drawn at that size and put
+    // on the screen texel for texel. It's nearer the camera than the letter.)
     inner.updateMatrix();
-    const face = v
-      .set(0, 0, sealR * 0.31)
-      .add(sealAt)
-      .applyMatrix4(inner.matrix);
-    seal.setTexel(sealTexel(view.h, th, view.scale, face.z * view.scale, DIST));
+    const face = v.copy(sealAt).applyMatrix4(inner.matrix);
+    seal.setRadius(sealR / sealTexel(view.h, th, view.scale, face.z * view.scale, DIST));
   }
   resize();
   const onResize = () => resize();
@@ -630,10 +642,11 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     // the envelope's lean.)
     const bloom = sealBloom(Math.max(p.bloom, (follow.lift / 0.45) * 0.14));
     seal.group.scale.setScalar(bloom.scale);
-    // (Upright on the screen, so the stamp's stems stand on the texel grid.)
+    // (Upright on the screen, as its face is drawn: then it goes on texel for texel.)
     seal.group.rotation.z = -TILT + bloom.spin;
     seal.group.visible = bloom.scale > 0;
     outer.updateMatrixWorld(true);
+    placeSeal();
     petalsAt(pt, p);
     // The dissolve: the edge across the letter, in its own units.
     toLetter.copy(inner.matrixWorld).invert().premultiply(letterScale);
@@ -650,6 +663,22 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
       doneAt ||= now;
       if (!flow.live(pt) || now - doneAt >= PETAL_GRACE) dispose();
     }
+  }
+
+  /**
+   * Where the seal's middle falls on the drawing (texels from its lower left), and how big and
+   * turned it shows against its face as drawn (seal.place snaps the sway's hair of either away,
+   * so its face goes on texel for texel).
+   */
+  function placeSeal() {
+    if (!seal.group.visible) return;
+    const c = sealWorld.copy(sealAt).applyMatrix4(inner.matrixWorld).project(camera);
+    const cx = (c.x * 0.5 + 0.5) * view.tw;
+    const cy = (c.y * 0.5 + 0.5) * view.th;
+    const e = seal.group.localToWorld(v.set(sealR, 0, 0)).project(camera);
+    const dx = (e.x * 0.5 + 0.5) * view.tw - cx;
+    const dy = (e.y * 0.5 + 0.5) * view.th - cy;
+    seal.place(cx, cy, Math.hypot(dx, dy) / seal.radius, Math.atan2(dy, dx));
   }
 
   /**
@@ -768,6 +797,7 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
         m.material?.dispose?.();
       });
     }
+    seal.dispose();
     colorRT.dispose();
     idRT.dispose();
     renderer.dispose();
