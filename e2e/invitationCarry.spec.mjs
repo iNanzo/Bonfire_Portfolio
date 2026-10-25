@@ -85,10 +85,15 @@ test.describe('on a desktop', () => {
     page,
   }) => {
     await calm(page);
-    // (Zoomed all the way out, the play area's sides come inside the screen.)
-    await page.mouse.move(80, 120);
+    // (The play area fills the screen at the default zoom. Zoomed all the way out about him (no
+    // pan) and walked to the back, where the screen is widest, its rim comes inside the screen.)
+    const at = await on(page, 'body');
+    await page.mouse.move(at.x, at.y);
     for (let i = 0; i < 8; i++) await page.mouse.wheel(0, 400);
-    await until(page, (s) => s.camera.distance >= s.cameraHome.distance * 1.9 && !s.camera.turning, 'zoomed out');
+    await until(page, (s) => s.camera.distance >= s.cameraHome.distance * 1.99 && !s.camera.turning, 'zoomed out');
+    const zoomed = await on(page, 'body');
+    await page.mouse.click(zoomed.x, zoomed.y - 150);
+    await until(page, (s) => s.states.includes('walk') && s.state === 'idle', 'walked to the back', 30_000);
     let cursor = await pickUp(page);
     await until(page, (s) => s.motion.heldFor >= 0.15, 'the grab eased in');
     const start = (await snapshot(page)).motion;
