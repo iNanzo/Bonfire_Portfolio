@@ -12,8 +12,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import * as THREE from 'three';
 import { LOGO_STROKES } from '../src/ui/logo.js';
-import { IDS, INK, LIGHT, PAPER, SHADES, WAX, rgb, shared, toon } from '../src/invitation/envelopeLook.js';
+import { HOVER, IDS, INK, LIGHT, PAPER, REST, SHADES, WAX, rgb, shared, toon } from '../src/invitation/envelopeLook.js';
+import { HOVER_INK } from '../src/invitation/retro.js';
 import {
   MONOGRAM_PATH,
   MONOGRAM_STROKES,
@@ -23,7 +25,7 @@ import {
   sealEdge,
   sealFace,
   sealLayout,
-  sealTexel,
+  sealOnScreen,
   stampCell,
   stampLayout,
 } from '../src/invitation/envelopeSeal.js';
@@ -72,9 +74,56 @@ test('the seal is a seal, not a coin', () => {
   assert.ok(SEAL_SIZE > 0.18 && SEAL_SIZE <= 0.21, `its radius ${SEAL_SIZE} of the letter’s width`);
 });
 
-test('a texel at the seal’s face: the envelope’s texel, smaller the nearer the face is to the camera', () => {
-  assert.equal(sealTexel(3, 300, 0.5, 0, 6), 3 / 300 / 0.5);
-  assert.ok(Math.abs(sealTexel(3, 300, 0.5, 0.3, 6) - ((3 / 300 / 0.5) * 5.7) / 6) < 1e-12);
+test('drawn for its axes on the screen: upright and round it’s the seal of that radius, texel for texel', () => {
+  for (const R of SOME) assert.deepEqual(sealFace([R, 0, 0, R]).tones, sealFace(R).tones, `${R}`);
+});
+
+/**
+ * The wax's extent along a screen direction (cos a, sin a): the furthest texel middle of the seal
+ * itself (the splotch left out), texels from its middle.
+ * @param {ReturnType<typeof sealFace>} f
+ * @param {number} a
+ */
+function reach(f, a) {
+  let most = 0;
+  for (let j = -f.c; j < f.c; j++)
+    for (let i = -f.c; i < f.c; i++) {
+      if (!f.at(i, j)) continue;
+      const x = i + 0.5;
+      const y = j + 0.5;
+      // (Within a texel of the line.)
+      if (Math.abs(-Math.sin(a) * x + Math.cos(a) * y) > 0.71) continue;
+      const along = Math.cos(a) * x + Math.sin(a) * y;
+      if (along > 0 && Math.hypot(x, y) < f.c * 0.9) most = Math.max(most, along);
+    }
+  return most;
+}
+
+test('turned and narrowed as the letter leans and turns, its outline is the ellipse its axes make, the stamp upright', () => {
+  for (const R of [31, 42]) {
+    const k = 0.86;
+    const lean = -0.36;
+    const [c, s] = [Math.cos(lean), Math.sin(lean)];
+    const f = sealFace([k * R * c, k * R * s, -R * s, R * c]);
+    const round = sealFace(R);
+    // (Its wavy edge along each of its own axes, against the round one's there: narrower along the
+    // turned one.)
+    // (Away from the splotch, which sits by the x axis.)
+    const across = reach(f, lean + Math.PI) / reach(round, Math.PI);
+    const up = reach(f, lean + Math.PI / 2) / reach(round, Math.PI / 2);
+    assert.ok(Math.abs(across - k) < 0.06, `${R}: ${across.toFixed(3)} across its narrowed axis`);
+    assert.ok(Math.abs(up - 1) < 0.06, `${R}: ${up.toFixed(3)} along the other`);
+    // (Still the seal and its one splotch.)
+    assert.equal(blobs(f).length, 2, `${R}: two blobs`);
+    // (The stamp upright on the screen, as at rest: its strokes and lips where the round one has them.)
+    const S = stampLayout(Math.sqrt(k) * R);
+    for (let j = -R; j <= R; j++)
+      for (let i = -R; i <= R; i++) {
+        const cell = stampCell(S, i, j);
+        if (cell === 'deep') assert.equal(f.at(i, j), 3, `${R}: a stroke at (${i}, ${j})`);
+        else if (cell === 'lip') assert.equal(f.at(i, j), 1, `${R}: a lip at (${i}, ${j})`);
+      }
+  }
 });
 
 /**
@@ -295,7 +344,7 @@ test('the seal’s face is a texture of sealFace’s tones in the wax’s colour
   const u = shared();
   const seal = buildSeal(u, 0.4);
   for (const R of [31, 42]) {
-    seal.setRadius(R);
+    seal.place(100, 50, [R, 0, 0, R]);
     const f = sealFace(R);
     const tex = seal.material.uniforms.uFace.value;
     assert.equal(tex.image.width, f.size);
@@ -315,24 +364,48 @@ test('the seal’s face is a texture of sealFace’s tones in the wax’s colour
       );
     }
   }
-  // (Where its middle falls on the screen, snapped to a texel's corner; upright and whole at rest.)
-  seal.place(100.4, 51.6, 1, 0);
+  // (Where its middle falls on the screen, snapped to a texel's corner.)
+  assert.equal(seal.place(100.4, 51.6, [31, 0, 0, 31]), true);
   assert.deepEqual(seal.material.uniforms.uCenter.value.toArray(), [100, 52]);
-  assert.equal(seal.material.uniforms.uZoom.value, 1);
-  assert.equal(seal.material.uniforms.uSpin.value, 0);
-  // (A hair off whole, as the letter sways, is still texel for texel: it never resamples.)
-  seal.place(10, 10, 1.02, 0.02);
-  assert.equal(seal.material.uniforms.uZoom.value, 1);
-  assert.equal(seal.material.uniforms.uSpin.value, 0);
-  // (Blooming, it swells, spins and shrinks.)
-  seal.place(10, 10, 0.5, 0.3);
-  assert.equal(seal.material.uniforms.uZoom.value, 0.5);
-  assert.equal(seal.material.uniforms.uSpin.value, 0.3);
 });
 
-test('the parts’ order lines every fold on its lower side; the seal is one piece, drawn with the toon material', () => {
-  assert.ok(IDS.body < IDS.inside && IDS.inside < IDS.left && IDS.left < IDS.bottom && IDS.right < IDS.bottom);
-  assert.ok(IDS.bottom < IDS.flap && IDS.flap < IDS.seal && IDS.seal < IDS.petal);
+test('the face is drawn again only as its axes cross a half-texel step, from a cache: never resampled, never shimmering', () => {
+  const seal = buildSeal(shared(), 0.4);
+  const face = () => seal.material.uniforms.uFace.value;
+  seal.place(10, 10, [31, -11, 11, 31]);
+  const first = face();
+  // (A hair off, as the letter sways: the same picture.)
+  seal.place(10.2, 10, [31.2, -11.1, 10.9, 30.8]);
+  assert.equal(face(), first, 'the same face under half a texel');
+  // (Past half a texel: drawn for the new axes, a whole step from the last.)
+  seal.place(10, 10, [30.4, -11, 11, 31]);
+  const next = face();
+  assert.notEqual(next, first);
+  assert.deepEqual(
+    Array.from(next.image.data),
+    Array.from(sealFace([30.5, -11, 11, 31]).tones).flatMap((t) => (t ? [...faceColour(t), 255] : [0, 0, 0, 0])),
+    'the face for the axes snapped to half texels',
+  );
+  // (Back where it was: from the cache.)
+  seal.place(10, 10, [31, -11, 11, 31]);
+  assert.equal(face(), first, 'cached');
+  // (Shrunk to under a texel and a half as it blooms away, it hides.)
+  assert.equal(seal.place(10, 10, [1, 0, 0, 1]), false);
+  seal.dispose();
+});
+
+/** A tone's colour as the face's texture has it. */
+function faceColour(/** @type {number} */ t) {
+  const c = rgb(WAX[t - 1]);
+  return [Math.round(c.x * 255), Math.round(c.y * 255), Math.round(c.z * 255)];
+}
+
+test('the parts’ order lines the pocket’s mouth over the inside; the seal is one piece, drawn with the toon material', () => {
+  assert.ok(
+    IDS.body < IDS.inside && IDS.inside < IDS.pocket && IDS.pocket < IDS.flap,
+    'the mouth lined over the inside',
+  );
+  assert.ok(IDS.flap < IDS.seal && IDS.seal < IDS.petal);
   assert.ok(
     Object.values(IDS).every((v) => v > 0 && v < 256),
     'none is the empty paper (0)',
@@ -346,6 +419,8 @@ test('the parts’ order lines every fold on its lower side; the seal is one pie
   assert.equal(m.uniforms.uId.value, IDS.flap);
   assert.equal(m.uniforms.uLean.value, 0.2);
   assert.ok('FLAT' in m.defines, 'paper is flat: one tone a face, no dither');
+  assert.equal(m.uniforms.uRest.value, REST, 'lit as the rest pose has it, whatever the letter’s turn');
+  assert.equal(m.uniforms.uToInner, u.uToInner, 'one world-to-letter for every part');
   assert.equal(m.uniforms.uIdPass, u.uIdPass, 'one switch for every part’s id pass');
   assert.equal(m.uniforms.uDissolve, u.uDissolve, 'one dissolve for the whole letter');
   const seal = buildSeal(u, 0.4);
@@ -358,4 +433,34 @@ test('the parts’ order lines every fold on its lower side; the seal is one pie
   assert.ok('SEAL' in faces[0].defines);
   assert.equal(faces[0].uniforms.uIdPass, u.uIdPass);
   assert.equal(faces[0].uniforms.uId.value, IDS.seal);
+});
+
+test('the first frame’s seal is placed as the letter shows it: about its size, not spun (the red box on reload)', () => {
+  // (As the scene makes it: a camera put in place but never drawn with, and the seal in the
+  // letter's group. three only updates a camera's matrices as it draws, so the first frame's
+  // placement once read an identity view and put a seal 37 times its size on the screen.)
+  const camera = new THREE.PerspectiveCamera(30, 1280 / 800, 0.1, 40);
+  camera.position.set(0, 0, 6);
+  camera.updateProjectionMatrix();
+  const letter = new THREE.Group();
+  letter.scale.setScalar(1.4);
+  const seal = new THREE.Group();
+  seal.position.set(0, -0.2, 0.05);
+  letter.add(seal);
+  const tw = 400;
+  const th = 250;
+  const r = 0.4;
+  const at = sealOnScreen(seal, camera, r, tw, th);
+  // (The radius it shows at, texels: the view's height at the letter is 2·6·tan 15°.)
+  const want = (r * 1.4 * th) / (2 * (6 - 0.05 * 1.4) * Math.tan(Math.PI / 12));
+  const [ax, ay, bx, by] = at.axes;
+  assert.ok(Math.abs(Math.hypot(ax, ay) / want - 1) < 0.02, `its x axis ${Math.hypot(ax, ay)} of ${want}`);
+  assert.ok(Math.abs(Math.hypot(bx, by) / want - 1) < 0.02, `its y axis ${Math.hypot(bx, by)} of ${want}`);
+  assert.ok(Math.abs(ay) < 1e-6 && Math.abs(bx) < 1e-6, 'upright, not spun');
+  assert.ok(Math.abs(at.x - tw / 2) < 1e-6, `its middle across ${at.x}`);
+  assert.ok(at.y < th / 2 && at.y > th / 2 - want, `its middle up ${at.y}`);
+});
+
+test('the hover pulse’s gold is NEWT’s hover gold (retro.js HOVER_INK, copied)', () => {
+  assert.equal(HOVER, HOVER_INK);
 });

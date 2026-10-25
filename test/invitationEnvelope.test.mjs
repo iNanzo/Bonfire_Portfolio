@@ -17,6 +17,7 @@ import {
   DISSOLVE,
   ENVELOPE_TEXT,
   FLAP_OPEN,
+  HOVER_PULSE,
   SWAY,
   SWIPE,
   TIMES,
@@ -27,9 +28,14 @@ import {
   FLAP_TIP,
   letterCovers,
   sealBloom,
+  TURN,
+  turnGoal,
+  turnStep,
   envelopeGesture,
   envelopeKey,
   hintFor,
+  hoverPulse,
+  hoverStep,
   particleAt,
   shedParticles,
 } from '../src/invitation/envelope.js';
@@ -408,4 +414,72 @@ test('with reduced motion it’s a short plain fade, no dissolve; a skip clears 
   s.skip(0);
   assert.equal(s.pose(0.01).dissolve, 0, 'a skip drops it, no dissolve');
   assert.ok(s.pose(TIMES.skip).backdrop < 0.01, 'the page clears');
+});
+
+test('hovered, the letter pulses slowly: from nothing to full and back every 2.8 s, so it shows clean between pulses', () => {
+  assert.equal(HOVER_PULSE.period, 2.8);
+  const P = HOVER_PULSE.period;
+  assert.equal(hoverPulse(1, 0), 0, 'it starts from nothing');
+  assert.ok(Math.abs(hoverPulse(1, P / 2) - 1) < 1e-9, 'full at the middle of a pulse');
+  assert.ok(hoverPulse(1, P) < 1e-9 && hoverPulse(1, 3 * P) < 1e-9, 'all the way back to nothing');
+  for (let t = 0; t < 3 * P; t += 0.05) {
+    const v = hoverPulse(1, t);
+    assert.ok(v >= 0 && v <= 1);
+    // (Eased in: half way in, half as strong.)
+    assert.ok(Math.abs(hoverPulse(0.5, t) - v / 2) < 1e-9);
+  }
+  // (Slowly: under a tenth of its strength for a good share of each pulse.)
+  let clean = 0;
+  for (let t = 0; t < P; t += P / 100) clean += hoverPulse(1, t) < 0.1 ? 1 : 0;
+  assert.ok(clean >= 15, `clean for ${clean}% of a pulse`);
+  // (Reduced motion: no pulse, a steady rim while it's hovered.)
+  assert.equal(hoverPulse(1, 0, true), hoverPulse(1, P / 3, true));
+  assert.ok(hoverPulse(1, 0, true) > 0.3);
+  assert.equal(hoverPulse(0, 1, true), 0);
+});
+
+test('the hover eases in as the pointer comes onto the letter and out as it leaves', () => {
+  let k = 0;
+  for (let i = 0; i < 3; i++) k = hoverStep(k, true, 0.05);
+  assert.ok(k > 0 && k < 1, `easing in: ${k}`);
+  for (let i = 0; i < 40; i++) k = hoverStep(k, true, 0.05);
+  assert.equal(k, 1);
+  k = hoverStep(k, false, 0.05);
+  assert.ok(k < 1 && k > 0);
+  for (let i = 0; i < 40; i++) k = hoverStep(k, false, 0.05);
+  assert.equal(k, 0);
+});
+
+test('the letter leans gently toward the pointer’s x, and a sideways drag or a held arrow turns it further, 0.15 rad at most', () => {
+  assert.ok(TURN.max <= 0.15 + 1e-9 && TURN.max >= 0.12, `at most ${TURN.max}`);
+  assert.equal(turnGoal({}), 0, 'no pointer, no drag, no key: square on');
+  // (Toward the pointer: right of the middle turns its face right, gently.)
+  const right = turnGoal({ pointer: 1 });
+  assert.ok(right > 0.03 && right <= 0.08, `toward the right edge ${right}`);
+  assert.equal(turnGoal({ pointer: -1 }), -right);
+  assert.ok(Math.abs(turnGoal({ pointer: 0.5 }) - right / 2) < 1e-9, 'by how far off the middle');
+  assert.equal(turnGoal({ pointer: 4 }), right, 'never past the edge’s');
+  // (A sideways drag turns it further its way, more the further it goes, never past the most.)
+  const w = 1000;
+  const small = turnGoal({ pointer: 0, dx: 50, w });
+  const big = turnGoal({ pointer: 0, dx: 400, w });
+  assert.ok(small > 0 && big > small, `${small} then ${big}`);
+  assert.ok(turnGoal({ pointer: 1, dx: 5000, w }) <= TURN.max + 1e-9);
+  assert.ok(turnGoal({ pointer: -1, dx: -5000, w }) >= -TURN.max - 1e-9);
+  assert.ok(turnGoal({ pointer: 1, dx: 5000, w }) > TURN.max - 0.01, 'all the way, dragged far');
+  // (A held arrow: further its way.)
+  assert.ok(turnGoal({ key: 1 }) > right, 'ArrowRight');
+  assert.equal(turnGoal({ key: -1 }), -turnGoal({ key: 1 }), 'ArrowLeft');
+  assert.ok(turnGoal({ pointer: 1, key: 1 }) <= TURN.max + 1e-9);
+});
+
+test('the turn eases toward where it heads and springs back once let go; reduced motion keeps it square on', () => {
+  let a = 0;
+  const trace = [];
+  for (let i = 0; i < 60; i++) trace.push((a = turnStep(a, 0.12, 1 / 60)));
+  assert.ok(trace[0] > 0 && trace[0] < 0.06, `eased: ${trace[0]} after a frame`);
+  assert.ok(Math.abs(a - 0.12) < 0.01, `there within a second: ${a}`);
+  for (let i = 0; i < 90; i++) a = turnStep(a, 0, 1 / 60);
+  assert.ok(Math.abs(a) < 0.005, `back square on: ${a}`);
+  assert.equal(turnStep(0.1, 0.12, 1 / 60, true), 0);
 });

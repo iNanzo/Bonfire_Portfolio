@@ -164,14 +164,61 @@ test.describe('on a desktop', () => {
     expect(await page.evaluate(() => window.__invitation.clock())).toBe(t0);
   });
 
-  test('a drag across it never turns the camera, and a sideways drag neither opens nor skips it', async ({ page }) => {
+  test('its seal shows at its own size from the first frame, a reload too: no red box', async ({ page }) => {
+    const len = (/** @type {number[]} */ a, k = 0) => Math.hypot(a[k], a[k + 1]);
+    for (const reload of [false, true]) {
+      if (reload) await page.reload();
+      else await page.goto(PAGE);
+      await hooks(page);
+      await expect.poll(async () => Boolean((await envSnap(page))?.seal?.last), { timeout: 30_000 }).toBe(true);
+      const { seal } = await envSnap(page);
+      // (Placed before its first frame was drawn, at about the size it goes on showing: settling in
+      // it's a touch small; the red box was 37 times the size.)
+      expect(seal.first.frame).toBe(1);
+      for (const k of [0, 2]) {
+        const share = len(seal.first.axes, k) / len(seal.last.axes, k);
+        expect(share, `axis ${k / 2}`).toBeGreaterThan(0.85);
+        expect(share, `axis ${k / 2}`).toBeLessThan(1.15);
+      }
+      expect(len(seal.first.axes, 0) / len(seal.first.axes, 2)).toBeGreaterThan(0.8);
+      expect(len(seal.first.axes, 0) / len(seal.first.axes, 2)).toBeLessThan(1.25);
+    }
+  });
+
+  test('the mouse over the letter pulses a gold rim round it, slowly, clean between pulses; off it, it fades', async ({
+    page,
+  }) => {
+    await envelopeUp(page);
+    const hover = async () => (await envSnap(page)).hover;
+    const vp = page.viewportSize();
+    // (Off the letter, though on the page over the toy: no pulse.)
+    await page.mouse.move(8, vp.height - 8);
+    expect((await hover()).k).toBe(0);
+    await page.mouse.move(vp.width / 2, vp.height / 2, { steps: 4 });
+    await expect.poll(async () => (await hover()).k, { message: 'hovered' }).toBe(1);
+    await expect.poll(async () => (await hover()).pulse, { message: 'a pulse at its peak' }).toBeGreaterThan(0.9);
+    await expect.poll(async () => (await hover()).pulse, { message: 'and back to nothing' }).toBeLessThan(0.05);
+    await page.mouse.move(8, vp.height - 8, { steps: 4 });
+    await expect.poll(async () => (await hover()).pulse, { message: 'gone off the letter' }).toBe(0);
+  });
+
+  test('a drag across it never turns the camera, and a sideways drag turns the letter but neither opens nor skips it', async ({
+    page,
+  }) => {
     await envelopeUp(page);
     const before = (await snapshot(page)).camera;
     const vp = page.viewportSize();
     await page.mouse.move(vp.width * 0.3, vp.height * 0.5);
     await page.mouse.down();
     for (let i = 1; i <= 10; i++) await page.mouse.move(vp.width * 0.3 + i * 40, vp.height * 0.5 + i * 2);
+    // (Dragged right, it turns its face right, further than the cursor alone leans it.)
+    await expect
+      .poll(async () => (await envSnap(page)).turn.now, { message: 'turned by the drag' })
+      .toBeGreaterThan(0.08);
+    expect((await envSnap(page)).turn.now).toBeLessThanOrEqual(0.15);
     await page.mouse.up();
+    // (Let go, it springs back to its lean toward the cursor.)
+    await expect.poll(async () => (await envSnap(page)).turn.now, { message: 'sprung back' }).toBeLessThan(0.07);
     await page.mouse.down({ button: 'right' });
     await page.mouse.move(vp.width * 0.2, vp.height * 0.4, { steps: 6 });
     await page.mouse.up({ button: 'right' });
@@ -243,6 +290,30 @@ test.describe('on a desktop', () => {
     await introStarted(page);
   });
 
+  test('it leans toward the cursor; the arrows across turn it further while they’re held, and it springs back', async ({
+    page,
+  }) => {
+    await envelopeUp(page);
+    const turn = async () => (await envSnap(page)).turn.now;
+    const vp = page.viewportSize();
+    await page.mouse.move(vp.width - 4, vp.height / 2, { steps: 3 });
+    await expect.poll(turn, { message: 'toward the cursor on the right' }).toBeGreaterThan(0.04);
+    await page.mouse.move(4, vp.height / 2, { steps: 3 });
+    await expect.poll(turn, { message: 'toward the cursor on the left' }).toBeLessThan(-0.04);
+    await page.mouse.move(vp.width / 2, vp.height / 2, { steps: 3 });
+    await expect.poll(async () => Math.abs(await turn()), { message: 'square on in the middle' }).toBeLessThan(0.01);
+    await page.keyboard.down('ArrowRight');
+    await expect.poll(turn, { message: 'ArrowRight held' }).toBeGreaterThan(0.1);
+    await page.keyboard.up('ArrowRight');
+    await expect.poll(async () => Math.abs(await turn()), { message: 'sprung back' }).toBeLessThan(0.01);
+    await page.keyboard.down('ArrowLeft');
+    await expect.poll(turn, { message: 'ArrowLeft held' }).toBeLessThan(-0.1);
+    await page.keyboard.up('ArrowLeft');
+    const s = await snapshot(page);
+    expect(s.envelope).toBe('floating');
+    expect(s.dialogue).toBeNull();
+  });
+
   test('focused at boot it shows no ring; once Tab is pressed, the ring follows focus', async ({ page }) => {
     await envelopeUp(page);
     await expect(envelope(page)).toBeFocused();
@@ -284,6 +355,45 @@ test.describe('on a desktop', () => {
     await skipped(page);
     await envelopeUp(page);
     await page.keyboard.press('ArrowUp');
+    await introStarted(page);
+  });
+
+  test('Replay Intro resets the scene and brings the envelope back; opened, the intro starts as at boot', async ({
+    page,
+  }) => {
+    await envelopeUp(page);
+    const home = (await snapshot(page)).camera;
+    await page.keyboard.press('Escape');
+    await skipped(page);
+    // The scene moved on: NEWT sat down and the camera turned.
+    await page.evaluate(() => window.__invitation.press('Sit'));
+    await until(page, (s) => s.state === 'sit' || s.state === 'sitDown', 'sitting');
+    const vp = page.viewportSize();
+    await page.mouse.move(vp.width * 0.3, vp.height * 0.3);
+    await page.mouse.down({ button: 'right' });
+    await page.mouse.move(vp.width * 0.6, vp.height * 0.35, { steps: 6 });
+    await page.mouse.up({ button: 'right' });
+    await expect.poll(async () => (await snapshot(page)).camera.yaw, { message: 'turned' }).not.toBe(home.yaw);
+    await page.locator('.inv-btn-intro').click();
+    // The envelope again over a scene as it started: NEWT idle on his feet, the camera home.
+    await until(page, (s) => s.envelope === 'floating', 'the envelope back');
+    await expect(page.locator('.inv-envelope')).toBeVisible();
+    await expect(page.locator('.inv-hud')).toHaveAttribute('inert', '');
+    await expect(envelope(page)).toBeFocused();
+    const s = await snapshot(page);
+    expect(s.state).toBe('idle');
+    expect(s.held).toBe(false);
+    expect(s.dialogue).toBeNull();
+    expect(s.camera.yaw).toBeCloseTo(home.yaw, 6);
+    expect(s.camera.distance).toBeCloseTo(home.distance, 6);
+    await expect(page.locator('.inv-bubble')).toBeHidden();
+    // (Paused behind it, as at boot.)
+    const t0 = await page.evaluate(() => window.__invitation.clock());
+    const f0 = (await envSnap(page)).frames;
+    await expect.poll(async () => (await envSnap(page)).frames, { timeout: 10_000 }).toBeGreaterThan(f0 + 5);
+    expect(await page.evaluate(() => window.__invitation.clock())).toBe(t0);
+    // Opened, the intro starts by itself at its first box.
+    await page.keyboard.press('Enter');
     await introStarted(page);
   });
 
@@ -372,16 +482,23 @@ test.describe('on a phone', () => {
     await noRing(page);
   });
 
-  test('a touch that slides across sheds petals where it goes, and leaves it floating', async ({ page }) => {
+  test('a touch that slides across sheds petals where it goes and turns the letter its way, and leaves it floating', async ({
+    page,
+  }) => {
     await envelopeUp(page);
+    const turn = async () => (await envSnap(page)).turn.now;
+    expect(await turn()).toBe(0);
     const touch = await toucher(page);
     const vp = page.viewportSize();
     const at = { x: vp.width * 0.4, y: vp.height * 0.5 };
     await touch('touchStart', [at]);
-    for (let i = 1; i <= 4; i++) await touch('touchMove', [{ x: at.x + i * 20, y: at.y }]);
+    for (let i = 1; i <= 8; i++) await touch('touchMove', [{ x: at.x + i * 20, y: at.y }]);
+    await expect.poll(turn, { message: 'turned toward the finger' }).toBeGreaterThan(0.05);
     await touch('touchEnd', []);
     const e = await layerSnap(page);
     expect(e.emitted.ring + e.emitted.trail).toBeGreaterThan(0);
+    // (The finger lifted: nothing to lean toward; it springs back square on.)
+    await expect.poll(async () => Math.abs(await turn()), { message: 'sprung back' }).toBeLessThan(0.01);
     await until(page, (s) => s.envelope === 'floating', 'still floating');
   });
 

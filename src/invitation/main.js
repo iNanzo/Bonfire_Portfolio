@@ -50,9 +50,12 @@
 // letter no longer hides his head and chest (envelope.veils, envelopeVeils); skipped, it drops
 // away and the toy is free, focus on the toolbar.
 // Without WebGL 2, or if NEWT can't load, it steps aside for the message. ?test skips it unless
-// &envelope.
+// &envelope. Replay Intro resets the scene and spawns it again (replay: any intro ended, a hold
+// dropped, NEWT, his brain, mix, gaze and faces as they started, the camera cut home, the bubble,
+// the grab ring and the hover gone), the toy paused behind it as at boot; opened, the intro starts
+// the same way. Under ?test without &envelope, Replay Intro runs the dialogue alone.
 //
-// Replay Intro (ui.js) runs the intro's dialogue (dialogue.js, on content.js introScript():
+// Replay Intro without an envelope runs the intro's dialogue (dialogue.js, on content.js introScript():
 // content.json's invitation.intro as the admin writes it, mended, or the toy's own) on the toy's
 // clock, shown by dialogueUi.js over the stage: the toolbar rests out of sight, the speech bubble
 // goes and stays quiet, the layer takes every press (no drags, no orbit, no floor taps), the first
@@ -294,21 +297,29 @@ let toyReady = false;
 /** The envelope stopped covering the toy (start() sets it: the loop runs again). */
 let envelopeGone = () => {};
 const hudEl = /** @type {HTMLElement} */ (stageEl.querySelector('.inv-hud'));
-const envelope = options.envelope
-  ? createEnvelopeScene(stageEl, {
-      reduced: prefersReduced(),
-      petals: petalsOn(look),
-      ready: () => toyReady,
-      onUncover: (how) => {
-        hudEl.removeAttribute('inert');
-        if (how === 'open') introWanted = true;
-        // (Skipped: the toy is free, focus on the toolbar's first button, its ring only after a key.)
-        else ui.focusToolbar();
-        envelopeGone();
-      },
-    })
-  : null;
-if (envelope) hudEl.setAttribute('inert', '');
+/** @type {ReturnType<typeof createEnvelopeScene>} the envelope (at boot, or Replay Intro's), null once there's none */
+let envelope = null;
+/**
+ * The envelope over the toy (at boot, and again on Replay Intro): the HUD inert under it; opened,
+ * the intro starts by itself (introWanted); skipped, focus on the toolbar.
+ */
+function spawnEnvelope() {
+  envelope?.dispose();
+  envelope = createEnvelopeScene(stageEl, {
+    reduced: prefersReduced(),
+    petals: petalsOn(look),
+    ready: () => toyReady,
+    onUncover: (how) => {
+      hudEl.removeAttribute('inert');
+      if (how === 'open') introWanted = true;
+      // (Skipped: the toy is free, focus on the toolbar's first button, its ring only after a key.)
+      else ui.focusToolbar();
+      envelopeGone();
+    },
+  });
+  if (envelope) hudEl.setAttribute('inert', '');
+}
+if (options.envelope) spawnEnvelope();
 /** The envelope's state for ?test (types.js EnvelopeState), null without one. */
 const envelopeState = () => (envelope ? envelope.state : null);
 
@@ -495,15 +506,16 @@ function start(s) {
   s.setArea(area);
   const brain = createBrain({ seed, calm: options.calm, bounds: area, middle: centreOf(area) });
   const gesture = createGesture({ holdLift: () => Boolean(hold?.feel.secondFinger && hold.onSecondFinger) });
-  const body = createBody();
-  const mix = createMix();
-  const gaze = createLook();
+  // (Made again by Replay Intro's reset: replay.)
+  let body = createBody();
+  let mix = createMix();
+  let gaze = createLook();
   /** Held, his glance up at you (lookAt.js createGlance), and the look put on this frame. */
-  const glance = createGlance();
+  let glance = createGlance();
   let headTurn = { yaw: 0, pitch: 0, weight: 1 };
   /** How much of a big look his chest takes (lookAt.js torsoStep). */
   let torso = 1;
-  const faces = createFaceState();
+  let faces = createFaceState();
   // (What he says and when, from the admin's lines and settings; the bubble goes in before the
   // HUD, so the toolbar and the Look sheet stay over it, and runs on the toy's clock, as talk
   // does: a slow frame's capped step or a hidden tab moves both alike, so they agree on when a
@@ -515,11 +527,16 @@ function start(s) {
     now: () => t,
     palette: textPalette(),
   });
-  orbit = createOrbit({ distance: s.view?.distance ?? 20, centre: centreOf(area), span: stageSize() });
-  const cam = orbit;
-  orbitSpan(cam, stageSpan(s));
-  orbitArea(cam, area);
-  s.setCamera(orbitPose(cam));
+  /** The camera at home (at boot, and cut there again by Replay Intro's reset). */
+  const homeCamera = () => {
+    const o = createOrbit({ distance: s.view?.distance ?? 20, centre: centreOf(area), span: stageSize() });
+    orbitSpan(o, stageSpan(s));
+    orbitArea(o, area);
+    s.setCamera(orbitPose(o));
+    orbit = o;
+    return o;
+  };
+  let cam = homeCamera();
   /** The light that casts NEWT's shadow (its shadow camera follows him). */
   const sun = /** @type {any} */ (s.scene.children.find((o) => /** @type {any} */ (o).isDirectionalLight)) ?? null;
 
@@ -897,8 +914,7 @@ function start(s) {
     // the camera.)
     const evs = intro ? [] : events;
     events = [];
-    if (introPressed || introWanted) beginIntro();
-    introPressed = false;
+    introNow();
     envelopeVeils = veiled();
     const box = introStep();
     const pose = moveCamera(evs, dt);
@@ -1045,6 +1061,66 @@ function start(s) {
     ui.setTalking(true);
     orbitTalk(cam, true, { cut: fromEnvelope || reducedMotion() });
     talkUi.open();
+  }
+
+  /**
+   * Replay Intro pressed, or the envelope opened: with an envelope, Replay Intro resets the scene
+   * and spawns it again (replay); else, and once it's opened, the dialogue starts (beginIntro).
+   */
+  function introNow() {
+    if (introPressed && options.envelope && !envelope?.covers) replay();
+    else if (introPressed || introWanted) beginIntro();
+    introPressed = false;
+  }
+
+  /**
+   * Replay Intro with an envelope: the scene as it started and the envelope over it again. Any
+   * intro ends (no easing back: the camera cuts home), a hold is dropped, NEWT's body, brain, mix,
+   * gaze and faces start again where they began, the talk's idle clock restarts, the bubble, the
+   * grab ring and the hover go; then the envelope comes (the HUD inert under it) and the toy
+   * pauses behind it once this frame is drawn. Opened, the intro starts as at boot (introWanted).
+   */
+  function replay() {
+    if (intro) {
+      intro = null;
+      introHeld = false;
+      shot = null;
+      framed = null;
+      talkUi.close();
+      ui.setTalking(false);
+    }
+    backFromIntro = false;
+    lastButton = null;
+    introWanted = false;
+    hold = null;
+    holdNow = null;
+    hand = null;
+    aimPx = null;
+    squashing = false;
+    body = createBody();
+    brain.reset();
+    mix = createMix();
+    gaze = createLook();
+    glance = createGlance();
+    headTurn = { yaw: 0, pitch: 0, weight: 1 };
+    torso = 1;
+    faces = createFaceState();
+    out = null;
+    heard = null;
+    target = { x: 0, y: hangY, z: 0 };
+    Object.assign(cue, { flight: null, blob: 0, ring: 0, line: 0, pulse: null, pushed: false, ringAt: null });
+    talk.rest(t);
+    cam = homeCamera();
+    bubble.hide();
+    hover = null;
+    hoverK = 0;
+    s.setHover(0);
+    burst = null;
+    s.setBurst(0, 0, 0, 0);
+    spawnEnvelope();
+    envelopeVeils = Boolean(envelope);
+    // (Paused behind it once this frame is drawn, as at boot.)
+    sync();
   }
 
   /**

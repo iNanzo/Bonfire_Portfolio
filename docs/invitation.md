@@ -15,14 +15,15 @@ Every visit opens on an envelope: a gold, low-poly envelope seen from the back, 
 with a round seal of red wax like a real one (a gently wavy edge, a raised rim catching the
 light, a thin ring inside it, and the NH monogram pressed into the flat middle in thin strokes,
 each a darker groove with a lighter lip where the light catches it, and one stray splotch of wax
-beside it, drawn on the screen's own pixels so it holds steady as the letter sways), floating on
-a plain white page (white, not the toy's own off-white, so it fades into the toy as the letter
-opens). It's drawn in the toy's own pixel look, with a dark one-texel line round it, along its
-flap's straight V (from the top corners to a tip under the seal's middle) and up the bottom
-fold's two edges, its only lines, as a real envelope's back shows them; each face of it is one
-flat tone of the paper's three (the flap light, the pocket mid, its inside shade), lit by one
-light and kept through the sway, so it reads as a letter, and it's the loading screen too: NEWT
-loads behind it.
+beside it; it sits on the flap's tip and moves with it as one, leaning, turning and narrowing
+with the letter, drawn on the screen's own pixels so it never shimmers), floating on a plain
+white page (white, not the toy's own off-white, so it fades into the toy as the letter opens).
+It's drawn in the toy's own pixel look, with a dark one-texel line round it and along its flap's
+straight V (from the top corners to a tip under the seal's middle), its only lines while it's
+closed, like a plain envelope's back (opened, the pocket's mouth shows under the flap); each face
+of it is one flat tone of the paper's three (the flap light, the pocket mid, its inside shade),
+lit by one light and kept through the sway and its turn, so it reads as a letter, and it's the
+loading screen too: NEWT loads behind it.
 
 - **Rose petals:** plain petals (never the monogram) in three shapes (rounded, cupped and
   curled), a few sizes and three reds, each tumbling, fluttering side to side and drifting its
@@ -38,6 +39,13 @@ loads behind it.
   drawn on a layer of their own over the page that every press goes through. **Rose Petals**
   in Settings turns them all off (the envelope's too); it's on by default and kept with the
   look.
+- **Hover it:** with the mouse over the letter (or keyboard focus on it, or on a touch screen
+  after a moment without a touch), a gold rim pulses slowly round it, seal and all, about every
+  three seconds, fading right out between pulses so you can see it clearly. With reduced motion
+  the rim holds steady.
+- **Turn it:** it leans gently toward the mouse (on a phone, toward your finger while it's down);
+  drag it sideways or hold the left or right arrow key to turn it further, and it springs back
+  when you let go. It never turns more than about 9°.
 - **Open it:** tap or click it, press Enter, Space or the up arrow, swipe it up, or scroll up.
   The seal blooms into roses first (about half a second): it swells, then shrinks away while a
   ring of petals unfurls out of it and lifts off, and the swirl is flung outward. Only then does
@@ -53,8 +61,8 @@ loads behind it.
   way) and you're straight into the toy, with no intro.
 - **While you drag it**, it follows your finger with a little give and, going up, the seal
   starts to open; let go short of a swipe and it springs back
-  (swiped open, it stays where you left it while it opens). A sideways drag does nothing, and nothing you do
-  on it reaches the toy underneath (the toolbar can't be reached until it's gone).
+  (swiped open, it stays where you left it while it opens). A sideways drag only turns it, and
+  nothing you do on it reaches the toy underneath (the toolbar can't be reached until it's gone).
 - **The hint** ("Click or swipe up to open", or "Tap or swipe up to open" on a touch screen,
   and "Swipe down to skip") shows while the mouse is over it or it has keyboard focus, and on a
   touch screen after a moment without a touch; while you drag it reads "Open ↑" or "Skip ↓".
@@ -63,6 +71,9 @@ loads behind it.
   ring (and its label) only if your last press was a key: a swipe or a drag shows neither.
 - **Reduced motion:** it holds still, with no petals (none on the cursor either); the flap is open at once and the seal and
   the letter fade away plainly.
+- **Replay Intro** on the toolbar brings it back: the scene starts over underneath (NEWT on his
+  feet where he began, the camera home, no speech bubble), and opening it starts the intro just
+  as the first time.
 - Without WebGL 2, or if NEWT can't load, it steps aside so the message shows. Nothing about it
   is saved: it opens every visit.
 
@@ -277,8 +288,8 @@ plain text. The admin checks every tag as you type and previews each line under 
 
 ## The Intro
 
-Opening the envelope starts a short chat with NEWT, and **Replay Intro** on the toolbar plays it
-again (the chat alone, no envelope). It's laid out like Uma Musume's story scenes and drawn in the
+Opening the envelope starts a short chat with NEWT, and **Replay Intro** on the toolbar brings the
+envelope back over a fresh scene to open again (above). It's laid out like Uma Musume's story scenes and drawn in the
 toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
 
 - **The screen:** a wide box along the bottom with his name on a tab at its top left and his
@@ -719,7 +730,11 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   (settling in from `born`), the seal's `bloom` over `TIMES.bloom` (0.45 s) and only then, from
   `TIMES.flapAt`, the flap's angle up to `FLAP_OPEN`, the gentle push, the dissolve (`dissolve`, its edge
   across the letter over `TIMES.dissolve`; `since`, the specks' clock; `backdrop`, the white page
-  clearing over `TIMES.clear`), a skip's drop, `BOB` and `SWAY`, `TIMES`; the dissolve's sums,
+  clearing over `TIMES.clear`), a skip's drop, `BOB` and `SWAY`, `TIMES`; the hover's pulse,
+  `hoverStep` and `hoverPulse(k, t)` (`HOVER_PULSE`: the eased hover times
+  0.5 − 0.5·cos(2πt / 2.8 s), steady with reduced motion); the letter's turn, `turnGoal` (toward
+  the pointer's x, plus a sideways drag or a held arrow, at most `TURN.max`, 0.15 rad) and
+  `turnStep` (eased, springing back; none with reduced motion); the dissolve's sums,
   `DISSOLVE` and `dissolveAt(x, y)` (mostly how far up the letter, leaning across, plus a smooth
   noise; the shader runs the same with a screen-locked Bayer dither on top), and its specks,
   `shedParticles(n)` (paper, embers, wax, each shed when the edge reaches it) and
@@ -768,39 +783,54 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   scaled up pixelated, over a `.inv-envelope-paper` page in `--inv-bg` that it clears as the letter
   dissolves; drawn twice, its colours and then each part's id (`IDS`, back to front), then put
   together with a one-texel line in `INK` on each texel bordering a later part, none round the
-  dissolving rim; the petals (`createPetalScene`, ids `IDS.petal` and the two after, so the
-  letter hides the swirl's back half and the ink runs round them) fed its matrix each frame,
-  stepped at most 1/20 s a frame so a loading stall holds them still; Rose Petals off (its
-  `petals` option), none; the specks as square points on layer 1
+  dissolving rim, and the hover's pulse there too (a Bayer-dithered `SHINE` on the letter's
+  outermost two texels and a `HOVER` gold halo past its line, the letter's ids only, never the
+  petals', like NEWT's in retro.js; `hover` in its snapshot); the letter's yaw is the sway plus
+  its turn (`turn` in its snapshot); the camera's matrices are brought up to date after it's
+  placed and every frame, the shaders compiled at creation and the seal hidden until it's been
+  placed once (the red box on reload was a first frame's seal placed through a camera three had
+  never updated: 37 times its size; `seal.first` in its snapshot); the petals (`createPetalScene`,
+  ids `IDS.petal` and the two after, so the letter hides the swirl's back half and the ink runs
+  round them) fed its matrix each frame, stepped at most 1/20 s a frame so a loading stall holds
+  them still; Rose Petals off (its `petals` option), none; the specks as square points on layer 1
   on top, with no line; disposed, its context lost and its layer removed once it's done and its
   last petals have gone), `envelopeLook.js` (the palette, three tones a material;
-  `envelopeLayout`, the envelope's parts as flat polygons, each fold's hidden corners under the
-  parts in front of it so the only lines are the outline, the flap's V and the bottom fold's
-  edges; `IDS`; the light, `LIGHT`, its bands, `SHADES` and `bandOf`, and each paper face's
+  `envelopeLayout`, the envelope's parts as flat polygons: the body, the inside, one `pocket`
+  whose mouth (a shallow V) is tucked under the flap, and the flap, so closed the only lines are
+  the outline and the flap's V (the user circled the folds' lines to go) and open the pocket's
+  mouth shows; `IDS`; the light, `LIGHT`, its bands, `SHADES` and `bandOf`, and each paper face's
   `LEAN`; and the toon material: three tones, the paper's one flat tone a face (`FLAT`, no
-  dither, leaning into the light by its `LEAN` so it keeps its band through the sway), the
+  dither, its normal taken in the letter's own frame and lit as the rest pose `REST` has it,
+  `paperLit`, leaning into the light by its `LEAN`, so it keeps its band through the sway and the
+  turn), the
   others' band edges dithered, its id pass, and the dissolve with its burning rim, copied
   from the Bonfire site's weapon dissolve, not imported; `PETAL`, the petals' three reds), `envelopeSeal.js` (the seal, one piece, drawn like the
-  user's reference: its radius `SEAL_SIZE` (0.2) of the letter's width, on the flap's tip,
-  upright on the screen; `sealLayout(R)` for a seal `R` texels across its radius (about 31 on a
-  desktop, 42 on a phone: the scene's `setRadius(sealR / sealTexel(...))`) gives a flat field, a
+  user's reference: its radius `SEAL_SIZE` (0.2) of the letter's width, a child of the flap's
+  hinge a hair over its tip (no parallax: it rounds to the screen's texels with the tip);
+  `sealOnScreen` gives its middle and its two axes on the screen from its own matrices (a
+  2×2 of face to screen); `sealLayout(R)` for a seal `R` texels across its radius (about 31 on a
+  desktop, 42 on a phone) gives a flat field, a
   thin ring at 0.7 R, a texel of field past it, the rim out to the gently wavy edge (`sealEdge`,
   within 6% of round) and its one stray splotch, 3.5 texels clear of the edge on the right;
-  `sealFace(R)` draws its face texel by texel in the wax's three tones (`WAX`), each rim texel
+  `sealFace(axes)` draws its face texel by texel in the wax's three tones (`WAX`) for those axes
+  (the ellipse they make, its ring measured in screen texels so it stays one texel all round,
+  the stamp upright on the screen at the size of a round seal of the same area: turned with the
+  letter, its one-texel strokes broke into stairs), each rim texel
   lit by its slope with the envelope's `LIGHT` and `bandOf` (a light band on the side toward the
   light and on the inner wall across from it, shade on the far side), the splotch a small dome;
-  the material (toon's `SEAL`) samples that texture on the screen's own texels round the seal's
-  middle, snapped to a texel's corner (`place`, its sway's hair of zoom and turn snapped away),
-  so moving the letter moves a steady picture (at 5028c51 the stamp was worked out on the
-  seal's own grid, which stopped matching the screen as the letter swayed, so it shimmered);
-  only blooming scales and turns it. The NH monogram is logo.js's PATH, copied in as
+  the material (toon's `SEAL`) puts that texture on the screen's own texels round the seal's
+  middle, snapped to a texel's corner, and `place(x, y, axes)` snaps the axes to half texels and
+  takes the face drawn for them from a small cache, so the seal grows, narrows and leans in
+  whole steps of its own picture and is never resampled (at 5028c51 the stamp was worked out on
+  the seal's own grid, which stopped matching the screen as the letter swayed, so it shimmered).
+  The NH monogram is logo.js's PATH, copied in as
   `MONOGRAM_PATH`: `stampLayout(radius)` snaps its strokes to whole texels, one texel wide
   (two before: the user found them too thick to read in the ring), the four uprights mirrored,
   the N's diagonal a row-by-row run from the outer stem's top to the inner stem's foot
   (`diagonalAt`); `stampCell`: a dark floor, and a one-texel light lip on its lit side, right of
   every stroke and under the crossbar and the stems' feet, never under the diagonal's steps) and
   `envelope.css` (the focus ring only under `.is-keyboard`, set once a key is pressed). main.js
-  makes it right after `bindUi`, sets the HUD inert under it, lets the toy draw its first frame
+  makes it right after `bindUi` (`spawnEnvelope`), sets the HUD inert under it, lets the toy draw its first frame
   and then holds the loop while it covers him (`sync`), and on its way out either sets
   `introWanted` (held until `beginIntro` can run, which cuts the camera to the talk shot behind
   the letter; its first line then waits, `introHeld`, until the brain is ready and
@@ -810,7 +840,12 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   and the box's gesture starts with its line; `?test`'s snapshot has `envelopeVeils`) or
   focuses the toolbar (`ui.focusToolbar`: ui.js moves focus for the visitor with `focusVisible`
   only when their last press was a key, there and when the intro ends; a plain scripted
-  `focus()` shows Chrome's ring when nothing before it was a pointer's). `?test` skips it unless `&envelope` (`parseQuery`'s `envelope`).
+  `focus()` shows Chrome's ring when nothing before it was a pointer's). Replay Intro with an
+  envelope runs `replay` (main.js): any intro ended, a hold dropped, NEWT's body, `brain.reset()`,
+  the mix, gaze, glance and faces made again, `talk.rest`, the camera cut home (a new orbit), the
+  bubble, the grab ring and the hover gone, then `spawnEnvelope` and the loop paused behind it
+  once that frame is drawn; opened, `introWanted` as at boot. `?test` skips it unless
+  `&envelope` (`parseQuery`'s `envelope`), and there Replay Intro runs the dialogue alone.
 - **The hover and the grab ring:** `retro.js`'s post shader takes `uHover` (a two-texel Bayer
   rim on NEWT's texels, a tenth of the rest, and a halo up to two texels outside him in the ring
   box: 12 reads a texel, only while hovering) and `uBurst` (a dither ring at the grip, an ALU
@@ -893,8 +928,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   it runs. The snapshot's `envelope` is the envelope's state (null without one), `hover` the
   hover dither (0..1) and `burst` whether the grab ring is up; `clock()` is the toy's clock (it
   stands still while the envelope covers him) and `envelope()` the envelope's state, reduced
-  motion, pose, frames drawn and `petals` (`live`, and how many each flow has `emitted`);
-  `petals()` the page's petal layer (`running`, `on`, `live`, `emitted`, `texels`). `?seed=N` makes the randomness repeatable; `?calm` stops him wandering and sitting by himself; `?perf` shows the frame times
+  motion, pose, frames drawn, `petals` (`live`, and how many each flow has `emitted`), `seal`
+  (its `first` and `last` placements), `hover` (`k`, `pulse`) and `turn` (`now`, `pointer`,
+  `key`); `petals()` the page's petal layer (`running`, `on`, `live`, `emitted`, `texels`). `?seed=N` makes the randomness repeatable; `?calm` stops him wandering and sitting by himself; `?perf` shows the frame times
   (p50 and p90), the GPU's time a frame where the browser can measure it, the grid, the
   governor's level and the zoom in a corner; `?govern` turns the governor on under `?test`.
 - **Captures:** `node tools/capture-invitation.mjs` records real-speed clips of every clip and
