@@ -228,8 +228,24 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     moment with no lines yet, its own short intro, its colors) to edit from (`INVITATION_STARTERS`, schema.js `STARTERS`). The toy reads it through
     `virtual:invitation-content` (`vite.config.js`), never `content.json` itself, and the
     other pages' copy of the content leaves it out. A change to its shape needs
-    `npm run admin:deploy` after the merge. There's no live preview of the toy itself (only
-    of the lines' text effects): open `/invitation/`.
+    `npm run admin:deploy` after the merge.
+  - **Intro Preview** (`admin/ui/introPreview.js`): beside the Invitation page (above it on
+    narrower screens, as the live preview is), the real toy in a frame playing one chat box
+    of the draft, unsaved: he turns to the camera, the camera goes to the box's shot, he
+    takes its face and plays its animation, and its line types out with its tags in the
+    draft's colors, its replies under it; then it holds. **Box** picks the box (the one
+    you're editing, as soon as a field in it has the focus; picking one plays it), **Play**
+    plays it from where he stands, **Replay** from the start of the scene (he walks back in
+    first), **Next** plays the box it goes on to (none at a box with replies, or one that
+    ends the intro), and **Desktop** / **Phone** show it at 1280 × 800 or 390 × 780, scaled
+    to fit. A tap in the frame goes on and a reply picked goes to its box, as in the intro,
+    and the picker follows. Once a box has played, an edit to the intro or the colors plays
+    it again with the change (after a third of a second's pause in the typing); edits
+    elsewhere on the page don't. The state beside its title says Loading…, Ready, Playing
+    and the box, or Done. Without an intro in the draft it plays the toy's own. It loads
+    `/invitation/?preview` on the site the live preview frames (`SITE_URL`; locally
+    `ADMIN_SITE_URL`), so it shows this draft in that version of the toy: a new box field
+    needs the site deployed first. Visitors see the saved intro.
 - **Hide / show** any entry (◉; not the invitation intro's boxes and choices), and
   **reorder** any list by dragging ⋮⋮ or with ↑/↓.
 - **Rename** any sidebar page or section heading with ✎ (empty resets it). Renames are
@@ -275,7 +291,7 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
 
 | Piece | File |
 | --- | --- |
-| The page (vanilla JS, same palette as the site) | `admin/ui/` (`main.js` app, `form.js` generic editor, `el.js` its DOM builder, `paths.js` content paths, `schema.js` pages, labels, help, sub-groups, `search.js` the search, `reset.js` Reset, `deployFollow.js` how often it checks on a deploy, `images.js` WebP conversion, `preview.js` live preview, `text.js` Title Case, `paletteTools.js` the palette buttons (the generators are `src/paletteGen.js`), `sceneTools.js` the Scenes page's cards and Painter tools) |
+| The page (vanilla JS, same palette as the site) | `admin/ui/` (`main.js` app, `form.js` generic editor, `el.js` its DOM builder, `paths.js` content paths, `schema.js` pages, labels, help, sub-groups, `search.js` the search, `reset.js` Reset, `deployFollow.js` how often it checks on a deploy, `images.js` WebP conversion, `preview.js` live preview, `introPreview.js` the Invitation page's intro preview, `text.js` Title Case, `paletteTools.js` the palette buttons (the generators are `src/paletteGen.js`), `sceneTools.js` the Scenes page's cards and Painter tools) |
 | Effects defaults, ranges, runtime | `src/effectsDefaults.js`, `src/effects.js`, `src/elements.js` (design notes: `docs/design/admin-v2.md`, `docs/elements.md`) |
 | The scene format (Painter, Bonfire Live, the Scenes page) | `src/scenes.js` (design notes: `docs/painter.md`, `docs/design/visualizer.md`) |
 | API: session, content, save, deploy status, image thumbnails | `admin/server/api.js` |
@@ -366,7 +382,11 @@ saves; the end-to-end tests (`e2e/admin.spec.mjs`) run it that way.
 The deployed admin's preview frames `SITE_URL` (its CSP allows only that origin), so it
 shows the effects editor's changes once this version of the site is deployed. The site
 only accepts preview messages when opened as `?preview` inside a frame, from its parent,
-and validates them first; nothing is stored.
+and validates them first; nothing is stored. The intro preview is the same frame rule for
+`/invitation/?preview` (the same origin, so the same CSP), and the toy is stricter: it takes
+messages only from its parent at the parent's own origin (the browser's word for it where it
+says, else the `admin` address in the frame's query, which must agree), checks every field
+(`src/invitation/preview.js`), and answers only that origin.
 
 **Put it online (one-time setup)**
 

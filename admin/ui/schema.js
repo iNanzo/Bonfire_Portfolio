@@ -155,6 +155,8 @@ export const PAGES = [
     id: 'invitation',
     group: 'Toys',
     label: 'Invitation',
+    // (Beside it, the intro preview: a chat box of the draft played in the toy, introPreview.js.)
+    introPreview: true,
     keys: ['invitation.defaults', 'invitation.speech', 'invitation.lines', 'invitation.text', 'invitation.intro'],
     blurb:
       'NEWT’s toy at /invitation/: the look a first visit gets, how often he talks, what he says, its text effects and the intro he plays.',

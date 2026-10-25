@@ -1520,6 +1520,30 @@ input[type='range']:focus-visible::-webkit-slider-thumb {
   padding: 4px 8px;
   font-size: 13px;
 }
+/* (Two panes share the slot, the site's and the intro's: the one not in use is hidden.) */
+.preview[hidden] {
+  display: none;
+}
+/* The intro preview's box picker takes the row's room; Desktop | Phone, a pressed pair. */
+.intro-preview .preview-tools select {
+  flex: 1 1 12em;
+  min-width: 0;
+  max-width: 100%;
+}
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.segmented .button {
+  border: 0;
+  border-radius: 0;
+}
+.segmented .button[aria-pressed='true'] {
+  background: var(--stone);
+  color: var(--hi);
+}
 .button.ghost {
   border-color: transparent;
 }

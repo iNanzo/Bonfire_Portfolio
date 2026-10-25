@@ -243,17 +243,20 @@ export function parseQuery(search) {
   const q = new URLSearchParams(search);
   const seed = Number.parseInt(q.get('seed') ?? '', 10);
   const settle = Number.parseInt(q.get('settle') ?? '', 10);
+  // (The admin's intro preview, in its frame: no envelope, calm; preview.js says who drives it.)
+  const preview = q.has('preview');
   return {
     test: q.has('test'),
+    preview,
     seed: Number.isFinite(seed) ? seed : null,
-    calm: q.has('calm'),
+    calm: q.has('calm') || preview,
     perf: q.has('perf'),
     // (The frame-time governor: on for visitors, off under ?test unless asked for; null: as such.)
     govern: q.has('govern') ? q.get('govern') !== 'off' : null,
     // (The intro's reply settle in ms, stretched for the browser specs: only under ?test.)
     settle: q.has('test') && settle > 0 ? settle : null,
-    // (The envelope that opens the page, every visit; ?test starts in the toy unless &envelope.)
-    envelope: !q.has('test') || q.has('envelope'),
+    // (The envelope that opens the page, every visit; ?test and ?preview start in the toy unless &envelope.)
+    envelope: (!q.has('test') && !preview) || q.has('envelope'),
   };
 }
 

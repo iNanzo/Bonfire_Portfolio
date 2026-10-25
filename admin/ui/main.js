@@ -18,6 +18,7 @@ import { q, typing } from '../../src/ui/shell.js';
 import { HELP, LABELS, PAGES, STARTERS, defaultLabel, moreFor, resolveHelp } from './schema.js';
 import { el, getAt, moreBox, renderFeatured, renderValue, showErrors } from './form.js';
 import { createPreview } from './preview.js';
+import { createIntroPreview } from './introPreview.js';
 import { flamesBlockTools, sceneBlockTools } from './paletteTools.js';
 import { scenesBlockTools } from './sceneTools.js';
 import { titleCase } from './text.js';
@@ -75,6 +76,7 @@ const ctx = {
   flash: false,
   siteUrl: '',
   preview: null,
+  introPreview: null,
   changed,
   thumb: (src) => ctx.uploads.get(src)?.preview ?? `/api/image?src=${encodeURIComponent(src)}&card=1`,
   toast,
@@ -567,7 +569,7 @@ function renderPage({ keepScroll = true } = {}) {
     if (a.dataset.nav === page.id) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
   }
-  showPreview(!!page.preview);
+  showPreview(page);
   if (ctx.focus) {
     let key = ctx.focus;
     let target = main.querySelector(`[data-path="${CSS.escape(key)}"]`);
@@ -625,24 +627,47 @@ function reveal(key, { flash = true } = {}) {
 }
 const goToError = (error) => reveal(error.path, { flash: false });
 
-// ---- live preview (the Look & Feel pages) ----------------------------------------------
-function showPreview(on) {
+// ---- live preview (the Look & Feel pages) and the intro preview (the Invitation page) ----
+/**
+ * The pane beside a page that has one: the site's live preview, or the Invitation page's intro
+ * preview. Both stay in the slot once made, the other one hidden (a frame moved or removed would
+ * load again).
+ */
+function showPreview(page) {
+  const site = !!page.preview;
+  const intro = !!page.introPreview;
   const slot = q('[data-preview-slot]');
-  slot.hidden = !on;
-  q('[data-layout]').classList.toggle('has-preview', on);
-  if (on) {
-    if (!ctx.preview) {
-      ctx.preview = createPreview(state.session?.siteUrl);
-      slot.append(ctx.preview.pane);
-    }
+  slot.hidden = !site && !intro;
+  q('[data-layout]').classList.toggle('has-preview', site || intro);
+  if (site && !ctx.preview) {
+    ctx.preview = createPreview(state.session?.siteUrl);
+    slot.append(ctx.preview.pane);
+  }
+  if (intro && !ctx.introPreview) {
+    ctx.introPreview = createIntroPreview(state.session?.siteUrl, { draft: () => ctx.draft });
+    slot.append(ctx.introPreview.pane);
+    // (The box being edited: the one a field in it takes the focus.)
+    q('[data-page]').addEventListener('focusin', (e) => {
+      const at = /** @type {HTMLElement} */ (e.target).closest?.('[data-path]');
+      if (at && currentPage().introPreview) ctx.introPreview.edit(at.getAttribute('data-path'));
+    });
+  }
+  if (ctx.preview) ctx.preview.pane.hidden = !site;
+  if (ctx.introPreview) ctx.introPreview.pane.hidden = !intro;
+  if (site) {
     ctx.preview.open();
     pushPreview();
+  }
+  if (intro) {
+    ctx.introPreview.open();
+    ctx.introPreview.update();
   }
   sticky.measure(); // (pinned or gone: the room below the bars changed)
 }
 
 function pushPreview() {
-  if (!ctx.preview || q('[data-preview-slot]').hidden) return;
+  ctx.introPreview?.update();
+  if (!ctx.preview || ctx.preview.pane.hidden || q('[data-preview-slot]').hidden) return;
   const valid = !state.errors.some((e) => within(e.path, 'effects'));
   ctx.preview.update(structuredClone(ctx.draft.effects), { valid });
 }
