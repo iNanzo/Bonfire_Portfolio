@@ -5,7 +5,7 @@
 // browser (node has no WebGL, so a context asked for is refused).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { QUIET, createPetalLayer, quietAt } from '../src/invitation/petalLayer.js';
+import { PETAL_PX, QUIET, createPetalLayer, petalPx, quietAt } from '../src/invitation/petalLayer.js';
 
 /** A page with a canvas that counts how often a context was asked of it (and refuses it). */
 function fakePage() {
@@ -161,4 +161,16 @@ test('while NEWT is carried, the pointer trails nothing', () => {
   for (let i = 0; i < 8; i++) page.move(100 + i * 40, 100);
   assert.equal(page.asked(), 0, 'nothing shed while he is carried');
   assert.equal(layer?.snapshot().gpu, 'none');
+});
+
+test('the page’s petals are sized in CSS px, about 10–16 px long, a little smaller on a phone', () => {
+  const phone = petalPx(390, 844);
+  const desk = petalPx(1280, 800);
+  assert.ok(phone < desk, `${phone} on a phone, ${desk} on a desktop`);
+  // (Its sizes, PETAL_SIZES 0.75–1.3 of it.)
+  assert.ok(desk * 0.75 >= 9 && desk * 1.3 <= 17, `desktop ${desk}`);
+  assert.ok(phone * 0.75 >= 8 && phone * 1.3 <= 15, `phone ${phone}`);
+  assert.equal(petalPx(844, 390), phone, 'a phone held sideways');
+  assert.equal(petalPx(2560, 1440), desk, 'never by the screen’s size');
+  assert.deepEqual(Object.keys(PETAL_PX).sort(), ['desktop', 'phone']);
 });

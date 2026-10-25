@@ -2,7 +2,8 @@
 // over the stage and under the HUD and the dialogue (it goes in just before the HUD, with no
 // z-index of its own; while the envelope is up it rises over it), letting every press through
 // (pointer-events none), with its own small three.js renderer drawing only petals and their ink
-// at the envelope's texel size, scaled up pixelated. At boot it is only its listeners and an empty
+// at the envelope's texel size, scaled up pixelated, each petal sized in CSS px (petalPx) so it
+// reads as a petal beside NEWT whatever the screen. At boot it is only its listeners and an empty
 // canvas: its renderer (a WebGL context, its targets and meshes) comes with the first press or move
 // that may shed petals, so with Rose Petals off or reduced motion there is never one; then it lives
 // for the rest of the page (refused, it tries once and stays quiet). Document-level passive
@@ -16,7 +17,7 @@
 // reduced motion: none at all (any up shrink away). ?test reads snapshot().
 import * as THREE from 'three';
 import { buildInk, createPetalScene } from './petalScene.js';
-import { FLOWS, createTrail } from './petals.js';
+import { FLOWS, PETAL_LEN, createTrail } from './petals.js';
 
 /** Texels along the screen's shorter side (the envelope's, so its petals and these match). */
 const TEXELS = 300;
@@ -33,6 +34,18 @@ export const LAYER_SCALE = 0.8;
  * @param {number} h
  */
 export const pageUnit = (w, h) => Math.min(0.7 * w, 0.53 * h) * LAYER_SCALE;
+
+/** A page petal's length (a PETAL_SIZES 1 petal), CSS px: a little smaller on a phone. */
+export const PETAL_PX = { desktop: 12.5, phone: 11 };
+
+/**
+ * A page petal's length (a PETAL_SIZES 1 petal; they come 0.75 to 1.3 of it) on a screen `w` × `h`
+ * CSS px: a phone's (its shorter side under 600 px, either way up), else a desktop's; never
+ * the screen's size.
+ * @param {number} w
+ * @param {number} h
+ */
+export const petalPx = (w, h) => (Math.min(w, h) < 600 ? PETAL_PX.phone : PETAL_PX.desktop);
 
 /**
  * What the layer stays quiet over (no trail, no burst): the HUD's parts (the toolbar and its pad,
@@ -154,6 +167,8 @@ export function createPetalLayer(root, { on, before = null, over = () => false, 
       view.w = view.h * camera.aspect;
       Object.assign(view, { cssW, cssH, tw, th });
       petals.unit = pageUnit(view.w, view.h);
+      // (Each petal its length in CSS px, whatever the screen: world units a CSS px, over its unit.)
+      petals.size = (petalPx(cssW, cssH) * (view.h / cssH)) / (PETAL_LEN * petals.unit);
       if (!running) clear();
     }
     /** The petals' colours, then which shape each texel is, then the two put together with the ink. */
@@ -316,7 +331,8 @@ export function createPetalLayer(root, { on, before = null, over = () => false, 
   return {
     /**
      * For ?test: whether its renderer is made ('none' until petals may come, 'failed' if it was
-     * refused), whether it's drawing, how many are up, how many each flow has launched, its texels.
+     * refused), whether it's drawing, how many are up, how many each flow has launched, its texels,
+     * and a PETAL_SIZES 1 petal's length as drawn, CSS px.
      */
     snapshot() {
       return {
@@ -326,6 +342,7 @@ export function createPetalLayer(root, { on, before = null, over = () => false, 
         live: gpu ? gpu.petals.live() : 0,
         emitted: gpu ? gpu.petals.emitted : { ...none },
         texels: gpu ? [gpu.view.tw, gpu.view.th] : [0, 0],
+        petalPx: gpu ? (PETAL_LEN * gpu.petals.unit * gpu.petals.size * gpu.view.cssH) / gpu.view.h : 0,
       };
     },
     element: canvas,

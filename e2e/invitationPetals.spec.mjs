@@ -3,8 +3,9 @@
 // press goes through; the mouse moving over the toy trails petals and a click bursts a ring of
 // them, but none over a button, the toolbar, the pad, Settings or the dialogue, and no trail while
 // NEWT is carried; on a phone a finger dragging trails them and a finger held still keeps a few
-// coming; with Rose Petals off (Settings) or reduced motion, none at all; and it sleeps once
-// they've gone. Every wait is on a state (?test's snapshot), never a duration.
+// coming; each about 10-16 CSS px long, whatever the screen; with Rose Petals off (Settings) or
+// reduced motion, none at all; and it sleeps once they've gone. Every wait is on a state (?test's
+// snapshot), never a duration.
 import { test, expect } from '@playwright/test';
 
 const PAGE = '/invitation/?test&calm&seed=3';
@@ -189,6 +190,21 @@ test.describe('with a mouse', () => {
     expect(now.ring, 'no burst from Replay Intro').toBe(start.ring);
   });
 
+  test('its petals are about 10-16 CSS px long, not sized by the screen', async ({ page }) => {
+    await toyUp(page);
+    const a = clear(page);
+    await page.mouse.move(a.x, a.y);
+    await page.mouse.move(a.x + 60, a.y, { steps: 4 });
+    await expect.poll(async () => (await petals(page)).gpu).toBe('up');
+    const px = (await petals(page)).petalPx;
+    expect(px * 0.75).toBeGreaterThanOrEqual(9);
+    expect(px * 1.3).toBeLessThanOrEqual(17);
+    const texels = (await petals(page)).texels;
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await expect.poll(async () => (await petals(page)).texels[0]).not.toBe(texels[0]);
+    expect((await petals(page)).petalPx, 'the same on a bigger screen').toBeCloseTo(px, 5);
+  });
+
   test('with Rose Petals off, none at all; on again, they come back', async ({ page }) => {
     await page.addInitScript(() => {
       try {
@@ -281,7 +297,9 @@ test.describe('on a phone', () => {
     await expect.poll(async () => (await petals(page)).running, { timeout: 15_000 }).toBe(false);
   });
 
-  test('a finger carrying NEWT, moving or held still, trails nothing', async ({ page }) => {
+  test('a finger carrying NEWT, moving or held still, trails nothing; the petals are a little smaller than on a desktop', async ({
+    page,
+  }) => {
     await toyUp(page);
     const touch = await toucher(page);
     const at = await page.evaluate(() => window.__invitation.screen('body'));
@@ -295,5 +313,8 @@ test.describe('on a phone', () => {
     expect((await toy(page)).held).toBe(true);
     expect((await petals(page)).emitted.trail, 'none while he is carried').toBe(grab);
     await touch('touchEnd', []);
+    const px = (await petals(page)).petalPx;
+    expect(px * 0.75).toBeGreaterThanOrEqual(8);
+    expect(px * 1.3).toBeLessThanOrEqual(15);
   });
 });

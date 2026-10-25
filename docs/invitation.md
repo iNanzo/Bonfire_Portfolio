@@ -34,7 +34,9 @@ loading screen too: NEWT loads behind it.
   off its trailing edge that drift its way. Never more than about 120 at once.
 - **Petals on the cursor, everywhere:** over the envelope and all through the toy, the mouse
   moving trails petals (one every 14–30 px, at most about 20 a second, thrown a little the way
-  it moves, every shape and size), and every click or tap bursts a ring of 10–14 of them. On a
+  it moves, every shape and size, each about 10–16 px long whatever the screen, a little
+  smaller on a phone, so they read as petals beside NEWT), and every click or tap bursts a ring
+  of 10–14 of them. On a
   phone a finger dragging trails them, and a finger held still keeps a few coming. None come
   over the UI (a button, the toolbar, the camera pad, Settings, or the intro's boxes), and none
   trail while you carry NEWT (a ring where you grab him, then nothing till he's down). They're
@@ -783,7 +785,7 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   move after a pause of 0.3 s, or after `lift()` (the pointer left the window, or it lost focus),
   starts afresh where it is, shedding nothing along the jump),
   `petalScene.js` (`createPetalScene({scene, unit, seed, reduced, uniforms, id})`: a flow in a
-  scene's world units, `unit` world units a letter width; `emit`, `letter(matrix, {h, opening,
+  scene's world units, `unit` world units a letter width, `size` how big each is drawn of that (1); `emit`, `letter(matrix, {h, opening,
   floating})` from the letter's world matrix, `step(dt)` writing the petals into an instanced mesh
   a shape; `petalMaterial`, the petals' own toon (the three reds, dithered band edges, each
   petal's `aShade`, its id pass on the scene's `uIdPass`); `buildInk`, the ink pass for a
@@ -797,7 +799,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   finger held still on him too); its own
   WebGLRenderer at the envelope's texel size, made with the first press or move that may shed
   petals (never with Rose Petals off or reduced motion; refused, it tries once), `pageUnit` (`LAYER_SCALE` of the envelope's letter
-  width); passive capture-phase `pointerdown`, `pointermove`, `pointerup` and `pointercancel` on
+  width: how far they fly), each petal drawn `petalPx(w, h)` CSS px long (`PETAL_PX`: 12.5 on a
+  desktop, 11 on a phone, its shorter side under 600 px; its sizes 0.75–1.3 of that), through
+  petalScene.js's `size`, never by the screen's size (`petalPx` in its snapshot); passive capture-phase `pointerdown`, `pointermove`, `pointerup` and `pointercancel` on
   the document (never `preventDefault`) drive the trail and a ring at each press, the primary
   pointer only; it draws only while petals are up or a finger is held, then clears and stops;
   `on()` false (Rose Petals off, `look.js petalsOn`, or reduced motion) launches none and shrinks

@@ -109,6 +109,8 @@ export function createPetalScene({ scene, unit = 1, seed = 16, reduced = false, 
   const meshes = buildPetals(id, uniforms);
   for (const m of meshes) scene.add(m.mesh);
   let L = unit;
+  /** How big each petal is drawn, of its own size in letter widths (the page's: petalLayer.js). */
+  let S = 1;
   const tmp = new THREE.Object3D();
   const col = new THREE.Vector3();
   /**
@@ -134,7 +136,7 @@ export function createPetalScene({ scene, unit = 1, seed = 16, reduced = false, 
       const n = counts[k]++;
       tmp.position.set(pose.x * L, pose.y * L, pose.z * L);
       tmp.quaternion.set(pose.q[0], pose.q[1], pose.q[2], pose.q[3]);
-      tmp.scale.setScalar(pose.scale * L);
+      tmp.scale.setScalar(pose.scale * L * S);
       tmp.updateMatrix();
       meshes[k].mesh.setMatrixAt(n, tmp.matrix);
       meshes[k].shade.setX(n, petal.shade);
@@ -154,6 +156,13 @@ export function createPetalScene({ scene, unit = 1, seed = 16, reduced = false, 
     },
     set unit(u) {
       L = u > 0 ? u : L;
+    },
+    /** How big each petal is drawn, of its size in letter widths (1: as the flow has it). */
+    get size() {
+      return S;
+    },
+    set size(s) {
+      S = s > 0 ? s : S;
     },
     /**
      * Launch a flow (petals.js emit) at a world point; `v` a world velocity, a second.
