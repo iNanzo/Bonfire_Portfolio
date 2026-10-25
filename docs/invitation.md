@@ -343,7 +343,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
 - **Reduced motion:** each line shows at once and the camera cuts: round to the front at the
   start, to each shot, and back to your view at the end.
 - Every intro starts at the start; nothing about it is saved. The lines, faces, gestures,
-  shots, waits and replies are edited in the admin's Invitation page ([admin.md](admin.md));
+  shots, waits and replies are edited in the admin's Invitation page ([admin.md](admin.md)),
+  whose Intro Preview plays any box of the draft in the toy (preview mode, below);
   with no intro there (or none it can play), the toy plays a short one of its own.
 
 ## For Developers
@@ -983,6 +984,27 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   `key`); `petals()` the page's petal layer (`gpu`: `none` till its renderer is made, `up` or `failed`; `running`, `on`, `live`, `emitted`, `texels`). `?seed=N` makes the randomness repeatable; `?calm` stops him wandering and sitting by himself; `?perf` shows the frame times
   (p50 and p90), the GPU's time a frame where the browser can measure it, the grid, the
   governor's level and the zoom in a corner; `?govern` turns the governor on under `?test`.
+- **Preview mode** (`?preview`, `src/invitation/preview.js`; the admin's Intro Preview,
+  `admin/ui/introPreview.js`, frames it): no envelope, calm (no wandering, no sitting by
+  himself), no bubble lines and no petals. It listens only when framed, only to its parent,
+  and only at one origin: the framer's own as the browser reports it
+  (`location.ancestorOrigins`), else the `&admin=<origin>` the admin adds (an http(s) origin
+  alone; one that disagrees with the browser's, or a sandboxed framer, and it takes nothing).
+  The admin posts `{type: 'invitation-intro-preview', script, palette, box, viewport,
+  restart}`: `script` the draft's `invitation.intro` as the admin writes it (mended as
+  `content.js` `introScript()` mends the saved one, `introFrom`, then `normalizeScript`, and
+  refused with no box with an id, or over 500 boxes), `box` one of its ids (the intro starts
+  there), `palette` the `invitation.text.colors` list (`paletteOf`; none: the toy's own),
+  `viewport` `desktop` or `phone`, `restart` true to put the scene back as it began first
+  (he walks in again); anything else is dropped (`readPreview`). On its next step `main.js`
+  drops any intro under way (the camera stays on him) and starts the dialogue from that box
+  the way Replay Intro does, with Auto off, so it holds once the line is typed; a tap or a
+  reply goes on as in the intro. It answers its framer, at that origin only, with
+  `{type: 'invitation-intro-preview-state', state}`: `ready` once he's drawn, `playing` with
+  the `box` up, its `next` (`nextBox`: where the admin's Next goes, null at replies or the end)
+  and whether it has `choices`, and `done` as it ends. With `?test` too, the snapshot's
+  `preview` is the origin it listens to, the box and viewport asked for and whether it waits to
+  start. `e2e/invitationPreview.spec.mjs` frames it from a stand-in admin page.
 - **Captures:** `node tools/capture-invitation.mjs` records real-speed clips of every clip and
   of taps, drags, buttons, floor taps, a chase and the camera at phone and desktop sizes
   (animated WebP plus a contact sheet; its `flick`, `shake` and `stroll` acts carry him by the

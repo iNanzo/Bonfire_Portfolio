@@ -902,6 +902,7 @@ test('the toolbar, the camera pad and the Settings sheet: every button named by 
   assert.equal(presetOf({ ...DEFAULT_LOOK, style: 'soft' }), LOOKS.soft);
   assert.deepEqual(parseQuery('?test&seed=42&calm'), {
     test: true,
+    preview: false,
     seed: 42,
     calm: true,
     perf: false,
@@ -911,6 +912,7 @@ test('the toolbar, the camera pad and the Settings sheet: every button named by 
   });
   assert.deepEqual(parseQuery(''), {
     test: false,
+    preview: false,
     seed: null,
     calm: false,
     perf: false,
