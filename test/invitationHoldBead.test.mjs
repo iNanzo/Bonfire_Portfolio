@@ -431,7 +431,7 @@ test('bead, a flick up (100 px in 0.1 s): he lofts 0.40-0.70 (phone) / 0.25-0.45
   }
 });
 
-test('bead, a flick down (100 px in 0.1 s): he skims the floor at his hang height, his lowest foot 0.02 or more over it every frame, and he’s back within 0.02 of his hold height by 0.55 s', () => {
+test('bead, a flick down (100 px in 0.1 s): he skims the floor 0.06 over his hang height, his lowest foot 0.02 or more over it every frame, and he’s back within 0.02 of his hold height by 0.55 s', () => {
   for (const screen of ['phone', 'desktop']) {
     const r = rig(screen);
     // (From the middle of the play area: 100 px down from design.md's spot is past the phone's front wall.)
@@ -440,10 +440,33 @@ test('bead, a flick down (100 px in 0.1 s): he skims the floor at his hang heigh
     assert.ok(lowest >= 0.02, `${screen}: lowest foot ${lowest.toFixed(3)}`);
     const after = frames.filter((f) => f.t >= 1.2);
     if (screen === 'phone')
-      assert.ok(Math.min(...after.map((f) => f.anchor.y)) <= LOW + 0.05, `${screen}: down to the floor’s clamp`);
+      assert.ok(
+        Math.min(...after.map((f) => f.anchor.y)) <= LOW + BEAD.floorGap + 0.03,
+        `${screen}: down to the floor’s clamp`,
+      );
     const out = after.filter((f) => Math.abs(f.anchor.y - f.holdY) > 0.02);
     const settle = out.length ? out[out.length - 1].t - 1.2 : 0;
     assert.ok(settle <= 0.55, `${screen}: settled by ${settle.toFixed(2)} s`);
+  }
+});
+
+test('bead, lifted clear, then a slow drag down at 12°, 15° and 36°: his collar held 0.06 or more over his hang height, so his limp feet never brush the floor (0.04 or more over it every frame)', () => {
+  for (const screen of ['phone', 'desktop']) {
+    for (const elevation of [12, 15, 36]) {
+      const r = rig(screen, { elevation });
+      const c = centrePx(r);
+      // (Up 160 px, so he's clear of the floor however the plane stands, then slowly down 420.)
+      const up = { x: c.x, y: c.y - 160 };
+      const down = ramp(up, { x: c.x + 40, y: c.y + 260 }, 1.6, 3.6);
+      const { frames } = sim(r, { path: (t) => (t < 1.6 ? ramp(c, up, 1.2, 1.5)(t) : down(t)), until: 4 });
+      for (const f of frames.filter((g) => g.t >= 1.6)) {
+        assert.ok(
+          f.anchor.y >= LOW + 0.06 - 1e-6,
+          `${screen} ${elevation}°: collar ${(f.anchor.y - LOW).toFixed(3)} over`,
+        );
+        assert.ok(f.feet.y >= 0.04, `${screen} ${elevation}°: feet ${f.feet.y.toFixed(3)} at ${f.t.toFixed(2)} s`);
+      }
+    }
   }
 });
 

@@ -410,7 +410,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     a flick up lofts him toward the camera before he settles away; the wheel (0.1 of his height a
     notch) and a second finger (0.8 per 100 px) set the hold height, up to 2.4 over his hang
     height (and the cursor up into the stage's top 18% lifts it up to 1.6 more, from where he was
-    grabbed, so a plain drag lifts him: `bandShare`), straight up over his spot on the floor (the gap to the cursor eased out from the next
+    grabbed, so a plain drag lifts him: `bandShare`), his collar kept 0.06 over his hang height
+    once it's been there (his limp feet off the floor), straight up over his spot on the floor (the gap to the cursor eased out from the next
     move over 0.12 s, or at 300 px a second for a bigger one), his tilt turning at most 15 rad/s; walls faced across the screen are side walls (`sideWall`: across only, never sliding
     in depth); his body on a one-sided Verlet rope (`ropeStep`, 0.55 long, slack on a drop,
     kicked every 2.5-6 s and while he thrashes) whose tilt replaces the swing (`HoldStep.tilt`;

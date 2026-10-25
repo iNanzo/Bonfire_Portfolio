@@ -48,7 +48,8 @@ const RAD = Math.PI / 180;
  * pointer moves `pinMove` CSS px; its gap to the cursor then eases out over HOLD.offsetEase, or at
  * `pinRate` CSS px a second for a bigger one. The top band: the stage's top `band`, where the
  * cursor going up lifts his hold height up to `bandLift` of his height more (smoothly, from where
- * he was grabbed), so a plain drag lifts him with no hidden control.
+ * he was grabbed), so a plain drag lifts him with no hidden control. Once his collar has been
+ * `floorGap` over his hang height it's kept there or higher, so his limp, swinging feet never brush it.
  */
 export const BEAD = {
   omega: 14,
@@ -88,6 +89,7 @@ export const BEAD = {
   ringHalf: 0.06,
   ringFloor: 0.35,
   pinMove: 1,
+  floorGap: 0.06,
   band: 0.18,
   bandLift: 1.6,
   pinRate: 300,
@@ -466,7 +468,7 @@ export function createBeadHold(deps = {}) {
     };
   };
   const lift = (dh) => {
-    holdGoal = clamp(holdGoal + dh, low, low + BEAD.holdMost * H);
+    holdGoal = clamp(holdGoal + dh, low + BEAD.floorGap, low + BEAD.holdMost * H);
     if (!pin && lastPx) pin = { x: anchor.x, z: anchor.z, y0: anchor.y, h0: holdY, px: { ...lastPx } };
   };
 
@@ -543,12 +545,17 @@ export function createBeadHold(deps = {}) {
       // he was grabbed.)
       const u = bandShare(px.y, stage);
       if (band0 === null) band0 = u;
-      const goalY = clamp(holdGoal + BEAD.bandLift * H * Math.max(0, u - band0), low, low + BEAD.holdMost * H);
+      const goalY = clamp(
+        holdGoal + BEAD.bandLift * H * Math.max(0, u - band0),
+        low + BEAD.floorGap,
+        low + BEAD.holdMost * H,
+      );
       [holdY, holdV] = damp(holdY, holdV, goalY, t - t0 < BEAD.holdInFor ? BEAD.holdIn : BEAD.holdFollow, dt);
       plane = beadPlane(camera, through, holdY, touch);
-      // (The floor: his hang height once he's clear of it; before, no lower than he was grabbed.)
-      if (anchor.y >= low - 1e-6) clear = true;
-      const floorY = clear ? low : Math.min(from, low);
+      // (The floor: BEAD.floorGap over his hang height once he's been there; before, no lower than
+      // he was grabbed.)
+      if (anchor.y >= low + BEAD.floorGap - 1e-6) clear = true;
+      const floorY = clear ? low + BEAD.floorGap : Math.min(from, low);
       const axes = levelAxes(camera.yaw);
       const edges = { bounds, low: floorY, high: CARRY.liftMax, toward: axes.toward };
       // (The goal: where the ray meets the plane, a grazing ray keeping the last, kept inside along
