@@ -2167,8 +2167,10 @@ test.describe('on a desktop', () => {
       .slice(1)
       .map((x, i) => Math.abs(x - xs[i]))
       .sort((p, q) => q - p);
+    // (At the default zoom the view no longer follows him: he comes back in by the rim's own
+    // ease, about 30-50 px, so the floor sits well under that spread.)
     const moved = xs[0] - Math.min(...xs);
-    expect(moved, `the view brought him back in by ${moved.toFixed(1)} px`).toBeGreaterThan(30);
+    expect(moved, `he came back in by ${moved.toFixed(1)} px`).toBeGreaterThan(15);
     expect(steps[0], `${steps[0].toFixed(1)} px in a frame, then ${steps[1].toFixed(1)}`).toBeLessThan(3 * steps[1]);
   });
 
