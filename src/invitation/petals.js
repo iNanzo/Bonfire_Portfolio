@@ -614,8 +614,8 @@ export function createPetalFlow({ seed = 7, reduced = false } = {}) {
   function joinSwirl(F, i) {
     const per = FLOWS.swirl.n / SWIRL.strands;
     const outer = i % 4 === 0;
-    /** @type {SwirlSlot} */
     const strand = i % SWIRL.strands;
+    /** @type {SwirlSlot} */
     const slot = {
       strand,
       s: (strandBase[strand] + (Math.floor(i / SWIRL.strands) % per) * SWIRL.gap + r(0, 0.008)) % 1,
