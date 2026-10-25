@@ -32,7 +32,7 @@ export const STEP = 1 / 60;
 /** How many each flow launches (a ring rolls its count; a trail step comes in 1–3). */
 export const FLOWS = {
   spawn: { n: 14 },
-  swirl: { n: 18 },
+  swirl: { n: 24 },
   pour: { n: 16 },
   ring: { n: [10, 14] },
   trail: { n: [1, 3] },
@@ -45,22 +45,28 @@ export const FLOWS = {
 /**
  * The swirl round the floating letter, the forge's held-blade aura on the Bonfire site but
  * slower: `strands` helix strands a third of a turn apart on an ellipse `rx` across and `rz` deep
- * (letter widths; its radius swelling in the middle of the climb), `span` of the letter's height
- * tall, `turns` round it bottom to top; it spins `spin` radians a second and each petal climbs
- * `climb` of the way a second. It fills in `delay` seconds after the letter floats, one petal
- * every `every`; every fourth starts `outer` times further out and falls in at `fall` a second.
+ * (letter widths; its radius swelling in the middle of the climb), seen from a little above (its
+ * back raised and its front lowered by `tilt` of its depth, so from the front it reads as a loop,
+ * not a line), `span` of the letter's height tall, `turns` round it bottom to top; it spins
+ * `spin` radians a second and each petal climbs `climb` of the way a second (the slow end of the
+ * forge's). It fills in `delay` seconds after the letter floats, one petal
+ * every `every`, each strand's in a run `gap` of the climb apart (a ribbon winding up round it, all
+ * of a strand climbing alike, so the strands stay apart and read as a helix); every fourth starts
+ * `outer` times further out and falls in at `fall` a second.
  * `pull` is how hard a petal is drawn to its slot.
  */
 export const SWIRL = {
   strands: 3,
   rx: 0.7,
   rz: 0.3,
+  tilt: 0.45,
   span: 1.3,
   turns: 2.2,
-  spin: [0.5, 0.8],
-  climb: [0.04, 0.08],
+  spin: [0.5, 0.6],
+  climb: [0.04, 0.06],
   delay: 0.5,
-  every: 0.15,
+  every: 0.12,
+  gap: 0.035,
   outer: [1.5, 2.1],
   fall: 0.25,
   pull: 7,
@@ -267,7 +273,8 @@ export const swirlRadius = (s) => 0.8 + 0.35 * Math.sin(Math.PI * clamp01(s));
 
 /**
  * A swirl slot's place round the letter `L` with the swirl spun `spin` radians: on its strand's
- * helix, on the ellipse SWIRL.rx across and SWIRL.rz deep (times its radius), `s` of the way up.
+ * helix, on the ellipse SWIRL.rx across and SWIRL.rz deep (times its radius), tipped by
+ * SWIRL.tilt, `s` of the way up.
  * @param {LetterFrame} L
  * @param {Pick<SwirlSlot, 'strand'|'s'|'r'>} slot
  * @param {number} spin
@@ -278,7 +285,7 @@ export function swirlSlot(L, slot, spin) {
   const r = swirlRadius(slot.s) * slot.r;
   const across = Math.cos(a) * SWIRL.rx * r;
   const deep = Math.sin(a) * SWIRL.rz * r;
-  const up = (slot.s - 0.5) * SWIRL.span * L.h;
+  const up = (slot.s - 0.5) * SWIRL.span * L.h - deep * SWIRL.tilt;
   return {
     x: L.c.x + L.right.x * across + L.up.x * up + L.fwd.x * deep,
     y: L.c.y + L.right.y * across + L.up.y * up + L.fwd.y * deep,
@@ -351,6 +358,13 @@ export function createPetalFlow({ seed = 7, reduced = false } = {}) {
   /** The swirl: its spin and how fast, since when it floats, when the next one comes, how many made. */
   let spin = 0;
   const spinRate = r(SWIRL.spin[0], SWIRL.spin[1]);
+  /**
+   * The swirl's climb (every strand's alike, so they keep their places), and where each strand's
+   * run starts: a whole turn up from the last, so the runs are spread up the letter and still a
+   * third of a turn apart round it.
+   */
+  const climb = r(SWIRL.climb[0], SWIRL.climb[1]);
+  const strandBase = Array.from({ length: SWIRL.strands }, (_, k) => ((k / SWIRL.turns) % 1) + r(0, 0.02));
   /** @type {number|null} */
   let floatingSince = null;
   let nextSwirl = 0;
@@ -601,11 +615,12 @@ export function createPetalFlow({ seed = 7, reduced = false } = {}) {
     const per = FLOWS.swirl.n / SWIRL.strands;
     const outer = i % 4 === 0;
     /** @type {SwirlSlot} */
+    const strand = i % SWIRL.strands;
     const slot = {
-      strand: i % SWIRL.strands,
-      s: ((Math.floor(i / SWIRL.strands) % per) + r(0, 0.4)) / per,
-      r: outer ? r(SWIRL.outer[0], SWIRL.outer[1]) : r(0.94, 1.06),
-      climb: r(SWIRL.climb[0], SWIRL.climb[1]),
+      strand,
+      s: (strandBase[strand] + (Math.floor(i / SWIRL.strands) % per) * SWIRL.gap + r(0, 0.008)) % 1,
+      r: outer ? r(SWIRL.outer[0], SWIRL.outer[1]) : r(0.97, 1.03),
+      climb,
       outer,
       infall: outer,
     };

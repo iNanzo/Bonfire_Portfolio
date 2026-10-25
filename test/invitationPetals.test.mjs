@@ -209,9 +209,14 @@ test('the swirl: three helix strands on an ellipse round the letter, the back ha
       const at = swirlSlot(L, slot, 0.4);
       const e = Math.hypot(at.x / SWIRL.rx, at.z / SWIRL.rz);
       assert.ok(Math.abs(e - swirlRadius(s)) < 1e-9, `on its ellipse: ${e}`);
-      assert.ok(Math.abs(at.y - (s - 0.5) * SWIRL.span * L.h) < 1e-9, 'up the letter as it climbs');
+      assert.ok(Math.abs(at.y - (s - 0.5) * SWIRL.span * L.h + at.z * SWIRL.tilt) < 1e-9, 'up the letter as it climbs');
     }
   assert.ok(swirlRadius(0.5) > swirlRadius(0.05) && swirlRadius(0.5) > swirlRadius(0.95));
+  // Seen from a little above: its back half higher than its front, so it reads as a loop.
+  const back = swirlSlot(L, { strand: 0, s: 0.5, r: 1 }, -Math.PI / 2 - 0.5 * SWIRL.turns * 2 * Math.PI);
+  const front = swirlSlot(L, { strand: 0, s: 0.5, r: 1 }, Math.PI / 2 - 0.5 * SWIRL.turns * 2 * Math.PI);
+  assert.ok(back.z < 0 && front.z > 0 && back.y - front.y > 0.15, `a loop: ${back.y - front.y}`);
+  assert.ok(SWIRL.tilt > 0.2 && SWIRL.tilt < 0.8);
   // The strands a third of a turn apart.
   const a0 = swirlSlot(L, { strand: 0, s: 0.5, r: 1 }, 0);
   const a1 = swirlSlot(L, { strand: 1, s: 0.5, r: 1 }, 0);
@@ -476,7 +481,10 @@ test('a spill on a skip goes down quickly; cut, every petal up shrinks away and 
   assert.ok(before.length > 0);
   const scale0 = before.map((p) => petalAt(p, g.time).scale);
   run(g, 0.15);
-  before.forEach((p, i) => scale0[i] && assert.ok(petalAt(p, g.time).scale < scale0[i], 'shrinking'));
+  // (Grown in by then: one born a moment before the cut may still be growing.)
+  before.forEach(
+    (p, i) => scale0[i] && g.time - p.born > 0.35 && assert.ok(petalAt(p, g.time).scale < scale0[i], 'shrinking'),
+  );
   run(g, 0.25);
   assert.ok(
     g.petals.every((p) => p.kind === 'spill'),
