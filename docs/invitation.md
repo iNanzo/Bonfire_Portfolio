@@ -26,13 +26,22 @@ loads behind it.
 
 - **Rose petals:** plain petals (never the monogram) in three shapes (rounded, cupped and
   curled), a few sizes and three reds, each tumbling, fluttering side to side and drifting its
-  own way, with the same dark line round them. A soft flurry of them comes as the envelope
-  settles in; moving the mouse over it, or touching it, stirs a few more; while it floats one
-  trickles from the seal now and then at most. Never more than a few dozen at once.
+  own way on a gentle wind with a little noise of their own, with the same dark line round
+  them. A soft flurry of them comes as the envelope settles in; while it floats, a slow swirl of
+  them circles it in two or three helix strands (an ellipse wider than the letter, climbing, the
+  back half going behind it), following it as it bobs; moving it (a drag, a turn) sheds a few
+  off its trailing edge that drift its way. Never more than about 120 at once.
+- **Petals on the cursor, everywhere:** over the envelope and all through the toy, the mouse
+  moving trails petals (one every 14–30 px, at most about 20 a second, thrown a little the way
+  it moves, every shape and size), and every click or tap bursts a ring of 10–14 of them. On a
+  phone a finger dragging trails them, and a finger held still keeps a few coming. They're
+  drawn on a layer of their own over the page that every press goes through. **Rose Petals**
+  in Settings turns them all off (the envelope's too); it's on by default and kept with the
+  look.
 - **Open it:** tap or click it, press Enter, Space or the up arrow, swipe it up, or scroll up.
   The seal blooms into roses first (about half a second): it swells, then shrinks away while a
-  ring of petals unfurls out of it and lifts off. Only then does the flap lift, with a burst of
-  petals out of the letter, and the letter dissolves the way a weapon does on the Bonfire site:
+  ring of petals unfurls out of it and lifts off, and the swirl is flung outward. Only then does
+  the flap lift, petals pouring up out of the envelope's inside, and the letter dissolves the way a weapon does on the Bonfire site:
   a ragged, burning edge sweeps up across it, shedding specks of paper, embers and wax that
   drift up and fade, while the white page behind clears onto NEWT, already turned to you, and
   the intro starts by itself (below): its first line, his face and his greeting wait until the
@@ -43,7 +52,7 @@ loads behind it.
   Intro** at the top right. It drops away with a spill of petals (the others shrink out of the
   way) and you're straight into the toy, with no intro.
 - **While you drag it**, it follows your finger with a little give and, going up, the seal
-  starts to open and a few petals stir from it; let go short of a swipe and it springs back
+  starts to open; let go short of a swipe and it springs back
   (swiped open, it stays where you left it while it opens). A sideways drag does nothing, and nothing you do
   on it reaches the toy underneath (the toolbar can't be reached until it's gone).
 - **The hint** ("Click or swipe up to open", or "Tap or swipe up to open" on a touch screen,
@@ -52,7 +61,7 @@ loads behind it.
 - **Focus:** it has focus from the start, but its ring only shows once you press a key (Tab goes
   between it and Skip Intro). Skipped, focus goes to the toolbar's first button, again with its
   ring (and its label) only if your last press was a key: a swipe or a drag shows neither.
-- **Reduced motion:** it holds still, with no petals; the flap is open at once and the seal and
+- **Reduced motion:** it holds still, with no petals (none on the cursor either); the flap is open at once and the seal and
   the letter fade away plainly.
 - Without WebGL 2, or if NEWT can't load, it steps aside so the message shows. Nothing about it
   is saved: it opens every visit.
@@ -179,6 +188,7 @@ the sheet and leaves the slider as it was.
 | Style | Default, DS, Soft, Custom | Default (what a first visit shows, set in the admin's Invitation page; as shipped, Soft with 6 colours, a full-strength dither, full-strength tinted lines on the outer ring, two toon bands and the highlight). DS: like the old handheld, 15-bit colour with a fine dither, dark 1-pixel lines, a hard shadow. Soft: fewer colours, pastel, a warm ring outside him and a softer, dithered shadow. Each sets every Shader option; Custom shows once one of them is yours (it can't be picked: choose a style, or Reset To Style, to go back). |
 | Motion | Smooth, Choppy | Smooth (the default) moves NEWT every frame. Choppy moves his arms, legs and head 15 times a second, like stop motion, while the camera and his walking about stay smooth. |
 | Ground Cues | Off, In the Mix, Always | The ring on the floor under NEWT while he's held and the dashed line from his collar down to it, so you can see where he is over the floor. In the Mix shows them while he's high or moving fast; Always all the time he's held. In the Mix until you pick one. |
+| Rose Petals | On, Off | On (the default): rose petals trail the cursor or a finger and burst in a ring at every click or tap, over the envelope and through the toy; Off, none at all (the envelope's too). |
 | Wander | On, Off | On (the default): left be, he strolls about by himself now and then. Kept for your next visit, like the rest. |
 
 **Shader** lays out the pixel look's own values, which the Style sets; any change shows at once
@@ -664,17 +674,47 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   skips (`SWIPE`); `envelopeKey`; `dragPose`, the follow with its give and the flap's lift;
   `dragHint`; `sealBloom(b)`, the seal's swell and shrink as it blooms; `ENVELOPE_TEXT`),
   `petals.js` (pure, seeded: `petalGrid(shape)` for `PETAL_SHAPES`, `PETAL_SIZES`, and
-  `createPetalFlow` with `emit(kind, t, at)` for the `FLOWS` (spawn, stir, bloom, burst, spill,
-  trickle), `stir` (held back `FLOWS.stir.gap`), `step` (the trickle every `TRICKLE_EVERY`),
-  `cut` (a skip), `at` and `live`; `petalAt(petal, t)`, each petal's launch easing into a settle
-  with its drift, flutter, rock and tumble, a bloom's unfurling first; at most `POOL`, none with
-  reduced motion), `envelopeScene.js` (its own small WebGLRenderer in a fixed
+  `createPetalFlow`, a simulation stepped at a fixed `STEP` (1/60 s, so 30 and 60 frames a
+  second agree) on its own clock: each petal's position and velocity, its drag easing it into
+  the air (a light wind with gusts, its `fall`, its own `valueNoise`), its flutter, rock and
+  tumble added as drawn (`petalAt(petal, t)`, a bloom's and a ring's unfurling first). `emit(kind,
+  at, o)` launches the `FLOWS`: spawn, bloom (at the seal), ring (10–14 at even angles with a
+  little jitter, out with drag, about a second), trail (`o.v` the pointer's velocity: 0.2–0.4 of
+  it, at most `TRAIL.maxLaunch`, with a sideways spread; a still finger's a soft puff), wake and
+  spill. `letter(frame)` each frame (`LetterFrame`: its middle, axes, height, `opening` and
+  `floating`) runs the rest: the swirl (`SWIRL`: 3 strands a third of a turn apart, `swirlSlot`
+  on an ellipse 0.7 × 0.3 letter widths times `swirlRadius(s)`, 2.2 turns up 1.3 of its height,
+  spinning 0.5–0.8 rad/s and climbing 0.04–0.08 a second, 18 petals filling in after 0.5 s, every
+  fourth falling in from 1.5–2.1 times out, each pulled to its slot, drawn small at the ends)
+  while it floats, flung outward once it doesn't; the pour (16 born across its inside below the
+  mouth at the pocket's depth, launched up and out along its axes, in step with the flap); and
+  the wake (`WAKE`: the edge moving fastest away from its outward side sheds petals at a rate
+  tied to its speed, drifting its way). `cut` (a skip), `at`, `live`; at most `POOL` (120; the
+  oldest free petal goes first, the swirl kept), none with reduced motion. `createTrail` is the
+  cursor trail in CSS px: a step every 14–30 px (rolled each time, put where the distance comes
+  up), 1–3 petals a step, at most `TRAIL.rate` (20) a second, the pointer's smoothed velocity
+  with each, and a press that holds (a finger) kept still keeps `TRAIL.hold` a second coming),
+  `petalScene.js` (`createPetalScene({scene, unit, seed, reduced, uniforms, id})`: a flow in a
+  scene's world units, `unit` world units a letter width; `emit`, `letter(matrix, {h, opening,
+  floating})` from the letter's world matrix, `step(dt)` writing the petals into an instanced mesh
+  a shape; `petalMaterial`, the petals' own toon (the three reds, dithered band edges, each
+  petal's `aShade`, its id pass on the scene's `uIdPass`); `buildInk`, the ink pass for a
+  petals-only drawing), `petalLayer.js` (`createPetalLayer(root, {on})`: the page's petals, a
+  fixed `canvas.inv-petals` at z-index 4 over everything with `pointer-events: none`, its own
+  WebGLRenderer at the envelope's texel size, `pageUnit` (`LAYER_SCALE` of the envelope's letter
+  width); passive capture-phase `pointerdown`, `pointermove`, `pointerup` and `pointercancel` on
+  the document (never `preventDefault`) drive the trail and a ring at each press, the primary
+  pointer only; it draws only while petals are up or a finger is held, then clears and stops;
+  `on()` false (Rose Petals off, `look.js petalsOn`, or reduced motion) launches none and shrinks
+  any up away), `envelopeScene.js` (its own small WebGLRenderer in a fixed
   `.inv-envelope` layer at z-index 3, drawn at `TEXELS` texels along the screen's shorter side and
   scaled up pixelated, over a `.inv-envelope-paper` page in `--inv-bg` that it clears as the letter
   dissolves; drawn twice, its colours and then each part's id (`IDS`, back to front), then put
   together with a one-texel line in `INK` on each texel bordering a later part, none round the
-  dissolving rim; the petals as one instanced mesh a shape, ids `IDS.petal` and the two after,
-  on their own clock that a loading stall holds still; the specks as square points on layer 1
+  dissolving rim; the petals (`createPetalScene`, ids `IDS.petal` and the two after, so the
+  letter hides the swirl's back half and the ink runs round them) fed its matrix each frame,
+  stepped at most 1/20 s a frame so a loading stall holds them still; Rose Petals off (its
+  `petals` option), none; the specks as square points on layer 1
   on top, with no line; disposed, its context lost and its layer removed once it's done and its
   last petals have gone), `envelopeLook.js` (the palette, three tones a material;
   `envelopeLayout`, the envelope's parts as flat polygons, each fold's hidden corners under the
@@ -683,8 +723,7 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   `LEAN`; and the toon material: three tones, the paper's one flat tone a face (`FLAT`, no
   dither, leaning into the light by its `LEAN` so it keeps its band through the sway), the
   others' band edges dithered, its id pass, and the dissolve with its burning rim, copied
-  from the Bonfire site's weapon dissolve, not imported; `PETAL`, never dissolved, its bands
-  stepped by each petal's `aShade`), `envelopeSeal.js` (the seal, one piece, drawn like the
+  from the Bonfire site's weapon dissolve, not imported; `PETAL`, the petals' three reds), `envelopeSeal.js` (the seal, one piece, drawn like the
   user's reference: its radius `SEAL_SIZE` (0.2) of the letter's width, on the flap's tip,
   upright on the screen; `sealLayout(R)` for a seal `R` texels across its radius (about 31 on a
   desktop, 42 on a phone: the scene's `setRadius(sealR / sealTexel(...))`) gives a flat field, a
@@ -749,9 +788,11 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   `invitationMotion`, `invitationGesture` and `invitationModel`), `invitationDialogue` (the
   runner, and content.js's intro as it plays), the speech and content tests above,
   `invitationEnvelope` (its states, swipes, keys and timeline), `invitationPetals` (the petals'
-  shapes, variety, paths and flows),
-  `e2e/invitation.spec.mjs`, `e2e/invitationDialogue.spec.mjs` and
-  `e2e/invitationEnvelope.spec.mjs` (`npm run e2e -- invitation`).
+  shapes, variety, the stepped simulation and every flow, the trail's spacing and rate),
+  `invitationPetalSetting` (Rose Petals stored with the look),
+  `e2e/invitation.spec.mjs`, `e2e/invitationDialogue.spec.mjs`,
+  `e2e/invitationEnvelope.spec.mjs` and `e2e/invitationPetals.spec.mjs` (the page's petal layer:
+  the mouse, a finger, Rose Petals off, reduced motion) (`npm run e2e -- invitation`).
 - **Test hooks:** `[data-stage].is-ready` once the first frame is drawn, `data-webgl="off"`
   without WebGL. `?test` adds `window.__invitation`: `snapshot()` (his state, clip, face,
   position, head turn, the camera's yaw, elevation and distance, the states he went through,
@@ -792,7 +833,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   it runs. The snapshot's `envelope` is the envelope's state (null without one), `hover` the
   hover dither (0..1) and `burst` whether the grab ring is up; `clock()` is the toy's clock (it
   stands still while the envelope covers him) and `envelope()` the envelope's state, reduced
-  motion, pose, frames drawn and `petals` (`live`, and how many each flow has `emitted`). `?seed=N` makes the randomness repeatable; `?calm` stops him wandering and sitting by himself; `?perf` shows the frame times
+  motion, pose, frames drawn and `petals` (`live`, and how many each flow has `emitted`);
+  `petals()` the page's petal layer (`running`, `on`, `live`, `emitted`, `texels`). `?seed=N` makes the randomness repeatable; `?calm` stops him wandering and sitting by himself; `?perf` shows the frame times
   (p50 and p90), the GPU's time a frame where the browser can measure it, the grid, the
   governor's level and the zoom in a corner; `?govern` turns the governor on under `?test`.
 - **Captures:** `node tools/capture-invitation.mjs` records real-speed clips of every clip and
