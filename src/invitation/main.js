@@ -1081,7 +1081,8 @@ function start(s) {
    * intro ends (no easing back: the camera cuts home), a hold is dropped, NEWT's body, brain, mix,
    * gaze and faces start again where they began, the talk's idle clock restarts, the bubble, the
    * grab ring and the hover go; then the envelope comes (the HUD inert under it) and the toy
-   * pauses behind it once this frame is drawn. Opened, the intro starts as at boot (introWanted).
+   * pauses behind it once this frame is drawn. Opened, the intro starts as at boot (introWanted);
+   * if no envelope can be made (its renderer refused), the intro starts by itself all the same.
    */
   function replay() {
     if (intro) {
@@ -1122,6 +1123,9 @@ function start(s) {
     s.setBurst(0, 0, 0, 0);
     spawnEnvelope();
     envelopeVeils = Boolean(envelope);
+    // (No envelope could be made, its renderer refused: the intro alone, as without one, once the
+    // buttons are on again.)
+    if (!envelope) introWanted = true;
     // (Paused behind it once this frame is drawn, as at boot.)
     sync();
   }

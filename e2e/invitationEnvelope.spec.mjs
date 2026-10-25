@@ -425,6 +425,29 @@ test.describe('on a desktop', () => {
     await introStarted(page);
   });
 
+  test('Replay Intro when no envelope can be made still plays the intro, over the reset scene', async ({ page }) => {
+    await envelopeUp(page);
+    await page.keyboard.press('Escape');
+    await skipped(page);
+    // (From now on a new canvas gets no WebGL: the envelope's renderer is refused, so there is none.)
+    await page.evaluate(() => {
+      const had = new Set(document.querySelectorAll('canvas'));
+      const get = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (type, ...rest) {
+        if (/webgl/.test(String(type)) && !had.has(this)) return null;
+        return get.call(this, type, ...rest);
+      };
+    });
+    const intro = await script(page);
+    await page.locator('.inv-btn-intro').click();
+    await until(page, (s) => s.dialogue?.id === intro.start, 'the intro at its first box');
+    const s = await snapshot(page);
+    expect(s.envelope).toBeNull();
+    await expect(page.locator('.inv-envelope')).toHaveCount(0);
+    await expect(page.locator('.inv-hud')).not.toHaveAttribute('inert', '');
+    await expect(page.locator('.inv-talk-box')).toBeVisible();
+  });
+
   test('Replay Intro’s envelope brings its petals back, and none with Rose Petals off', async ({ page }) => {
     const replayed = async () => {
       await page.locator('.inv-btn-intro').click();

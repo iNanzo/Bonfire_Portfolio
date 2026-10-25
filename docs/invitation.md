@@ -75,7 +75,8 @@ loading screen too: NEWT loads behind it.
 - **Replay Intro** on the toolbar brings it back: the scene starts over underneath (NEWT on his
   feet where he began, the camera home, no speech bubble), the envelope comes with its petals
   as at first (none with Rose Petals off), and opening it starts the intro just as the first
-  time.
+  time. If the envelope can't be made again (the browser refuses it another WebGL context), the
+  intro starts by itself over the reset scene.
 - Without WebGL 2, or if NEWT can't load, it steps aside so the message shows. Nothing about it
   is saved: it opens every visit.
 
@@ -853,7 +854,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   the mix, gaze, glance and faces made again, `talk.rest`, the camera cut home (a new orbit), the
   bubble, the grab ring and the hover gone, then `spawnEnvelope` (its `petals` from the look's
   Rose Petals as it is then) and the loop paused behind it
-  once that frame is drawn; opened, `introWanted` as at boot. `?test` skips it unless
+  once that frame is drawn; opened, `introWanted` as at boot (and at once when `spawnEnvelope`
+  makes none: its renderer refused). `?test` skips it unless
   `&envelope` (`parseQuery`'s `envelope`), and there Replay Intro runs the dialogue alone.
 - **The hover and the grab ring:** `retro.js`'s post shader takes `uHover` (a two-texel Bayer
   rim on NEWT's texels, a tenth of the rest, and a halo up to two texels outside him in the ring
