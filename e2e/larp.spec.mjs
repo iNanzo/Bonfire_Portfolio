@@ -126,6 +126,28 @@ test('the output window shows the fire, the scores, the clock and the banners, n
   expect(errors).toEqual([]);
 });
 
+test('another tab follows team edits and the game title without reloading', async ({ page, context }) => {
+  const errors = await fresh(page);
+  const setup = page.locator('[data-setup]');
+  await setup.locator('input[data-set$=".name"]').first().fill('Owls');
+  const other = await context.newPage();
+  try {
+    await other.goto('/larp/');
+    await other.locator('[data-act="setup"]').click();
+    const otherSetup = other.locator('[data-setup]');
+    await expect(otherSetup.locator('input[data-set$=".name"]').first()).toHaveValue('Owls');
+    await setup.locator('input[data-set$=".name"]').first().fill('Foxes');
+    await expect(rowOf(other, 'Foxes')).toBeVisible();
+    await expect(otherSetup.locator('input[data-set$=".name"]').first()).toHaveValue('Foxes');
+    await setup.getByRole('tab', { name: 'Game', exact: true }).click();
+    await setup.locator('[data-set="game.title"]').fill('Shared Game Night');
+    await expect(other).toHaveTitle('Shared Game Night');
+    expect(errors).toEqual([]);
+  } finally {
+    await other.close();
+  }
+});
+
 test('the first version’s save is carried over: its teams, rounds and points', async ({ page }) => {
   const errors = watch(page);
   await page.goto('/larp/');

@@ -226,7 +226,10 @@ window.addEventListener('storage', (e) => {
   const prev = game;
   game = g;
   draw();
-  if (g.roundIndex !== prev.roundIndex) stage.playRound(g.rounds[g.roundIndex]);
+  const round = g.rounds[g.roundIndex];
+  if (g.roundIndex !== prev.roundIndex || round.scene !== prev.rounds[prev.roundIndex]?.scene) stage.playRound(round);
+  document.title = g.title;
+  setup.refresh();
 });
 
 if (loaded.from === 'old') note('Your game from the earlier version was carried over', 5);
