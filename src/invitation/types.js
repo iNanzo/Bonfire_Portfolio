@@ -152,7 +152,13 @@
  * @property {{x: number, y: number}} drive  a critically damped follow of the pointer, client px
  * @property {{x: number, y: number}} vel  its velocity, CSS px/s
  * @property {number} speed  its speed, CSS px/s
- * @property {number} shake  its acceleration, smoothed, world units/s² (none while it settles)
+ * @property {number} shake  its acceleration while it's shaking (carry.js HAND: two turns close
+ *   together), smoothed, world units/s² (none otherwise, nor while it settles)
+ * @property {{x: number, y: number}} px  the pointer's spot last seen, client px
+ * @property {number} movedAt  when that spot last moved (a gap in its samples starts the hand over)
+ * @property {{x: number, y: number}} from  where the pointer's stroke began, client px
+ * @property {{x: number, y: number}} far  the stroke's farthest from there
+ * @property {number[]} turns  when the last turns were, two at most, close enough together
  */
 
 /**

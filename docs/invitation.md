@@ -495,7 +495,12 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     `carry.js` `createHand`, `handStep`, `handFeel`: what the brain feels while he's held, the
     shake and the drag speed, from the user's own pointer alone (a critically damped follow of
     it at `CARRY.follow`, the shake its acceleration over the CSS px a world unit spans where he
-    hangs, none for the first `HAND.settle`, 0.2 s, so a pointer already moving as he's grabbed
+    hangs, only while the pointer goes back and forth: two turns, each after a stroke of at
+    least `HAND.swing`, 0.1 units, and back as far, no more than `HAND.turnWithin`, 0.35 s,
+    apart, so one fast flick is no shake however fast; a pointer whose spot stands still for
+    `HAND.gap`, 0.1 s, and then moves on had a gap in its events while the frames kept coming,
+    and the hand starts over there, at rest, instead of reading the jump as a jolt; none for the
+    first `HAND.settle`, 0.2 s, so a pointer already moving as he's grabbed
     isn't a jolt), never from a kind easing his collar onto it: read off his collar, the grab
     offset, a finger's lift and the bead's spring and hold height made every still grab a hard
     shake ("Too much!" and an early Thrash) and stress enough to flee once he landed; `carry.js`
