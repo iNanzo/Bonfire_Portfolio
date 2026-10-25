@@ -225,10 +225,10 @@ const moveBy = (r, d, span, hold = 1.2, extra = {}) => {
 };
 const settledAt = (frames, t) => frames.reduce((best, f) => (Math.abs(f.t - t) < Math.abs(best.t - t) ? f : best));
 
-test('bead: a hold of its own kind, In the Mix by default, with the squash, a 48 px finger lift and a second finger for height', () => {
+test('bead: a hold of its own kind, In the Mix by default, with the squash, an 80 px finger lift (the ring over the finger) and a second finger for height', () => {
   const h = createHold('bead');
   assert.equal(h.kind, 'bead');
-  assert.deepEqual(h.feel, { groundCues: 'mix', squash: true, fingerLift: 48, secondFinger: true });
+  assert.deepEqual(h.feel, { groundCues: 'mix', squash: true, fingerLift: 80, secondFinger: true });
   assert.equal(typeof h.onWheel, 'function');
   assert.equal(typeof h.onSecondFinger, 'function');
   assert.equal(h.plane, null, 'no plane before a grab');
@@ -271,6 +271,32 @@ test('bead, settled: per 100 px of cursor up held still at 36°, he goes as far 
       const size = b.scale / a.scale - 1;
       assert.ok(size <= -0.04 && size >= -0.08, `${screen} yaw ${yaw}: size ${(size * 100).toFixed(1)}%`);
     }
+});
+
+test('bead, a finger (HoldStart.touch): per 100 px up held still he goes 0.55-0.65 as far away as with the mouse at 24°, 36° and 50°, his collar on the finger’s ray; held still, the ring shows at or above the finger', () => {
+  const finger = createHold('bead').feel.fingerLift ?? 0;
+  for (const elevation of [24, 36, 50]) {
+    for (const yaw of [0, 90]) {
+      const r = rig('phone', { yaw, elevation });
+      const at = `phone ${elevation}° yaw ${yaw}`;
+      const away = (given) => {
+        const { frames } = moveBy(r, { x: 0, y: -100 }, 0.25, 1.2, { given });
+        const a = settledAt(frames, 1.2);
+        const b = frames[frames.length - 1];
+        assert.ok(b.gap <= 1, `${at}: ${b.gap.toFixed(2)} px off the ray`);
+        return depthAlong(b.anchor, r.camera.yaw) - depthAlong(a.anchor, r.camera.yaw);
+      };
+      const share = away({ touch: true }) / away({});
+      assert.ok(share >= 0.55 && share <= 0.65, `${at}: a finger goes ${share.toFixed(3)} as far`);
+      const { frames } = sim(r, { path: still(centrePx(r)), until: 1.5, given: { touch: true } });
+      const f = frames[frames.length - 1];
+      const ring = r.project({ x: f.step.cues.ring.x, y: 0, z: f.step.cues.ring.z });
+      assert.ok(
+        ring.y <= f.px.y + finger,
+        `${at}: the ring ${(ring.y - f.px.y - finger).toFixed(1)} px under the finger`,
+      );
+    }
+  }
 });
 
 test('bead, settled: 70° still carries him away (0.85-1.05 / 0.55-0.67), 12° stands the plane up so it’s a lift (0.75-0.90 / 0.44-0.54, away ≤ 0.05), and 24° does some of both', () => {

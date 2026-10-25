@@ -418,6 +418,7 @@ export function squash(sinceGrab, sinceLand) {
  * @property {HoldCamera} camera
  * @property {number} low  his hang height: the lowest his collar is carried once he's clear
  * @property {Bounds|null} bounds  the play area
+ * @property {boolean} [touch]  grabbed by a finger
  */
 /**
  * @typedef {object} HoldFrame  what a kind gets each frame he's held

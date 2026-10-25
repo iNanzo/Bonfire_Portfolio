@@ -404,7 +404,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     `holds/bead.js` is the bead candidate
     (built): his collar a bead on the cursor's ray, exactly under it, its distance from the
     camera sprung (`BEAD.omega` 14 rad/s, `zeta` 0.65) toward a level plane at his hold height
-    (his hang height + 0.45, blended upright from 35° down to 12° of elevation: `beadPlane`), so
+    (his hang height + 0.45, or + 0.15 by a finger, his collar 80 px over it, so the ring shows over it; blended upright
+    from 35° down to 12° of elevation, and by a finger leant back so a move up carries him 0.6 as
+    far, lifting him a little: `beadPlane`), so
     a flick up lofts him toward the camera before he settles away; the wheel (0.1 of his height a
     notch) and a second finger (0.8 per 100 px) set the hold height, up to 2.4 over his hang
     height, straight up over his spot on the floor (the gap to the cursor eased out from the next

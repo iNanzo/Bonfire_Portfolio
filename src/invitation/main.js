@@ -1278,6 +1278,7 @@ function start(s) {
           camera: view,
           low: hangY,
           bounds: area,
+          touch: pressKind === 'touch',
         });
         const head = shape().head;
         headAbove = press.y0 - (head.y - head.r);

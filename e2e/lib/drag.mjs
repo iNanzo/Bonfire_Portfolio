@@ -107,6 +107,32 @@ export async function finger(page) {
 }
 
 /**
+ * Fingers through CDP (real touches), by id: start, move and end one while the rest stay down.
+ * @param {import('@playwright/test').Page} page
+ */
+export async function fingers(page) {
+  const cdp = await page.context().newCDPSession(page);
+  /** @type {Map<number, {x: number, y: number}>} */
+  const down = new Map();
+  const send = (type) =>
+    cdp.send('Input.dispatchTouchEvent', {
+      type,
+      touchPoints: [...down].map(([id, p]) => ({ x: p.x, y: p.y, id })),
+    });
+  return {
+    start: (id, p) => (down.set(id, p), send('touchStart')),
+    move: (id, p) => (down.set(id, p), send('touchMove')),
+    // (A touchEnd lists the touches that end; the rest stay down.)
+    end: async (id) => {
+      const p = down.get(id);
+      down.delete(id);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [{ x: p.x, y: p.y, id }] });
+    },
+    done: () => cdp.detach(),
+  };
+}
+
+/**
  * The shared checks for drag kind `kind`. `baseline`: the checks the kind is known to fail (today's
  * hold leaves the collar off the cursor on a down drag: marked test.fail, so fixing it shows).
  * Each check gets him high with `lift` (a drag up, and the wheel for a kind that has one).

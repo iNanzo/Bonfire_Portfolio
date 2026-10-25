@@ -9,7 +9,7 @@
 // second finger dragged 100 px up raises him 0.8, never pinching. Every wait is on a state
 // (snapshot().drag through ?test), never a duration. Playwright only.
 import { test, expect } from '@playwright/test';
-import { calm, dragDescribe, gap, glide, grab, on, onCursor, snapshot, until } from './lib/drag.mjs';
+import { calm, dragDescribe, fingers, gap, glide, grab, on, onCursor, snapshot, until } from './lib/drag.mjs';
 
 dragDescribe('level');
 
@@ -192,29 +192,6 @@ test.describe('?drag=level, on a desktop', () => {
 
 test.describe('?drag=level, on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
-
-  /** Fingers through CDP (real touches), by id. */
-  async function fingers(page) {
-    const cdp = await page.context().newCDPSession(page);
-    /** @type {Map<number, {x: number, y: number}>} */
-    const down = new Map();
-    const send = (type) =>
-      cdp.send('Input.dispatchTouchEvent', {
-        type,
-        touchPoints: [...down].map(([id, p]) => ({ x: p.x, y: p.y, id })),
-      });
-    return {
-      start: (id, p) => (down.set(id, p), send('touchStart')),
-      move: (id, p) => (down.set(id, p), send('touchMove')),
-      // (A touchEnd lists the touches that end; the rest stay down.)
-      end: async (id) => {
-        const p = down.get(id);
-        down.delete(id);
-        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [{ x: p.x, y: p.y, id }] });
-      },
-      done: () => cdp.detach(),
-    };
-  }
 
   test('level: his collar sits 48 px over the finger; a second finger dragged 100 px up raises him 0.8 and never zooms', async ({
     page,

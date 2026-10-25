@@ -31,7 +31,8 @@ const RAD = Math.PI / 180;
 /**
  * The bead: its spring along the ray (`omega` rad/s, `zeta` its damping ratio, at most `maxSpeed`
  * u/s), integrated in steps of `substep`, at most `maxSteps` a frame. The hold height: `hold0`
- * of his height over his hang height as he's grabbed, eased in from his collar with a critically
+ * of his height over his hang height as he's grabbed (`touchHold0` by a finger, so the ring shows
+ * over it; a finger's plane leant back so he goes `touchDepth` as far: beadPlane), eased in from his collar with a critically
  * damped `holdIn` s halflife for `holdInFor` s, then following its goal at `holdFollow`; never
  * more than `holdMost` of his height over his hang height; the wheel moves it `wheel` of his height
  * per CSS px, a second finger `finger`. The plane: level from `blendFrom` of elevation up, upright
@@ -54,6 +55,8 @@ export const BEAD = {
   substep: 1 / 120,
   maxSteps: 8,
   hold0: 0.45,
+  touchHold0: 0.15,
+  touchDepth: 0.6,
   holdIn: 0.06,
   holdInFor: 0.3,
   holdFollow: 0.08,
@@ -119,14 +122,24 @@ export function damp(x, v, goal, half, dt) {
 /**
  * The plane the bead springs toward: level at `holdY` with the camera BEAD.blendFrom up or more,
  * stood up to face it (its normal the level way toward the camera) by BEAD.blendTo, smoothly
- * between, through `through`'s spot on the floor at `holdY`.
+ * between, through `through`'s spot on the floor at `holdY`. For a finger (`touch`), leant back
+ * further, so a move up the screen carries him BEAD.touchDepth as far away (a phone's px are a
+ * long way across the floor) and lifts him a little: from a plane at θ from level a move goes
+ * 1 / (1 + cot β tan θ) as far as from a level one, β the camera's elevation.
  * @param {HoldCamera} camera
  * @param {XZ} through
  * @param {number} holdY
+ * @param {boolean} [touch]
  * @returns {Plane}
  */
-export function beadPlane(camera, through, holdY) {
-  const w = smooth(clamp((BEAD.blendFrom - camera.elevation) / (BEAD.blendFrom - BEAD.blendTo), 0, 1));
+export function beadPlane(camera, through, holdY, touch = false) {
+  let w = smooth(clamp((BEAD.blendFrom - camera.elevation) / (BEAD.blendFrom - BEAD.blendTo), 0, 1));
+  if (touch && w < 1) {
+    const tb = Math.tan(clamp(camera.elevation, 5 * RAD, 85 * RAD));
+    const tm = w / (1 - w);
+    const tt = ((1 + tm / tb) / BEAD.touchDepth - 1) * tb;
+    w = tt / (1 + tt);
+  }
   const { toward } = levelAxes(camera.yaw);
   const n = { x: toward.x * w, y: 1 - w, z: toward.z * w };
   const len = Math.hypot(n.x, n.y, n.z) || 1;
@@ -402,6 +415,8 @@ export function createBeadHold(deps = {}) {
   let wasSide = false;
   /** @type {Bounds|null} */
   let area = null;
+  /** Grabbed by a finger. */
+  let touch = false;
   /**
    * A height change under way: his spot on the floor kept, his collar `y0` plus how far the hold
    * height has moved since `h0`, till the pointer leaves `px`.
@@ -438,7 +453,7 @@ export function createBeadHold(deps = {}) {
 
   return {
     kind: 'bead',
-    feel: { groundCues: 'mix', squash: true, fingerLift: 48, secondFinger: true },
+    feel: { groundCues: 'mix', squash: true, fingerLift: 80, secondFinger: true },
     get plane() {
       return plane;
     },
@@ -448,8 +463,9 @@ export function createBeadHold(deps = {}) {
     get landing() {
       return landing;
     },
-    start({ t, collar, press, collarPx, rayAt, camera, low: hang, bounds }) {
+    start({ t, collar, press, collarPx, rayAt, camera, low: hang, bounds, touch: byFinger }) {
       t0 = t;
+      touch = Boolean(byFinger);
       area = bounds;
       off0 = { x: collarPx.x - press.x, y: collarPx.y - press.y };
       bead.s = Math.max(0, sOf(rayAt(collarPx.x, collarPx.y), collar));
@@ -460,10 +476,10 @@ export function createBeadHold(deps = {}) {
       clear = collar.y >= hang - 1e-6;
       holdY = collar.y;
       holdV = 0;
-      holdGoal = hang + BEAD.hold0 * H;
+      holdGoal = hang + (touch ? BEAD.touchHold0 : BEAD.hold0) * H;
       through = { x: collar.x, z: collar.z };
       view = camera;
-      plane = beadPlane(camera, through, holdY);
+      plane = beadPlane(camera, through, holdY, touch);
       anchor = { x: collar.x, y: collar.y, z: collar.z };
       rope = hangRope(collar);
       tilt = { x: 0, z: 0 };
@@ -504,7 +520,7 @@ export function createBeadHold(deps = {}) {
       view = camera;
       // (The hold height: eased in from his collar as he's grabbed, then following its goal.)
       [holdY, holdV] = damp(holdY, holdV, holdGoal, t - t0 < BEAD.holdInFor ? BEAD.holdIn : BEAD.holdFollow, dt);
-      plane = beadPlane(camera, through, holdY);
+      plane = beadPlane(camera, through, holdY, touch);
       // (The floor: his hang height once he's clear of it; before, no lower than he was grabbed.)
       if (anchor.y >= low - 1e-6) clear = true;
       const floorY = clear ? low : Math.min(from, low);

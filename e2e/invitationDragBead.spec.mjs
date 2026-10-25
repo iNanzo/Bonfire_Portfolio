@@ -2,10 +2,11 @@
 // (e2e/lib/drag.mjs dragDescribe), then what only the page can measure: his collar within 1 px of
 // the cursor after a flick up and down, 100 px up the screen held still carrying him away about as
 // far as design.md's level plane (1.45-1.75 on a phone, 0.90-1.10 on a desktop, at 36°), the wheel
-// moving his hold height and not the camera, a finger 48 px under his collar, and a sideways throw
-// landing where the ring waited for him. Every wait is on a state, never a duration.
+// moving his hold height and not the camera, a finger 80 px under his collar, a second finger's
+// lift leaving him held once it lifts, and a sideways throw landing where the ring waited for
+// him. Every wait is on a state, never a duration.
 import { test, expect } from '@playwright/test';
-import { calm, dragDescribe, finger, glide, grab, on, onCursor, snapshot, until } from './lib/drag.mjs';
+import { calm, dragDescribe, finger, fingers, glide, grab, on, onCursor, snapshot, until } from './lib/drag.mjs';
 
 dragDescribe('bead');
 
@@ -118,7 +119,7 @@ test.describe('?drag=bead, on a desktop', () => {
 test.describe('?drag=bead, on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
 
-  test('bead: carried with a finger, his collar is 48 ± 2 px above it', async ({ page }) => {
+  test('bead: carried with a finger, his collar is 80 ± 2 px above it', async ({ page }) => {
     await calm(page, 'bead');
     await frame(page);
     const head = await on(page, 'body');
@@ -130,10 +131,40 @@ test.describe('?drag=bead, on a phone', () => {
     await f.move(at);
     await onCursor(page, 'the collar where it’s aimed');
     const d = (await snapshot(page)).drag;
-    expect(d.pointer.y - d.aim.y, 'aimed 48 px above the finger').toBeGreaterThan(46);
-    expect(d.pointer.y - d.aim.y, 'aimed 48 px above the finger').toBeLessThan(50);
+    expect(d.pointer.y - d.aim.y, 'aimed 80 px above the finger').toBeGreaterThan(78);
+    expect(d.pointer.y - d.aim.y, 'aimed 80 px above the finger').toBeLessThan(82);
     expect(Math.abs(d.pointer.x - d.aim.x)).toBeLessThan(1);
     await f.up();
+    await f.done();
+    await until(page, (s) => !s.held, 'let go');
+  });
+
+  test('bead: a second finger dragged up lifts him; once it lifts, he is still held, and the next move of the first puts his collar back over it', async ({
+    page,
+  }) => {
+    await calm(page, 'bead');
+    const body = await on(page, 'body');
+    const f = await fingers(page);
+    const at = { x: body.x, y: body.y + 40 };
+    await f.start(1, at);
+    await f.move(1, { x: at.x, y: at.y - 20 });
+    await until(page, (s) => s.held && s.motion.heldFor >= 0.2, 'held, the lift in');
+    const y0 = (await snapshot(page)).drag.holdY;
+    let two = { x: Math.min(370, at.x + 120), y: 600 };
+    await f.start(2, two);
+    for (let i = 0; i < 10; i++) {
+      two = { x: two.x, y: two.y - 10 };
+      await f.move(2, two);
+    }
+    await until(page, (s) => s.drag.holdY > y0 + 0.4, 'the second finger lifted him');
+    await f.end(2);
+    const heldFor = (await snapshot(page)).motion.heldFor;
+    // (Ends on a let-go too, so a dropped hold fails at once rather than timing out.)
+    await until(page, (s) => !s.held || s.motion.heldFor >= heldFor + 0.3, '0.3 s on, or let go');
+    expect((await snapshot(page)).held, 'still held').toBe(true);
+    await f.move(1, { x: at.x + 10, y: at.y - 20 });
+    await onCursor(page, 'over the finger once more');
+    await f.end(1);
     await f.done();
     await until(page, (s) => !s.held, 'let go');
   });
