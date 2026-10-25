@@ -246,22 +246,22 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
 
 - **The screen:** a wide box along the bottom with his name on a tab at its top left and his
   line typed out in it, a small bouncing ▼ at its bottom right once the line is all there, Auto,
-  Skip and Log at the top right, **Skip Intro** at the top left, and a gentle dim along the bottom
+  Next and Log at the top right, **Skip Intro** at the top left, and a gentle dim along the bottom
   behind the box. A line's own line breaks (as the admin types them) show. The toolbar goes while
   the intro runs and comes back after it.
 - **Going on:** a tap or click anywhere first finishes the line, then goes on to the next box;
-  Space and Enter do the same (after a click or tap on Auto, Skip or Log too; from the keyboard,
+  Space and Enter do the same (after a click or tap on Auto, Next or Log too; from the keyboard,
   a focused button presses itself). Some boxes ask a question: two or three replies show as buttons
   stacked in the middle of the screen, under his face (that box's shot frames him in the space
   over them, from the start of its line), and each leads to its own lines. They take a press
   only once the presses that went on have stopped for a moment (0.45 s), so a quick second tap,
   or the next Enter of someone pressing along, never picks one by chance.
 - **Auto** goes on by itself once each line has had time to be read (a box can set its own
-  wait); it waits at a question. **Skip** jumps to the next question, or to the end. **Log**
+  wait); it waits at a question. **Next** jumps to the next question, or to the end. **Log**
   shows every line so far and the replies picked, in a list that scrolls; Close or Escape
   shuts it. **Skip Intro** ends the intro at once, with no question. **Escape** asks whether to
   skip the intro, and a second Escape (or Skip Intro there) ends it. While the Log or that
-  question is open, Auto, Skip, Skip Intro, Log and the replies rest under it.
+  question is open, Auto, Next, Skip Intro, Log and the replies rest under it.
 - **NEWT:** he gets up if he's sitting, takes a few steps in if he's out near the edge, turns
   to face you and looks at you while he talks, his head drifting a little. The first line waits
   for him (the box shows his name and nothing else, and a tap meanwhile does nothing), so its

@@ -2,7 +2,8 @@
 // laid out like Uma Musume's chats and drawn in the toy's own style (dialogue.css): a wide box along the bottom with the
 // speaker's name on a tab at its top left and the line typed out in it (the rest of the line
 // waits unseen in its place, so the box keeps its size), a small bouncing ▼ at its bottom right
-// once the line is up, Auto, Skip and Log at the top right of the screen, Skip Intro at its top
+// once the line is up, Auto, Next (to the next question, or the end) and Log at the top right
+// of the screen, Skip Intro at its top
 // left (on screen all through the intro: it ends it at once, no question), the replies as buttons
 // stacked in the middle of it when a box has them (laid out out of sight from the box's start, so
 // main.js frames him over them: clearSpace), a gentle dim along the bottom behind the box,
@@ -17,7 +18,7 @@
 // a quick second tap or press after the one that finished the line never picks one.
 // Keys, wherever focus is: Space or Enter go on (a focused button presses itself instead),
 // Escape closes the Log, or asks whether to skip the intro, and a second Escape ends it; a click
-// or tap on Auto, Skip or Log (or the Log's Close) leaves focus where Space and Enter go on, and
+// or tap on Auto, Next or Log (or the Log's Close) leaves focus where Space and Enter go on, and
 // from the keyboard focus stays on the button (the Log's back on it as it closes); under the Log
 // or the question the buttons over the stage are out of reach (inert); Tab goes
 // round the layer's buttons. A screen reader hears each line whole once, from a live region
@@ -49,7 +50,7 @@ export const REPLY_SETTLE = 450;
 export const TALK_TEXT = {
   layer: 'Intro',
   auto: 'Auto',
-  skip: 'Skip',
+  next: 'Next',
   log: 'Log',
   logTitle: 'Log',
   close: 'Close',
@@ -75,7 +76,7 @@ export function talkHtml() {
   return `<div class="inv-talk-dim" aria-hidden="true"></div>
   <div class="inv-talk-top" role="toolbar" aria-label="${t.layer}">
     <button type="button" class="inv-btn inv-talk-btn" data-talk="auto" aria-pressed="false">${t.auto}</button>
-    <button type="button" class="inv-btn inv-talk-btn" data-talk="skip">${t.skip}</button>
+    <button type="button" class="inv-btn inv-talk-btn" data-talk="skip">${t.next}</button>
     <button type="button" class="inv-btn inv-talk-btn" data-talk="log" aria-haspopup="dialog" aria-expanded="false">${t.log}</button>
   </div>
   <button type="button" class="inv-btn inv-talk-btn inv-talk-skip-intro" data-intro-skip>${t.skipIntro}</button>
@@ -159,7 +160,7 @@ export function createDialogueUi(stage, { onAction, log, replySettle = REPLY_SET
 
   const modal = () => !logBox.hidden || !ask.hidden;
   /**
-   * What's in reach: under the open Log or the question, Auto, Skip, Log and the replies are
+   * What's in reach: under the open Log or the question, Auto, Next, Log and the replies are
    * inert (out of reach of taps, clicks and Tab); the replies too until they show.
    */
   const reach = () => {
@@ -386,7 +387,7 @@ export function createDialogueUi(stage, { onAction, log, replySettle = REPLY_SET
       return $('.inv-talk-box');
     },
     /**
-     * The space the shots frame him in, client px: from under the Auto, Skip and Log row to the
+     * The space the shots frame him in, client px: from under the Auto, Next and Log row to the
      * chat box's top as it's laid out (its rise as the layer opens left out), or to the replies'
      * top while a box has them and there's REPLY_ROOM over them, so they show under his face.
      */

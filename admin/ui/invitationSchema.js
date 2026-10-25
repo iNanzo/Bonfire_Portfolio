@@ -226,7 +226,7 @@ export const INVITATION_MORE = {
   'invitation.lines': `Up to ${LINES_MAX} lines a moment, each up to ${LINE_MAX} characters (past 80 they wrap a lot in his bubble). A moment with no lines says nothing.`,
   'invitation.intro':
     'A tap anywhere goes on: the first finishes the typing, the next goes to the next box. Space or Enter goes on too; Escape offers to skip it.\n' +
-    'Auto goes on by itself after each line’s wait, Skip jumps to the next choice or the end, and Log lists the lines so far.\n' +
+    'Auto goes on by itself after each line’s wait, Next jumps to the next choice or the end, and Log lists the lines so far.\n' +
     'While it plays he stays put, facing you; once it ends, the camera eases back and he plays as before.',
   'invitation.intro.boxes':
     'Choices come first, then End, then Next: with choices, a box waits for a reply; with none of the three, a tap goes to the box after it, and the last box ends the intro.\n' +

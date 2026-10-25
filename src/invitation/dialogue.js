@@ -13,8 +13,8 @@
 //     that reply's box (one that isn't there ends it);
 //   - Auto goes on by itself once the line is typed and the box's `auto` seconds have passed (or
 //     autoDelay's, from the line's length), never past a choice;
-//   - Skip goes to the next box with choices, typed, or to the end (a loop with no choice in it
-//     ends rather than going round);
+//   - Next (the top right's button; skip here) goes to the next box with choices, typed, or to
+//     the end (a loop with no choice in it ends rather than going round);
 //   - the log keeps every line shown (its speaker and text) and every reply picked, in order;
 //   - pause holds its clock (the Log or the "Skip intro?" question open): no typing, no Auto.
 // lookSway is the small, slow drift his look has on top of looking at the camera while he talks.
@@ -337,8 +337,8 @@ export function createDialogue(script, { reduced = false } = {}) {
       m.auto = on;
     },
     /**
-     * Skip: to the next box with choices (typed at once), or the end; at a box with choices, its
-     * line finishes.
+     * Next (the top right's button): to the next box with choices (typed at once), or the end;
+     * at a box with choices, its line finishes.
      * @param {number} t
      */
     skip(t) {

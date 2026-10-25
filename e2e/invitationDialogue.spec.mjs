@@ -2,14 +2,14 @@
 // on a phone (390×844, touch) and a desktop (1280×800): the button opens the chat box over the
 // stage (the toolbar rests out of sight, NEWT goes into his talk state and turns to the camera);
 // out near the edge the first line waits until he's walked in and turned (then its line, face and
-// gesture begin together); the line types out, a tap finishes it and the next tap goes on; Skip
-// goes to the box with replies, which show as buttons stacked mid-screen under his face, take no
+// gesture begin together); the line types out, a tap finishes it and the next tap goes on; Next
+// (top right) goes to the box with replies, which show as buttons stacked mid-screen under his face, take no
 // press until the presses that went on have settled, and picking one goes where it leads; Auto
 // goes on by itself; the Log lists the lines shown and closes again; each box's shot sends the
 // camera nearer or further (close nearer than wide), framed over the box as its own line has it
 // and again when the box grows; Escape asks before it skips the intro and a second Escape ends
 // it, while Skip Intro, on screen all through, ends it at once with no question; a line's own
-// line breaks show; Space and Enter go on (after a click on Auto, Skip or Log too); under the Log or the
+// line breaks show; Space and Enter go on (after a click on Auto, Next or Log too); under the Log or the
 // question the buttons over the stage are out of reach; reduced motion shows each line at once
 // and cuts the camera (round to the front, to each shot, back at the end); and after the end the
 // toolbar, the camera and his free play come back. The script is read from the page (?test's
@@ -130,7 +130,7 @@ function askAndBefore(intro) {
   return { ask, before };
 }
 /**
- * At the box with replies (Skip goes there), once they show and the camera's at its shot: his
+ * At the box with replies (Next goes there), once they show and the camera's at its shot: his
  * head is over the replies, clear of them and of the Auto row, and the shot was framed over them
  * from the box's start (they don't move it as they show).
  */
@@ -139,9 +139,9 @@ async function repliesClearOfHim(page, tap) {
   const ask = intro.boxes.find((b) => b.choices?.length);
   test.skip(!ask, 'this script has no replies');
   await open(page, tap);
-  const skip = page.getByRole('button', { name: 'Skip', exact: true });
-  if (tap) await skip.tap();
-  else await skip.click();
+  const next = page.getByRole('button', { name: 'Next', exact: true });
+  if (tap) await next.tap();
+  else await next.click();
   await until(page, (s) => s.dialogue.id === ask.id && Boolean(s.dialogue.choices), 'at the replies');
   // Distance can already match while the shot is still tilting or raising its target.
   // Measure the head, camera and overlay together, and wait for the actual framing.
@@ -356,7 +356,7 @@ test.describe('on a phone', () => {
     expect(errors).toEqual([]);
   });
 
-  test('Skip goes to the box with replies; they’re buttons stacked mid-screen, and one goes where it leads', async ({
+  test('Next goes to the box with replies; they’re buttons stacked mid-screen, and one goes where it leads', async ({
     page,
   }) => {
     await calm(page);
@@ -364,7 +364,8 @@ test.describe('on a phone', () => {
     const ask = intro.boxes.find((b) => b.choices?.length);
     test.skip(!ask, 'this script has no replies');
     await open(page, true);
-    await page.getByRole('button', { name: 'Skip', exact: true }).tap();
+    await expect(page.getByRole('button', { name: 'Skip', exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Next', exact: true }).tap();
     await until(page, (s) => s.dialogue.id === ask.id && Boolean(s.dialogue.choices), 'at the replies');
     const replies = page.locator('.inv-talk-choice');
     await expect(replies).toHaveCount(ask.choices.length);
@@ -486,7 +487,7 @@ test.describe('on a phone', () => {
     await until(page, (x) => !x.dialogue.paused, 'on again');
   });
 
-  test('under the open Log or the Skip question, Auto, Skip and Log are out of reach', async ({ page }) => {
+  test('under the open Log or the Skip question, Auto, Next and Log are out of reach', async ({ page }) => {
     await calm(page);
     await open(page, true);
     const centre = (name) =>
@@ -494,15 +495,15 @@ test.describe('on a phone', () => {
         const r = el.getBoundingClientRect();
         return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
       });
-    const at = { auto: await centre('Auto'), skip: await centre('Skip') };
-    /** Taps where Auto and Skip are: nothing moves on and Auto stays off. */
+    const at = { auto: await centre('Auto'), skip: await centre('Next') };
+    /** Taps where Auto and Next are: nothing moves on and Auto stays off. */
     const tapsDoNothing = async (why) => {
       const before = (await snapshot(page)).dialogue;
       await page.touchscreen.tap(at.skip.x, at.skip.y);
       await page.touchscreen.tap(at.auto.x, at.auto.y);
       await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
       const s = (await snapshot(page)).dialogue;
-      expect([s.seq, s.log, s.auto], `${why}: Skip and Auto out of reach`).toEqual([before.seq, before.log, false]);
+      expect([s.seq, s.log, s.auto], `${why}: Next and Auto out of reach`).toEqual([before.seq, before.log, false]);
       await expect(page.locator('.inv-talk-top')).toHaveAttribute('inert', '');
     };
     // The Log.
@@ -752,7 +753,7 @@ test.describe('on a desktop', () => {
     expect(lines).toBe(2);
   });
 
-  test('after a click on Auto, Skip or Log, Space and Enter still go on; from the keyboard, focus stays on the button', async ({
+  test('after a click on Auto, Next or Log, Space and Enter still go on; from the keyboard, focus stays on the button', async ({
     page,
   }) => {
     await calm(page);
@@ -800,7 +801,7 @@ test.describe('on a desktop', () => {
     await expect(logBtn).toBeFocused();
   });
 
-  test('the box sits along the bottom under his face, the replies over him, and Auto, Skip and Log at the top right', async ({
+  test('the box sits along the bottom under his face, the replies over him, and Auto, Next and Log at the top right', async ({
     page,
   }) => {
     await calm(page);

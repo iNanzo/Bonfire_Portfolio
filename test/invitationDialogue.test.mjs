@@ -5,7 +5,7 @@
 // characters a second (a beat after punctuation; reduced motion: all at once), a tap finishing
 // the typing and then going on (the next id, the following box, the end), choices shown once
 // the line is typed and leading where they say, Auto going on after the box's wait or one from
-// the line's length, Skip to the next box with choices or the end, the log of lines shown and
+// the line's length, Next to the next box with choices or the end, the log of lines shown and
 // replies picked, a pause holding the clock, and a broken script ending gracefully. Play Intro's
 // script is content.js introScript() (content.json's intro, or one mended), which the runner plays
 // as it is.
@@ -352,7 +352,7 @@ async function loadContent() {
 test('the chat screen’s markup: Title Case labels, a live region for the line, dialogs for the Log and the question, no tooltips; the Log escapes what it lists', async () => {
   const { TALK_TEXT, logHtml, talkHtml } = await import('../src/invitation/dialogueUi.js');
   const { titleCase } = await import('../src/text.js');
-  for (const k of ['layer', 'auto', 'skip', 'log', 'logTitle', 'close', 'you', 'replies', 'ask', 'yes', 'no'])
+  for (const k of ['layer', 'auto', 'next', 'log', 'logTitle', 'close', 'you', 'replies', 'ask', 'yes', 'no'])
     assert.equal(TALK_TEXT[k], titleCase(TALK_TEXT[k]), k);
   for (const k of ['askHint', 'goOn']) assert.ok(/^[A-Z].*\.$/.test(TALK_TEXT[k]) && TALK_TEXT[k].length <= 160, k);
   const markup = talkHtml();
@@ -363,6 +363,11 @@ test('the chat screen’s markup: Title Case labels, a live region for the line,
   assert.match(markup, /class="inv-talk-ask" role="alertdialog" aria-modal="true"/);
   for (const b of ['auto', 'skip', 'log']) assert.match(markup, new RegExp(`data-talk="${b}"`));
   assert.match(markup, /data-talk="auto" aria-pressed="false"/);
+  // (The top right's Next jumps to the next question or the end; Skip Intro, top left, ends it.)
+  assert.equal(TALK_TEXT.next, 'Next');
+  assert.match(markup, />Next<\/button>/);
+  assert.ok(!/>Skip<\/button>/.test(markup), 'no Skip button any more');
+  assert.match(markup, /data-intro-skip>Skip Intro<\/button>/);
   const log = logHtml([
     { kind: 'line', speaker: 'NEWT', text: 'a <b> & c' },
     { kind: 'reply', text: 'Yes' },
