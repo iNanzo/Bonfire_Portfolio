@@ -72,8 +72,9 @@ loading screen too: NEWT loads behind it.
 - **Reduced motion:** it holds still, with no petals (none on the cursor either); the flap is open at once and the seal and
   the letter fade away plainly.
 - **Replay Intro** on the toolbar brings it back: the scene starts over underneath (NEWT on his
-  feet where he began, the camera home, no speech bubble), and opening it starts the intro just
-  as the first time.
+  feet where he began, the camera home, no speech bubble), the envelope comes with its petals
+  as at first (none with Rose Petals off), and opening it starts the intro just as the first
+  time.
 - Without WebGL 2, or if NEWT can't load, it steps aside so the message shows. Nothing about it
   is saved: it opens every visit.
 
@@ -846,7 +847,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   `focus()` shows Chrome's ring when nothing before it was a pointer's). Replay Intro with an
   envelope runs `replay` (main.js): any intro ended, a hold dropped, NEWT's body, `brain.reset()`,
   the mix, gaze, glance and faces made again, `talk.rest`, the camera cut home (a new orbit), the
-  bubble, the grab ring and the hover gone, then `spawnEnvelope` and the loop paused behind it
+  bubble, the grab ring and the hover gone, then `spawnEnvelope` (its `petals` from the look's
+  Rose Petals as it is then) and the loop paused behind it
   once that frame is drawn; opened, `introWanted` as at boot. `?test` skips it unless
   `&envelope` (`parseQuery`'s `envelope`), and there Replay Intro runs the dialogue alone.
 - **The hover and the grab ring:** `retro.js`'s post shader takes `uHover` (a two-texel Bayer

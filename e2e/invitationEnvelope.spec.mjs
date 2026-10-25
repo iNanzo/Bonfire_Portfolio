@@ -397,6 +397,38 @@ test.describe('on a desktop', () => {
     await introStarted(page);
   });
 
+  test('Replay Intro’s envelope brings its petals back, and none with Rose Petals off', async ({ page }) => {
+    const replayed = async () => {
+      await page.locator('.inv-btn-intro').click();
+      await until(page, (s) => s.envelope === 'floating', 'the envelope back');
+      // (Long enough for the flurry, on its first frame, and the swirl filling in.)
+      const f0 = (await envSnap(page)).frames;
+      await expect.poll(async () => (await envSnap(page)).frames, { timeout: 15_000 }).toBeGreaterThan(f0 + 60);
+      return (await envSnap(page)).petals;
+    };
+    await envelopeUp(page);
+    await page.keyboard.press('Escape');
+    await skipped(page);
+    const on = await replayed();
+    expect(on.emitted.spawn).toBeGreaterThan(0);
+    expect(on.emitted.swirl).toBeGreaterThan(0);
+    expect(on.live).toBeGreaterThan(0);
+    await page.keyboard.press('Escape');
+    await skipped(page);
+    // Rose Petals off in Settings: the next envelope has none at all.
+    await page.getByRole('button', { name: 'Settings' }).click();
+    const sw = page.getByRole('switch', { name: 'Rose Petals' });
+    await expect(sw).toBeChecked();
+    await sw.scrollIntoViewIfNeeded();
+    await sw.click();
+    await expect(sw).not.toBeChecked();
+    await page.keyboard.press('Escape');
+    await expect(sw).toBeHidden();
+    const off = await replayed();
+    expect(off.live).toBe(0);
+    expect(Object.values(off.emitted).reduce((a, b) => a + b, 0)).toBe(0);
+  });
+
   test('Skip Intro on it skips it', async ({ page }) => {
     await envelopeUp(page);
     await skipIntro(page).click();
