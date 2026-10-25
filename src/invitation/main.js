@@ -3,34 +3,46 @@
 // retro pass), NEWT (character.js, from models/newt.glb), the Look menu (switched live, kept in
 // localStorage: look.js; a first visit gets the admin's Default look, content.js), the orbit
 // camera (camera.js: a finger's drag on empty space or the mouse's right-drag turns it, the
-// mouse's left-drag on empty space or two fingers pan it, the wheel or a pinch zooms it, Reset
-// Camera brings it back), and the render loop (stopped while the page is hidden, steps of at
-// most 0.05 s, a lost WebGL context told). While the Look sheet
+// mouse's left-drag on empty space or two fingers pan it, the wheel or a pinch zooms it about the
+// cursor or the fingers' middle, the Camera pad turns, tilts, zooms, follows him and resets it,
+// queued like Reset Camera and left be while the intro runs; a tap or a grab on him ends a pan),
+// the pixel cursors (cursor.js: the stage's data-cursor each frame from what the pointer is over
+// and doing), and the render loop (stopped while the page is hidden, steps of at most 0.05 s, a
+// lost WebGL context told). While the Settings sheet
 // is open NEWT stays in sight: the view shows him in the clear space above or beside it
 // (focusInsets, pixels.js clearInsets) and the orbit follows him all the way there. The floor
-// is endless (rays meet it anywhere) and his play area is the floor the default view shows fully
-// zoomed out (area.js viewArea), worked out again on a resize; the light's shadow camera goes
-// where he goes (floor.js fitShadow).
+// is endless (rays meet it anywhere) and his play area is one rounded square round the orbit's
+// centre (area.js viewArea), worked out again on a resize, its middle the brain's and Reset
+// Camera's; the light's shadow camera goes where he goes (floor.js fitShadow). Wander, a
+// setting, is kept for the next visit (ui.js loadWander) and goes to the brain as its button.
 //
 // A frame, in types.js's order: the pointers' gestures (gesture.js; taps get their floor spot
 // by ray) and the buttons → the camera moves → brain.step → talk.step (speech.js: what he says,
 // from the admin's lines and settings, content.js; a line goes to the bubble) → his root: steer
 // on the ground, carry while he's held (his collar, the Neck bone's head, hung where the
 // pointer's ray meets the camera-facing plane through where he was grabbed, plus the grab
-// offset, so the point grabbed stays under the cursor; 48 CSS px above a finger, coming in as
+// offset as it eases out, so his collar comes under the cursor; 24 CSS px above a finger, coming in as
 // he's picked up, and near the top of the stage as low as keeps his head on it: carry.js
 // dragTarget), the fall once he's let go (play.js bodyStep)
 // → the clip mix and step phase (play.js mixStep; a restart of a clip still showing fades its
 // twin out) → character.setWeights and update → the swing's tilt on his root and the collar
 // anchoring, matrices updated before and after → lookStep and applyLook → faceStep and setFace
 // → the blob shadow, the marker, the toolbar → the speech bubble (bubble.js: over his head as
-// posed, clear of the toolbar and the open Look sheet, out of sight while the sheet covers his
+// posed, clear of the toolbar, the open Camera pad and Settings sheet, out of sight while the sheet covers his
 // head; near the top, beside his head, narrowed to fit there, or under his feet) → render. With Motion Choppy (look.js) his pose (the update and applyLook) only moves
 // on the clock's steps, 15 a second; his root, the camera and the rest move every frame. The
 // lowest his collar is carried comes from the Held clip at load (his collar over his lowest
 // sole, plus a gap).
 //
-// Play Intro (ui.js) runs the intro's dialogue (dialogue.js, on content.js introScript():
+// The envelope (envelopeScene.js, envelope.js) opens the page every visit: made right after the
+// controls, so it's the loading screen too, it covers the toy and takes every press (the HUD is
+// inert under it); the toy draws its first frame (.is-ready) and waits behind it, paused. Opened,
+// it fades and the intro starts by itself (introWanted, held until the buttons are on), the
+// camera cut to the talk shot; skipped, it drops away and the toy is free, focus on the toolbar.
+// Without WebGL 2, or if NEWT can't load, it steps aside for the message. ?test skips it unless
+// &envelope.
+//
+// Replay Intro (ui.js) runs the intro's dialogue (dialogue.js, on content.js introScript():
 // content.json's invitation.intro as the admin writes it, mended, or the toy's own) on the toy's
 // clock, shown by dialogueUi.js over the stage: the toolbar rests out of sight, the speech bubble
 // goes and stays quiet, the layer takes every press (no drags, no orbit, no floor taps), the first
@@ -48,27 +60,37 @@
 // (a point on NEWT in client px: his head, middle or feet), floorAt(x, y), feet() and bones()
 // (his ankles in the world, his bones from his root), grabbed() (while he's held, where the
 // point he was grabbed by shows), say(text) (a line in his bubble now), play(clip) (forces a
-// clip, Walk and Run going round their step at their own pace) and face(name) (holds any of
-// clips.js FACE_NAMES on him, no blinks; null gives it back to the brain); `?seed=N` and `?calm`
-// go to the brain (and the seed to talk).
+// clip, Walk and Run going round their step at their own pace), face(name) (holds any of
+// clips.js FACE_NAMES on him, no blinks; null gives it back to the brain) and press(name) (a
+// toolbar button's press, as the brain gets it: types.js ButtonName); snapshot().motion is the
+// carry (his collar on screen, how long he's been held, the anchor and the drag plane, whether
+// he's pushed at the edge), the limp layer (its weight, the most a limb has swung) and Give
+// Device (the brain's device and label, the tablet shown and where, his turn off the camera);
+// `?seed=N` and `?calm` go to the brain (and the seed to talk). clock() is the toy's clock (it
+// stands still while the envelope covers him), envelope() the envelope's state and pose (null
+// without one).
 import { Vector3 } from 'three';
 import '@fontsource/pixelify-sans/400.css';
 import '@fontsource/pixelify-sans/600.css';
 import './invitation.css';
 import './bubble.css';
 import './dialogue.css';
-import { createBrain } from './brain.js';
+import './envelope.css';
+import { DANGLE, createBrain, dangleLift, talkPhase } from './brain.js';
 import { createBubble, speakerPoint } from './bubble.js';
 import { introFrom, introScript, invitationDefaults, invitationLines, speechSettings } from './content.js';
-import { CARRY, carryFeel, dragPlane, dragTarget, gripFor } from './carry.js';
+import { CARRY, carryFeel, dragPlane, dragTarget, gripFor, offsetAt } from './carry.js';
 import { NEWT_HEIGHT, playArea, viewArea } from './area.js';
 import {
   createOrbit,
   orbitArea,
   orbitEvents,
+  orbitFollow,
   orbitFollowAll,
   orbitHold,
   orbitHome,
+  orbitNudge,
+  orbitPanEnd,
   orbitPose,
   orbitRelease,
   orbitReset,
@@ -79,12 +101,15 @@ import {
   orbitTalk,
   orbitTurning,
   orbitWheel,
+  orbitZoom,
   shotView,
 } from './camera.js';
+import { cursorKind, installCursors } from './cursor.js';
 import { loadCharacter } from './character.js';
-import { ANKLE_HEIGHT, BONES, COLLAR, FACE_NAMES, FACE_TRACK, SCALE, fadeFor } from './clips.js';
+import { ANKLE_HEIGHT, BONES, COLLAR, DIALOGUE_WAYS, FACE_NAMES, FACE_TRACK, SCALE, fadeFor } from './clips.js';
 import { createDialogue, lookSway, normalizeScript } from './dialogue.js';
 import { REPLY_SETTLE, createDialogueUi } from './dialogueUi.js';
+import { createEnvelopeScene } from './envelopeScene.js';
 import { createFaceState, faceStep } from './faces.js';
 import { fitShadow, shadowTop } from './floor.js';
 import { createGesture, pickScreen, rayPlaneY } from './gesture.js';
@@ -92,17 +117,18 @@ import { clearInsets, newtShare, newtTexels, pixelSteps, resolutionOf, stepFor }
 import { animFps, installDefaults, isCustom, loadLook, lookPreset, motionStep, saveLook, shaderOf } from './look.js';
 import { createLook, lookStep, torsoStep } from './lookAt.js';
 import { bodyStep, createBody, createMix, lookAim, lookShare, mixStep, twinWeights } from './play.js';
+import { burstAt, hoverEase } from './retro.js';
 import { createRng } from './rng.js';
 import { createTalk } from './speech.js';
 import { LIFT, createStage } from './stage.js';
 import { centreOf } from './steer.js';
-import { bindUi, parseQuery } from './ui.js';
+import { bindUi, deviceLabelOf, loadWander, parseQuery, saveWander } from './ui.js';
 
 /** The longest step a frame takes, seconds (a slow frame or a tab coming back never jumps). */
 const MAX_DT = 0.05;
 const BASE = import.meta.env.BASE_URL;
 /** A finger carries him this far above itself, CSS px, so it doesn't hide him (a mouse: 0). */
-const FINGER_LIFT = 48;
+const FINGER_LIFT = 24;
 /**
  * A finger carrying him near the top of the stage keeps the top of his head this far inside it,
  * CSS px: its lift gives way, then the finger's own spot (a mouse is never moved off its point).
@@ -110,6 +136,10 @@ const FINGER_LIFT = 48;
 const HEAD_ROOM = 8;
 /** The time constant his head's height over the point grabbed is followed at, seconds. */
 const HEAD_FOLLOW = 0.1;
+/** How far along a Foot bone his toes' underside is, model units (pointed down, they're his lowest). */
+const TOE_REACH = 0.8;
+/** His shoe under the Foot bone's line at the toe, model units. */
+const TOE_DEPTH = 0.12;
 /** His soles hang at least this far over the floor while he's held, world units. */
 const HANG_GAP = 0.06;
 /** Extra reach for a finger picking him, CSS px. */
@@ -138,8 +168,9 @@ const SHOT_MARGIN = { top: 10, bottom: 30 };
  */
 const SHADOW_TOP = LIFT + NEWT_HEIGHT;
 /**
- * Where NEWT may go: the play area (area.js viewArea), one object kept in place (the brain and
- * his steps hold it) and filled in again on a resize; the default view's disc until then.
+ * Where NEWT may go: the play area (area.js viewArea, a rounded square round the orbit's centre),
+ * one object kept in place (the brain and his steps hold it) and filled in again on a resize;
+ * the default view's disc until then.
  * @type {import('./types.js').Bounds}
  */
 const area = playArea();
@@ -155,22 +186,75 @@ let look = loadLook();
 let pressed = null;
 /** Reset Camera was pressed since the last frame. */
 let resetCamera = false;
-/** Play Intro was pressed since the last frame. */
+/** The Camera pad's other presses since the last frame, in order (left be while the intro runs). */
+/** @type {Array<import('./ui.js').CameraKey>} */
+let cameraPresses = [];
+/** Replay Intro was pressed since the last frame. */
 let introPressed = false;
+/**
+ * Wander as the visitor wants it (the Settings switch, or as they left it last time), until the
+ * brain has it: null, the brain's own (on, but never under ?calm).
+ * @type {boolean|null}
+ */
+let wanderWanted = options.calm ? null : loadWander();
+/**
+ * The envelope was opened: the intro starts by itself as soon as it can (the buttons on), and
+ * this stays set until it has (beginIntro clears it), unlike the one-shot introPressed.
+ */
+let introWanted = false;
 const ui = bindUi(stageEl, {
   look,
+  wander: wanderWanted ?? !options.calm,
   onButton: (name) => {
     pressed = name;
   },
   onLook,
-  onResetCamera: () => {
-    resetCamera = true;
+  onCamera: (key) => {
+    if (key === 'reset') resetCamera = true;
+    else cameraPresses.push(key);
+  },
+  onWander: (on) => {
+    wanderWanted = on;
+    saveWander(on);
   },
   onSheet,
   onIntro: () => {
     introPressed = true;
   },
 });
+installCursors();
+stageEl.dataset.cursor = 'arrow';
+
+/** Whether the visitor asked for less motion (false where it can't be read). */
+function prefersReduced() {
+  try {
+    return Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+  } catch {
+    return false;
+  }
+}
+
+/** The toy behind the envelope has drawn its first frame (then it waits, paused, behind it). */
+let toyReady = false;
+/** The envelope stopped covering the toy (start() sets it: the loop runs again). */
+let envelopeGone = () => {};
+const hudEl = /** @type {HTMLElement} */ (stageEl.querySelector('.inv-hud'));
+const envelope = options.envelope
+  ? createEnvelopeScene(stageEl, {
+      reduced: prefersReduced(),
+      ready: () => toyReady,
+      onUncover: (how) => {
+        hudEl.removeAttribute('inert');
+        if (how === 'open') introWanted = true;
+        // (Skipped: the toy is free, focus on the toolbar's first button.)
+        else /** @type {HTMLElement|null} */ (ui.toolbar.querySelector('button:not(:disabled)'))?.focus();
+        envelopeGone();
+      },
+    })
+  : null;
+if (envelope) hudEl.setAttribute('inert', '');
+/** The envelope's state for ?test (types.js EnvelopeState), null without one. */
+const envelopeState = () => (envelope ? envelope.state : null);
 
 /** @param {import('./look.js').Look} next */
 function onLook(next) {
@@ -184,7 +268,7 @@ function onLook(next) {
 }
 
 /**
- * The Look sheet opened or closed: the orbit follows NEWT all the way while it's open, and the
+ * The Settings sheet opened or closed: the orbit follows NEWT all the way while it's open, and the
  * view shows him in the clear space it leaves (focusInsets).
  * @param {boolean} open
  */
@@ -228,6 +312,7 @@ if (webgl2()) {
         orbitSpan(orbit, stageSpan(stage));
         setArea(areaOf(stage));
         orbitArea(orbit, area);
+        stage.setArea(area);
       },
     });
   } catch {
@@ -238,6 +323,7 @@ if (!stage) {
   stageEl.dataset.webgl = 'off';
   ui.setToolbar(false);
   ui.setStatus('NEWT needs WebGL 2 to draw, and this browser has it turned off.');
+  envelope?.aside();
 } else {
   start(stage);
 }
@@ -260,8 +346,9 @@ function stageSpan(s) {
 }
 
 /**
- * The play area: the floor the default view shows fully zoomed out, inside the clear space
- * (area.js viewArea); the default view's disc until the stage has a view.
+ * The play area: a rounded square round the default view's target, the biggest the fully
+ * zoomed-out default view shows him whole in (area.js viewArea); the default view's disc until
+ * the stage has a view.
  * @param {NonNullable<typeof stage>} s
  */
 function areaOf(s) {
@@ -304,9 +391,9 @@ function insets() {
 }
 
 /**
- * Where the point the camera looks at shows: the middle of the space insets() leaves, or, with
- * the Look sheet open, of the clear space above or beside it, so a look's changes show on NEWT
- * (and Reset Camera's way back).
+ * Where the point the camera looks at shows: the middle of the space insets() leaves (the open
+ * Camera pad over the stage never changes it), or, with the Settings sheet open, of the clear
+ * space above or beside it, so a look's changes show on NEWT.
  */
 function focusInsets() {
   const base = insets();
@@ -339,7 +426,8 @@ function start(s) {
   const seed = options.seed ?? Math.floor(Math.random() * 2 ** 31);
   const rng = createRng(seed + 1);
   setArea(areaOf(s));
-  const brain = createBrain({ seed, calm: options.calm, bounds: area, middle: centreOf(s.bounds) });
+  s.setArea(area);
+  const brain = createBrain({ seed, calm: options.calm, bounds: area, middle: centreOf(area) });
   const gesture = createGesture();
   const body = createBody();
   const mix = createMix();
@@ -353,7 +441,7 @@ function start(s) {
   // line is up.)
   const talk = createTalk({ lines: invitationLines(), speech: speechSettings(), rng: createRng(seed + 2) });
   const bubble = createBubble({ root: stageEl, before: stageEl.querySelector('.inv-hud'), now: () => t });
-  orbit = createOrbit({ distance: s.view?.distance ?? 20, centre: centreOf(s.bounds), span: stageSize() });
+  orbit = createOrbit({ distance: s.view?.distance ?? 20, centre: centreOf(area), span: stageSize() });
   const cam = orbit;
   orbitSpan(cam, stageSpan(s));
   orbitArea(cam, area);
@@ -369,6 +457,8 @@ function start(s) {
   let t = 0;
   /** Motion Choppy: the time his pose has waited since its last step, seconds. */
   let waiting = 0;
+  /** The step his pose last moved by, seconds (0: it didn't this frame): the limp layer's and the earrings'. */
+  let stepped = 0;
   /** A clip forced by ?test's play(), else null (the brain decides). */
   let forced = null;
   /** @type {import('./clips.js').FaceName|null} a face held by ?test's face(), else null (the brain's, with blinks) */
@@ -393,8 +483,18 @@ function start(s) {
   let target = { x: 0, y: hangY, z: 0 };
   /** The retro pass's other path is compiled (stage.js warm), for ?test. */
   let warmed = false;
+  /** The hover dither, 0..1 (eased: retro.js hoverEase). */
+  let hoverK = 0;
+  /** @type {{t0: number, x: number, y: number}|null} the grab ring under way: when, and where (client px) */
+  let burst = null;
   /** The toolbar as last set, so the DOM is only touched on a change. */
-  const shown = { sit: 'Sit', wander: /** @type {boolean|null} */ (null), enabled: true };
+  const shown = {
+    sit: 'Sit',
+    device: /** @type {string} */ ('Give Device'),
+    wander: /** @type {boolean|null} */ (null),
+    enabled: true,
+    cursor: 'arrow',
+  };
   /** @type {ReturnType<typeof createDialogue>|null} the intro under way (Play Intro) */
   let intro = null;
   /** The box whose shot the camera last went to (dialogue.js DialogueView seq). */
@@ -454,6 +554,7 @@ function start(s) {
     })
     .catch(() => {
       ui.setStatus('NEWT couldn’t load. Check the connection, then reload.', { reload: true });
+      envelope?.aside();
     });
 
   // --- Where things are.
@@ -464,6 +565,12 @@ function start(s) {
     const l = c.bonePos(BONES.footL, { x: 0, y: 0, z: 0 }).y;
     const r = c.bonePos(BONES.footR, { x: 0, y: 0, z: 0 }).y;
     return Math.min(l, r) - ANKLE_HEIGHT * SCALE;
+  }
+  /** His lowest point, world units: a sole, or a toe pointed down (Held's dangle). */
+  function lowestY() {
+    const c = /** @type {NonNullable<typeof character>} */ (character);
+    const toe = (name) => c.pointOn(name, TOE_REACH, { x: 0, y: 0, z: 0 }).y - TOE_DEPTH * SCALE;
+    return Math.min(soleY(), toe(BONES.footL), toe(BONES.footR));
   }
   /**
    * The collar over his lowest sole in the Held clip, at its highest through the clip (so his
@@ -502,12 +609,14 @@ function start(s) {
     );
   }
   /**
-   * Where the point he's held by shows, client px: his collar as posed less the grab offset.
+   * Where the point he's held by shows, client px: his collar as posed less the grab offset as
+   * it is now (eased out: his collar, once the grab is in).
    * @param {import('./carry.js').Grip} g
    */
   function grabbedAt(g) {
     const p = /** @type {NonNullable<typeof character>} */ (character).bonePos(COLLAR, { x: 0, y: 0, z: 0 });
-    const at = new Vector3(p.x - g.offset.x, p.y - g.offset.y, p.z - g.offset.z).project(s.camera);
+    const o = offsetAt(g, t);
+    const at = new Vector3(p.x - o.x, p.y - o.y, p.z - o.z).project(s.camera);
     const r = canvas.getBoundingClientRect();
     return { x: r.left + ((at.x + 1) / 2) * r.width, y: r.top + ((1 - at.y) / 2) * r.height };
   }
@@ -602,8 +711,10 @@ function start(s) {
     (e) => {
       e.preventDefault();
       const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? canvas.clientHeight : 1;
-      // (A trackpad's pinch comes as a wheel with ctrl held, in small steps.)
-      orbitWheel(cam, e.deltaY * unit * (e.ctrlKey ? 5 : 1));
+      // (A trackpad's pinch comes as a wheel with ctrl held, in small steps. About the cursor: the
+      // floor under it stays under it.)
+      const at = shownAt();
+      orbitWheel(cam, e.deltaY * unit * (e.ctrlKey ? 5 : 1), { x: e.clientX - at.x, y: e.clientY - at.y });
       events.push({ type: 'pinch', on: 'floor', x: e.clientX, y: e.clientY, t: now(), scale: 1 });
     },
     { passive: false },
@@ -649,14 +760,16 @@ function start(s) {
     // the camera.)
     const evs = intro ? [] : events;
     events = [];
-    if (introPressed) beginIntro();
+    if (introPressed || introWanted) beginIntro();
     introPressed = false;
     const box = introStep();
     const pose = moveCamera(evs, dt);
     const ptr = pointerNow();
-    const button = pressed;
+    effects(ptr, dt);
+    const button = pressed ?? wanderPress();
     if (pressed) lastButton = pressed;
     pressed = null;
+    showCursor(ptr);
     if (forced) {
       // (Walk and Run take their time from the step phase: it goes round at the clip's own pace.)
       const len = c.clipLength(forced);
@@ -687,37 +800,97 @@ function start(s) {
       mix.fade = fadeFor(o.clip, o.clip);
     }
     mixStep(mix, { clip: o.clip, speed: body.body.speed, dt });
+    // (A box's Walk or Run steps in place at its own pace: he has no speed to step it on.)
+    if (o.state === 'talk' && DIALOGUE_WAYS[o.clip] === 'inPlace')
+      mix.phase = talkPhase(mix.phase, dt, c.clipLength(o.clip));
     c.setWeights(mix.weights, mix.phase);
-    // 5. The animation; 6. held, his collar hung from the anchor.
+    // 5. The animation; 6. held, his collar hung from the anchor (a box's dangle: lifted clear).
     const moved = animate(c, dt);
+    // (His limbs limp while he's carried and falling, eased out once he's down: character.js.)
+    c.limp(stepped, body.mode !== 'ground');
     hang(c);
+    if (o.state === 'talk') dangle(c);
     // 7–8. The look and the face; the toolbar.
     const want = {
       mode: o.look.mode,
       weight: o.look.weight * lookShare(mix.weights),
       ease: o.look.ease,
       at: o.look.at ?? null,
+      pitch: o.look.pitch,
     };
     finish(c, intro ? null : ptr, pose, dt, want, o.face, o.blink, moved);
     toolbar(o);
     voice();
   }
 
-  /** Whether the visitor asked for less motion (false where it can't be read). */
-  function reducedMotion() {
-    try {
-      return Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
-    } catch {
-      return false;
+  /**
+   * Wander as the visitor wants it, as the brain's own button: pressed (toggling it) while the
+   * brain has it the other way, never during the intro. Null once the brain has it.
+   * @returns {import('./types.js').ButtonName|null}
+   */
+  function wanderPress() {
+    if (wanderWanted === null || !out || intro) return null;
+    if (out.wander === wanderWanted) {
+      wanderWanted = null;
+      return null;
     }
+    return 'Wander';
   }
 
   /**
-   * Play Intro: the dialogue starts from its first box (when the buttons are on: never while he's
-   * held or falling); the toolbar rests, the bubble goes, the camera turns to the front.
+   * The stage's cursor (cursor.js) as the pointer is now: over him, pressing or holding him,
+   * panning or orbiting; the arrow while the intro runs.
+   * @param {ReturnType<typeof pointerNow>} ptr
+   */
+  function showCursor(ptr) {
+    const c = gesture.current();
+    const kind = cursorKind({
+      onNewt: Boolean(ptr?.onNewt && !ptr.touch),
+      pressing: c?.on === 'newt',
+      held: body.mode === 'held',
+      drag: c?.orbit ? 'orbit' : c?.pan ? 'pan' : null,
+      talking: Boolean(intro),
+    });
+    if (kind !== shown.cursor) stageEl.dataset.cursor = shown.cursor = kind;
+  }
+
+  /**
+   * The retro pass's pointer effects: the hover dither eases toward 1 while the pointer is on
+   * him, he's on the ground and no intro runs (a finger pressing on him too, before it grabs),
+   * else toward 0; the grab ring grows out and thins away from where he was grabbed, following
+   * that point, and nothing more shows for the rest of the drag.
+   * @param {ReturnType<typeof pointerNow>} ptr
+   * @param {number} dt
+   */
+  function effects(ptr, dt) {
+    const on = Boolean(ptr?.onNewt) && body.mode === 'ground' && !intro && !grip;
+    hoverK = hoverEase(hoverK, on, dt);
+    s.setHover(hoverK);
+    if (!burst) return;
+    const b = character ? burstAt(t - burst.t0) : null;
+    if (!b) {
+      burst = null;
+      s.setBurst(0, 0, 0, 0);
+      return;
+    }
+    const at = grip ? grabbedAt(grip) : burst;
+    s.setBurst(at.x, at.y, b.radius, b.strength);
+  }
+
+  /** Whether the visitor asked for less motion (false where it can't be read). */
+  function reducedMotion() {
+    return prefersReduced();
+  }
+
+  /**
+   * Replay Intro, or the envelope opened: the dialogue starts from its first box (when the
+   * buttons are on: never while he's held or falling); the toolbar rests, the bubble goes, the
+   * camera turns to the front (from the envelope it cuts there: the envelope fades onto the shot).
    */
   function beginIntro() {
     if (intro || !out?.buttonsEnabled || ui.sheetOpen) return;
+    const fromEnvelope = introWanted;
+    introWanted = false;
     intro = createDialogue(playScript(), { reduced: reducedMotion() });
     intro.start(t);
     intro.pause(true, t);
@@ -730,7 +903,7 @@ function start(s) {
     hover = null;
     bubble.hide();
     ui.setTalking(true);
-    orbitTalk(cam, true, { cut: reducedMotion() });
+    orbitTalk(cam, true, { cut: fromEnvelope || reducedMotion() });
     talkUi.open();
   }
 
@@ -874,13 +1047,15 @@ function start(s) {
 
   /**
    * The bubble, while a line is up: over his head as posed this frame (character.js
-   * screenShape), clear of the toolbar and the open Look sheet, out of sight while the sheet
+   * screenShape), clear of the toolbar, the open Camera pad and Settings sheet, out of sight while the sheet
    * covers his head (bubble.js speakerPoint).
    */
   function voice() {
     if (bubble.text === null) return;
     const sheet = ui.sheetOpen ? ui.sheet.getBoundingClientRect() : null;
-    const avoid = sheet ? [ui.toolbar.getBoundingClientRect(), sheet] : [ui.toolbar.getBoundingClientRect()];
+    const avoid = [ui.toolbar.getBoundingClientRect()];
+    if (sheet) avoid.push(sheet);
+    if (ui.padOpen) avoid.push(ui.pad.getBoundingClientRect());
     // (His feet's bottom on screen: a bubble with no room over or beside his head goes under him.)
     const sh = shape();
     const feet = Math.max(sh.body.a.y, sh.body.b.y) + sh.body.r;
@@ -904,7 +1079,13 @@ function start(s) {
    * @param {number} dt
    */
   function moveCamera(evs, dt) {
-    orbitEvents(cam, evs, evs.some((e) => e.type === 'pan') ? shownAt() : null);
+    // (A tap or a grab on him: the user's pan is over, the view takes him again.)
+    if (evs.some((e) => e.on === 'newt' && (e.type === 'tap' || e.type === 'grab'))) orbitFollow(cam);
+    orbitEvents(cam, evs, evs.some((e) => e.type === 'pan' || e.type === 'pinch') ? shownAt() : null);
+    // (Two fingers' pan ends with no release of its own: once nothing pans, it's let go.)
+    if (cam.panning && !gesture.current()?.pan) orbitPanEnd(cam);
+    if (!intro) for (const key of cameraPresses) padPress(key);
+    cameraPresses = [];
     if (resetCamera && !intro) orbitReset(cam);
     resetCamera = false;
     orbitHold(cam, body.mode === 'held');
@@ -915,6 +1096,20 @@ function start(s) {
     // the texel to it, so he keeps the chosen sprite resolution at any zoom; cheap every frame.)
     s.setZoomScale(cam.home.distance / cam.distance);
     return pose;
+  }
+
+  /**
+   * One of the Camera pad's presses: Turn Left or Right a 45° turn (Left as a drag to the left
+   * turns it), Tilt Up or Down 12°, Zoom In or Out about where it looks, Follow NEWT onto him.
+   * @param {import('./ui.js').CameraKey} key
+   */
+  function padPress(key) {
+    const TURN = Math.PI / 4;
+    const TILT = (12 * Math.PI) / 180;
+    if (key === 'left' || key === 'right') orbitNudge(cam, { yaw: key === 'left' ? TURN : -TURN });
+    else if (key === 'up' || key === 'down') orbitNudge(cam, { elevation: key === 'up' ? TILT : -TILT });
+    else if (key === 'in' || key === 'out') orbitZoom(cam, key === 'in' ? 1.25 : 0.8);
+    else if (key === 'follow') orbitFollow(cam, { x: body.root.x, z: body.root.z });
   }
 
   /**
@@ -971,11 +1166,14 @@ function start(s) {
         grip = gripFor(s.ray(press.x0, press.y0), dragPlane(s.camera.position, collar), collar, t);
         const head = shape().head;
         headAbove = press.y0 - (head.y - head.r);
+        // (The grab ring, where the grip is made; it follows the point grabbed: effects.)
+        burst = { t0: t, x: press.x, y: press.y };
       }
       // (A finger's lift over itself, coming in as he's picked up. Near the top of the stage it
       // gives way, then the finger's own spot, so the top of his head stays on the screen: lifted,
       // he hangs nearer the camera and his head shows further over the point grabbed, so that's
-      // followed from the last frame's pose. A mouse's point stays under the cursor.)
+      // followed from the last frame's pose. A mouse's cursor has his collar under it, once the
+      // grab offset has eased out.)
       let y = press.y;
       if (pressKind === 'touch') {
         y -= FINGER_LIFT * Math.min(1, (t - grip.t0) / CARRY.liftIn);
@@ -983,7 +1181,9 @@ function start(s) {
         headAbove += (grabbedAt(grip).y - (head.y - head.r) - headAbove) * Math.min(1, dt / HEAD_FOLLOW);
         y = Math.max(y, stageEl.getBoundingClientRect().top + HEAD_ROOM + headAbove);
       }
-      target = dragTarget(grip, s.ray(press.x, y), hangY);
+      target = dragTarget(grip, s.ray(press.x, y), hangY, t);
+      // (The plane he's dragged on: at the play area's edge he stops along it, carry.js holdStep.)
+      if (body.carry) body.carry.plane = grip.plane;
     } else grip = null;
     bodyStep(body, {
       state: o.state,
@@ -1019,11 +1219,28 @@ function start(s) {
   }
 
   /**
-   * The toolbar, only on a change: the Sit/Stand label, Wander's state, the buttons resting.
+   * A box dangling him from an unseen hand (Held, Thrash, Fall: clips.js DIALOGUE_WAYS): his root
+   * lifted by their share till his lowest point clears the floor, Fall a hop (brain.js dangleLift).
+   * @param {NonNullable<typeof character>} c
+   */
+  function dangle(c) {
+    const share = DANGLE.clips.reduce((sum, k) => sum + c.weightOf(k), 0);
+    if (!(share > 0)) return;
+    const len = c.clipLength('Fall');
+    const fallU = len > 0 ? c.timeOf('Fall') / len : 0;
+    c.root.position.y += dangleLift({ hang: share, sole: lowestY(), fall: c.weightOf('Fall'), fallU });
+    c.root.updateMatrixWorld(true);
+  }
+
+  /**
+   * The toolbar, only on a change: the Sit/Stand label, Give Device's (what its next press does:
+   * the brain's deviceLabel, ui.js deviceLabelOf), Wander's switch, the buttons resting.
    * @param {import('./types.js').BrainOut} o
    */
   function toolbar(o) {
     if (o.sitLabel !== shown.sit) ui.setSitLabel((shown.sit = o.sitLabel));
+    const device = deviceLabelOf(o);
+    if (device !== shown.device) ui.setDeviceLabel((shown.device = device));
     if (o.wander !== shown.wander) ui.setWander((shown.wander = o.wander));
     if (o.buttonsEnabled !== shown.enabled) ui.setEnabled((shown.enabled = o.buttonsEnabled));
   }
@@ -1038,8 +1255,10 @@ function start(s) {
     const fps = animFps(look);
     const m = motionStep(waiting, dt, fps);
     waiting = m.acc;
+    stepped = 0;
     if (fps > 0 && !(m.step > 0)) return false;
     c.update(m.step);
+    stepped = m.step;
     return true;
   }
 
@@ -1049,8 +1268,8 @@ function start(s) {
    * @param {ReturnType<typeof pointerNow>} ptr
    * @param {{position: import('./types.js').XYZ}} pose
    * @param {number} dt
-   * @param {{mode: 'pointer'|'camera'|'forward'|'back', weight: number, ease?: number, at?: import('./types.js').XZ|null}} want
-   *   at: who he runs from ('back')
+   * @param {{mode: 'pointer'|'camera'|'forward'|'back', weight: number, ease?: number, at?: import('./types.js').XZ|null, pitch?: number}} want
+   *   at: who he runs from ('back'); pitch: 'ahead' at this pitch (held: his head hangs)
    * @param {import('./clips.js').FaceName} face
    * @param {import('./clips.js').BlinkMode} blink
    * @param {boolean} moved  his pose stepped this frame (the look goes on with it)
@@ -1069,7 +1288,8 @@ function start(s) {
     // (Talking, a little sway on his look at the camera, so it's never a fixed stare.)
     const sway = intro && aim ? lookSway(t) : null;
     const at = sway && aim ? { yaw: aim.yaw + sway.yaw, pitch: aim.pitch + sway.pitch } : aim;
-    lookStep(gaze, want.mode, at, dt, t, rng, want.weight, ahead, want.ease);
+    const front = want.pitch === undefined ? ahead : { yaw: ahead.yaw, pitch: want.pitch };
+    lookStep(gaze, want.mode, at, dt, t, rng, want.weight, front, want.ease);
     // (His chest joins in on his feet only: held, his collar hangs from the cursor.)
     torso = torsoStep(torso, body.mode === 'ground', dt);
     if (moved) c.applyLook(gaze.yaw, gaze.pitch, gaze.weight, torso);
@@ -1081,6 +1301,8 @@ function start(s) {
     const mark = ptr && !ptr.pinch && !ptr.onNewt && body.mode === 'ground' ? ptr.floor : null;
     s.marker.visible = Boolean(mark);
     if (mark) s.marker.position.set(mark.x, s.marker.position.y, mark.z);
+    // (His earrings swing on his head as the look left it; the tablet goes to his palms.)
+    c.accessories(moved ? stepped : 0, t);
   }
 
   /** @param {number} ms */
@@ -1094,27 +1316,33 @@ function start(s) {
       lost = true;
       sync();
       ui.setStatus('Something went wrong drawing NEWT. Reload to try again.', { reload: true });
+      envelope?.aside();
       return;
     }
     if (!drawn) {
       drawn = true;
       stageEl.classList.add('is-ready');
       ui.setStatus(null);
+      // (Under the envelope: drawn once, then it waits there until it's uncovered.)
+      toyReady = true;
+      sync();
     }
   }
 
   function sync() {
-    const should = Boolean(character) && !lost && !document.hidden;
+    const should = Boolean(character) && !lost && !document.hidden && !(drawn && envelope?.covers);
     if (should === running) return;
     running = should;
     last = -1; // (the time it was hidden doesn't count)
     s.renderer.setAnimationLoop(running ? frame : null);
   }
   document.addEventListener('visibilitychange', sync);
+  envelopeGone = sync;
   canvas.addEventListener('webglcontextlost', (e) => {
     e.preventDefault();
     lost = true;
     sync();
+    envelope?.aside();
     ui.setStatus('NEWT’s picture was lost when the graphics driver reset. Reload to bring him back.', {
       reload: true,
     });
@@ -1161,6 +1389,44 @@ function start(s) {
     };
   }
 
+  /**
+   * A world point on the screen, client px.
+   * @param {import('./types.js').XYZ} p
+   */
+  function onScreen(p) {
+    const at = new Vector3(p.x, p.y, p.z).project(s.camera);
+    const r = canvas.getBoundingClientRect();
+    return { x: r.left + ((at.x + 1) / 2) * r.width, y: r.top + ((1 - at.y) / 2) * r.height };
+  }
+
+  /** The carry, the limp layer and Give Device, for ?test (snapshot().motion). */
+  function motionSnapshot() {
+    const c = character;
+    const carry = body.mode === 'held' ? body.carry : null;
+    const eye = s.camera.position;
+    const r = c?.root.position ?? { x: 0, z: 0 };
+    const off = body.body.yaw - Math.atan2(eye.x - r.x, eye.z - r.z);
+    const tabletShown = Boolean(c?.tablet.visible);
+    return {
+      collar: c && carry ? onScreen(c.bonePos(COLLAR, { x: 0, y: 0, z: 0 })) : null,
+      heldFor: carry && grip ? t - grip.t0 : null,
+      anchor: carry ? { ...carry.anchor } : null,
+      plane: grip ? { x: grip.plane.normal.x, z: grip.plane.normal.z } : null,
+      pushed: Boolean(carry?.push),
+      limp: { weight: c?.limpWeight ?? 0, most: c ? Math.max(0, ...Object.values(c.limpAngles())) : 0 },
+      device: {
+        state: out?.device ?? null,
+        label: out?.deviceLabel ?? 'Give Device',
+        shown: tabletShown,
+        turn: Math.abs(Math.atan2(Math.sin(off), Math.cos(off))),
+        screen: c && tabletShown ? onScreen(c.tablet.getWorldPosition(new Vector3())) : null,
+      },
+    };
+  }
+
+  /** The controls for ?test: Wander as the brain has it, and the stage's cursor. */
+  const controlsSnapshot = () => ({ wander: out ? out.wander : null, cursor: stageEl.dataset.cursor || null });
+
   if (options.test) {
     /** @type {any} */ (window).__invitation = {
       snapshot: () => ({
@@ -1203,7 +1469,9 @@ function start(s) {
           panned: cam.panned,
           turning: orbitTurning(cam),
         },
-        // (Where he may go: the play area, area.js viewArea.)
+        // (Whether he wanders by himself, as the brain has it; the stage's cursor.)
+        ...controlsSnapshot(),
+        // (Where he may go: the play area, area.js viewArea, a rounded square.)
         area: { ...area },
         // (Both of the retro pass's paths compiled: the first switch to Off or back won't stall.)
         warmed,
@@ -1219,8 +1487,18 @@ function start(s) {
         // Log and the question, the shot and where the camera's going.)
         dialogue: introSnapshot(),
         toolbarTalking: ui.talking,
+        // (The retro pass's pointer effects: the hover dither 0..1, and whether the grab ring's up.)
+        hover: hoverK,
+        burst: Boolean(burst),
+        // (The envelope's state, null without one: types.js EnvelopeState.)
+        envelope: envelopeState(),
         options,
+        motion: motionSnapshot(),
       }),
+      /** The toy's clock, seconds (it stands still while the envelope covers him). */
+      clock: () => t,
+      /** The envelope's state, reduced motion, pose and frames drawn; null without one. */
+      envelope: () => envelope?.snapshot() ?? null,
       /** @param {'head'|'body'|'feet'} part */
       screen(part) {
         const sh = shape();
@@ -1231,7 +1509,7 @@ function start(s) {
       floorAt,
       /**
        * While he's held: where the point he was grabbed by shows now, client px (his collar as
-       * posed less the grab offset); null otherwise.
+       * posed less the grab offset as it eases out); null otherwise.
        */
       grabbed() {
         if (!grip || !character || body.mode !== 'held') return null;
@@ -1275,6 +1553,13 @@ function start(s) {
        */
       setIntro(value) {
         testIntro = value == null ? null : introFrom(value);
+      },
+      /**
+       * A toolbar button's press, as the brain gets it (Give Device's before the toolbar has one).
+       * @param {import('./types.js').ButtonName} name
+       */
+      press(name) {
+        pressed = name;
       },
       /** @param {string|null} clip */
       play(clip) {

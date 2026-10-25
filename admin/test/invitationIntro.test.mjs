@@ -19,7 +19,7 @@ import {
   INTRO_CHOICES_MIN,
   validateContent,
 } from '../../src/contentRules.js';
-import { CLIPS, FACE_NAMES } from '../../src/invitation/clips.js';
+import { CLIPS, DIALOGUE_WAYS, FACE_NAMES, dialogueHolds } from '../../src/invitation/clips.js';
 
 // ---- a stand-in document: enough DOM for el() and the form ---------------------------------
 class FakeElement {
@@ -271,8 +271,19 @@ test('Face, Animation and Camera are the toy’s own lists; Auto a slider in its
   const anim = Object.fromEntries(sel('animation').map((o) => [o.value, o.label]));
   assert.match(anim.Nod, /once/i);
   assert.match(anim.Think, /loop/i);
-  for (const k of INTRO_ANIMATIONS.filter((a) => a !== 'none'))
-    assert.match(anim[k], CLIPS[k].loop ? /loop/i : /once/i, k);
+  // (Every clip is there: how a box plays it says in its name. Sitting or lying down holds;
+  // Walk and Run step in place; Held, Thrash and Fall dangle him from an unseen hand.)
+  assert.deepEqual(INTRO_ANIMATIONS.filter((a) => a !== 'none').sort(), Object.keys(CLIPS).sort());
+  for (const k of INTRO_ANIMATIONS.filter((a) => a !== 'none')) {
+    assert.match(anim[k], dialogueHolds(k) ? /loops\)/i : /once\)/i, k);
+    assert.equal(/in place/i.test(anim[k]), DIALOGUE_WAYS[k] === 'inPlace', `${k}: in place`);
+    assert.equal(/dangling/i.test(anim[k]), DIALOGUE_WAYS[k] === 'dangling', `${k}: dangling`);
+  }
+  assert.equal(anim.Run, 'Run (In Place, Loops)');
+  assert.equal(anim.Thrash, 'Thrash (Dangling, Once)');
+  assert.equal(anim.Fall, 'Fall (Dangling, Once)');
+  assert.equal(anim.SitDown, 'Sit Down (Loops)');
+  assert.equal(anim.DeviceLie, 'Lie With Device (Loops)');
   assert.deepEqual(rangeFor('invitation.intro.boxes[].auto'), INTRO_AUTO);
 });
 

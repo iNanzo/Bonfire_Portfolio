@@ -2,8 +2,9 @@
 // randomness from an injected rng). Each frame createTalk's step reads what the brain did (its
 // BrainOut, this frame's and the last), the gestures, the button pressed and the camera, and
 // finds the moments worth a line: the plan's triggers (TRIGGERS) for a tap's wave or spook,
-// running off, being caught mid-run, picked up, shaken, dropped and landing, walking to a floor
-// tap or wandering off, sitting down by himself, still sitting a while, standing up, idle time
+// running off, being caught mid-run, picked up, shaken, thrashing, dropped and landing, walking
+// to a floor tap or wandering off, sitting down by himself, still sitting a while, standing up,
+// getting the tablet (Give Device) and lying down with it, idle time
 // every 20 to 40 s, the camera spun round a lot or zoomed in very close. A moment speaks at its
 // trigger's chance, once its cooldown is over (the admin's, content.json `invitation.speech`,
 // read by speechFrom), with one of its lines (`invitation.lines`, linesFrom) picked at random,
@@ -19,8 +20,8 @@ import { wrapAngle } from './steer.js';
 /** @typedef {import('./types.js').GestureEvent} GestureEvent */
 /** @typedef {import('./types.js').ButtonName} ButtonName */
 /**
- * @typedef {'wave'|'spook'|'flee'|'caught'|'pickedUp'|'shaken'|'dropped'|'landed'|'walkTo'|
- *   'wander'|'sitDown'|'sitting'|'standUp'|'idle'|'spin'|'zoom'} Trigger
+ * @typedef {'wave'|'spook'|'flee'|'caught'|'pickedUp'|'shaken'|'thrash'|'dropped'|'landed'|'walkTo'|
+ *   'wander'|'sitDown'|'sitting'|'standUp'|'device'|'lieDown'|'idle'|'spin'|'zoom'} Trigger
  */
 /** @typedef {{chance: number, cooldown: number}} TriggerSetting  chance 0..1; cooldown, seconds */
 /**
@@ -34,7 +35,7 @@ import { wrapAngle } from './steer.js';
  * @property {number} t  the toy's clock, seconds
  * @property {number} dt
  * @property {(Partial<BrainOut> & {state: string})|null} state  the brain's output this frame
- *   (state, clip, restart, reaction, face, faceCamera are read); null before NEWT is in
+ *   (state, clip, restart, reaction, face, faceCamera, device are read); null before NEWT is in
  * @property {(Partial<BrainOut> & {state: string})|null} [prevState]  last frame's (left out: the
  *   last one step saw)
  * @property {GestureEvent[]} [events]  this frame's gestures (a floor tap marks the walk his)
@@ -52,6 +53,7 @@ export const TRIGGERS = /** @type {Trigger[]} */ ([
   'caught',
   'pickedUp',
   'shaken',
+  'thrash',
   'dropped',
   'landed',
   'walkTo',
@@ -59,6 +61,8 @@ export const TRIGGERS = /** @type {Trigger[]} */ ([
   'sitDown',
   'sitting',
   'standUp',
+  'device',
+  'lieDown',
   'idle',
   'spin',
   'zoom',
@@ -72,6 +76,7 @@ export const TRIGGERS = /** @type {Trigger[]} */ ([
 export const PRIORITY = {
   caught: 4,
   shaken: 4,
+  thrash: 4,
   spook: 3,
   flee: 3,
   pickedUp: 3,
@@ -81,6 +86,8 @@ export const PRIORITY = {
   walkTo: 2,
   sitDown: 2,
   standUp: 2,
+  device: 2,
+  lieDown: 2,
   spin: 2,
   zoom: 2,
   wander: 1,
@@ -108,6 +115,7 @@ export const SPEECH_DEFAULTS = {
     caught: { chance: 0.9, cooldown: 10 },
     pickedUp: { chance: 0.7, cooldown: 8 },
     shaken: { chance: 0.8, cooldown: 6 },
+    thrash: { chance: 0.6, cooldown: 8 },
     dropped: { chance: 0.5, cooldown: 8 },
     landed: { chance: 0.6, cooldown: 8 },
     walkTo: { chance: 0.35, cooldown: 12 },
@@ -115,6 +123,8 @@ export const SPEECH_DEFAULTS = {
     sitDown: { chance: 0.8, cooldown: 30 },
     sitting: { chance: 0.9, cooldown: 20 },
     standUp: { chance: 0.5, cooldown: 15 },
+    device: { chance: 0.9, cooldown: 15 },
+    lieDown: { chance: 0.9, cooldown: 15 },
     idle: { chance: 0.8, cooldown: 0 },
     spin: { chance: 0.9, cooldown: 20 },
     zoom: { chance: 0.9, cooldown: 20 },
@@ -272,8 +282,10 @@ export function createTalk({ lines, speech, rng }) {
   }
 
   /**
-   * His changes of state: running off, being caught or picked up, shaken, dropped, landing,
-   * sitting down by himself, standing up.
+   * His changes of state: running off, being caught or picked up, shaken, thrashing (Thrash
+   * starting while he's held: its face is angry, never a shake), dropped, landing, sitting down
+   * by himself (not with the tablet), standing up (or getting up from lying), getting the tablet
+   * (sitting with it) and lying down with it.
    * @param {NonNullable<TalkIn['state']>} s
    * @param {NonNullable<TalkIn['state']>} p
    * @returns {Trigger[]}
@@ -286,10 +298,13 @@ export function createTalk({ lines, speech, rng }) {
     if (entered('held')) out.push(p.state === 'flee' ? 'caught' : 'pickedUp');
     if (s.state === 'held' && p.state === 'held' && s.face === 'surprised' && p.face !== 'surprised')
       out.push('shaken');
+    if (s.state === 'held' && s.clip === 'Thrash' && s.restart) out.push('thrash');
     if (s.state === 'fall' && p.state === 'held') out.push('dropped');
     if (s.state === 'land' && p.state === 'fall') out.push('landed');
-    if (entered('sitDown') && m.t - m.sitPressed > TALK.sitButton + 1e-9) out.push('sitDown');
-    if (entered('standUp')) out.push('standUp');
+    if (entered('sitDown') && !s.device && m.t - m.sitPressed > TALK.sitButton + 1e-9) out.push('sitDown');
+    if (entered('standUp') || entered('getUp')) out.push('standUp');
+    if (entered('deviceSit')) out.push('device');
+    if (entered('lieDown')) out.push('lieDown');
     return out;
   }
 

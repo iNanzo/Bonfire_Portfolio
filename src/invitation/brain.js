@@ -1,18 +1,30 @@
 // NEWT's brain in the invitation toy: a pure state machine (idle, walk, react, flee, held, fall,
-// land, sitDown, sit, standUp) that owns every timer and every change of state. Each frame it
+// land, sitDown, sit, standUp, and Give Device's deviceSit, lieDown, deviceLie, getUp) that owns
+// every timer and every change of state. Each frame it
 // turns gestures and buttons into what he does, keeps his stress (taps, rough handling; it
 // decays), and says which clip plays, how he moves, his face, where he looks and what the
 // buttons show. A reaction and a sit (by the button or by himself) first turn him to face the
 // camera, so his face shows; a sit's turn isn't sitting yet (a tap reacts, a floor tap walks,
-// Stand calls it off). No three.js and no clock: time comes in as t, randomness from rng.js.
+// Stand calls it off). Held, he hangs his head (a light look aimed down, the sad face) and
+// thrashes every TUNE.thrashMin–thrashMax s (sooner when he's shaken hard): Thrash once, then
+// Held again on its own clock. Give Device (the button 'Device') alternates: sitting down with the
+// tablet (SitDown, then DeviceSit; from Sit, DeviceSit where he sits), lying on his stomach with
+// it turned TUNE.lieTurnMin–lieTurnMax from the camera (LieDown, then DeviceLie), getting up
+// (GetUp); any other input gets him up from either first (StandUp from sitting, GetUp from
+// lying), a grab picks him straight up. No three.js and no clock: time comes in as t, randomness
+// from rng.js.
 //
 // Play Intro (BrainIn.dialogue, the box up while the intro runs) puts him in `talk`: he gets up
 // if he's sitting, walks in toward the middle of the view when he's out past TUNE.talkNear, and
 // turns to the camera, keeping his own face meanwhile; then he's in place (BrainOut.talkReady:
 // main.js holds the line until it) and each new box sets his face (blinking on neutral only) and
-// plays its animation: a gesture once, then Talk while its line types and Idle once it's up; a
-// loop (Talk, Think, Idle) holds; Sit sits him down and holds it, and the next gesture gets him
-// up first; none keeps what he's doing. He looks at the camera. Taps, grabs, floor taps, buttons,
+// plays its animation, any clip (clips.js DIALOGUE_WAYS): a gesture once, then Talk while its
+// line types and Idle once it's up; a loop (Talk, Think, Idle, Walk and Run in place, Held
+// dangling) holds; Fall is a hop, then Land; Sit, Sit Down and the tablet's sit sit him down and
+// hold it, Lie Down and the tablet's lie lie him down (sitting first) and hold it, and the next
+// box that wants him up gets him up first (StandUp, GetUp); Stand Up and Get Up only get him up;
+// none keeps what he's doing. The page stages Walk and Run in place and dangles Held, Thrash and
+// Fall (talkPhase, dangleLift). He looks at the camera. Taps, grabs, floor taps, buttons,
 // wandering and sitting by himself wait meanwhile; once the dialogue's gone he's back to play
 // (standing up first if a box sat him down), not counted as alone all that time.
 
@@ -35,11 +47,11 @@ import { fadeOutDue } from './blend.js';
  * @property {'stand'|'walk'|'turn'|'on'} phase  getting up, walking in, turning to the camera, talking
  * @property {number} phaseAt  when the phase began
  * @property {number} seq  the box last acted on (-1: none yet)
- * @property {string|null} once  the one-shot under way (a gesture, SitDown or StandUp)
- * @property {string|null} hold  the loop a box holds ('Idle', 'Talk', 'Think', 'Sit'), or null:
- *   Talk while the line types, else Idle
- * @property {string|null} then  the box's animation, waiting for StandUp to end
- * @property {boolean} seated  a Sit box sat him down
+ * @property {string|null} once  the one-shot under way (a gesture, or a way down or up)
+ * @property {string|null} hold  the loop a box holds ('Idle', 'Talk', 'Think', 'Sit', 'DeviceLie'…),
+ *   or null: Talk while the line types, else Idle
+ * @property {string|null} then  the box's animation, waiting for the way down or up to end
+ * @property {'stand'|'sit'|'lie'} pose  where the boxes have left him: on his feet, sat down, lying
  */
 
 /**
@@ -117,7 +129,56 @@ export const TUNE = {
   talkNear: 0.9,
   /** …then turns to the camera, until he faces it or for this long at most, seconds. */
   talkTurn: 1.2,
+  /** Held: his look this light (the clip hangs his head), aimed this far down, radians. */
+  heldLook: 0.15,
+  heldPitch: -0.5,
+  /**
+   * Held, he thrashes every thrashMin–thrashMax s, and within thrashShaken s of a hard shake, but
+   * never before he's hung still thrashRest s (since he was grabbed, or his last thrash).
+   */
+  thrashMin: 3,
+  thrashMax: 7,
+  thrashShaken: 0.6,
+  thrashRest: 1.5,
+  /**
+   * Lying with the tablet he turns this far from the camera, radians (either way), so his
+   * profile and the screen show past his cap's brim.
+   */
+  lieTurnMin: (62 * Math.PI) / 180,
+  lieTurnMax: (73 * Math.PI) / 180,
 };
+
+/**
+ * The page's staging of the clips a box dangles him for (clips.js DIALOGUE_WAYS): his lowest sole
+ * at least `gap` over the floor (world units), and Fall a hop `hop` high at its top.
+ */
+export const DANGLE = { gap: 0.03, hop: 0.14, clips: ['Held', 'Thrash', 'Fall'] };
+
+/**
+ * The step phase of Walk or Run held in a box, in place: on by dt over the clip's length (he
+ * has no speed to step it on by), as ?test's play() does.
+ * @param {number} phase  [0, 1)
+ * @param {number} dt
+ * @param {number} length  the clip's, seconds (0: held)
+ */
+export function talkPhase(phase, dt, length) {
+  if (!(length > 0)) return phase;
+  const next = (phase + dt / length) % 1;
+  return next < 0 ? next + 1 : next;
+}
+
+/**
+ * How far to lift his root while a box dangles him: his lowest sole up to DANGLE.gap over the
+ * floor by the share Held, Thrash and Fall have (`hang`), and Fall's hop (by its share, over
+ * its time `fallU` from 0 to 1: up and back down).
+ * @param {{hang: number, sole: number, fall?: number, fallU?: number}} o  sole: his lowest
+ *   sole's height with his root on the floor, world units
+ */
+export function dangleLift({ hang, sole, fall = 0, fallU = 0 }) {
+  const k = Math.min(1, Math.max(0, hang));
+  const u = Math.min(1, Math.max(0, fallU));
+  return Math.max(0, DANGLE.gap - sole) * k + Math.min(1, Math.max(0, fall)) * DANGLE.hop * 4 * u * (1 - u);
+}
 
 /** The clip each state plays ('gait': Idle/Walk/Run by speed; react picks its own). */
 const STATE_CLIP = {
@@ -132,10 +193,21 @@ const STATE_CLIP = {
   sit: 'Sit',
   standUp: 'StandUp',
   talk: 'gait',
+  deviceSit: 'DeviceSit',
+  lieDown: 'LieDown',
+  deviceLie: 'DeviceLie',
+  getUp: 'GetUp',
 };
 /** The FACE_TRACK entry for the gait states (sitDown: while he turns to the camera first). */
 const GAIT_FACE = { idle: 'Idle', walk: 'Walk', flee: 'Run', sitDown: 'SitDown' };
-const SITTING = new Set(['sitDown', 'sit']);
+/** Sitting (Stand gets him up), and lying with the tablet. */
+const SITTING = new Set(['sitDown', 'sit', 'deviceSit']);
+const LYING = new Set(['lieDown', 'deviceLie']);
+/** The states Give Device's tablet goes through (entering any other puts it away). */
+const DEVICE_STATES = new Set(['sitDown', 'deviceSit', 'lieDown', 'deviceLie']);
+/** A box's animation as the talk plays it: where its hold leaves him, and the ones that alias another. */
+const TALK_POSE = { Sit: 'sit', DeviceSit: 'sit', DeviceLie: 'lie' };
+const TALK_ALIAS = { SitDown: 'Sit', LieDown: 'DeviceLie' };
 const EPS = 1e-9;
 
 /**
@@ -186,6 +258,14 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     input: null,
     /** @type {TalkState|null} */
     talk: null,
+    /** Give Device under way: the sit down is the tablet's, and lies on down once he's sat. */
+    device: false,
+    lieAfter: false,
+    /** @type {XZ|null} the spot he turns to as he lies down with the tablet (lieTurn off the camera) */
+    lieGoal: null,
+    /** Held: when he thrashes next, and since when he's hung still (grabbed, or his last thrash over). */
+    thrashAt: Infinity,
+    hungSince: 0,
   };
 
   // ---- changes of state ---------------------------------------------------------------------
@@ -199,6 +279,14 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     m.restart = m.clip !== 'gait';
     if (state !== 'react') m.reaction = null;
     if (state === 'idle') m.idleFor = between(rng, T.idleMin, T.idleMax);
+    if (state === 'held') {
+      m.thrashAt = m.t + between(rng, T.thrashMin, T.thrashMax);
+      m.hungSince = m.t;
+    }
+    if (!DEVICE_STATES.has(state)) {
+      m.device = false;
+      m.lieAfter = false;
+    }
   }
 
   /** Wave or Spook at random, never the same three times running. */
@@ -234,6 +322,8 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
 
   /** Sit down, turned to the camera first unless he faces it already (so his happy face shows). */
   function sitDown() {
+    m.device = false;
+    m.lieAfter = false;
     enter('sitDown');
     if (facingCamera()) return;
     m.turning = true;
@@ -244,7 +334,45 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
   /** Sitting, or on the way down or up (a sit's turn to the camera isn't: he still stands). */
   function seated() {
     const st = m.state;
-    return st === 'sit' || st === 'standUp' || (st === 'sitDown' && !m.turning);
+    return st === 'sit' || st === 'deviceSit' || st === 'standUp' || (st === 'sitDown' && !m.turning);
+  }
+
+  /** Lying with the tablet, or on the way down or up. */
+  function lyingDown() {
+    return LYING.has(m.state) || m.state === 'getUp';
+  }
+
+  /** Down: sitting or lying, so anything else gets him up first. */
+  function down() {
+    return seated() || lyingDown();
+  }
+
+  /** Give Device: sat down with the tablet, then lying with it, then up again (BrainOut.device). */
+  function giveDevice() {
+    const st = m.state;
+    if (st === 'deviceSit') lieDown();
+    else if (st === 'sitDown' && m.device) {
+      // (Pressed again on his way down: he lies on down once he's sat; a third press, up again.)
+      if (!m.lieAfter) m.lieAfter = true;
+      else if (m.turning) enter('idle');
+      else afterStanding(null);
+    } else if (LYING.has(st)) afterStanding(null);
+    else if (st === 'sit') {
+      enter('deviceSit');
+      m.device = true;
+    } else {
+      sitDown();
+      m.device = true;
+    }
+  }
+
+  /** Down onto his stomach with the tablet, turning lieTurn off the camera (either way) as he goes. */
+  function lieDown() {
+    enter('lieDown');
+    m.device = true;
+    const n = m.input?.newt;
+    const yaw = cameraYaw() + (rng() < 0.5 ? -1 : 1) * between(rng, T.lieTurnMin, T.lieTurnMax);
+    m.lieGoal = n ? { x: n.x + Math.sin(yaw), z: n.z + Math.cos(yaw) } : null;
   }
 
   function startClip(name) {
@@ -295,10 +423,11 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     return { x: n.x + side * Math.cos(a) * T.runFromGap, z: n.z - side * Math.sin(a) * T.runFromGap };
   }
 
-  /** Gets him up first when he's sitting, then does `p`. */
+  /** Gets him up first when he's down (StandUp from sitting, GetUp from lying), then does `p`. */
   function afterStanding(/** @type {Pending|null} */ p) {
     m.pending = p;
-    if (m.state !== 'standUp') enter('standUp');
+    if (m.state === 'standUp' || m.state === 'getUp') return;
+    enter(lyingDown() ? 'getUp' : 'standUp');
   }
 
   /** @param {Pending|null} p */
@@ -312,24 +441,25 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
   // ---- dialogue mode (Play Intro) -------------------------------------------------------------
 
   /** @param {TalkState['phase']} phase */
-  function talkPhase(phase) {
+  function setTalkPhase(phase) {
     const k = /** @type {TalkState} */ (m.talk);
     k.phase = phase;
     k.phaseAt = m.t;
     m.turning = phase === 'turn';
   }
 
-  /** The intro begins: up first if he's sitting, then in toward the middle if he's far out, then the turn. */
+  /** The intro begins: up first if he's down, then in toward the middle if he's far out, then the turn. */
   function beginTalk() {
     const sitting = seated();
+    const lying = lyingDown();
     m.pending = null;
     m.stress = 0;
     company();
     enter('talk');
-    m.talk = { phase: 'turn', phaseAt: m.t, seq: -1, once: null, hold: null, then: null, seated: false };
-    if (sitting) {
-      talkPhase('stand');
-      playOnce('StandUp');
+    m.talk = { phase: 'turn', phaseAt: m.t, seq: -1, once: null, hold: null, then: null, pose: 'stand' };
+    if (sitting || lying) {
+      setTalkPhase('stand');
+      playOnce(lying ? 'GetUp' : 'StandUp');
     } else walkInOrTurn();
   }
 
@@ -342,8 +472,8 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
       const k = (T.talkNear * 0.8) / d;
       m.goal = { x: c.x + (n.x - c.x) * k, z: c.z + (n.z - c.z) * k };
       m.walkUntil = m.t + ((d - T.talkNear * 0.8) / T.walkSpeed) * T.walkPatience + T.walkSlack;
-      talkPhase('walk');
-    } else talkPhase('turn');
+      setTalkPhase('walk');
+    } else setTalkPhase('turn');
     m.clip = 'gait';
     m.restart = false;
   }
@@ -358,36 +488,55 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
   }
 
   /**
-   * A box's animation now: a loop held, or a gesture once (a Sit box sits him down; a gesture
-   * after one gets him up first). 'none' keeps what he does.
-   * @param {string} a
+   * A box's animation now: a loop held, or a gesture once; one that sits or lies him down gets
+   * him there first (SitDown, then LieDown) and holds, and one that wants him on his feet gets
+   * him up first (StandUp, GetUp); Stand Up and Get Up only get him up; Fall is a hop, then Land.
+   * 'none' keeps what he does.
+   * @param {string} name
    */
-  function talkAnimation(a) {
+  function talkAnimation(name) {
     const k = /** @type {TalkState} */ (m.talk);
-    if (a === 'none' || !a) return;
-    if (a === 'Sit') {
-      k.hold = 'Sit';
-      if (!k.seated) {
-        k.seated = true;
-        playOnce('SitDown');
+    if (name === 'none' || !name) return;
+    const a = TALK_ALIAS[name] ?? name;
+    if (a === 'StandUp' || a === 'GetUp') {
+      if (k.pose !== 'stand') getUpTalking(null);
+      return;
+    }
+    const pose = TALK_POSE[a] ?? 'stand';
+    if (pose === k.pose) {
+      k.then = null;
+      if (pose !== 'stand') k.hold = a;
+      else if (CLIPS[a]?.loop && a !== 'Fall') {
+        k.once = null;
+        k.hold = a;
+      } else {
+        k.hold = null;
+        playOnce(a);
+        if (a === 'Fall') k.then = 'Land';
       }
       return;
     }
-    if (k.seated) {
-      k.seated = false;
-      k.hold = null;
-      k.then = a;
-      playOnce('StandUp');
-      return;
-    }
-    k.then = null;
-    if (CLIPS[a]?.loop) {
-      k.once = null;
+    // The way there first, then the box's animation.
+    if (k.pose === 'stand') {
+      k.pose = 'sit';
+      k.hold = pose === 'sit' ? a : null;
+      k.then = pose === 'sit' ? null : a;
+      playOnce('SitDown');
+    } else if (k.pose === 'sit' && pose === 'lie') {
+      k.pose = 'lie';
       k.hold = a;
-    } else {
-      k.hold = null;
-      playOnce(a);
-    }
+      k.then = null;
+      playOnce('LieDown');
+    } else getUpTalking(a);
+  }
+
+  /** In a box: up from sitting (StandUp) or lying (GetUp), then `then` (null: Talk or Idle). */
+  function getUpTalking(/** @type {string|null} */ then) {
+    const k = /** @type {TalkState} */ (m.talk);
+    playOnce(k.pose === 'lie' ? 'GetUp' : 'StandUp');
+    k.pose = 'stand';
+    k.hold = null;
+    k.then = then;
   }
 
   /**
@@ -422,7 +571,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     company();
     if (!d) return;
     if (k.phase === 'stand') {
-      if (!fadeOutDue('StandUp', clipTime().remaining, 'Idle')) return;
+      if (!fadeOutDue(k.once ?? 'StandUp', clipTime().remaining, 'Idle')) return;
       k.once = null;
       walkInOrTurn();
       return;
@@ -430,12 +579,12 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     if (k.phase === 'walk') {
       const n = m.input?.newt;
       const there = !n || !m.goal || Math.hypot(m.goal.x - n.x, m.goal.z - n.z) <= T.arrive;
-      if (there || m.t >= m.walkUntil) talkPhase('turn');
+      if (there || m.t >= m.walkUntil) setTalkPhase('turn');
       return;
     }
     if (k.phase === 'turn') {
       if (!(facingCamera() || m.t - k.phaseAt >= T.talkTurn - EPS)) return;
-      talkPhase('on');
+      setTalkPhase('on');
     }
     if (d.seq !== k.seq) {
       k.seq = d.seq;
@@ -444,21 +593,25 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     talkClip(d);
   }
 
-  /** The intro's over: back to play, standing up first if a box sat him down (or he's getting up). */
+  /** The intro's over: back to play, getting up first if a box sat or laid him down (or he's getting up). */
   function endTalk() {
     const k = /** @type {TalkState} */ (m.talk);
-    const getUp = k.seated || m.clip === 'SitDown' || m.clip === 'Sit';
-    const rising = m.clip === 'StandUp';
+    const c = m.clip;
+    const lying = k.pose === 'lie' || c === 'LieDown' || c === 'DeviceLie';
+    const getUp = lying || k.pose === 'sit' || c === 'SitDown' || c === 'Sit' || c === 'DeviceSit';
+    const rising = c === 'StandUp' || c === 'GetUp';
     m.talk = null;
     m.turning = false;
     company();
     if (rising) {
-      // (Already on his way up: the same StandUp plays on.)
-      m.state = 'standUp';
+      // (Already on his way up: the same StandUp or GetUp plays on.)
+      m.state = c === 'GetUp' ? 'getUp' : 'standUp';
       m.since = m.t;
       m.pending = null;
-    } else if (getUp) afterStanding(null);
-    else enter('idle');
+    } else if (getUp) {
+      m.pending = null;
+      enter(lying ? 'getUp' : 'standUp');
+    } else enter('idle');
   }
 
   // ---- input ---------------------------------------------------------------------------------
@@ -487,7 +640,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     if (st === 'fall' || st === 'land' || st === 'held') return;
     addStress(T.stressTap);
     if (m.stress >= T.stressFlee && st !== 'flee') {
-      if (seated()) afterStanding({ do: 'flee', for: T.fleeMin, fromThreat: true });
+      if (down()) afterStanding({ do: 'flee', for: T.fleeMin, fromThreat: true });
       else flee(T.fleeMin, true);
       return;
     }
@@ -496,7 +649,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
       if (!m.turning && reactProgress() >= T.reactLock) react(pick());
       return;
     }
-    if (seated()) afterStanding({ do: 'react', which: pick() });
+    if (down()) afterStanding({ do: 'react', which: pick() });
     else react(pick());
   }
 
@@ -504,7 +657,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
   function onFloorTap(floor) {
     if (!floor) return;
     const st = m.state;
-    if (seated()) afterStanding({ do: 'walk', goal: { x: floor.x, z: floor.z } });
+    if (down()) afterStanding({ do: 'walk', goal: { x: floor.x, z: floor.z } });
     else if (st === 'idle' || st === 'walk' || st === 'sitDown') walk(floor, false);
   }
 
@@ -546,7 +699,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     const st = m.state;
     if (st === 'held' || st === 'fall') return;
     company();
-    const sitting = seated();
+    const sitting = down();
     switch (name) {
       case 'Wave':
       case 'Spook':
@@ -555,8 +708,11 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
         break;
       case 'Sit':
         if (st === 'sitDown' && m.turning) enter('idle');
-        else if (SITTING.has(st)) afterStanding(null);
+        else if (SITTING.has(st) || LYING.has(st)) afterStanding(null);
         else sitDown();
+        break;
+      case 'Device':
+        giveDevice();
         break;
       case 'Run':
         if (sitting) afterStanding({ do: 'flee', for: T.runFor, fromThreat: false });
@@ -593,7 +749,12 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
       const add = (c.dragSpeed * T.dragStress + Math.max(0, c.shake - T.shakeSoft) * T.shakeStress) * dt;
       m.stress = Math.min(T.stressMax, m.stress + add);
       if (dt > 0 && add / dt > T.decay) m.raisedAt = m.t;
-      if (c.shake >= T.shakeHard) m.shakenUntil = m.t + T.shakenFor;
+      if (c.shake >= T.shakeHard) {
+        m.shakenUntil = m.t + T.shakenFor;
+        // (Shaken hard, he thrashes sooner.)
+        if (m.clip !== 'Thrash')
+          m.thrashAt = Math.min(m.thrashAt, Math.max(m.t + T.thrashShaken, m.hungSince + T.thrashRest));
+      }
     }
     if (m.t - m.raisedAt < T.decayDelay - EPS) return;
     const p = input.pointer;
@@ -654,21 +815,50 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     sitDown(age) {
       if (m.turning) {
         if (facingCamera() || age >= T.sitTurnMax - EPS) startClip('SitDown');
-      } else if (fadeOutDue('SitDown', clipTime().remaining, 'Sit')) enter('sit');
+        return;
+      }
+      // (With the tablet: DeviceSit, or on down to lie with it when pressed again meanwhile.)
+      const next = !m.device ? 'Sit' : m.lieAfter ? 'LieDown' : 'DeviceSit';
+      if (!fadeOutDue('SitDown', clipTime().remaining, next)) return;
+      if (next === 'Sit') enter('sit');
+      else if (next === 'LieDown') lieDown();
+      else enter('deviceSit');
     },
     sit() {},
-    held() {},
+    deviceSit() {},
+    lieDown() {
+      if (fadeOutDue('LieDown', clipTime().remaining, 'DeviceLie')) enter('deviceLie');
+    },
+    deviceLie() {},
+    held() {
+      // Thrash now and then: once from its start, then Held again on its own clock.
+      if (m.clip === 'Thrash') {
+        if (!fadeOutDue('Thrash', clipTime().remaining, 'Held')) return;
+        m.clip = 'Held';
+        m.restart = false;
+        m.hungSince = m.t;
+        m.thrashAt = m.t + between(rng, T.thrashMin, T.thrashMax);
+      } else if (m.t >= m.thrashAt - EPS) startClip('Thrash');
+    },
     talk() {
       talkStep();
     },
     standUp() {
-      const p = m.pending;
-      const next = !p ? 'Idle' : p.do === 'react' ? p.which : p.do === 'walk' ? 'Walk' : 'Run';
-      if (!fadeOutDue('StandUp', clipTime().remaining, next)) return;
-      m.pending = null;
-      doPending(p);
+      gettingUp('StandUp');
+    },
+    getUp() {
+      gettingUp('GetUp');
     },
   };
+
+  /** Up (`clip`: StandUp or GetUp), then what waited for it. */
+  function gettingUp(/** @type {string} */ clip) {
+    const p = m.pending;
+    const next = !p ? 'Idle' : p.do === 'react' ? p.which : p.do === 'walk' ? 'Walk' : 'Run';
+    if (!fadeOutDue(clip, clipTime().remaining, next)) return;
+    m.pending = null;
+    doPending(p);
+  }
 
   /** The base face and blinking from FACE_TRACK, measured from the clip's (or state's) start. */
   function face() {
@@ -693,8 +883,10 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     if (st === 'fall' || st === 'land') return { mode: 'forward', weight: 0, ease: T.dropLookEase };
     if (st === 'react' && m.reaction === 'Spook') return { mode: 'forward', weight: 0 };
     if (st === 'react' && m.reaction === 'Wave') return { mode: 'camera', weight: 1 };
-    // (Held: at the viewer, glancing about now and then, not a fixed stare.)
-    if (st === 'held') return { mode: 'forward', weight: 1 };
+    // (Held: his head hangs in defeat, the clip's; a light look aimed down, glancing about.)
+    if (st === 'held') return { mode: 'forward', weight: T.heldLook, pitch: T.heldPitch };
+    // (With the tablet: at it, as the clips look.)
+    if (st === 'deviceSit' || LYING.has(st)) return { mode: 'forward', weight: 0 };
     if (st === 'flee') return { mode: 'back', weight: 1, at: pursuer() };
     return { mode: 'pointer', weight: 1 };
   }
@@ -731,15 +923,28 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
         const c = m.input?.camera;
         return { mode: 'face', goal: c ? { x: c.x, z: c.z } : null, speed: 0 };
       }
+      case 'lieDown':
+      case 'deviceLie':
+        return { mode: 'face', goal: m.lieGoal ? { x: m.lieGoal.x, z: m.lieGoal.z } : null, speed: 0 };
       default:
         return { mode: 'stay', goal: null, speed: 0 };
     }
+  }
+
+  /** Give Device under way: sitting with the tablet (or on his way down with it), or lying with it. */
+  function deviceNow() {
+    const st = m.state;
+    if (st === 'deviceSit') return 'sit';
+    if (LYING.has(st)) return 'lie';
+    if (st === 'sitDown' && m.device) return m.lieAfter ? 'lie' : 'sit';
+    return null;
   }
 
   /** @returns {BrainOut} */
   function output() {
     const st = m.state;
     const { face: f, blink } = face();
+    const device = deviceNow();
     return {
       state: st,
       clip: m.clip,
@@ -751,10 +956,12 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
       faceCamera: m.turning,
       stress: m.stress,
       wander: m.wander,
-      sitLabel: SITTING.has(st) ? 'Stand' : 'Sit',
+      sitLabel: SITTING.has(st) || LYING.has(st) ? 'Stand' : 'Sit',
       buttonsEnabled: st !== 'held' && st !== 'fall' && st !== 'talk',
       reaction: st === 'react' ? m.reaction : null,
       talkReady: st === 'talk' && m.talk?.phase === 'on',
+      device,
+      deviceLabel: device === 'sit' ? 'Lie Down' : device === 'lie' ? 'Get Up' : 'Give Device',
     };
   }
 

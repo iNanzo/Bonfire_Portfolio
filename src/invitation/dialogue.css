@@ -1,4 +1,4 @@
-/* Play Intro's chat screen (dialogueUi.js), Uma Musume's layout in the invitation toy's own style:
+/* The intro's chat screen (dialogueUi.js), Uma Musume's layout in the invitation toy's own style:
    cream fill, a dark 3 px outline with the buttons' chunky drop, big rounded corners, Pixelify
    Sans. A wide box along the bottom (inside the safe area, where the toolbar was: it hides while
    the intro runs) with the speaker's name on a tab at its top left, the line typed out in it and
@@ -44,6 +44,12 @@
   right: calc(10px + env(safe-area-inset-right));
   display: flex;
   gap: 6px;
+}
+/* Skip Intro, at the top left all through the intro. */
+.inv-talk-skip-intro {
+  position: absolute;
+  top: calc(10px + env(safe-area-inset-top));
+  left: calc(10px + env(safe-area-inset-left));
 }
 .inv-talk-btn {
   min-height: 40px;
@@ -94,6 +100,8 @@
   line-height: 1.42;
   letter-spacing: 0.01em;
   overflow-wrap: break-word;
+  /* (The admin's own line breaks show.) */
+  white-space: pre-line;
 }
 .inv-talk-rest {
   visibility: hidden;
@@ -282,6 +290,10 @@
     top: 16px;
     right: 16px;
     gap: 8px;
+  }
+  .inv-talk-skip-intro {
+    top: 16px;
+    left: 16px;
   }
   .inv-talk-btn {
     min-height: 44px;
