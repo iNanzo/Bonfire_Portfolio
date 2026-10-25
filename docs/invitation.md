@@ -114,7 +114,8 @@ loads behind it.
   fingers (the floor there stays there). The light turns with the camera, so his shadow always
   falls behind him and to one side.
 - **The Camera pad:** **Camera** on the toolbar opens it over the stage: **Turn Left** and **Turn
-  Right** (45° round), **Tilt Up** and **Tilt Down** (12°, from 12° to 70° up), **Zoom In** and
+  Right** (45° round, the way their arrows show: Turn Left turns the scene counter-clockwise, as
+  a drag to the right does), **Tilt Up** and **Tilt Down** (12°, from 12° to 70° up), **Zoom In** and
   **Zoom Out**, **Follow NEWT** (back to him: the middle at the default zoom, onto him zoomed
   in) and **Reset Camera** (back to where it started). Camera again or Escape closes it.
 - **He stays on screen:** at the default zoom (and further out) the camera doesn't follow him,

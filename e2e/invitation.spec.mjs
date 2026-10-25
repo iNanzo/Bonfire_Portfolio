@@ -1777,7 +1777,7 @@ test.describe('on a desktop', () => {
     const home = (await snapshot(page)).camera;
     const settled = (pred, msg) => until(page, (s) => !s.camera.turning && pred(s.camera), msg);
     await page.getByRole('button', { name: 'Turn Right' }).click();
-    await settled((c) => Math.abs(Math.abs(c.yaw - home.yaw) - Math.PI / 4) < 0.01, 'Turn Right: 45°');
+    await settled((c) => Math.abs(c.yaw - home.yaw - Math.PI / 4) < 0.01, 'Turn Right: 45° clockwise');
     await page.getByRole('button', { name: 'Tilt Up' }).click();
     await settled((c) => Math.abs(c.elevation - home.elevation - (12 * Math.PI) / 180) < 0.01, 'Tilt Up: 12°');
     await page.getByRole('button', { name: 'Tilt Down' }).click();
@@ -1808,8 +1808,29 @@ test.describe('on a desktop', () => {
       (s) => !s.camera.panned && Math.hypot(s.camera.target.x - s.pos.x, s.camera.target.z - s.pos.z) < 0.05,
       'onto him',
     );
+    // Turn Left turns the scene the way its arrow shows, counter-clockwise: a spot of floor to
+    // his right on screen comes round away from the camera, up the screen and in toward him.
+    const feet = await on(page, 'feet');
+    const right = { x: feet.x + 120, y: feet.y };
+    const spot = await floorAt(page, right);
+    const before = (await snapshot(page)).camera.yaw;
     await page.getByRole('button', { name: 'Turn Left' }).click();
-    await settled((c) => Math.abs(c.yaw - home.yaw - Math.PI / 4) < 0.01, 'Turn Left: 45° before reset');
+    await settled((c) => Math.abs(c.yaw - before + Math.PI / 4) < 0.01, 'Turn Left: 45° counter-clockwise');
+    const now = await page.evaluate(
+      ({ at, w }) => {
+        let best = { x: at.x, y: at.y, d: Infinity };
+        for (let dy = -160; dy <= 160; dy += 4)
+          for (let dx = -160; dx <= 160; dx += 4) {
+            const f = window.__invitation.floorAt(at.x + dx, at.y + dy);
+            const d = f ? Math.hypot(f.x - w.x, f.z - w.z) : Infinity;
+            if (d < best.d) best = { x: at.x + dx, y: at.y + dy, d };
+          }
+        return best;
+      },
+      { at: right, w: spot },
+    );
+    expect(now.y, 'the spot to his right went up the screen').toBeLessThan(right.y - 20);
+    expect(now.x, 'and in toward him').toBeLessThan(right.x - 10);
     await page.getByRole('button', { name: 'Reset Camera' }).click();
     await settled(
       (c) => Math.abs(c.yaw - home.yaw) < 0.01 && Math.abs(c.distance - home.distance) < home.distance * 0.01,

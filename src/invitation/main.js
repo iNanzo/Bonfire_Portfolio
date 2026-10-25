@@ -1226,14 +1226,15 @@ function start(s) {
   }
 
   /**
-   * One of the Camera pad's presses: Turn Left or Right a 45° turn (Left as a drag to the left
+   * One of the Camera pad's presses: Turn Left or Right a 45° turn (Left turns the scene
+   * counter-clockwise, the way its arrow shows: the camera's yaw goes down, as a drag to the right
    * turns it), Tilt Up or Down 12°, Zoom In or Out about where it looks, Follow NEWT onto him.
    * @param {import('./ui.js').CameraKey} key
    */
   function padPress(key) {
     const TURN = Math.PI / 4;
     const TILT = (12 * Math.PI) / 180;
-    if (key === 'left' || key === 'right') orbitNudge(cam, { yaw: key === 'left' ? TURN : -TURN });
+    if (key === 'left' || key === 'right') orbitNudge(cam, { yaw: key === 'left' ? -TURN : TURN });
     else if (key === 'up' || key === 'down') orbitNudge(cam, { elevation: key === 'up' ? TILT : -TILT });
     else if (key === 'in' || key === 'out') orbitZoom(cam, key === 'in' ? 1.25 : 0.8);
     else if (key === 'follow') orbitFollow(cam, { x: body.root.x, z: body.root.z });
