@@ -34,6 +34,7 @@ export default defineConfig({
   use: {
     baseURL: origin,
     storageState: GATE_STATE,
+    trace: 'retain-on-failure',
     channel: process.env.PW_CHANNEL || undefined,
     launchOptions: {
       args: [

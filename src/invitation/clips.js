@@ -36,10 +36,64 @@ export const CLIPS = {
   Point: { loop: false, length: 30 / FPS, fadeIn: 0.15 },
   Think: { loop: true, length: 48 / FPS, fadeIn: 0.2 },
   Cheer: { loop: false, length: 30 / FPS, fadeIn: 0.12 },
+  // (Round 16: Thrash kicks and flails while he's held, pinned by the collar like Held, from and
+  // back to Held's first frame; Give Device sits him with a tablet (DeviceSit), then lies him on
+  // his stomach with it (LieDown from the sitting pose, DeviceLie), and GetUp ends on Idle.)
+  Thrash: { loop: false, length: 28 / FPS, fadeIn: 0.1 },
+  DeviceSit: { loop: true, length: 72 / FPS, fadeIn: 0.2 },
+  LieDown: { loop: false, length: 36 / FPS, fadeIn: 0.2 },
+  DeviceLie: { loop: true, length: 48 / FPS, fadeIn: 0.2 },
+  GetUp: { loop: false, length: 30 / FPS, fadeIn: 0.15 },
 };
-/** The clips a dialogue box may play (the admin lists these): his gestures, the reactions, sitting. */
-export const DIALOGUE_CLIPS = ['Idle', 'Talk', 'Nod', 'Shrug', 'Point', 'Think', 'Cheer', 'Wave', 'Spook', 'Sit'];
+/**
+ * Give Device's tablet (round 16): the page draws it in his hands (device.js) and tools/newt.py's
+ * arm IK holds it. `size` is [width (palm to palm), height, thickness] in model units; `palm` is
+ * how far along each ForeArm bone his palm is (its tip). Per clip: `centre` is where the tablet's
+ * middle sits, `tilt` how many degrees its screen tips from facing straight up toward his face,
+ * and `lift` how far his palms sit above its mid-plane along the screen's normal (0: held by its
+ * sides; lying, the palms rest on top of its edges). The palms are at centre ± (width / 2, 0, 0)
+ * + lift × normal, within 0.08 on every frame (test/invitationModel.test.mjs), so the page can
+ * put the tablet at the palms' midpoint less lift × normal, its width along the palm-to-palm line.
+ *
+ * Coordinates are Blender armature space, as newt.py poses him: +X his left, −Y his front, +Z up,
+ * the origin on the floor between his feet. In three.js (his model's own space, glTF) a point
+ * (x, y, z) is (x, z, −y) and the normal (0, sin tilt, cos tilt) is (0, cos tilt, −sin tilt);
+ * world units are model units × SCALE from his root.
+ */
+export const DEVICE = {
+  size: [1.6, 1.2, 0.08],
+  palm: 0.9,
+  clips: {
+    DeviceSit: { centre: [0, -0.85, 1.45], tilt: 12, lift: 0 },
+    DeviceLie: { centre: [0, -2.15, 0.04], tilt: 0, lift: 0.3 },
+  },
+};
 export const CLIP_NAMES = Object.keys(CLIPS);
+/** The clips a dialogue box may play (the admin lists these): every clip (DIALOGUE_WAYS, brain.js talk). */
+export const DIALOGUE_CLIPS = [...CLIP_NAMES];
+/**
+ * How a box plays the clips that don't simply play there as themselves (brain.js talk): Walk
+ * and Run step in place at their own pace; Held, Thrash and Fall dangle him from an unseen
+ * hand, his root lifted till his lowest sole clears the floor (Fall a short hop, then Land).
+ * The rest: Sit Down and Lie Down sit or lie him down and hold it (as Sit and Device Lie do),
+ * Stand Up and Get Up only get him up (on his feet, nothing), and the tablet's sit and lie hold
+ * with their way down and up.
+ * @type {Record<string, 'inPlace'|'dangling'>}
+ */
+export const DIALOGUE_WAYS = {
+  Walk: 'inPlace',
+  Run: 'inPlace',
+  Held: 'dangling',
+  Thrash: 'dangling',
+  Fall: 'dangling',
+};
+/**
+ * Whether a box's animation holds while the box is up (a loop, or a way down that stays down)
+ * rather than playing once (then Talk while its line types).
+ * @param {string} name
+ */
+export const dialogueHolds = (name) =>
+  name === 'SitDown' || name === 'LieDown' || (name !== 'Fall' && Boolean(CLIPS[name]?.loop));
 
 /** Idle, Walk and Run play as one blend by speed, on one shared step phase (blend.js). */
 export const GAIT_CLIPS = ['Idle', 'Walk', 'Run'];
@@ -77,12 +131,18 @@ export const FACE_TRACK = {
   Run: { face: 'surprised', blink: 'none' },
   Wave: { face: 'happy', blink: 'none' },
   Spook: { face: 'surprised', blink: 'none', at: [[0.5, 'neutral']] },
-  Held: { face: 'surprised', blink: 'slow', at: [[0.6, 'neutral']] },
+  // (Hanging in defeat: sad; the brain shows surprised while he's shaken hard.)
+  Held: { face: 'sad', blink: 'slow' },
   Fall: { face: 'surprised', blink: 'none' },
   Land: { face: 'surprised', blink: 'none', at: [[0.45, 'neutral']] },
   SitDown: { face: 'happy', blink: 'slow' },
   Sit: { face: 'happy', blink: 'slow' },
   StandUp: { face: 'neutral', blink: 'normal' },
+  Thrash: { face: 'angry', blink: 'none' },
+  DeviceSit: { face: 'happy', blink: 'slow' },
+  LieDown: { face: 'happy', blink: 'slow' },
+  DeviceLie: { face: 'happy', blink: 'slow' },
+  GetUp: { face: 'neutral', blink: 'normal' },
 };
 
 /** Where each face sits on NEWT_Face's 2×2 sheet (texture offset, glTF's flipY = false). */

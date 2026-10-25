@@ -1,5 +1,8 @@
 /* The invitation toy's page (/invitation/): its own look, not the bonfire site's. Off-white and
-   warm greys, chunky rounded buttons with a dark outline (a handheld's feel), Pixelify Sans.
+   warm greys, chunky rounded buttons with a dark outline (a handheld's feel), Pixelify Sans; the
+   toolbar's are squircles with pixel icons (icons.js), their labels pixel tabs, their hover and
+   press an ordered dither (--inv-dv-N, icons.js installDither); the cursors are pixel art too
+   (cursor.js puts their CSS in the page).
    The stage fills the screen (fixed, inset 0; dvh only as a fallback); the canvas inside it is
    drawn at texel size and stretched with nearest-neighbour (auto at Pixel Size Off), a little
    larger than the stage, which hides the overhang. Touch is the toy's own: no page zoom,
@@ -14,7 +17,10 @@
   --inv-grey: #ddd6ca;
   --inv-mid: #9c9286;
   --inv-on: #f4cf7a;
+  --inv-accent: #c9822a;
   --inv-focus: #4f83d9;
+  /* (A toolbar button's side: a thumb's width on a phone, seven to a 360 px row.) */
+  --inv-tool: clamp(44px, 11.4vw, 54px);
   --inv-font: 'Pixelify Sans', ui-rounded, system-ui, sans-serif;
 }
 
@@ -156,43 +162,177 @@ body {
   outline-offset: 3px;
 }
 
+/* The toolbar: a row of squircles, Replay Intro on the left, the actions in the middle, Camera
+   and Settings on the right (beside the Settings sheet on a phone held sideways), a phone's
+   width at most. */
 .inv-toolbar {
+  position: relative;
+  box-sizing: border-box;
   display: flex;
+  align-items: flex-end;
   justify-content: center;
-  gap: 5px;
-  padding: 10px 8px 12px;
+  gap: clamp(3px, 1.4vw, 8px);
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 8px clamp(6px, 2.6vw, 14px) 10px;
 }
-/* (Seven labels in one row down to a 360 px phone: each button as wide as its label plus an even
-   share of the rest, the type a little smaller on a narrow screen, and Play Intro on two lines
-   there.) */
-.inv-toolbar .inv-btn {
-  flex: 1 1 auto;
-  min-width: 40px;
-  max-width: 116px;
-  padding: 0 3px;
-  font-size: clamp(11px, 3.1vw, 15px);
-  letter-spacing: 0;
+.inv-tool {
+  position: relative;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: var(--inv-tool);
+  height: var(--inv-tool);
+  min-height: 0;
+  padding: 0;
+  border-radius: 30%;
+  background-repeat: repeat;
+  background-size: 8px 8px;
+  image-rendering: pixelated;
 }
-.inv-toolbar .inv-btn-intro {
-  line-height: 1.05;
-}
-@media (max-width: 520px) {
-  .inv-toolbar {
-    gap: 4px;
+@supports (corner-shape: squircle) {
+  .inv-tool {
+    border-radius: 50%;
+    corner-shape: squircle;
   }
-  .inv-toolbar .inv-btn-intro {
-    flex: 0 1 auto;
-    width: min-content;
+}
+.inv-toolbar > [data-button='Wave'],
+.inv-toolbar > .inv-btn-camera {
+  margin-left: auto;
+}
+.inv-icon {
+  display: block;
+  width: 32px;
+  height: 32px;
+}
+.inv-icon-line {
+  fill: currentColor;
+}
+.inv-icon-accent {
+  fill: var(--inv-accent);
+}
+/* (The ordered dither of the ink over the paper: light on hover, heavier pressed.) */
+.inv-tool:active:not(:disabled) {
+  background-image: var(--inv-dv-6);
+}
+
+/* The label: the button's own text (its name), shown as a pixel tab over it; hidden until then
+   (opacity only, so it still names the button). With a mouse on hover and keyboard focus; on
+   touch, a press held still (ui.js: .is-label). */
+.inv-btn-label {
+  --inv-tab-x: -50%;
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  bottom: calc(100% + 9px);
+  padding: 4px 8px 5px;
+  border: 2px solid var(--inv-ink);
+  background: var(--inv-paper);
+  color: var(--inv-ink);
+  font: 600 13px/1 var(--inv-font);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  box-shadow: 0 3px 0 var(--inv-ink);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(var(--inv-tab-x), 3px);
+  transition:
+    opacity 90ms steps(3),
+    transform 90ms steps(3);
+}
+/* (Its notch, a pixel arrow down to the button's middle: three pixels, then one.) */
+.inv-btn-label::after {
+  content: '';
+  position: absolute;
+  top: calc(100% + 5px);
+  left: var(--inv-notch, 50%);
+  width: 2px;
+  height: 2px;
+  margin-left: -1px;
+  background: var(--inv-ink);
+  box-shadow:
+    -2px -2px 0 var(--inv-ink),
+    0 -2px 0 var(--inv-ink),
+    2px -2px 0 var(--inv-ink);
+}
+.inv-btn-intro .inv-btn-label {
+  --inv-tab-x: 0;
+  --inv-notch: calc(var(--inv-tool) / 2);
+  left: -2px;
+}
+.inv-btn-look .inv-btn-label {
+  --inv-tab-x: 0;
+  --inv-notch: calc(100% - var(--inv-tool) / 2);
+  left: auto;
+  right: -2px;
+}
+.inv-tool.is-label .inv-btn-label {
+  opacity: 1;
+  transform: translate(var(--inv-tab-x), 0);
+}
+@media (hover: hover) and (pointer: fine) {
+  .inv-tool:hover:not(:disabled) {
+    background-image: var(--inv-dv-2);
+  }
+  .inv-tool:active:not(:disabled) {
+    background-image: var(--inv-dv-6);
+  }
+  .inv-tool:hover .inv-btn-label,
+  .inv-tool:focus-visible .inv-btn-label {
+    opacity: 1;
+    transform: translate(var(--inv-tab-x), 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .inv-btn-label {
+    transition: none;
   }
 }
 
-/* (Under the open Look sheet the toolbar's action buttons rest, out of reach: ui.js makes them
-   inert. Look stays live, pressed: it closes the sheet, beside it on a phone held sideways.) */
+/* The Camera pad: over the stage above the bar's right end (it never moves the bar, so the
+   view's clear space and the play area stay as they are), its controls four to a row. */
+.inv-camera-pad {
+  position: absolute;
+  z-index: 1;
+  right: clamp(6px, 2.6vw, 14px);
+  bottom: calc(100% + 2px);
+  display: grid;
+  grid-template-columns: repeat(4, var(--inv-tool));
+  gap: 6px;
+  max-width: calc(100vw - 24px);
+  padding: 10px;
+  border: 3px solid var(--inv-ink);
+  border-radius: 18px;
+  background: var(--inv-paper);
+  box-shadow: 0 4px 0 var(--inv-ink);
+}
+.inv-camera-pad .inv-hint {
+  grid-column: 1 / -1;
+  max-width: calc(4 * var(--inv-tool) + 18px);
+  margin: 2px 2px 0;
+  font-size: 12px;
+  line-height: 1.3;
+}
+.inv-camera-pad .inv-tool:nth-child(4n + 1) .inv-btn-label {
+  --inv-tab-x: 0;
+  --inv-notch: calc(var(--inv-tool) / 2);
+  left: -2px;
+}
+.inv-camera-pad .inv-tool:nth-child(4n) .inv-btn-label {
+  --inv-tab-x: 0;
+  --inv-notch: calc(100% - var(--inv-tool) / 2);
+  left: auto;
+  right: -2px;
+}
+
+/* (Under the open Settings sheet the toolbar's other buttons rest, out of reach: ui.js makes them
+   inert. Settings stays live, pressed: it closes the sheet, beside it on a phone held sideways.) */
 .inv-toolbar .inv-btn[inert] {
   opacity: 0.45;
 }
 
-/* --- The Look sheet: a bottom sheet over the toolbar. */
+/* --- The Settings sheet: a bottom sheet over the toolbar. */
 .inv-sheet {
   position: absolute;
   left: 0;
@@ -476,19 +616,10 @@ body {
   margin-top: 6px;
 }
 
-/* The camera: how to turn and zoom it, and the way back to the default view. */
-.inv-camera {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+/* Wander: whether he walks about by himself, and a line on it. */
+.inv-play {
   margin-top: 14px;
 }
-.inv-camera .inv-hint {
-  flex: 1 1 auto;
-  margin: 0;
-}
-.inv-camera .inv-btn {
-  flex: 0 0 auto;
-  min-height: 44px;
-  padding: 0 14px;
+.inv-play .inv-hint {
+  margin-top: 6px;
 }

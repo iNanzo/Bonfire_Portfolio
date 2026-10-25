@@ -63,10 +63,10 @@ export function cameraActs({ point, presser, sweep, pinch, along, sleep }) {
     if (size.phone) await twoFingerDrag(page, back, { x: size.w * 0.3, y: size.h * 0.2 });
     else await sweep(page, size, back, { x: back.x + size.w * 0.3, y: back.y + size.h * 0.2 }, 900, 'left');
     await sleep(800);
-    await page.locator('[data-look-open]').click();
+    await page.locator('[data-camera-open]').click();
     await page.locator('[data-reset-camera]').click();
     await sleep(300);
-    await page.locator('[data-look-close]').click();
+    await page.locator('[data-camera-open]').click();
   }
   /**
    * A press on his body held into a grab, carried up near the top of the screen, across and back,

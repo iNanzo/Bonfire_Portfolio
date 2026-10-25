@@ -12,12 +12,16 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {
   ALL,
+  BURST,
+  HOVER,
   ID,
   MAX_SOFT,
   POST_SHADER,
+  burstAt,
   catcherMaterial,
   createRetro,
   decalMaterial,
+  hoverEase,
   markId,
   snapShift,
   subjectBoxes,
@@ -441,4 +445,94 @@ test('outside the area round NEWT, his shadow and the decals, the canvas is the 
   retro.setBoxes(null);
   retro.render(scene, camera);
   assert.deepEqual(calls, ['target whole', 'clear colour alpha 0', 'clear', 'scene', 'canvas', 'post']);
+});
+
+test('the hover dither and the grab burst live in the post shader: a Bayer rim on NEWT filling inward, a halo just outside him in the ring box, a dither ring at the grab point, each off at 0', () => {
+  assert.match(POST_SHADER, /uniform float uHover;/);
+  assert.match(POST_SHADER, /uniform vec3 uHoverInk;/);
+  assert.match(POST_SHADER, /uniform vec4 uBurst;/);
+  const main = POST_SHADER.slice(POST_SHADER.indexOf('void main()'));
+  // His texels: the rim (all of his edge, a thinner share of the rest as it fills inward), and
+  // the ring where it crosses him, both before his own quantize.
+  const his = main.slice(0, main.indexOf('return;'));
+  assert.match(his, /if \(uHover > 0\.0 && bayer\(p\) < uHover \* \(edge \? 1\.0 : HOVER_FILL\)\)/);
+  assert.match(his, /burstAt\(p\)/);
+  // The paper: the halo only while hovering and only in the ring box (it searches round each
+  // texel), the ring an ALU test anywhere in the area; both marked as a line, so the shader keeps
+  // its two quantize calls (the test above).
+  const paper = main.slice(main.indexOf('return;'));
+  assert.match(paper, /if \(uHover > 0\.0 && !line && inBox\(p, uRingBox\)\)/);
+  assert.match(paper, /burstAt\(p\)/);
+  assert.match(POST_SHADER, /if \(uBurst\.w <= 0\.0\) return false;/, 'no burst: one compare');
+  assert.match(POST_SHADER, /abs\(length\(p - uBurst\.xy\) - uBurst\.z\) < BURST_WIDTH/);
+  assert.equal([...main.matchAll(/quantize\(/g)].length, 2);
+});
+
+test('setHover and setBurst reach the post shader: the hover kept to 0..1, the burst from client px to texels (y up), with its radius and strength', () => {
+  const scene = new THREE.Scene();
+  const { renderer } = standIn(scene, new THREE.Mesh());
+  renderer.domElement = { getBoundingClientRect: () => ({ left: 10, top: 20, width: 400, height: 200 }) };
+  const retro = createRetro(renderer);
+  retro.setSize(200, 100);
+  const u = retro.uniforms;
+  assert.equal(u.uHover.value, 0, 'off until the pointer is on him');
+  assert.equal(u.uBurst.value.w, 0);
+  retro.setHover(0.5);
+  assert.equal(u.uHover.value, 0.5);
+  retro.setHover(3);
+  assert.equal(u.uHover.value, 1);
+  retro.setHover(-1);
+  assert.equal(u.uHover.value, 0);
+  retro.setBurst(210, 70, 12, 0.8);
+  const b = u.uBurst.value;
+  assert.ok(near(b.x, 100.5) && near(b.y, 75.5), `the texel's centre, y up: ${b.x}, ${b.y}`);
+  assert.equal(b.z, 12);
+  assert.ok(near(b.w, 0.8));
+  retro.setBurst(210, 70, 12, 0);
+  assert.equal(u.uBurst.value.w, 0, 'gone');
+  assert.ok(u.uHoverInk.value.r > u.uHoverInk.value.b, 'a warm ink');
+  retro.dispose();
+});
+
+test('at Pixel Size Off his materials take the hover as a Bayer tint (no halo): one program for every id, one hover they share', () => {
+  const a = compiled(markId(new THREE.MeshToonMaterial(), ID.newt), 'toon');
+  const f = compiled(markId(new THREE.MeshToonMaterial(), ID.floor), 'toon');
+  assert.match(a.fragmentShader, /uniform float uHover;/);
+  assert.match(a.fragmentShader, /if \(uIdOn < 0\.5 && uHover > 0\.0 && abs\(uSurfaceId \* /);
+  assert.equal(a.fragmentShader, f.fragmentShader, 'the same text: the id is a uniform');
+  assert.equal(a.uniforms.uHover, f.uniforms.uHover, 'one shared hover');
+  const scene = new THREE.Scene();
+  const { renderer } = standIn(scene, new THREE.Mesh());
+  const retro = createRetro(renderer);
+  retro.setHover(0.7);
+  assert.ok(near(a.uniforms.uHover.value, 0.7));
+  retro.setHover(0);
+  retro.dispose();
+});
+
+test('the hover eases in over 0.08 s while the pointer is on him and out over 0.2 s; the grab ring grows to about 20 texels and is gone in 0.35–0.4 s', () => {
+  assert.equal(HOVER.in, 0.08);
+  assert.equal(HOVER.out, 0.2);
+  let k = 0;
+  for (let i = 0; i < 4; i++) k = hoverEase(k, true, 0.02);
+  assert.ok(near(k, 1), `in, in four 20 ms frames: ${k}`);
+  assert.ok(near(hoverEase(0, true, 0.04), 0.5), 'half way in at 0.04 s');
+  assert.equal(hoverEase(1, true, 0.5), 1, 'never over 1');
+  assert.ok(near(hoverEase(1, false, 0.1), 0.5), 'half way out at 0.1 s');
+  assert.equal(hoverEase(0.2, false, 0.5), 0, 'never under 0');
+  assert.ok(BURST.time >= 0.35 && BURST.time <= 0.4);
+  assert.ok(BURST.radius >= 16 && BURST.radius <= 24);
+  const at = (s) => burstAt(s);
+  assert.deepEqual(at(0), { radius: 0, strength: 1 });
+  let r = 0;
+  let w = 1;
+  for (let s = 0.02; s < BURST.time; s += 0.02) {
+    const b = at(s);
+    assert.ok(b.radius >= r && b.strength <= w, `grows and thins: ${s}`);
+    r = b.radius;
+    w = b.strength;
+  }
+  assert.ok(at(BURST.time * 0.5).radius > BURST.radius * 0.6, 'it eases out: most of the way by half time');
+  assert.equal(at(BURST.time), null, 'gone');
+  assert.equal(at(1), null);
 });

@@ -178,8 +178,9 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     it. A box has its **ID** (how Next and the choices point to it), a **Speaker Override**
     (such as ??? before he's said his name; empty: the intro's Speaker), its **Text** (typed
     out letter by letter, up to 240 characters; past 100 it outgrows the box's three lines on
-    a phone), a **Face** (every face he has; he still blinks on Neutral), an **Animation** (a
-    gesture that plays once, a loop that keeps going, or None: as he was), a **Camera**
+    a phone), a **Face** (every face he has; he still blinks on Neutral), an **Animation** (any
+    of his: Once plays and then he talks, Loops keeps going, In Place walks or runs on the spot,
+    Dangling holds him up off the floor, sitting or lying down gets him down first; None: as he was), a **Camera**
     (Close: head and shoulders, too tight for a Cheer's fists on a phone; Medium: his whole
     body; Wide: the default view; Keep: as it was), its **Next Box** (empty: the box after
     it), **Ends the Intro**, an **Auto Wait** (seconds Auto waits once the line is typed; 0:
