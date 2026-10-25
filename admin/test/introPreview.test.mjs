@@ -84,6 +84,8 @@ const {
   INTRO_PREVIEW_SIZES,
   boxAt,
   createIntroPreview,
+  fitFrame,
+  roomFor,
   previewBoxes,
   previewMessage,
 } = await import('../ui/introPreview.js');
@@ -307,6 +309,20 @@ test('the box being edited is picked; edits to the intro play it again, debounce
   } finally {
     mock.timers.reset();
   }
+});
+
+test('the frame fits the pane’s width and the room down the window, in the middle', () => {
+  // (A desktop beside a 500 px pane: by its width; a phone: by the room, centred.)
+  const room = roomFor(900, false);
+  assert.ok(room > 400 && room < 900, `beside the page: most of the window (${room})`);
+  assert.ok(roomFor(768, true) < roomFor(768, false), 'less in the slot pinned over the page');
+  const desk = fitFrame(INTRO_PREVIEW_SIZES.desktop, { width: 500, room });
+  assert.equal(desk.scale, 500 / 1280);
+  assert.equal(desk.left, 0);
+  const phone = fitFrame(INTRO_PREVIEW_SIZES.phone, { width: 500, room });
+  assert.ok(780 * phone.scale <= room + 1e-9, 'the phone stays in the room');
+  assert.ok(phone.left > 0 && Math.abs(2 * phone.left + 390 * phone.scale - 500) <= 1, 'in the middle');
+  assert.equal(fitFrame(INTRO_PREVIEW_SIZES.phone, { width: 2000, room: 2000 }).scale, 1, 'never over its size');
 });
 
 test('a draft with no intro plays the toy’s own, in its own colours; one with no boxes says so', () => {

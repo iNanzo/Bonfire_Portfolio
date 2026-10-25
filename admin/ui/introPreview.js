@@ -87,6 +87,27 @@ export function previewMessage(draft, box, { restart = false, viewport = 'deskto
 }
 
 /**
+ * The height the frame may take, CSS px, in a window `tall` px high: most of it beside the page,
+ * less in the slot pinned over it (narrower than 1280 px: 48% of the window, its head and tools
+ * taken out).
+ * @param {number|undefined} tall
+ * @param {boolean} pinned
+ */
+export const roomFor = (tall, pinned) =>
+  Math.max(160, Math.round((tall || 800) * (pinned ? 0.48 : 0.72)) - (pinned ? 96 : 150));
+
+/**
+ * The frame's scale to fit the stage's width and the room down the window (never over 1), and
+ * how far in it starts to stand in the middle, CSS px.
+ * @param {[number, number]} size  the frame's own width and height
+ * @param {{width: number, room: number}} o  the stage's width; the height it may take
+ */
+export function fitFrame([w, h], { width, room }) {
+  const scale = Math.min(width / w, room / h, 1);
+  return { scale, left: Math.max(0, Math.round((width - w * scale) / 2)) };
+}
+
+/**
  * The pane. `draft()` is the draft now; `win` the window it listens on (the tests' stand-in).
  * @param {string|undefined} siteUrl  the site the frame loads (the session's)
  * @param {{draft: () => any, win?: any, settle?: number}} o
@@ -203,10 +224,13 @@ export function createIntroPreview(siteUrl, { draft, win = globalThis.window, se
 
   function fit() {
     const [w, h] = INTRO_PREVIEW_SIZES[st.viewport];
-    const scale = Math.min((stage.clientWidth || w) / w, 1);
+    const width = stage.clientWidth || w;
+    // (The room it has down the window: the slot pinned over the page under 1280 px is shorter.)
+    const pinned = Boolean(win?.matchMedia?.('(max-width: 1279px)').matches);
+    const { scale, left } = fitFrame([w, h], { width, room: roomFor(win?.innerHeight, pinned) });
     frame.style.setProperty('width', `${w}px`);
     frame.style.setProperty('height', `${h}px`);
-    frame.style.setProperty('transform', `scale(${scale})`);
+    frame.style.setProperty('transform', `translateX(${left}px) scale(${scale})`);
     stage.style.setProperty('height', `${Math.round(h * scale)}px`);
   }
   if (typeof win?.ResizeObserver === 'function') new win.ResizeObserver(fit).observe(stage);
