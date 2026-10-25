@@ -1,14 +1,14 @@
-// Carrying NEWT and Give Device in a real browser (/invitation/, the production build), through
+// Carrying NEWT and Screen Time in a real browser (/invitation/, the production build), through
 // `?test`'s window.__invitation and real input. Carried with a mouse, his collar comes under the
 // cursor within 2 px once the grab has eased in (0.15 s), up and across; at the play area's
 // edge he stops (the cursor carries on, he stays put, never sliding toward or away from the
 // camera); his limbs swing against a quick drag and settle; held, he keeps the way he faced
 // when grabbed, glances up now and then (his head only ever rising as it does: no dip, no swing to
 // a side first), and lands facing the same way; he thrashes now and then
-// (an angry kick and flail, then back to hanging). Give Device's three presses sit him down
+// (an angry kick and flail, then back to hanging). Screen Time's three presses sit him down
 // with the tablet (visible in his hands), lie him on his stomach with it (in his hands as he
 // lies down), each the way he was facing (no turn to the camera), and get him up (it put away as
-// he starts to); the button's label (the brain's deviceLabel) goes Give Device, Lie Down, Get
+// he starts to); the button's label (the brain's deviceLabel) goes Screen Time, Lie Down, Get
 // Up. Every wait is on a state, never a duration (CI's software WebGL runs slower than real
 // time); a state that lasts only a fraction of a second (a glance up, a Thrash, lying down,
 // getting up) is checked in the page every frame (onFrame), so a poll's back-off never steps
@@ -213,16 +213,16 @@ test.describe('on a desktop', () => {
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
 
-  test('Give Device, pressed on the toolbar (it reads Lie Down, then Get Up): sits him down with the tablet in his hands, lies him on his stomach with it, each the way he was facing, and gets him up', async ({
+  test('Screen Time, pressed on the toolbar (it reads Lie Down, then Get Up): sits him down with the tablet in his hands, lies him on his stomach with it, each the way he was facing, and gets him up', async ({
     page,
   }) => {
     const errors = watch(page);
     await calm(page);
     const device = async () => (await snapshot(page)).motion.device;
-    expect(await device()).toMatchObject({ state: null, label: 'Give Device', shown: false });
-    // (The toolbar's Give Device: it reads what its next press does, the brain's deviceLabel.)
+    expect(await device()).toMatchObject({ state: null, label: 'Screen Time', shown: false });
+    // (The toolbar's Screen Time: it reads what its next press does, the brain's deviceLabel.)
     const button = page.locator('[data-button="Device"]');
-    await expect(button).toHaveAccessibleName('Give Device');
+    await expect(button).toHaveAccessibleName('Screen Time');
     const press = () => button.tap();
     // (The way he faces as it's pressed: he keeps it, sitting and lying.)
     const heading = (await snapshot(page)).heading;
@@ -254,8 +254,8 @@ test.describe('on a phone', () => {
     await press();
     await onFrame(page, (s) => s.state === 'getUp' && !s.motion.device.shown, 'getting up, it put away');
     await until(page, (s) => s.state === 'idle', 'up', 30_000);
-    expect(await device()).toMatchObject({ state: null, label: 'Give Device', shown: false });
-    await expect(button).toHaveAccessibleName('Give Device');
+    expect(await device()).toMatchObject({ state: null, label: 'Screen Time', shown: false });
+    await expect(button).toHaveAccessibleName('Screen Time');
     expect(errors).toEqual([]);
   });
 });

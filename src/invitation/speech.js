@@ -4,7 +4,7 @@
 // finds the moments worth a line: the plan's triggers (TRIGGERS) for a tap's wave or spook,
 // running off, being caught mid-run, picked up, shaken, thrashing, dropped and landing, walking
 // to a floor tap or wandering off, sitting down by himself, still sitting a while, standing up,
-// getting the tablet (Give Device) and lying down with it, idle time
+// getting the tablet (Screen Time) and lying down with it, idle time
 // every 20 to 40 s, the camera spun round a lot or zoomed in very close. A moment speaks at its
 // trigger's chance, once its cooldown is over (the admin's, content.json `invitation.speech`,
 // read by speechFrom), with one of its lines (`invitation.lines`, linesFrom) picked at random,
@@ -13,6 +13,7 @@
 // The idle clock runs from the last line coming down; while he's busy (held, running, a
 // reaction) it waits, and while he sits it says a still-sitting line instead.
 
+import { letterCount, plainText } from './markup.js';
 import { between } from './rng.js';
 import { wrapAngle } from './steer.js';
 
@@ -134,13 +135,16 @@ export const SPEECH_DEFAULTS = {
 
 /** At most this many lines a trigger, each at most LINE_MAX characters (contentRules.js holds content.json to them too). */
 export const LINES_MAX = 20;
+/** A line's most letters (markup.js: the ones that show, its tags aside)… */
 export const LINE_MAX = 120;
+/** …and its most characters as written, tags and all. */
+export const LINE_RAW_MAX = 3 * LINE_MAX;
 
 /** The numbers talk runs on (seconds, characters a second, radians, zoom shares). */
 export const TALK = {
-  /** A line types out at this many characters a second… */
+  /** A line types out at this many letters a second… */
   typeCps: 30,
-  /** …then stays up this long, plus this much a character (time to read it)… */
+  /** …then stays up this long, plus this much a letter (time to read it)… */
   hold: 1.6,
   holdPerChar: 0.045,
   /** …then fades out over this long. */
@@ -162,12 +166,17 @@ export const TALK = {
 /** The states he can say an idle line in (sitting: a still-sitting line). */
 const IDLE_STATES = new Set(['idle', 'walk']);
 
-/** A line's length in characters (an emoji is one). @param {string} text */
-const charsOf = (text) => Array.from(text).length;
+/**
+ * A line's length in the letters that show (markup.js: its text effects' tags aside; an emoji
+ * is one).
+ * @param {string} text
+ */
+const charsOf = (text) => letterCount(text);
 
 /**
- * How long a line is up, seconds: typed at TALK.typeCps, held to be read, faded (bubble.js
- * shows it on this timeline, with prefers-reduced-motion all at once and held the longer).
+ * How long a line is up, seconds, by the letters that show: typed at TALK.typeCps, held to be
+ * read, faded (bubble.js shows it on this timeline, with prefers-reduced-motion all at once and
+ * held the longer).
  * @param {string} text
  */
 export function lineDuration(text) {
@@ -211,7 +220,8 @@ export function speechFrom(raw) {
 
 /**
  * The lines from content.json's `invitation.lines` (anything): each known trigger's list of
- * text, trimmed, the empty, the non-text and the too long (over LINE_MAX) left out, at most
+ * text, trimmed, the empty (or only a blank under tags), the non-text and the too long (over LINE_MAX letters, or LINE_RAW_MAX
+ * characters with its tags) left out, at most
  * LINES_MAX of them.
  * @param {unknown} raw
  * @returns {Lines}
@@ -226,7 +236,7 @@ export function linesFrom(raw) {
     out[k] = list
       .filter((l) => typeof l === 'string')
       .map((l) => l.trim())
-      .filter((l) => l && charsOf(l) <= LINE_MAX)
+      .filter((l) => plainText(l).trim() && l.length <= LINE_RAW_MAX && charsOf(l) <= LINE_MAX)
       .slice(0, LINES_MAX);
   }
   return out;

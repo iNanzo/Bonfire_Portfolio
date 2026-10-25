@@ -2411,6 +2411,26 @@
           "choices": []
         }
       ]
+    },
+    "text": {
+      "colors": [
+        {
+          "name": "red",
+          "color": "#c8323c"
+        },
+        {
+          "name": "gold",
+          "color": "#c9822a"
+        },
+        {
+          "name": "rose",
+          "color": "#e44544"
+        },
+        {
+          "name": "ink",
+          "color": "#2b2a33"
+        }
+      ]
     }
   }
 }

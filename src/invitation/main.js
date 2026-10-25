@@ -33,9 +33,10 @@
 // → the clip mix and step phase (play.js mixStep; a restart of a clip still showing fades its
 // twin out) → character.setWeights and update → the swing's tilt on his root and the collar
 // anchoring, matrices updated before and after → lookStep and applyLook → faceStep and setFace
-// → the blob shadow (straight down under his hips while he's off the floor, sized and faded by his
-// lowest foot's height: cues.js), the marker (or, while he's held, the ring under him and the
-// dashed drop line, Ground Cues), the toolbar → the speech bubble (bubble.js: over his head as
+// → the blob shadow (off the floor, sized and faded by his lowest foot's height: cues.js; held,
+// or flying from a let-go, on the floor point the ring and the drop line share, cueSpot, else
+// under his hips), the marker (or, while he's held, the ring under him and the dashed drop
+// line, Ground Cues), the toolbar → the speech bubble (bubble.js: over his head as
 // posed, clear of the toolbar, the open Camera pad and Settings sheet, out of sight while the sheet covers his
 // head; near the top, beside his head, narrowed to fit there, or under his feet) → render. With Motion Choppy (look.js) his pose (the update and applyLook) only moves
 // on the clock's steps, 15 a second; his root, the camera and the rest move every frame. The
@@ -50,9 +51,12 @@
 // letter no longer hides his head and chest (envelope.veils, envelopeVeils); skipped, it drops
 // away and the toy is free, focus on the toolbar.
 // Without WebGL 2, or if NEWT can't load, it steps aside for the message. ?test skips it unless
-// &envelope.
+// &envelope. Replay Intro resets the scene and spawns it again (replay: any intro ended, a hold
+// dropped, NEWT, his brain, mix, gaze and faces as they started, the camera cut home, the bubble,
+// the grab ring and the hover gone), the toy paused behind it as at boot; opened, the intro starts
+// the same way. Under ?test without &envelope, Replay Intro runs the dialogue alone.
 //
-// Replay Intro (ui.js) runs the intro's dialogue (dialogue.js, on content.js introScript():
+// Replay Intro without an envelope runs the intro's dialogue (dialogue.js, on content.js introScript():
 // content.json's invitation.intro as the admin writes it, mended, or the toy's own) on the toy's
 // clock, shown by dialogueUi.js over the stage: the toolbar rests out of sight, the speech bubble
 // goes and stays quiet, the layer takes every press (no drags, no orbit, no floor taps), the first
@@ -66,7 +70,8 @@
 // his free play, the toolbar and the bubble come back.
 //
 // Without WebGL the stage gets data-webgl="off" and a plain message. `?test` exposes
-// window.__invitation for the specs and tools/capture-invitation.mjs: snapshot(), screen(part)
+// window.__invitation for the specs and tools/capture-invitation.mjs: snapshot(), petals() (the
+// page's petal layer, petalLayer.js), screen(part)
 // (a point on NEWT in client px: his head, middle or feet), floorAt(x, y), feet() and bones()
 // (his ankles in the world, his bones from his root), grabbed() (while he's held, where the
 // point he was grabbed by shows), say(text) (a line in his bubble now), play(clip) (forces a
@@ -74,13 +79,14 @@
 // clips.js FACE_NAMES on him, no blinks; null gives it back to the brain) and press(name) (a
 // toolbar button's press, as the brain gets it: types.js ButtonName); snapshot().motion is the
 // carry (his collar on screen, how long he's been held, the anchor and the drag plane, whether
-// he's pushed at the edge), the limp layer (its weight, the most a limb has swung) and Give
-// Device (the brain's device and label, the tablet shown and where, his turn off the camera);
+// he's pushed at the edge), the limp layer (its weight, the most a limb has swung) and Screen
+// Time (the brain's device and label, the tablet shown and where, his turn off the camera);
 // snapshot().drag is the hold's (its height controls, the collar's gap from where it's aimed, CSS px,
 // the hold height, the anchor's depth along the camera's level axis, the blob, his hips' floor
-// point and lowest foot, the ring, the drop line and Ground Cues as they play, the way his root
-// faces as drawn); view({yaw, elevation, zoom}) eases the camera there; `?seed=N` and `?calm` go
-// to the brain (and the seed to talk).
+// point and lowest foot, the floor point the cues share, the ring, the drop line and Ground Cues
+// as they play, the blob's and the ring's centres on screen, the way his root faces as drawn);
+// view({yaw, elevation, zoom}) eases the camera there; `?seed=N` and `?calm` go to the brain (and
+// the seed to talk).
 // clock() is the toy's clock (it stands still while the envelope covers him), envelope() the
 // envelope's state and pose (null without one).
 import { Vector3 } from 'three';
@@ -92,12 +98,13 @@ import './dialogue.css';
 import './envelope.css';
 import { DANGLE, createBrain, dangleLift, talkPhase } from './brain.js';
 import { createBubble, speakerPoint } from './bubble.js';
-import { introFrom, introScript, invitationDefaults, invitationLines, speechSettings } from './content.js';
+import { introFrom, introScript, invitationDefaults, invitationLines, speechSettings, textPalette } from './content.js';
 import { CARRY, createHand, handFeel, handStep } from './carry.js';
 import {
   CUES,
   blobLook,
   blobWeight,
+  cueSpot,
   cueStep,
   groundCueMode,
   lineMode,
@@ -140,11 +147,22 @@ import { ANKLE_HEIGHT, BONES, COLLAR, DIALOGUE_WAYS, FACE_NAMES, FACE_TRACK, SCA
 import { createDialogue, lookSway, normalizeScript } from './dialogue.js';
 import { REPLY_SETTLE, createDialogueUi } from './dialogueUi.js';
 import { createEnvelopeScene } from './envelopeScene.js';
+import { createPetalLayer } from './petalLayer.js';
 import { createFaceState, faceStep } from './faces.js';
 import { fitShadow, shadowTop } from './floor.js';
 import { createGesture, pickScreen, rayPlaneY } from './gesture.js';
 import { clearInsets, newtShare, newtTexels, pixelSteps, resolutionOf, stepFor } from './pixels.js';
-import { animFps, installDefaults, isCustom, loadLook, lookPreset, motionStep, saveLook, shaderOf } from './look.js';
+import {
+  animFps,
+  installDefaults,
+  isCustom,
+  loadLook,
+  lookPreset,
+  motionStep,
+  petalsOn,
+  saveLook,
+  shaderOf,
+} from './look.js';
 import { createGlance, createLook, glanceLook, glanceStep, lookStep, torsoStep } from './lookAt.js';
 import {
   bodyStep,
@@ -158,6 +176,7 @@ import {
   twinWeights,
 } from './play.js';
 import { burstAt, hoverEase } from './retro.js';
+import { blobCentre, lieWeight } from './ring.js';
 import { createRng } from './rng.js';
 import { createTalk } from './speech.js';
 import { LIFT, createStage } from './stage.js';
@@ -264,6 +283,19 @@ const ui = bindUi(stageEl, {
 });
 installCursors();
 stageEl.dataset.cursor = 'arrow';
+/** NEWT is being carried now (start() says, once he's in). */
+let carrying = () => false;
+/**
+ * The page's rose petals (the cursor trail and a ring at every press), for good (its renderer
+ * made only once petals may come): over the stage and under the HUD and the dialogue, over the
+ * envelope while it's up; no trail while he's carried.
+ */
+const petalLayer = createPetalLayer(stageEl, {
+  on: () => petalsOn(look) && !prefersReduced(),
+  before: stageEl.querySelector('.inv-hud'),
+  over: () => Boolean(envelope?.element.isConnected),
+  carrying: () => carrying(),
+});
 
 /** Whether the visitor asked for less motion (false where it can't be read). */
 function prefersReduced() {
@@ -279,20 +311,29 @@ let toyReady = false;
 /** The envelope stopped covering the toy (start() sets it: the loop runs again). */
 let envelopeGone = () => {};
 const hudEl = /** @type {HTMLElement} */ (stageEl.querySelector('.inv-hud'));
-const envelope = options.envelope
-  ? createEnvelopeScene(stageEl, {
-      reduced: prefersReduced(),
-      ready: () => toyReady,
-      onUncover: (how) => {
-        hudEl.removeAttribute('inert');
-        if (how === 'open') introWanted = true;
-        // (Skipped: the toy is free, focus on the toolbar's first button, its ring only after a key.)
-        else ui.focusToolbar();
-        envelopeGone();
-      },
-    })
-  : null;
-if (envelope) hudEl.setAttribute('inert', '');
+/** @type {ReturnType<typeof createEnvelopeScene>} the envelope (at boot, or Replay Intro's), null once there's none */
+let envelope = null;
+/**
+ * The envelope over the toy (at boot, and again on Replay Intro): the HUD inert under it; opened,
+ * the intro starts by itself (introWanted); skipped, focus on the toolbar.
+ */
+function spawnEnvelope() {
+  envelope?.dispose();
+  envelope = createEnvelopeScene(stageEl, {
+    reduced: prefersReduced(),
+    petals: petalsOn(look),
+    ready: () => toyReady,
+    onUncover: (how) => {
+      hudEl.removeAttribute('inert');
+      if (how === 'open') introWanted = true;
+      // (Skipped: the toy is free, focus on the toolbar's first button, its ring only after a key.)
+      else ui.focusToolbar();
+      envelopeGone();
+    },
+  });
+  if (envelope) hudEl.setAttribute('inert', '');
+}
+if (options.envelope) spawnEnvelope();
 /** The envelope's state for ?test (types.js EnvelopeState), null without one. */
 const envelopeState = () => (envelope ? envelope.state : null);
 
@@ -479,26 +520,38 @@ function start(s) {
   s.setArea(area);
   const brain = createBrain({ seed, calm: options.calm, bounds: area, middle: centreOf(area) });
   const gesture = createGesture({ holdLift: () => Boolean(hold?.feel.secondFinger && hold.onSecondFinger) });
-  const body = createBody();
-  const mix = createMix();
-  const gaze = createLook();
+  // (Made again by Replay Intro's reset: replay.)
+  let body = createBody();
+  carrying = () => body.mode === 'held';
+  let mix = createMix();
+  let gaze = createLook();
   /** Held, his glance up at you (lookAt.js createGlance), and the look put on this frame. */
-  const glance = createGlance();
+  let glance = createGlance();
   let headTurn = { yaw: 0, pitch: 0, weight: 1 };
   /** How much of a big look his chest takes (lookAt.js torsoStep). */
   let torso = 1;
-  const faces = createFaceState();
+  let faces = createFaceState();
   // (What he says and when, from the admin's lines and settings; the bubble goes in before the
   // HUD, so the toolbar and the Look sheet stay over it, and runs on the toy's clock, as talk
   // does: a slow frame's capped step or a hidden tab moves both alike, so they agree on when a
   // line is up.)
   const talk = createTalk({ lines: invitationLines(), speech: speechSettings(), rng: createRng(seed + 2) });
-  const bubble = createBubble({ root: stageEl, before: stageEl.querySelector('.inv-hud'), now: () => t });
-  orbit = createOrbit({ distance: s.view?.distance ?? 20, centre: centreOf(area), span: stageSize() });
-  const cam = orbit;
-  orbitSpan(cam, stageSpan(s));
-  orbitArea(cam, area);
-  s.setCamera(orbitPose(cam));
+  const bubble = createBubble({
+    root: stageEl,
+    before: stageEl.querySelector('.inv-hud'),
+    now: () => t,
+    palette: textPalette(),
+  });
+  /** The camera at home (at boot, and cut there again by Replay Intro's reset). */
+  const homeCamera = () => {
+    const o = createOrbit({ distance: s.view?.distance ?? 20, centre: centreOf(area), span: stageSize() });
+    orbitSpan(o, stageSpan(s));
+    orbitArea(o, area);
+    s.setCamera(orbitPose(o));
+    orbit = o;
+    return o;
+  };
+  let cam = homeCamera();
   /** The light that casts NEWT's shadow (its shadow camera follows him). */
   const sun = /** @type {any} */ (s.scene.children.find((o) => /** @type {any} */ (o).isDirectionalLight)) ?? null;
 
@@ -548,7 +601,8 @@ function start(s) {
    * The ground cues (cues.js): the blob's held look eased in, the ring's and the drop line's
    * strengths, when the ring last pulsed, whether he was pushed at the edge last frame, where the
    * hold said he'd land as he was let go (the ring waits there till he does: hold.js
-   * Hold.landing), and, for ?test, Ground Cues as it plays and where the ring is while it shows.
+   * Hold.landing), and, for ?test, Ground Cues as it plays, where the ring is while it shows and
+   * the floor point the cues share (cues.js cueSpot: null while he's on his feet).
    */
   const cue = {
     flight: /** @type {import('./types.js').XZ|null} */ (null),
@@ -559,6 +613,7 @@ function start(s) {
     pushed: false,
     mode: /** @type {import('./hold.js').CueMode} */ ('off'),
     ringAt: /** @type {import('./types.js').XZ|null} */ (null),
+    spot: /** @type {import('./types.js').XZ|null} */ (null),
   };
   /** How far the top of his head shows above the point grabbed, CSS px (followed while held). */
   let headAbove = 0;
@@ -573,7 +628,7 @@ function start(s) {
   /** The toolbar as last set, so the DOM is only touched on a change. */
   const shown = {
     sit: 'Sit',
-    device: /** @type {string} */ ('Give Device'),
+    device: /** @type {string} */ ('Screen Time'),
     wander: /** @type {boolean|null} */ (null),
     enabled: true,
     cursor: 'arrow',
@@ -618,6 +673,7 @@ function start(s) {
     onAction: onTalk,
     log: () => intro?.log ?? [],
     replySettle: options.settle ?? REPLY_SETTLE,
+    palette: textPalette(),
   });
   // (A resize while the intro runs, or the chat box growing with a longer line: the shot framed
   // again for the new clear space.)
@@ -875,8 +931,7 @@ function start(s) {
     // the camera.)
     const evs = intro ? [] : events;
     events = [];
-    if (introPressed || introWanted) beginIntro();
-    introPressed = false;
+    introNow();
     envelopeVeils = veiled();
     const box = introStep();
     const pose = moveCamera(evs, dt);
@@ -1023,6 +1078,79 @@ function start(s) {
     ui.setTalking(true);
     orbitTalk(cam, true, { cut: fromEnvelope || reducedMotion() });
     talkUi.open();
+  }
+
+  /**
+   * Replay Intro pressed, or the envelope opened: with an envelope, Replay Intro resets the scene
+   * and spawns it again (replay); else, and once it's opened, the dialogue starts (beginIntro).
+   */
+  function introNow() {
+    if (introPressed && options.envelope && !envelope?.covers) replay();
+    else if (introPressed || introWanted) beginIntro();
+    introPressed = false;
+  }
+
+  /**
+   * Replay Intro with an envelope: the scene as it started and the envelope over it again. Any
+   * intro ends (no easing back: the camera cuts home), a hold is dropped, NEWT's body, brain, mix,
+   * gaze and faces start again where they began, the talk's idle clock restarts, the bubble, the
+   * grab ring and the hover go; then the envelope comes (the HUD inert under it) and the toy
+   * pauses behind it once this frame is drawn. Opened, the intro starts as at boot (introWanted);
+   * if no envelope can be made (its renderer refused), the intro starts by itself all the same.
+   */
+  function replay() {
+    if (intro) {
+      intro = null;
+      introHeld = false;
+      shot = null;
+      framed = null;
+      talkUi.close();
+      ui.setTalking(false);
+    }
+    backFromIntro = false;
+    lastButton = null;
+    introWanted = false;
+    hold = null;
+    holdNow = null;
+    hand = null;
+    aimPx = null;
+    squashing = false;
+    body = createBody();
+    brain.reset();
+    mix = createMix();
+    gaze = createLook();
+    glance = createGlance();
+    headTurn = { yaw: 0, pitch: 0, weight: 1 };
+    torso = 1;
+    faces = createFaceState();
+    out = null;
+    heard = null;
+    target = { x: 0, y: hangY, z: 0 };
+    Object.assign(cue, {
+      flight: null,
+      blob: 0,
+      ring: 0,
+      line: 0,
+      pulse: null,
+      pushed: false,
+      ringAt: null,
+      spot: null,
+    });
+    talk.rest(t);
+    cam = homeCamera();
+    bubble.hide();
+    hover = null;
+    hoverK = 0;
+    s.setHover(0);
+    burst = null;
+    s.setBurst(0, 0, 0, 0);
+    spawnEnvelope();
+    envelopeVeils = Boolean(envelope);
+    // (No envelope could be made, its renderer refused: the intro alone, as without one, once the
+    // buttons are on again.)
+    if (!envelope) introWanted = true;
+    // (Paused behind it once this frame is drawn, as at boot.)
+    sync();
   }
 
   /**
@@ -1226,14 +1354,15 @@ function start(s) {
   }
 
   /**
-   * One of the Camera pad's presses: Turn Left or Right a 45° turn (Left as a drag to the left
+   * One of the Camera pad's presses: Turn Left or Right a 45° turn (Left turns the scene
+   * counter-clockwise, the way its arrow shows: the camera's yaw goes down, as a drag to the right
    * turns it), Tilt Up or Down 12°, Zoom In or Out about where it looks, Follow NEWT onto him.
    * @param {import('./ui.js').CameraKey} key
    */
   function padPress(key) {
     const TURN = Math.PI / 4;
     const TILT = (12 * Math.PI) / 180;
-    if (key === 'left' || key === 'right') orbitNudge(cam, { yaw: key === 'left' ? TURN : -TURN });
+    if (key === 'left' || key === 'right') orbitNudge(cam, { yaw: key === 'left' ? -TURN : TURN });
     else if (key === 'up' || key === 'down') orbitNudge(cam, { elevation: key === 'up' ? TILT : -TILT });
     else if (key === 'in' || key === 'out') orbitZoom(cam, key === 'in' ? 1.25 : 0.8);
     else if (key === 'follow') orbitFollow(cam, { x: body.root.x, z: body.root.z });
@@ -1453,7 +1582,7 @@ function start(s) {
   }
 
   /**
-   * The toolbar, only on a change: the Sit/Stand label, Give Device's (what its next press does:
+   * The toolbar, only on a change: the Sit/Stand label, Screen Time's (what its next press does:
    * the brain's deviceLabel, ui.js deviceLabelOf), Wander's switch, the buttons resting.
    * @param {import('./types.js').BrainOut} o
    */
@@ -1520,24 +1649,40 @@ function start(s) {
     if (moved) c.applyLook(headTurn.yaw, headTurn.pitch, headTurn.weight, torso);
     // (Any of the eight: character.js shows a dialogue face's stand-in until its sheet is in.)
     c.setFace(forcedFace ?? faceStep(faces, face, blink, t, rng));
-    // (Off the floor, the blob goes straight down under his hips, sized and faded by his lowest
-    // foot's height: cues.js blobLook, eased in and out.)
+    // (Off the floor, the blob is sized and faded by his lowest foot's height: cues.js blobLook,
+    // eased in and out. Held, or flying from a let-go, it sits on the floor point the ring and the
+    // drop line share, so it's always in the ring's middle (cues.js cueSpot: under his collar,
+    // not his swinging hips, or where he'll land); otherwise off the floor, under his hips. Lying
+    // on the floor, under his body, not his feet: ring.js blobCentre, by the lying clips' weight.)
     const off = body.mode !== 'ground';
     const footH = Math.max(0, lowestY() - CARRY.floorY);
     const hips = c.bonePos(BONES.hips, { x: 0, y: 0, z: 0 });
+    const spot = cueSpotNow(hips);
+    const under = spot ?? (off ? hips : blobCentre(root.position, hips, head, lieWeight(c.weightOf)));
     cue.blob = blobWeight(cue.blob, off, dt);
-    s.setBlob(
-      off ? hips.x : root.position.x,
-      off ? hips.z : root.position.z,
-      off ? Math.min(1, root.position.y / 0.5) : 0,
-      { ...blobLook(footH, s.blobLifted), w: cue.blob },
-    );
+    s.setBlob(under.x, under.z, off ? Math.min(1, root.position.y / 0.5) : 0, {
+      ...blobLook(footH, s.blobLifted),
+      w: cue.blob,
+    });
     if (sun)
       fitShadow(sun, s.bounds, shadowTop(root.position.y, SHADOW_TOP), { x: root.position.x, z: root.position.z });
     const mark = ptr && !ptr.pinch && !ptr.onNewt && body.mode === 'ground' ? ptr.floor : null;
-    groundCues(c, footH, hips, mark, dt);
+    groundCues(c, footH, spot ?? hips, mark, dt);
     // (His earrings swing on his head as the look left it; the tablet goes to his palms.)
     c.accessories(moved ? stepped : 0, t);
+  }
+
+  /**
+   * The floor point the ground cues share while he's held, or flying from a let-go (cues.js
+   * cueSpot: the hold's ring spot, else where it said he'd land); null otherwise.
+   * @param {import('./types.js').XZ} hips
+   */
+  function cueSpotNow(hips) {
+    // (Let go where the hold said he'd land: the ring waits there till he does, then fades.)
+    if (body.mode !== 'fall') cue.flight = null;
+    const isHeld = body.mode === 'held' && Boolean(body.carry && hold);
+    cue.spot = isHeld || cue.flight !== null ? cueSpot(isHeld ? holdNow?.cues.ring : null, cue.flight, hips) : null;
+    return cue.spot;
   }
 
   /**
@@ -1546,15 +1691,13 @@ function start(s) {
    * the ring pulsing on a wall clamp; otherwise the marker where the pointer meets the floor.
    * @param {NonNullable<typeof character>} c
    * @param {number} footH  his lowest foot's height
-   * @param {import('./types.js').XYZ} hips
+   * @param {import('./types.js').XZ} at  the floor point the cues share (cueSpotNow), or his hips'
    * @param {import('./types.js').XZ|null} mark  the pointer's spot on the floor, when it shows
    * @param {number} dt
    */
-  function groundCues(c, footH, hips, mark, dt) {
+  function groundCues(c, footH, at, mark, dt) {
     const carry = body.mode === 'held' ? body.carry : null;
     const isHeld = Boolean(carry && hold);
-    // (Let go where the hold said he'd land: the ring waits there till he does, then fades.)
-    if (body.mode !== 'fall') cue.flight = null;
     const flying = cue.flight !== null;
     const cues = holdNow?.cues ?? (flying ? { ring: cue.flight, line: false } : {});
     const mode = groundCueMode(look.groundCues);
@@ -1567,11 +1710,10 @@ function start(s) {
     cue.pushed = pushed;
     const pulsed = ringStrength(cue.ring, cue.pulse === null ? null : t - cue.pulse, mode);
     const ring = isHeld ? ringFloor(pulsed, mode, cues.floor, t - holdT0) : flying ? pulsed : 0;
-    const at = cues.ring ?? { x: hips.x, z: hips.z };
     cue.mode = mode;
     cue.ringAt = ring > 0 ? at : null;
     if (ring > 0) s.setMarker(at, 2 * CUES.ring * NEWT_HEIGHT, ring);
-    else s.setMarker(mark);
+    else s.setPointerMarker(mark);
     s.setLine(
       c.bonePos(COLLAR, { x: 0, y: 0, z: 0 }),
       { x: at.x, y: CARRY.floorY, z: at.z },
@@ -1673,7 +1815,7 @@ function start(s) {
     return { x: r.left + ((at.x + 1) / 2) * r.width, y: r.top + ((1 - at.y) / 2) * r.height };
   }
 
-  /** The carry, the limp layer and Give Device, for ?test (snapshot().motion). */
+  /** The carry, the limp layer and Screen Time, for ?test (snapshot().motion). */
   function motionSnapshot() {
     const c = character;
     const carry = body.mode === 'held' ? body.carry : null;
@@ -1690,7 +1832,7 @@ function start(s) {
       limp: { weight: c?.limpWeight ?? 0, most: c ? Math.max(0, ...Object.values(c.limpAngles())) : 0 },
       device: {
         state: out?.device ?? null,
-        label: out?.deviceLabel ?? 'Give Device',
+        label: out?.deviceLabel ?? 'Screen Time',
         shown: tabletShown,
         turn: Math.abs(Math.atan2(Math.sin(off), Math.cos(off))),
         screen: c && tabletShown ? onScreen(c.tablet.getWorldPosition(new Vector3())) : null,
@@ -1724,6 +1866,11 @@ function start(s) {
       hips: hips ? { x: hips.x, z: hips.z } : null,
       lowestFoot: c ? lowestY() : null,
       ring: cue.ringAt ? { x: cue.ringAt.x, z: cue.ringAt.z, alpha: s.marker.material.opacity / 0.85 } : null,
+      spot: cue.spot ? { ...cue.spot } : null,
+      // (The floor ring as drawn: the cursor marker or the ring under him, ring.js.)
+      marker: s.markerState,
+      // (The blob's and the ring's centres as drawn, client px; the ring's null while it's hidden.)
+      floorPx: { blob: onScreen(s.blob.position), ring: s.marker.visible ? onScreen(s.marker.position) : null },
       line: s.lineState,
       groundCues: cue.mode,
       pushed: Boolean(carry?.push),
@@ -1826,6 +1973,8 @@ function start(s) {
       clock: () => t,
       /** The envelope's state, reduced motion, pose and frames drawn; null without one. */
       envelope: () => envelope?.snapshot() ?? null,
+      /** The page's petal layer (petalLayer.js snapshot): its renderer, drawing, on, up, launched. */
+      petals: () => petalLayer.snapshot(),
       /** @param {'head'|'body'|'feet'} part */
       screen(part) {
         const sh = shape();
@@ -1882,7 +2031,7 @@ function start(s) {
         testIntro = value == null ? null : introFrom(value);
       },
       /**
-       * A toolbar button's press, as the brain gets it (Give Device's before the toolbar has one).
+       * A toolbar button's press, as the brain gets it (Screen Time's before the toolbar has one).
        * @param {import('./types.js').ButtonName} name
        */
       press(name) {

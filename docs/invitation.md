@@ -15,24 +15,49 @@ Every visit opens on an envelope: a gold, low-poly envelope seen from the back, 
 with a round seal of red wax like a real one (a gently wavy edge, a raised rim catching the
 light, a thin ring inside it, and the NH monogram pressed into the flat middle in thin strokes,
 each a darker groove with a lighter lip where the light catches it, and one stray splotch of wax
-beside it, drawn on the screen's own pixels so it holds steady as the letter sways), floating on
-a plain white page (white, not the toy's own off-white, so it fades into the toy as the letter
-opens). It's drawn in the toy's own pixel look, with a dark one-texel line round it, along its
-flap's straight V (from the top corners to a tip under the seal's middle) and up the bottom
-fold's two edges, its only lines, as a real envelope's back shows them; each face of it is one
-flat tone of the paper's three (the flap light, the pocket mid, its inside shade), lit by one
-light and kept through the sway, so it reads as a letter, and it's the loading screen too: NEWT
-loads behind it.
+beside it; it sits on the flap's tip and moves with it as one, leaning, turning and narrowing
+with the letter, drawn on the screen's own pixels so it never shimmers), floating on a plain
+white page (white, not the toy's own off-white, so it fades into the toy as the letter opens).
+It's drawn in the toy's own pixel look, with a dark one-texel line round it and along its flap's
+straight V (from the top corners to a tip under the seal's middle), its only lines while it's
+closed, like a plain envelope's back (opened, the pocket's mouth shows under the flap); each face
+of it is one flat tone of the paper's three (the flap light, the pocket mid, its inside shade),
+lit by one light and kept through the sway and its turn, so it reads as a letter, and it's the
+loading screen too: NEWT loads behind it.
 
 - **Rose petals:** plain petals (never the monogram) in three shapes (rounded, cupped and
   curled), a few sizes and three reds, each tumbling, fluttering side to side and drifting its
-  own way, with the same dark line round them. A soft flurry of them comes as the envelope
-  settles in; moving the mouse over it, or touching it, stirs a few more; while it floats one
-  trickles from the seal now and then at most. Never more than a few dozen at once.
+  own way on a gentle wind with a little noise of their own, with the same dark line round
+  them. A soft flurry of them comes as the envelope settles in; while it floats, a slow swirl of
+  them circles it in two or three helix strands (an ellipse wider than the letter, climbing, the
+  back half going behind it), following it as it bobs; moving it (a drag, a turn) sheds a few
+  off its trailing edge that drift its way. Never more than about 120 at once.
+- **Petals on the cursor, everywhere:** over the envelope and all through the toy, the mouse
+  moving trails petals (one every 14–30 px, at most about 20 a second, thrown a little the way
+  it moves, every shape and size, each about 10–16 px long whatever the screen, a little
+  smaller on a phone, so they read as petals beside NEWT), and every click or tap bursts a ring
+  of 10–14 of them. On a
+  phone a finger dragging trails them, and a finger held still keeps a few coming. None come
+  over the UI (a button, the toolbar, the camera pad, Settings, or the intro's boxes), and none
+  trail while you carry NEWT (a ring where you grab him, then nothing till he's down). They're
+  drawn on a layer of their own over the toy and under its toolbar, Settings and the intro (over
+  the envelope while that's up) that every press goes through. **Rose Petals**
+  in Settings turns them all off (the envelope's too); it's on by default and kept with the
+  look.
+- **Hover it:** with the mouse over the letter (or keyboard focus on it, or on a touch screen
+  after a moment without a touch), a gold rim pulses slowly round it, seal and all, about every
+  three seconds, fading right out between pulses so you can see it clearly. With reduced motion
+  the rim holds steady.
+- **Turn it:** it leans toward the mouse, clearly enough to see (about 6° with the mouse halfway
+  to the edge of the screen, 8° at the edge; on a phone, toward your finger while it's down);
+  its top tips the same way as it turns, so it reads as leaning toward you; drag it sideways or
+  hold the left or right arrow key to turn it further, and it springs back when you let go. It
+  never turns more than about 14°.
 - **Open it:** tap or click it, press Enter, Space or the up arrow, swipe it up, or scroll up.
   The seal blooms into roses first (about half a second): it swells, then shrinks away while a
-  ring of petals unfurls out of it and lifts off. Only then does the flap lift, with a burst of
-  petals out of the letter, and the letter dissolves the way a weapon does on the Bonfire site:
+  ring of petals unfurls out of it and drifts up and off to either side, fading soon, and the
+  swirl is flung outward. Only then does the flap lift; as it passes half open, a stream of
+  petals rises out of the pocket's mouth (the bloom has cleared it by then), and the letter dissolves the way a weapon does on the Bonfire site:
   a ragged, burning edge sweeps up across it, shedding specks of paper, embers and wax that
   drift up and fade, while the white page behind clears onto NEWT, already turned to you, and
   the intro starts by itself (below): its first line, his face and his greeting wait until the
@@ -43,17 +68,23 @@ loads behind it.
   Intro** at the top right. It drops away with a spill of petals (the others shrink out of the
   way) and you're straight into the toy, with no intro.
 - **While you drag it**, it follows your finger with a little give and, going up, the seal
-  starts to open and a few petals stir from it; let go short of a swipe and it springs back
-  (swiped open, it stays where you left it while it opens). A sideways drag does nothing, and nothing you do
-  on it reaches the toy underneath (the toolbar can't be reached until it's gone).
+  starts to open; let go short of a swipe and it springs back
+  (swiped open, it stays where you left it while it opens). A sideways drag only turns it, a
+  drag brought back to where it started does nothing (only a press that never strays opens it), and
+  nothing you do on it reaches the toy underneath (the toolbar can't be reached until it's gone).
 - **The hint** ("Click or swipe up to open", or "Tap or swipe up to open" on a touch screen,
   and "Swipe down to skip") shows while the mouse is over it or it has keyboard focus, and on a
   touch screen after a moment without a touch; while you drag it reads "Open ↑" or "Skip ↓".
 - **Focus:** it has focus from the start, but its ring only shows once you press a key (Tab goes
   between it and Skip Intro). Skipped, focus goes to the toolbar's first button, again with its
   ring (and its label) only if your last press was a key: a swipe or a drag shows neither.
-- **Reduced motion:** it holds still, with no petals; the flap is open at once and the seal and
+- **Reduced motion:** it holds still, with no petals (none on the cursor either); the flap is open at once and the seal and
   the letter fade away plainly.
+- **Replay Intro** on the toolbar brings it back: the scene starts over underneath (NEWT on his
+  feet where he began, the camera home, no speech bubble), the envelope comes with its petals
+  as at first (none with Rose Petals off), and opening it starts the intro just as the first
+  time. If the envelope can't be made again (the browser refuses it another WebGL context), the
+  intro starts by itself over the reset scene.
 - Without WebGL 2, or if NEWT can't load, it steps aside so the message shows. Nothing about it
   is saved: it opens every visit.
 
@@ -79,11 +110,17 @@ loads behind it.
   and he flies, a flick up the screen lobbing him away from you; let go while
   pushing him against the edge of his patch and he just drops there. The camera holds still
   while you carry him. As you grab him a gold ring of dither bursts out from your grip and is
-  gone in under half a second. Off the floor, the soft shadow under him sits straight below his
-  hips and shrinks, fades and softens the higher his feet are; it stays while he flies, so you
-  see where he'll land. With **Ground Cues** on (Settings), a ring sits on the floor under him
+  gone in under half a second. Off the floor, the soft shadow under him shrinks, fades and
+  softens the higher his feet are. While you hold him it sits where he'd land if you let go:
+  under his collar, not his swinging hips, or ahead of him while you fling him about. It stays
+  while he flies, on where he'll land, and it's always in the middle of the ring when the ring
+  shows, at any angle. With **Ground Cues** on (Settings), a ring sits on the floor under him
   while he's held and a dashed line drops from his collar to it; the ring flashes when you push
-  him against the edge of his patch.
+  him against the edge of his patch. That ring, and the smaller one that marks where the cursor
+  meets the floor, are drawn crisp at any angle and zoom: a rim two pixels wide, at least six
+  pixels round, stepping a whole pixel at a time as it moves (a smooth edge at Pixel Size Off).
+  The cursor's fades out as the view gets low over it, under about 18°, where a ring would
+  flatten into a dash.
 - **Point at him** (the mouse over him, or a finger pressing on him) and a gold dithered outline
   fills in round him, a texel or two outside him and two in, with a sprinkle further in; it
   fades as you move off, and it doesn't show while he's held or during the intro. At Pixel Size
@@ -114,7 +151,8 @@ loads behind it.
   fingers (the floor there stays there). The light turns with the camera, so his shadow always
   falls behind him and to one side.
 - **The Camera pad:** **Camera** on the toolbar opens it over the stage: **Turn Left** and **Turn
-  Right** (45° round), **Tilt Up** and **Tilt Down** (12°, from 12° to 70° up), **Zoom In** and
+  Right** (45° round, the way their arrows show: Turn Left turns the scene counter-clockwise, as
+  a drag to the right does), **Tilt Up** and **Tilt Down** (12°, from 12° to 70° up), **Zoom In** and
   **Zoom Out**, **Follow NEWT** (back to him: the middle at the default zoom, onto him zoomed
   in) and **Reset Camera** (back to where it started). Camera again or Escape closes it.
 - **He stays on screen:** at the default zoom (and further out) the camera doesn't follow him,
@@ -139,20 +177,23 @@ loads behind it.
   shows, he wanders where you can see him and runs off within what was on screen.
 - **Leave him alone** for about 20 seconds and he sits down where he is, facing the way he was
   (the Sit button too: no turn to the camera).
-- **The toolbar:** Replay Intro (below), Wave, Sit (Stand once he's sitting), Give Device (Lie
+- **The toolbar:** Replay Intro (below), Wave, Sit (Stand once he's sitting), Screen Time (Lie
   Down while he sits with the tablet, Get Up while he lies), Run (he runs off for a few seconds,
   across the screen to one side or the other, or away from the cursor), Camera (the pad above)
-  and Settings. Each is a rounded square with a pixel icon; with a mouse its name shows as a
+  and Settings. Each is a rounded square with a Phosphor icon (bold weight: an envelope, a
+  waving hand, arrows down and up, a phone, fat arrows down and up, a sneaker, a camera, sliders);
+  with a mouse its name shows as a
   little tab over it when you point at it or Tab to it, and on a phone (icons only) when you
   press and hold it, which then does nothing else. Pointed at or pressed, a button fills with a
   dither. Spook has gone from the bar (a tap on him still startles or waves him) and Wander is in
   Settings. The action buttons rest while he's being held or falling.
 - **The cursor** is pixel art too: an open hand over NEWT, a closed hand while you hold him or
   slide the view, a turning arrow while you turn it, and a pointing hand on the buttons.
-- **Give Device** hands him a tablet with a tiny pixel game on it. Each press does the next
+- **Screen Time** hands him a tablet with a tiny pixel game on it. Each press does the next
   thing: he sits down with it in both hands, playing (the button then says Lie Down); he lies
-  down on his stomach with it, feet kicking behind him (the button says Get Up); he gets up and
-  puts it away. He keeps the way he was facing throughout: no turn to the camera. Anything else you do (a tap, the floor, another button) gets him up
+  down flat on his stomach, arms out in front holding it on the floor past his face, feet kicking
+  behind him (the button says Get Up); he gets up and
+  puts it away. Lying, his soft shadow sits under his body, not his feet. He keeps the way he was facing throughout: no turn to the camera. Anything else you do (a tap, the floor, another button) gets him up
   first, then does it; picking him up takes him straight off the floor.
 - **His earrings:** a black stud on each earlobe and a little Latin cross hanging from it on a
   thin chain, drawn as pixel art (one-pixel lines with square ends, crisp at every Pixel Size),
@@ -179,6 +220,7 @@ the sheet and leaves the slider as it was.
 | Style | Default, DS, Soft, Custom | Default (what a first visit shows, set in the admin's Invitation page; as shipped, Soft with 6 colours, a full-strength dither, full-strength tinted lines on the outer ring, two toon bands and the highlight). DS: like the old handheld, 15-bit colour with a fine dither, dark 1-pixel lines, a hard shadow. Soft: fewer colours, pastel, a warm ring outside him and a softer, dithered shadow. Each sets every Shader option; Custom shows once one of them is yours (it can't be picked: choose a style, or Reset To Style, to go back). |
 | Motion | Smooth, Choppy | Smooth (the default) moves NEWT every frame. Choppy moves his arms, legs and head 15 times a second, like stop motion, while the camera and his walking about stay smooth. |
 | Ground Cues | Off, In the Mix, Always | The ring on the floor under NEWT while he's held and the dashed line from his collar down to it, so you can see where he is over the floor. In the Mix shows them while he's high or moving fast; Always all the time he's held. In the Mix until you pick one. |
+| Rose Petals | On, Off | On (the default): rose petals trail the cursor or a finger and burst in a ring at every click or tap, over the envelope and through the toy; Off, none at all (the envelope's too). |
 | Wander | On, Off | On (the default): left be, he strolls about by himself now and then. Kept for your next visit, like the rest. |
 
 **Shader** lays out the pixel look's own values, which the Style sets; any change shows at once
@@ -223,14 +265,14 @@ Now and then NEWT says something in a speech bubble over his head, in the page's
 | Running | he runs off; he's caught mid-run |
 | Carried | he's picked up, shaken, thrashes, dropped; he lands |
 | Moving | he walks to a floor tap; he wanders off by himself |
-| Sitting | he sits down by himself (not with Sit); he's still sitting after a quiet spell; he stands up (or gets up from lying); Give Device sits him down with the tablet; he lies down with it |
+| Sitting | he sits down by himself (not with Sit); he's still sitting after a quiet spell; he stands up (or gets up from lying); Screen Time sits him down with the tablet; he lies down with it |
 | Passive | standing about, after a quiet spell of 20 to 40 seconds |
 | Camera | the camera is spun round more than a turn in a few seconds; it's zoomed in very close |
 
 Each moment speaks at its own chance, once its cooldown is over, with one of its lines at
 random, never the line he just said. There's one bubble at a time: while a line is up, only a
 moment that matters more replaces it (a thrash first, then being caught or shaken, idle time
-last). A line types out at about 30 characters a second, stays long enough to read, then fades; with
+last). A line types out at about 30 letters a second, stays long enough to read, then fades; with
 reduced motion it shows all at once. The bubble follows him and stays on screen, clear of the
 toolbar, the open Camera pad and the open Settings sheet (near the top it goes beside his head, on a phone narrowed to
 fit there with the line on more rows, or else under his feet, never over his face or body), and
@@ -238,30 +280,52 @@ never takes a tap; a screen reader hears each line once, whole. His lines, how o
 he talks and the look a first visit gets are edited in the admin's Invitation page
 ([admin.md](admin.md)).
 
+## Text Effects
+
+His bubble lines and the intro's lines can style words with tags, `{styles|text}`:
+
+- **Colors:** a name from the admin's Text Effects colors (`{red|NEWT}`; as shipped red, gold,
+  rose and ink), or a hex color of its own (`{#e44544|NEWT}`, `#rgb` or `#rrggbb`).
+- **Effects:** `wave` (each letter bobs up and down, a little later down the line), `shake`
+  (each letter jitters a pixel across and up and down, out of step with its neighbours, so the
+  word trembles but stays legible), `bold` and `big` (a fifth bigger). They combine with commas:
+  `{red,wave|Hey!}`, and both moves together wave with the jitter on top.
+- **Nesting:** a tag can hold one more, which adds to it (its color wins):
+  `{gold|a {wave|big} deal}`. Deeper isn't allowed.
+- **Braces:** write `\{` and `\}` for a brace; a backslash anywhere else is itself, and `*`,
+  `**` and `~` are only text. An emoji counts as one letter.
+
+The moves step like a sprite's frames rather than gliding, and reduced motion stills them. A
+moving letter keeps its own width and only ever steps a pixel sideways, to the right, so it never
+runs into the next letter by more than a pixel and the space before a shaken word never closes. A
+styled word never breaks across two rows. The typing, Auto's wait, how long a bubble stays up and
+the length limits count only the letters that show; a screen reader and the Log get the line as
+plain text. The admin checks every tag as you type and previews each line under its box.
+
 ## The Intro
 
-Opening the envelope starts a short chat with NEWT, and **Replay Intro** on the toolbar plays it
-again (the chat alone, no envelope). It's laid out like Uma Musume's story scenes and drawn in the
+Opening the envelope starts a short chat with NEWT, and **Replay Intro** on the toolbar brings the
+envelope back over a fresh scene to open again (above). It's laid out like Uma Musume's story scenes and drawn in the
 toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
 
 - **The screen:** a wide box along the bottom with his name on a tab at its top left and his
   line typed out in it, a small bouncing ▼ at its bottom right once the line is all there, Auto,
-  Skip and Log at the top right, **Skip Intro** at the top left, and a gentle dim along the bottom
+  Next and Log at the top right, **Skip Intro** at the top left, and a gentle dim along the bottom
   behind the box. A line's own line breaks (as the admin types them) show. The toolbar goes while
   the intro runs and comes back after it.
 - **Going on:** a tap or click anywhere first finishes the line, then goes on to the next box;
-  Space and Enter do the same (after a click or tap on Auto, Skip or Log too; from the keyboard,
+  Space and Enter do the same (after a click or tap on Auto, Next or Log too; from the keyboard,
   a focused button presses itself). Some boxes ask a question: two or three replies show as buttons
   stacked in the middle of the screen, under his face (that box's shot frames him in the space
   over them, from the start of its line), and each leads to its own lines. They take a press
   only once the presses that went on have stopped for a moment (0.45 s), so a quick second tap,
   or the next Enter of someone pressing along, never picks one by chance.
 - **Auto** goes on by itself once each line has had time to be read (a box can set its own
-  wait); it waits at a question. **Skip** jumps to the next question, or to the end. **Log**
+  wait); it waits at a question. **Next** jumps to the next question, or to the end. **Log**
   shows every line so far and the replies picked, in a list that scrolls; Close or Escape
   shuts it. **Skip Intro** ends the intro at once, with no question. **Escape** asks whether to
   skip the intro, and a second Escape (or Skip Intro there) ends it. While the Log or that
-  question is open, Auto, Skip, Skip Intro, Log and the replies rest under it.
+  question is open, Auto, Next, Skip Intro, Log and the replies rest under it.
 - **NEWT:** he gets up if he's sitting, takes a few steps in if he's out near the edge, turns
   to face you and looks at you while he talks, his head drifting a little. The first line waits
   for him (the box shows his name and nothing else, and a tap meanwhile does nothing), so its
@@ -288,7 +352,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   modules (a shared `src/` module would share a chunk with the portfolio's first load).
   - Browser-only and thin: `main.js` (boot, the loop, the wiring in `types.js`'s frame
     order), `stage.js` (renderer at texel size, the camera with its off-centre projection,
-    lights and shadows, the blob shadow and the floor marker, and each frame the boxes round
+    lights and shadows, the blob shadow and the floor ring (`setMarker`, under him while he's
+    held; `setPointerMarker`, the cursor's), and each frame the boxes round
     NEWT the retro pass keeps its work to; `setZoomScale(k)`, which main.js calls with the
     orbit's home distance over its distance, sizes the texel to the zoom, refitting the grid only
     when the block changes; the frame-time governor's level added to every texel, and `?perf`'s
@@ -312,8 +377,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     chain and cross aren't drawn (`uOn` 0: the vertex shader puts them outside the view), each anchor
     snapped to a texel's centre after his head's texel snap (`spriteShift` keeps them on whole
     texels), marked as his trim (retro.js `ID.trim`: drawn as he is, no outline round it), each
-    chain swinging on the same spring about straight down; and Give Device's tablet, `device.js`: 1.6 × 1.2 × 0.08 model units, a cream
-    bezel and an unlit 16×12 game, nearest-filtered, placed at his palms from clips.js `DEVICE`,
+    chain swinging on the same spring about straight down; and Screen Time's tablet, `device.js`: 1.6 × 1.2 × 0.08 model units, a cream
+    bezel and an unlit 16×12 game, nearest-filtered, placed at his palms and their grip from clips.js `DEVICE` (sitting
+    by its side edges; lying, by its near edge's corners, so it sticks out past his face),
     shown while DeviceSit, LieDown and DeviceLie weigh half or more (in his hands as he lies
     down) until StandUp or GetUp has any weight (put away as he starts to get up); `accessories`
     swings the earrings and places the tablet after the look),
@@ -328,13 +394,21 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     `setDeviceLabel` changing only a label and its icon, `deviceLabelOf` reading the brain's
     `deviceLabel`; `createHold`, a touch held still `HOLD_MS` (450 ms) showing a label and
     swallowing the click after it; Wander kept under `invitation.wander.v1`, `loadWander` and
-    `saveWander` in try/catch), `icons.js` (the 16×16 pixel icons as ASCII art turned into crisp
-    SVG, and the Bayer dither tiles of the buttons' hover and press, `installDither`: copies of
-    `src/ui/pixelArt.js`'s and `src/ui/dither.js`'s approaches, as the page imports nothing from
-    `src/ui`), `cursor.js` (the five pixel cursors drawn at 1× and 2×, at most 32 CSS px, as
+    `saveWander` in try/catch), `icons.js` (the Phosphor bold icons, MIT, their path data vendored with the
+    licence and drawn as 24 px inline SVG in `currentColor` on Phosphor's 256 grid, and the Bayer
+    dither tiles of the buttons' hover and press, `installDither`: a copy of `src/ui/dither.js`'s
+    approach, as the page imports nothing from `src/ui`), `cursor.js` (the five pixel cursors drawn at 1× and 2×, at most 32 CSS px, as
     `url()`, `-webkit-image-set()` and `image-set()` with exact hotspots and a system fallback;
     `cursorKind`, which shows, set as the stage's `data-cursor` each frame), `invitation.css`.
-  - Pure and unit-tested: `pixels.js` (the texel grid: at sprite resolution N, `RESOLUTIONS` 16
+  - Pure and unit-tested: `ring.js` (the floor ring's shader, `RING_FRAGMENT`: each texel's
+    distance to its centre, the rim `RING.rim` (2) texels wide from that distance's screen
+    derivative (per texel: the way out from the centre dotted with the floor's derivatives), cut
+    hard with the pixel look on and smooth over a texel at Off, `ringCover` its
+    JS twin; `snapToTexel`, the centre moved to the nearest texel corner on screen;
+    `ringRadius`/`texelSize`, at least `RING.minTexels` (6) texels round; `markerFade`, the
+    cursor marker full from 18° of elevation over it and gone by 10°; `blobCentre`, the blob
+    moved from under his feet to the middle of his hips and head by `lieWeight`, the weight of
+    `LIE_CLIPS`), `pixels.js` (the texel grid: at sprite resolution N, `RESOLUTIONS` 16
     to 256, a texel is `max(1, round(NEWT's default height in device px / N))` device pixels,
     `blockFor`, so he's about N texels tall; Native, a texel a device pixel at the real DPR with
     no cap; Off, the screen's pixels with the DPR capped at `OFF_DPR` (2); `pixelSteps`, a
@@ -480,7 +554,10 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     `lineMode`: `HoldCues.line` false, in flight to the ring, keeps the line out of In the Mix,
     never out of Always; `ringFloor`: the hold's `HoldCues.floor`, the ring's least strength In the Mix while
     he's held, eased in over 0.15 s; and
-    `dragSpeedOf`, the brain's drag speed as the pointer's own screen px a second over 110);
+    `dragSpeedOf`, the brain's drag speed as the pointer's own screen px a second over 110;
+    `cueSpot`, the floor point the ring, the drop line and the blob share while he's held or
+    flying from a let-go: the hold's `HoldCues.ring`, else `Hold.landing`, else under his hips,
+    so the blob sits in the ring's middle at every elevation);
     `carry.js` `createHand`, `handStep`, `handFeel`: what the brain feels while he's held, the
     shake and the drag speed, from the user's own pointer alone (a critically damped follow of
     it at `CARRY.follow`, the shake its acceleration over the CSS px a world unit spans where he
@@ -556,15 +633,16 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     `thrashMin`–`thrashMax` s (3–7; within `thrashShaken` of a hard shake, never before he's
     hung `thrashRest`, 1.5 s), then Held again on its own clock. Held, falling and landing he
     keeps the yaw he had when grabbed (`move` 'stay'; `play.js` `bodyStep` never turns him
-    off the ground), and carries on from there. Give Device (`ButtonName` 'Device') goes sitDown →
+    off the ground), and carries on from there. Screen Time (`ButtonName` 'Device') goes sitDown →
     deviceSit, lieDown → deviceLie, getUp, each the way he faced (`move` 'stay', as a sit); `BrainOut.device` and `deviceLabel` say which, for the toolbar. The Run button with no pointer runs him from a spot beside him square to the
     camera (`TUNE.runFromGap`), across the view. `floor.js` `fitShadow(…, at)` moves the
     shadow camera to wherever he is, by whole shadow texels.
 - **Speech and content:** `speech.js` (pure: `createTalk({lines, speech, rng}).step(...)` reads
   the brain's output this frame and last, the gestures, the button pressed and the camera's yaw
   and zoom, and says the line to show and its trigger; `TRIGGERS`, `PRIORITY`, `SPEECH_RANGES`;
-  `lineDuration`: typed at 30 characters a second, held 1.6 s plus 0.045 s a character, faded
-  over 0.35 s; `speechFrom` and `linesFrom` read the admin's settings and lines from anything),
+  `lineDuration`: typed at 30 letters a second, held 1.6 s plus 0.045 s a letter, faded
+  over 0.35 s, counting the letters that show; `speechFrom` and `linesFrom` read the admin's
+  settings and lines from anything, `LINE_MAX` 120 letters and `LINE_RAW_MAX` 360 characters),
   `bubble.js` + `bubble.css` (the bubble: `createBubble({root, before, now}).say(text)`, on
   the toy's clock as talk is (`now`: main.js's frame steps, capped and paused with the tab), then
   `update(head, avoid, under)` each frame with his head's circle on screen, the toolbar's and
@@ -576,7 +654,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   (content.json's `invitation`, which the admin edits, through `virtual:invitation-content`:
   `invitationContent` in `vite.config.js` inlines only that subtree, watches the file and leaves
   the subtree out of the other pages' copy of content.json; `invitationLines()`,
-  `speechSettings()`, `invitationDefaults()` and `introScript()`, each with its fallback:
+  `speechSettings()`, `invitationDefaults()`, `textPalette()` (the text effects' colors, the
+  built-in ones without `invitation.text`) and `introScript()`, each with its fallback:
   `introScript()` is the intro the envelope and Replay Intro open, `introFrom` of content.json's
   `invitation.intro`, a `types.js` `DialogueScript` with each box's flow spelled out (exactly
   one of its choices, `end: true` or `next`: its own Next when that box is there, else the box
@@ -588,6 +667,28 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   `invitationBubble`, `invitationContent`, `invitationIntro` (the intro's content rules and
   `introFrom`), and `admin/test/invitation.test.mjs` and `invitationIntro.test.mjs` (the
   content rules and the admin page).
+- **Text effects:** `markup.js` (pure: `parseMarkup(text, palette)` gives the styled `runs`,
+  the `letters` that show (graphemes, `Intl.Segmenter`), the `plain` text and the `errors`,
+  each a sentence for the admin; `paletteOf` reads `invitation.text.colors`, `DEFAULT_TEXT_COLORS`
+  the built-in ones; `visibleLetters`, `letterCount`, `plainText` (memoised: typing asks each
+  frame); `clipMarkup` cuts a line to n letters, its tags kept well formed; `letterPlan`,
+  `renderMarkup` and `revealLetters` build a line once as a span a letter, `--i` its index, a
+  word with a styled letter in a nowrap `.inv-fx-word`, and show the first n by visibility) and
+  `markup.css` (`dialogue.css` imports it; the admin's `admin.css` too: `.inv-fx-wave` and
+  `.inv-fx-shake` as `step-end` keyframes staggered by `--i`, on `inline-block` letters
+  (`.inv-fx-moves`, not spaces); the wave on the `translate` property, 0.2em up to 0.12em down
+  over 1 s, the shake on `transform`, a pixel's jitter over 0.42 s, so a letter with both runs
+  both; sideways only ever 0 to 1px, so no letter runs more than a pixel into its neighbour
+  whatever their phases; `.inv-fx-bold` the 600 weight, `.inv-fx-big` 1.2em at line height 1,
+  stilled by `prefers-reduced-motion` and the bubble's `is-still`). A broken tag
+  still shows: a stray brace as itself, an unknown style as plain letters. `dialogue.js`,
+  `speech.js`, `bubble.js` and `dialogueUi.js` count, time and type by its letters; the Log, the
+  live regions and the admin's lists get its plain text; main.js hands `textPalette()` to the
+  bubble and the chat screen. Tests: `invitationMarkup` (its moves' sideways steps read from
+  markup.css), the timing cases in `invitationDialogue`, `invitationSpeech` and
+  `invitationBubble`, and `e2e/invitationDialogue.spec.mjs`, which steps every move of a shaken
+  and waved line in the box and the bubble and measures that no letter's box runs more than a
+  pixel into the next.
 - **The clips contract:** `src/invitation/clips.js` names NEWT's clips (lengths, loops, fades),
   the face each shows, the bones by their three.js names and the step lengths. `tools/newt.py`
   makes the clips in Blender and `test/invitationModel.test.mjs` holds the glb to the contract.
@@ -654,7 +755,14 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   (settling in from `born`), the seal's `bloom` over `TIMES.bloom` (0.45 s) and only then, from
   `TIMES.flapAt`, the flap's angle up to `FLAP_OPEN`, the gentle push, the dissolve (`dissolve`, its edge
   across the letter over `TIMES.dissolve`; `since`, the specks' clock; `backdrop`, the white page
-  clearing over `TIMES.clear`), a skip's drop, `BOB` and `SWAY`, `TIMES`; the dissolve's sums,
+  clearing over `TIMES.clear`), a skip's drop, `BOB` and `SWAY`, `TIMES`; the hover's pulse,
+  `hoverStep` and `hoverPulse(k, t)` (`HOVER_PULSE`: the eased hover times
+  0.5 − 0.5·cos(2πt / 2.8 s), steady with reduced motion); the letter's turn, `turnGoal` (toward
+  the pointer's x, eased out to `TURN.lean` (0.14 rad at the edge, about 0.1 halfway), plus a
+  sideways drag or a held arrow up to `TURN.push` (0.16), at most `TURN.max`, 0.24 rad),
+  `turnRoll(turn)` (the roll that goes with it, `TURN.roll` 0.45 of it, its top tipping the way
+  it turns: a yaw of a flat letter seen face on only narrows it) and
+  `turnStep` (eased, springing back; none with reduced motion); the dissolve's sums,
   `DISSOLVE` and `dissolveAt(x, y)` (mostly how far up the letter, leaning across, plus a smooth
   noise; the shader runs the same with a screen-locked Bayer dither on top), and its specks,
   `shedParticles(n)` (paper, embers, wax, each shed when the edge reaches it) and
@@ -664,47 +772,111 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   skips (`SWIPE`); `envelopeKey`; `dragPose`, the follow with its give and the flap's lift;
   `dragHint`; `sealBloom(b)`, the seal's swell and shrink as it blooms; `ENVELOPE_TEXT`),
   `petals.js` (pure, seeded: `petalGrid(shape)` for `PETAL_SHAPES`, `PETAL_SIZES`, and
-  `createPetalFlow` with `emit(kind, t, at)` for the `FLOWS` (spawn, stir, bloom, burst, spill,
-  trickle), `stir` (held back `FLOWS.stir.gap`), `step` (the trickle every `TRICKLE_EVERY`),
-  `cut` (a skip), `at` and `live`; `petalAt(petal, t)`, each petal's launch easing into a settle
-  with its drift, flutter, rock and tumble, a bloom's unfurling first; at most `POOL`, none with
-  reduced motion), `envelopeScene.js` (its own small WebGLRenderer in a fixed
+  `createPetalFlow`, a simulation stepped at a fixed `STEP` (1/60 s, so 30 and 60 frames a
+  second agree) on its own clock: each petal's position and velocity, its drag easing it into
+  the air (a light wind with gusts, its `fall`, its own `valueNoise`), its flutter, rock and
+  tumble added as drawn (`petalAt(petal, t)`, a bloom's and a ring's unfurling first). `emit(kind,
+  at, o)` launches the `FLOWS`: spawn, bloom (at the seal: out round it, then drifting up and off
+  to its side and gone within 1.4 s, so the mouth is clear by the time the flap is half open), ring (10–14 at even angles with a
+  little jitter, out with drag, about a second), trail (`o.v` the pointer's velocity: 0.2–0.4 of
+  it, at most `TRAIL.maxLaunch`, with a sideways spread; a still finger's a soft puff), wake and
+  spill. `letter(frame)` each frame (`LetterFrame`: its middle, axes, height, `opening` and
+  `floating`) runs the rest: the swirl (`SWIRL`: 3 strands a third of a turn apart, `swirlSlot`
+  on an ellipse 0.7 × 0.3 letter widths times `swirlRadius(s)`, seen from a little above (its
+  back raised by `tilt` of its depth, so it reads as a loop), 2.2 turns up 1.3 of its height,
+  spinning 0.5–0.6 rad/s and climbing 0.04–0.06 a second (the slow end), 24 petals filling in
+  after 0.5 s, each strand's in a close run (`gap`) a whole turn up from the last, every fourth
+  falling in from 1.5–2.1 times out, each pulled to its slot, drawn small at the ends)
+  while it floats, flung outward once it doesn't; the pour (`FLOWS.pour`: 30 over 0.5 s from
+  when the flap is half open, each born 0.015–0.05 under the mouth's V at its x (`LETTER_MOUTH`,
+  the envelope's), just in front of the inside's face and behind the pocket's (`LETTER_DEPTHS`, the envelope's
+  envelopeLook.js `DEPTH`, which the frame can carry as `inside` and `pocket`), launched up its
+  axis at 1.25–1.6 a second and only gently forward, a little bigger than most (1–1.4 of
+  `PETAL_LEN`), so the pocket hides each only for its first moment and it stands 0.3 of the
+  letter or more over the mouth, out past its top, within half a second); and
+  the wake (`WAKE`: the edge moving fastest away from its outward side sheds petals at a rate
+  tied to its speed, drifting its way). `cut` (a skip), `at`, `live`; at most `POOL` (120; the
+  oldest free petal goes first, the swirl kept), none with reduced motion. `createTrail` is the
+  cursor trail in CSS px: a step every 14–30 px (rolled each time, put where the distance comes
+  up), 1–3 petals a step, at most `TRAIL.rate` (20) a second, the pointer's smoothed velocity
+  with each, and a press that holds (a finger) kept still keeps `TRAIL.hold` a second coming; a
+  move after a pause of 0.3 s, or after `lift()` (the pointer left the window, or it lost focus),
+  starts afresh where it is, shedding nothing along the jump),
+  `petalScene.js` (`createPetalScene({scene, unit, seed, reduced, uniforms, id})`: a flow in a
+  scene's world units, `unit` world units a letter width, `size` how big each is drawn of that (1); `emit`, `letter(matrix, {h, opening,
+  floating})` from the letter's world matrix, `step(dt)` writing the petals into an instanced mesh
+  a shape; `petalMaterial`, the petals' own toon (the three reds, dithered band edges, each
+  petal's `aShade`, its id pass on the scene's `uIdPass`); `buildInk`, the ink pass for a
+  petals-only drawing), `petalLayer.js` (`createPetalLayer(root, {on, before, over, carrying})`:
+  the page's petals, a fixed `canvas.inv-petals` with `pointer-events: none` put in `before` the
+  HUD with no z-index of its own (so over the stage's canvas, under the toolbar, its labels, the
+  pad, Settings, the speech bubble and the dialogue), raised to z-index 4 over the envelope while
+  `over()` (the envelope is in the page); no trail or ring while the element under the pointer
+  is inside `QUIET` (`quietAt`: the HUD's parts, the dialogue's boxes, any button: the trail lifts
+  there, so leaving it sheds nothing across it), and no trail while `carrying()` (NEWT held; a
+  finger held still on him too); its own
+  WebGLRenderer at the envelope's texel size held within `TEXEL_PX` (1.25–1.75 CSS px, `texelPx`, so
+  even its smallest petal is 5 texels long), made with the first press or move that may shed
+  petals (never with Rose Petals off or reduced motion; refused, it tries once), `pageUnit` (`LAYER_SCALE` of the envelope's letter
+  width: how far they fly), each petal drawn `petalPx(w, h)` CSS px long (`PETAL_PX`: 12.5 on a
+  desktop, 11 on a phone, its shorter side under 600 px; its sizes 0.75–1.3 of that), through
+  petalScene.js's `size`, never by the screen's size (`petalPx` in its snapshot); passive capture-phase `pointerdown`, `pointermove`, `pointerup` and `pointercancel` on
+  the document (never `preventDefault`) drive the trail and a ring at each press, the primary
+  pointer only; it draws only while petals are up or a finger is held, then clears and stops;
+  `on()` false (Rose Petals off, `look.js petalsOn`, or reduced motion) launches none and shrinks
+  any up away), `envelopeScene.js` (its own small WebGLRenderer in a fixed
   `.inv-envelope` layer at z-index 3, drawn at `TEXELS` texels along the screen's shorter side and
   scaled up pixelated, over a `.inv-envelope-paper` page in `--inv-bg` that it clears as the letter
   dissolves; drawn twice, its colours and then each part's id (`IDS`, back to front), then put
   together with a one-texel line in `INK` on each texel bordering a later part, none round the
-  dissolving rim; the petals as one instanced mesh a shape, ids `IDS.petal` and the two after,
-  on their own clock that a loading stall holds still; the specks as square points on layer 1
+  dissolving rim, and the hover's pulse there too (a Bayer-dithered `SHINE` on the letter's
+  outermost two texels and a `HOVER` gold halo past its line, the letter's ids only, never the
+  petals', like NEWT's in retro.js; `hover` in its snapshot); the letter's yaw is the sway plus
+  its turn, rolled by `turnRoll(turn)` (`turn` in its snapshot); the camera's matrices are brought up to date after it's
+  placed and every frame, the shaders compiled at creation and the seal hidden until it's been
+  placed once (the red box on reload was a first frame's seal placed through a camera three had
+  never updated: 37 times its size; `seal.first` in its snapshot); the petals (`createPetalScene`,
+  ids `IDS.petal` and the two after, so the letter hides the swirl's back half and the ink runs
+  round them) fed its matrix each frame, stepped at most 1/20 s a frame so a loading stall holds
+  them still; Rose Petals off (its `petals` option), none; the specks as square points on layer 1
   on top, with no line; disposed, its context lost and its layer removed once it's done and its
   last petals have gone), `envelopeLook.js` (the palette, three tones a material;
-  `envelopeLayout`, the envelope's parts as flat polygons, each fold's hidden corners under the
-  parts in front of it so the only lines are the outline, the flap's V and the bottom fold's
-  edges; `IDS`; the light, `LIGHT`, its bands, `SHADES` and `bandOf`, and each paper face's
+  `envelopeLayout`, the envelope's parts as flat polygons: the body, the inside, one `pocket`
+  whose mouth (a shallow V) is tucked under the flap, and the flap, so closed the only lines are
+  the outline and the flap's V (the user circled the folds' lines to go) and open the pocket's
+  mouth shows; `IDS`; the light, `LIGHT`, its bands, `SHADES` and `bandOf`, and each paper face's
   `LEAN`; and the toon material: three tones, the paper's one flat tone a face (`FLAT`, no
-  dither, leaning into the light by its `LEAN` so it keeps its band through the sway), the
+  dither, its normal taken in the letter's own frame and lit as the rest pose `REST` has it,
+  `paperLit`, leaning into the light by its `LEAN`, so it keeps its band through the sway and the
+  turn), the
   others' band edges dithered, its id pass, and the dissolve with its burning rim, copied
-  from the Bonfire site's weapon dissolve, not imported; `PETAL`, never dissolved, its bands
-  stepped by each petal's `aShade`), `envelopeSeal.js` (the seal, one piece, drawn like the
-  user's reference: its radius `SEAL_SIZE` (0.2) of the letter's width, on the flap's tip,
-  upright on the screen; `sealLayout(R)` for a seal `R` texels across its radius (about 31 on a
-  desktop, 42 on a phone: the scene's `setRadius(sealR / sealTexel(...))`) gives a flat field, a
+  from the Bonfire site's weapon dissolve, not imported; `PETAL`, the petals' three reds), `envelopeSeal.js` (the seal, one piece, drawn like the
+  user's reference: its radius `SEAL_SIZE` (0.2) of the letter's width, a child of the flap's
+  hinge a hair over its tip (no parallax: it rounds to the screen's texels with the tip);
+  `sealOnScreen` gives its middle and its two axes on the screen from its own matrices (a
+  2×2 of face to screen); `sealLayout(R)` for a seal `R` texels across its radius (about 31 on a
+  desktop, 42 on a phone) gives a flat field, a
   thin ring at 0.7 R, a texel of field past it, the rim out to the gently wavy edge (`sealEdge`,
   within 6% of round) and its one stray splotch, 3.5 texels clear of the edge on the right;
-  `sealFace(R)` draws its face texel by texel in the wax's three tones (`WAX`), each rim texel
+  `sealFace(axes)` draws its face texel by texel in the wax's three tones (`WAX`) for those axes
+  (the ellipse they make, its ring measured in screen texels so it stays one texel all round,
+  the stamp upright on the screen at the size of a round seal of the same area: turned with the
+  letter, its one-texel strokes broke into stairs), each rim texel
   lit by its slope with the envelope's `LIGHT` and `bandOf` (a light band on the side toward the
   light and on the inner wall across from it, shade on the far side), the splotch a small dome;
-  the material (toon's `SEAL`) samples that texture on the screen's own texels round the seal's
-  middle, snapped to a texel's corner (`place`, its sway's hair of zoom and turn snapped away),
-  so moving the letter moves a steady picture (at 5028c51 the stamp was worked out on the
-  seal's own grid, which stopped matching the screen as the letter swayed, so it shimmered);
-  only blooming scales and turns it. The NH monogram is logo.js's PATH, copied in as
+  the material (toon's `SEAL`) puts that texture on the screen's own texels round the seal's
+  middle, snapped to a texel's corner, and `place(x, y, axes)` snaps the axes to half texels and
+  takes the face drawn for them from a small cache, so the seal grows, narrows and leans in
+  whole steps of its own picture and is never resampled (at 5028c51 the stamp was worked out on
+  the seal's own grid, which stopped matching the screen as the letter swayed, so it shimmered).
+  The NH monogram is logo.js's PATH, copied in as
   `MONOGRAM_PATH`: `stampLayout(radius)` snaps its strokes to whole texels, one texel wide
   (two before: the user found them too thick to read in the ring), the four uprights mirrored,
   the N's diagonal a row-by-row run from the outer stem's top to the inner stem's foot
   (`diagonalAt`); `stampCell`: a dark floor, and a one-texel light lip on its lit side, right of
   every stroke and under the crossbar and the stems' feet, never under the diagonal's steps) and
   `envelope.css` (the focus ring only under `.is-keyboard`, set once a key is pressed). main.js
-  makes it right after `bindUi`, sets the HUD inert under it, lets the toy draw its first frame
+  makes it right after `bindUi` (`spawnEnvelope`), sets the HUD inert under it, lets the toy draw its first frame
   and then holds the loop while it covers him (`sync`), and on its way out either sets
   `introWanted` (held until `beginIntro` can run, which cuts the camera to the talk shot behind
   the letter; its first line then waits, `introHeld`, until the brain is ready and
@@ -714,7 +886,14 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   and the box's gesture starts with its line; `?test`'s snapshot has `envelopeVeils`) or
   focuses the toolbar (`ui.focusToolbar`: ui.js moves focus for the visitor with `focusVisible`
   only when their last press was a key, there and when the intro ends; a plain scripted
-  `focus()` shows Chrome's ring when nothing before it was a pointer's). `?test` skips it unless `&envelope` (`parseQuery`'s `envelope`).
+  `focus()` shows Chrome's ring when nothing before it was a pointer's). Replay Intro with an
+  envelope runs `replay` (main.js): any intro ended, a hold dropped, NEWT's body, `brain.reset()`,
+  the mix, gaze, glance and faces made again, `talk.rest`, the camera cut home (a new orbit), the
+  bubble, the grab ring and the hover gone, then `spawnEnvelope` (its `petals` from the look's
+  Rose Petals as it is then) and the loop paused behind it
+  once that frame is drawn; opened, `introWanted` as at boot (and at once when `spawnEnvelope`
+  makes none: its renderer refused). `?test` skips it unless
+  `&envelope` (`parseQuery`'s `envelope`), and there Replay Intro runs the dialogue alone.
 - **The hover and the grab ring:** `retro.js`'s post shader takes `uHover` (a two-texel Bayer
   rim on NEWT's texels, a tenth of the rest, and a halo up to two texels outside him in the ring
   box: 12 reads a texel, only while hovering) and `uBurst` (a dither ring at the grip, an ALU
@@ -725,9 +904,10 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   `effects` drives each frame.
 - **The intro:** `dialogue.js` (pure, on an injected clock: `normalizeScript` makes any
   `DialogueScript` safe, types.js; `createDialogue(script, {reduced})` with `start`, `step`,
-  `advance`, `choose`, `setAuto`, `skip`, `pause`, `end`, `view` and `log`; `DIALOGUE`: 32
-  characters a second with a beat after punctuation, Auto's wait 1.1 s plus 0.035 s a character
-  between 1.4 and 6 s, 240 characters and 3 replies at most; `lookSway`; main.js runs
+  `advance`, `choose`, `setAuto`, `skip` (the Next button), `pause`, `end`, `view` and `log`
+  (plain text); `DIALOGUE`: 32 letters a second with a beat after punctuation, Auto's wait
+  1.1 s plus 0.035 s a letter between 1.4 and 6 s, 240 letters and 3 replies at most, all
+  counting the letters that show (markup.js); `lookSway`; main.js runs
   `content.js` `introScript()` through `normalizeScript` as a safety net, `playScript`),
   `dialogueUi.js` and `dialogue.css` (the screen: a modal layer over the stage that takes every
   press; the line in a live region once, whole; `REPLY_SETTLE`, `REPLY_ROOM`), brain.js's `talk` state (`BrainIn.dialogue`: the
@@ -749,9 +929,12 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   `invitationMotion`, `invitationGesture` and `invitationModel`), `invitationDialogue` (the
   runner, and content.js's intro as it plays), the speech and content tests above,
   `invitationEnvelope` (its states, swipes, keys and timeline), `invitationPetals` (the petals'
-  shapes, variety, paths and flows),
-  `e2e/invitation.spec.mjs`, `e2e/invitationDialogue.spec.mjs` and
-  `e2e/invitationEnvelope.spec.mjs` (`npm run e2e -- invitation`).
+  shapes, variety, the stepped simulation and every flow, the trail's spacing and rate),
+  `invitationPetalSetting` (Rose Petals stored with the look), `invitationPetalLayer` (no WebGL
+  context till petals may come),
+  `e2e/invitation.spec.mjs`, `e2e/invitationDialogue.spec.mjs`,
+  `e2e/invitationEnvelope.spec.mjs` and `e2e/invitationPetals.spec.mjs` (the page's petal layer:
+  the mouse, a finger, Rose Petals off, reduced motion) (`npm run e2e -- invitation`).
 - **Test hooks:** `[data-stage].is-ready` once the first frame is drawn, `data-webgl="off"`
   without WebGL. `?test` adds `window.__invitation`: `snapshot()` (his state, clip, face,
   position, head turn, the camera's yaw, elevation and distance, the states he went through,
@@ -771,14 +954,17 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   grabbed by shows, client px), `say(text)` (a line in his bubble now, as talk would show it),
   `play(clip)` (Walk and Run step in place at their own pace), `face(name)` (holds any of
   `FACE_NAMES` on him, no blinks; null gives his face back to the brain) and `press(name)` (a
-  toolbar button's press as the brain gets it, Give Device's `Device` too). The snapshot's
+  toolbar button's press as the brain gets it, Screen Time's `Device` too). The snapshot's
   `motion` has the carry (`collar` on screen, `heldFor`, the `anchor`, the drag `plane`'s
   normal, `pushed` at the edge), `drag` the hold's (its own height `controls`, `aim`: where it aims his collar, client px, the `pointer`, the `gap` between them,
   CSS px, `holdY`, the `anchor` and its `depth` along the camera's level axis, away positive,
   the `blob` as set, his `hips`' floor point and `lowestFoot`, the `ring` and the drop `line`,
+  the `spot` the cues share (cues.js `cueSpot`, null on his feet), the floor ring as drawn
+  (`marker`: shown, centre, radius in world units and `texels`, `alpha`, the view's
+  `elevation` over it), the blob's and the ring's centres as drawn (`floorPx`, client px),
   `groundCues` as it plays and `pushed`); `view({yaw, elevation, zoom})` eases the camera there
   (radians; zoom the home distance over the distance); the limp layer (`limp.weight`, `limp.most`: the most a limb
-  has swung, radians) and Give Device (`device.state` and `label`, the tablet `shown` and its
+  has swung, radians) and Screen Time (`device.state` and `label`, the tablet `shown` and its
   `screen` point, his `turn` off the camera). The snapshot's `camera` has
   the point it looks at on the floor (`target`) and whether a pan holds it (`panned`), `area` is
   the play area (a disc: `r`), `sight` what's on screen (camera.js `orbitSight`), and `talk` is
@@ -792,7 +978,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   it runs. The snapshot's `envelope` is the envelope's state (null without one), `hover` the
   hover dither (0..1) and `burst` whether the grab ring is up; `clock()` is the toy's clock (it
   stands still while the envelope covers him) and `envelope()` the envelope's state, reduced
-  motion, pose, frames drawn and `petals` (`live`, and how many each flow has `emitted`). `?seed=N` makes the randomness repeatable; `?calm` stops him wandering and sitting by himself; `?perf` shows the frame times
+  motion, pose, frames drawn, `petals` (`live`, and how many each flow has `emitted`), `seal`
+  (its `first` and `last` placements), `hover` (`k`, `pulse`) and `turn` (`now`, `pointer`,
+  `key`); `petals()` the page's petal layer (`gpu`: `none` till its renderer is made, `up` or `failed`; `running`, `on`, `live`, `emitted`, `texels`). `?seed=N` makes the randomness repeatable; `?calm` stops him wandering and sitting by himself; `?perf` shows the frame times
   (p50 and p90), the GPU's time a frame where the browser can measure it, the grid, the
   governor's level and the zoom in a corner; `?govern` turns the governor on under `?test`.
 - **Captures:** `node tools/capture-invitation.mjs` records real-speed clips of every clip and
@@ -815,8 +1003,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   collar; an animated WebP a view, a sheet, and the drag's numbers frame by frame (to compare
   against another version, run it in that version's worktree with its own `--tag`).
   `e2e/lib/drag.mjs` `dragDescribe()` is the shared drag spec (collar within 2 px of the
-  cursor, blob under his hips, lowest foot over the floor, no gap on a down drag, a finger's aim,
-  Ground Cues, raising him with the wheel); `e2e/invitationDrag.spec.mjs` runs it, with Settings
+  cursor, the blob on the ring's spot under him, lowest foot over the floor, no gap on a down
+  drag, a finger's aim, Ground Cues, raising him with the wheel); `e2e/invitationDrag.spec.mjs` runs it, with Settings
   (no Drag row, Ground Cues kept) and an old `?drag=level` address carried with the bead, and
   `e2e/invitationDragBead.spec.mjs` has the bead's own checks.
 - **First load:** none of this reaches the portfolio's first load (`firstLoadGuard` in

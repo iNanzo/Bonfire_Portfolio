@@ -9,9 +9,12 @@
 // speech.js counts (lineDuration; with prefers-reduced-motion the whole line at once, held as
 // long, no fade). It stays on the stage, clear of what it's told to avoid (clearRegion, then
 // placeBubble: pure, tested), never takes a press (pointer-events none) and sits under the
-// toolbar and the sheet (it goes in before `before`, the page's HUD). A screen reader hears the
-// whole line at once from a polite live region; the typed letters themselves are aria-hidden.
+// toolbar and the sheet (it goes in before `before`, the page's HUD). A line's text effects
+// (markup.js: {red,wave|…}) show as it types, built once as a span a letter; its timing counts
+// the letters that show. A screen reader hears the whole line at once, plain, from a polite live
+// region; the typed letters themselves are aria-hidden.
 
+import { DEFAULT_TEXT_COLORS, letterCount, paletteOf, parseMarkup, renderMarkup, revealLetters } from './markup.js';
 import { TALK, lineDuration } from './speech.js';
 
 /** @typedef {{left: number, top: number, right: number, bottom: number}} Rect  client px */
@@ -169,7 +172,7 @@ export function placeBubble({
 }
 
 /**
- * The bubble at `elapsed` seconds into its line: how many characters show, and its phase (typing,
+ * The bubble at `elapsed` seconds into its line: how many letters show (markup.js: its tags aside), and its phase (typing,
  * holding, fading, done), on lineDuration's timeline. Reduced motion: all of it from the start,
  * held for the typing's time too.
  * @param {string} text
@@ -178,7 +181,7 @@ export function placeBubble({
  * @returns {{shown: number, phase: 'type'|'hold'|'fade'|'done'}}
  */
 export function bubbleFrame(text, elapsed, reduced) {
-  const n = Array.from(text).length;
+  const n = letterCount(text);
   const total = lineDuration(text);
   if (elapsed >= total) return { shown: n, phase: 'done' };
   if (elapsed >= total - TALK.fade) return { shown: n, phase: 'fade' };
@@ -201,14 +204,16 @@ function prefersReduced() {
 
 /**
  * The bubble, in `root` (the stage), before `before` (the HUD, so the toolbar and sheet stay on
- * top). `now` is the clock, seconds; `reducedMotion` asks at each line.
- * @param {{root: HTMLElement, before?: Element|null, now?: () => number, reducedMotion?: () => boolean}} o
+ * top). `now` is the clock, seconds; `reducedMotion` asks at each line; `palette`: the text
+ * effects' colours (markup.js paletteOf; content.js textPalette).
+ * @param {{root: HTMLElement, before?: Element|null, now?: () => number, reducedMotion?: () => boolean, palette?: Map<string, string>}} o
  */
 export function createBubble({
   root,
   before = null,
   now = () => performance.now() / 1000,
   reducedMotion = prefersReduced,
+  palette = paletteOf(DEFAULT_TEXT_COLORS),
 }) {
   const doc = root.ownerDocument;
   const make = (/** @type {string} */ tag, /** @type {string} */ cls) => {
@@ -220,9 +225,9 @@ export function createBubble({
   box.setAttribute('aria-hidden', 'true');
   box.hidden = true;
   const line = make('p', 'inv-bubble-text');
+  // (The line's letters, all of them: the typed ones show, the rest keep their place unseen.)
   const typed = make('span', 'inv-bubble-typed');
-  const rest = make('span', 'inv-bubble-rest');
-  line.append(typed, rest);
+  line.append(typed);
   box.append(line, make('span', 'inv-bubble-tail'));
   const live = make('p', 'inv-bubble-live');
   live.setAttribute('role', 'status');
@@ -234,8 +239,8 @@ export function createBubble({
   const s = {
     /** @type {string|null} */
     text: null,
-    /** @type {string[]} */
-    chars: [],
+    /** @type {HTMLElement[]} the line's letter spans (markup.js renderMarkup) */
+    spans: [],
     start: 0,
     reduced: false,
     shown: -1,
@@ -274,9 +279,8 @@ export function createBubble({
   /** @param {number} n */
   function show(n) {
     if (n === s.shown) return;
+    revealLetters(s.spans, n, s.shown);
     s.shown = n;
-    typed.textContent = s.chars.slice(0, n).join('');
-    rest.textContent = s.chars.slice(n).join('');
   }
 
   function hide() {
@@ -293,7 +297,8 @@ export function createBubble({
      */
     say(text) {
       s.text = text;
-      s.chars = Array.from(text);
+      const parsed = parseMarkup(text, palette);
+      s.spans = renderMarkup(typed, parsed);
       s.start = now();
       s.reduced = reducedMotion();
       s.shown = -1;
@@ -304,7 +309,7 @@ export function createBubble({
       box.classList.toggle('is-still', s.reduced);
       show(bubbleFrame(text, 0, s.reduced).shown);
       measure();
-      live.textContent = `NEWT: ${text}`;
+      live.textContent = `NEWT: ${parsed.plain}`;
       // (The page's font may still be on its way: measured again once it's in.)
       doc.fonts?.ready?.then(() => s.text === text && measure()).catch(() => {});
       return lineDuration(text);

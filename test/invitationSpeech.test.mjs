@@ -9,6 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  LINE_MAX,
   PRIORITY,
   SPEECH_DEFAULTS,
   SPEECH_RANGES,
@@ -530,4 +531,18 @@ test('after a quiet spell he wasn’t stepped through (the intro), rest() restar
     after.some((x) => x.trigger === 'idle'),
     'an idle line 20 to 40 s after he’s back',
   );
+});
+
+test('a line that is only a styled blank is left out, as an empty one is', () => {
+  assert.deepEqual(linesFrom({ wave: ['{red| }', '{red,wave|   }', '{bold| } {big| }', '{red|hi}'] }).wave, [
+    '{red|hi}',
+  ]);
+});
+
+test('text effects: a line’s time and its length count the letters that show, not its tags', () => {
+  const styled = '{red,wave|Put me} {big|down}!';
+  assert.equal(lineDuration(styled), lineDuration('Put me down!'));
+  // (Within LINE_MAX letters, however long its tags make it.)
+  const long = `{gold,shake|${'a'.repeat(LINE_MAX)}}`;
+  assert.deepEqual(linesFrom({ wave: [long, `{gold|${'b'.repeat(LINE_MAX + 1)}}`] }).wave, [long]);
 });

@@ -23,7 +23,16 @@ import { DIALOGUE_CLIPS, FACE_NAMES } from './invitation/clips.js';
 import { LEGACY_SHADER, MOTIONS, STYLES } from './invitation/look.js';
 import { PIXEL_SIZES as INVITATION_PIXEL_SIZES } from './invitation/pixels.js';
 import { SHADER_CONTROLS } from './invitation/shader.js';
-import { LINE_MAX, LINES_MAX, SPEECH_RANGES, TRIGGERS } from './invitation/speech.js';
+import { LINE_MAX, LINE_RAW_MAX, LINES_MAX, SPEECH_RANGES, TRIGGERS } from './invitation/speech.js';
+import {
+  COLOR_NAME_RE,
+  DEFAULT_TEXT_COLORS,
+  TEXT_EFFECTS,
+  letterCount,
+  paletteOf,
+  parseMarkup,
+  plainText,
+} from './invitation/markup.js';
 import {
   GATE_ALG,
   GATE_HASH_BYTES,
@@ -239,8 +248,14 @@ const TRIGGER_KEYS = /** @type {string[]} */ (TRIGGERS);
 export const INTRO_CAMERAS = ['close', 'medium', 'wide', 'keep'];
 /** What a chat box has him do: one of his dialogue clips (clips.js DIALOGUE_CLIPS), or 'none' (as he was). */
 export const INTRO_ANIMATIONS = ['none', ...DIALOGUE_CLIPS];
-/** The longest line a chat box types out, in characters. */
+/** The longest line a chat box types out, in letters (the ones that show: its tags aside)… */
 export const INTRO_TEXT_MAX = 240;
+/** …and in characters as written, tags and all. */
+export const INTRO_TEXT_RAW_MAX = 3 * INTRO_TEXT_MAX;
+/** The most colours the text effects' palette (`invitation.text.colors`) holds. */
+export const TEXT_COLORS_MAX = 24;
+/** The longest colour name, in characters. */
+export const COLOR_NAME_MAX = 20;
 /**
  * A line longer than this (characters) outgrows the chat box's three lines on a phone (measured at
  * 390×844: 100 fit, 110 take four), growing it up over NEWT: a warning.
@@ -266,18 +281,24 @@ const BOX_NEEDS = ['id', 'text', 'face', 'animation', 'camera'];
  * control, shader.js SHADER_CONTROLS), its speech settings (`speech`: the quiet spell before an
  * idle line, each trigger's chance and cooldown, speech.js SPEECH_RANGES), its lines (`lines`:
  * each trigger's list of text, at most LINES_MAX of at most LINE_MAX characters) and its intro
- * (`intro`: the chat Play Intro opens, types.js DialogueScript; invitationIntro). Every part is
- * optional, and so is every value outside the intro: the toy falls back on its own (speech.js
+ * (`intro`: the chat Play Intro opens, types.js DialogueScript; invitationIntro) and its text
+ * effects (`text`: the colours a line's tags name, invitationText). The tags in the lines and
+ * the chat boxes' text are checked against those colours (the built-in ones when there's no
+ * `text.colors`: markup.js DEFAULT_TEXT_COLORS), and their limits count the letters that show.
+ * Every part is optional, and so is every value outside the intro: the toy falls back on its own (speech.js
  * speechFrom, linesFrom; look.js validLook; content.js introFrom). `err(path, message)` gets
  * paths like `invitation.lines.wave[2]`; `warn` too.
  */
 export function validateInvitation(inv, err, warn, base = 'invitation') {
   if (!isObj(inv)) return err(base, 'Must be a group of fields.');
   const at = (p) => `${base}.${p}`;
+  const own = isObj(inv.text) && Array.isArray(inv.text.colors) ? inv.text.colors : DEFAULT_TEXT_COLORS;
   const check = {
     at,
     err,
     warn,
+    /** The colour names a line's tags may use. */
+    palette: paletteOf(own),
     /** A group of fields, or an error. */
     group(v, p) {
       if (isObj(v)) return true;
@@ -298,12 +319,61 @@ export function validateInvitation(inv, err, warn, base = 'invitation') {
     },
   };
   for (const k of Object.keys(inv))
-    if (!['defaults', 'speech', 'lines', 'intro'].includes(k)) err(at(k), 'Unknown section.');
+    if (!['defaults', 'speech', 'lines', 'intro', 'text'].includes(k)) err(at(k), 'Unknown section.');
   if (inv.defaults !== undefined && check.group(inv.defaults, 'defaults')) invitationDefaults(inv.defaults, check);
   if (inv.speech !== undefined && check.group(inv.speech, 'speech')) invitationSpeech(inv.speech, check);
   if (inv.lines !== undefined && check.group(inv.lines, 'lines')) invitationLines(inv.lines, check);
   if (inv.intro !== undefined && check.group(inv.intro, 'intro')) invitationIntro(inv.intro, check);
+  if (inv.text !== undefined && check.group(inv.text, 'text')) invitationText(inv.text, check);
 }
+
+/**
+ * The text effects: `colors`, a list of at most TEXT_COLORS_MAX {name, color}, each name its own
+ * (lowercase letters, numbers and dashes, from a letter; not an effect's) and each a #rrggbb.
+ */
+function invitationText(t, check) {
+  const { at, err } = check;
+  for (const k of Object.keys(t)) if (k !== 'colors') err(at(`text.${k}`), 'Unknown setting.');
+  if (t.colors === undefined) return;
+  if (!Array.isArray(t.colors)) return err(at('text.colors'), 'Must be a list.');
+  if (t.colors.length > TEXT_COLORS_MAX) err(at('text.colors'), `At most ${TEXT_COLORS_MAX} colors.`);
+  const seen = new Set();
+  t.colors.forEach((c, i) => textColor(c, `text.colors[${i}]`, seen, check));
+}
+
+/** One colour of the text effects: its name (its own, not an effect's) and a #rrggbb. */
+function textColor(c, p, seen, check) {
+  const { at, err } = check;
+  if (!isObj(c)) return err(at(p), 'Must be a group of fields.');
+  for (const k of Object.keys(c)) if (k !== 'name' && k !== 'color') err(at(`${p}.${k}`), 'Unknown setting.');
+  const name = c.name;
+  if (typeof name !== 'string' || !name) err(at(`${p}.name`), 'Give it a name, like red.');
+  else if (!COLOR_NAME_RE.test(name) || name.length > COLOR_NAME_MAX)
+    err(at(`${p}.name`), `Lowercase letters, numbers and dashes, from a letter, up to ${COLOR_NAME_MAX}.`);
+  else if (TEXT_EFFECTS.includes(/** @type {any} */ (name)))
+    err(at(`${p}.name`), `${name} is an effect: pick another name.`);
+  else if (seen.has(name)) err(at(`${p}.name`), 'Another color has this name.');
+  if (typeof name === 'string') seen.add(name);
+  if (typeof c.color !== 'string' || !HEX_RE.test(c.color)) err(at(`${p}.color`), 'Use a color like #c8323c.');
+}
+
+/**
+ * A line's text effects (markup.js): the first mistake in its tags (an unbalanced or unknown
+ * tag, an unknown colour name, a bad hex) at its path `q`.
+ */
+function markupErrors(v, q, check) {
+  const first = tagError(v, check);
+  if (first) check.err(q, first);
+}
+
+/** The first mistake in `v`'s tags (against the section's colours), or null. */
+const tagError = (v, check) => parseMarkup(v, check.palette).errors[0]?.message ?? null;
+
+/**
+ * Whether text with tags shows nothing: empty, or only a blank under its tags (`{red| }`). Tags
+ * that are wrong say so instead.
+ */
+const blankMarkup = (v, check) => !v.trim() || (!tagError(v, check) && !plainText(v).trim());
 
 /** A key that looks like it holds a password (or its plain text), anywhere in the gate. */
 const PLAINTEXT_KEY = /pass|pwd|plain|secret/i;
@@ -448,13 +518,18 @@ function invitationLines(l, check) {
   }
 }
 
-/** One line: text, not empty, short enough for his bubble. */
+/**
+ * One line: text, not empty (nor only a blank under tags), short enough for his bubble (in the letters that show; as written,
+ * tags and all, at most LINE_RAW_MAX), its tags well formed.
+ */
 function lineText(line, q, check) {
-  const n = typeof line === 'string' ? Array.from(line.trim()).length : 0;
-  if (typeof line !== 'string') check.err(q, 'Must be text.');
-  else if (!n) check.err(q, 'Can’t be empty.');
+  if (typeof line !== 'string') return check.err(q, 'Must be text.');
+  const n = letterCount(line.trim());
+  if (blankMarkup(line, check)) check.err(q, 'Can’t be empty.');
+  else if (line.trim().length > LINE_RAW_MAX) check.err(q, `At most ${LINE_RAW_MAX} characters with its tags.`);
   else if (n > LINE_MAX) check.err(q, `At most ${LINE_MAX} characters (it has to fit his bubble).`);
   else if (n > LINE_LONG) check.warn(q, `Over ${LINE_LONG} characters: it wraps a lot in his bubble.`);
+  markupErrors(line, q, check);
 }
 
 /**
@@ -498,8 +573,8 @@ function invitationIntro(it, check) {
 /** How a box's own fields are checked, each when it's there (its id, Next and choices aside). */
 const BOX_CHECKS = {
   text: (v, p, check) => {
-    introText(v, p, INTRO_TEXT_MAX, check);
-    const n = typeof v === 'string' ? Array.from(v.trim()).length : 0;
+    introText(v, p, INTRO_TEXT_MAX, check, true, true);
+    const n = typeof v === 'string' ? letterCount(v.trim()) : 0;
     if (n > INTRO_TEXT_LONG && n <= INTRO_TEXT_MAX)
       check.warn(check.at(p), `Over ${INTRO_TEXT_LONG} characters: on a phone it outgrows the box’s three lines.`);
   },
@@ -558,12 +633,20 @@ function introChoice(c, p, target, check) {
   target(c.next, `${p}.next`, 'Pick the box it leads to.');
 }
 
-/** Text up to `max` characters (not UTF-16 units), not empty unless it may be. */
-function introText(v, p, max, check, required = true) {
-  const n = typeof v === 'string' ? Array.from(v.trim()).length : 0;
-  if (typeof v !== 'string') check.err(check.at(p), 'Must be text.');
-  else if (!n && required) check.err(check.at(p), 'Can’t be empty.');
+/**
+ * Text up to `max` characters (not UTF-16 units), not empty unless it may be. With `markup` (a
+ * chat box's line): its text effects' tags well formed, `max` counting the letters that show,
+ * and at most INTRO_TEXT_RAW_MAX characters as written.
+ */
+function introText(v, p, max, check, required = true, markup = false) {
+  if (typeof v !== 'string') return check.err(check.at(p), 'Must be text.');
+  const n = markup ? letterCount(v.trim()) : Array.from(v.trim()).length;
+  if (markup ? blankMarkup(v, check) : !v.trim()) {
+    if (required) check.err(check.at(p), 'Can’t be empty.');
+  } else if (markup && v.trim().length > INTRO_TEXT_RAW_MAX)
+    check.err(check.at(p), `At most ${INTRO_TEXT_RAW_MAX} characters with its tags.`);
   else if (n > max) check.err(check.at(p), `At most ${max} characters.`);
+  if (markup) markupErrors(v, check.at(p), check);
 }
 
 /**

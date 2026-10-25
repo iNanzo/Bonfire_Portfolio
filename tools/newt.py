@@ -2,7 +2,7 @@
 
 Builds the 22 clips of src/invitation/clips.js (Idle, Walk, Run, Wave, Spook, Held, Fall, Land,
 SitDown, Sit, StandUp, round 15's talking gestures Talk, Nod, Shrug, Point, Think, Cheer, and
-round 16's Thrash and Give Device's DeviceSit, LieDown, DeviceLie, GetUp) on NEWT's rig as one slotted Action each, and exports the rig, its meshes and every clip as a binary
+round 16's Thrash and Screen Time's DeviceSit, LieDown, DeviceLie, GetUp) on NEWT's rig as one slotted Action each, and exports the rig, its meshes and every clip as a binary
 glTF for three.js.
 
 Run it either way:
@@ -47,7 +47,8 @@ and Run from a few step parameters; Idle, Held, Fall, Sit, Talk and Think from a
 number along a monotone cubic (tween), so the legs' IK runs on each frame and a planted foot stays
 put. Loops end on an exact copy of frame 0; quaternion signs stay continuous. Held and Thrash pin
 the collar (the Neck bone's head) where it rests. DeviceSit and DeviceLie pin both palms to the
-tablet's side edges (DEVICE, the same numbers as clips.js DEVICE).
+tablet's grip (DEVICE, the same numbers as clips.js DEVICE): its side edges sitting, its near
+edge's corners lying.
 """
 
 import math
@@ -671,16 +672,17 @@ def thrash(t):
     return p
 
 
-# Give Device: the tablet (clips.js DEVICE; the page draws it from his palms) in both hands while he
+# Screen Time: the tablet (clips.js DEVICE; the page draws it from his palms) in both hands while he
 # sits (DeviceSit) and while he lies on his stomach (DeviceLie). Each palm (the ForeArm bone's
-# tip) is pinned by the arm IK to a side edge's midpoint, raised `lift` along the screen's normal.
-DEVICE_W = 1.6  # model units, palm to palm (DEVICE.size[0])
+# tip) is pinned by the arm IK to the clip's grip: `grip` = (across, back toward him along the
+# screen) from the tablet's middle, raised `lift` along the screen's normal.
 DEVICE = {
-    # held on his lap in front of the knees, tipped a little toward his face (more and the 36
-    # degree camera sees only its edge)
-    'DeviceSit': {'centre': (0, -0.85, 1.45), 'tilt': 12, 'lift': 0.0},
-    # lying flat on the floor in front of him, his palms on its edges
-    'DeviceLie': {'centre': (0, -2.15, 0.04), 'tilt': 0, 'lift': 0.3},
+    # held on his lap in front of the knees by its side edges, tipped a little toward his face
+    # (more and the 36 degree camera sees only its edge)
+    'DeviceSit': {'centre': (0, -0.85, 1.45), 'tilt': 12, 'lift': 0.0, 'grip': (0.8, 0.0)},
+    # round 17 (the user's pose): flat on the floor out in front, his palms on its near edge's
+    # corners at the end of near-straight arms, so it sticks out past his face (and shows under it)
+    'DeviceLie': {'centre': (0, -3.5, 0.045), 'tilt': 0, 'lift': 0.2, 'grip': (0.7, 0.6)},
 }
 
 
@@ -689,7 +691,12 @@ def palm(clip, dz=0.0):
     d = DEVICE[clip]
     t = math.radians(d['tilt'])
     cx, cy, cz = d['centre']
-    return (cx + DEVICE_W / 2, cy + d['lift'] * math.sin(t), cz + d['lift'] * math.cos(t) + dz)
+    gx, gy = d['grip']
+    return (
+        cx + gx,
+        cy + gy * math.cos(t) + d['lift'] * math.sin(t),
+        cz - gy * math.sin(t) + d['lift'] * math.cos(t) + dz,
+    )
 
 
 DEV_SIT = merge(
@@ -727,33 +734,48 @@ def device_sit(t):
     return p
 
 
-LIE_FEET = (0.55, 0.85, 1.05)  # the ankles up behind him, the knees on the floor
+LIE_KNEE = (0.5, 0.42, 0.45)  # the knees on the floor behind him (x for his left; the joint's centre)
+LIE_SHIN = 0.93  # knee to ankle, model units (a little inside the calf's reach)
+LIE_KICK = (55, 28)  # the shins' angle up off the floor behind him: the middle, and each way
+
+
+def lie_foot(a):
+    """The left ankle's place lying, the shin `a` degrees up off the floor behind the knee."""
+    kx, ky, kz = LIE_KNEE
+    r = math.radians(a)
+    return (kx - 0.05, ky + LIE_SHIN * math.cos(r), kz + LIE_SHIN * math.sin(r))
+
+
 DEV_LIE = {
-    # on his stomach, the chest propped about 35 degrees off the floor on near-straight arms
-    'hips': {'loc': (0, 0, -1.1), 'rot': (85, 0, 0)},
-    'chest': (-36, 0, 0),
-    'neck': (-4, 0, 0),
-    'head': (-6, 0, 0),  # back 10 degrees on the chest (12 at the bob): further, his back hair digs in
-    'armL': {'shoulder': (0, 10), 'hand': palm('DeviceLie'), 'elbow': (1, 0.6, -0.2), 'twist': 0, 'twist2': 0},
-    'armR': {'shoulder': (0, 10), 'hand': palm('DeviceLie'), 'elbow': (1, 0.6, -0.2), 'twist': 0, 'twist2': 0},
-    'legL': {'at': LIE_FEET, 'pitch': -110, 'knee': (0.25, -1, 0)},  # toes pointed
-    'legR': {'at': LIE_FEET, 'pitch': -110, 'knee': (0.25, -1, 0)},
+    # round 17, the user's pose: on his stomach, the belly and hips flat on the floor, the chest
+    # raised about 21 degrees, the arms stretched nearly straight out in front holding the tablet
+    # by its near edge. The neck tips back and the head forward on it: the back hair keeps clear
+    # of his shirt only while the head itself tips back little on the neck (the shirt's collar
+    # turns with the neck, not the head), so the face comes up this way.
+    'hips': {'loc': (0, 0, -1.24), 'rot': (86, 0, 0)},
+    'chest': (-17, 0, 0),
+    'neck': (-62, 0, 0),
+    'head': (22, 0, 0),
+    'armL': {'shoulder': (0, 50), 'hand': palm('DeviceLie'), 'elbow': (1, 0.2, -0.6), 'twist': 0, 'twist2': 0},
+    'armR': {'shoulder': (0, 50), 'hand': palm('DeviceLie'), 'elbow': (1, 0.2, -0.6), 'twist': 0, 'twist2': 0},
+    'legL': {'at': lie_foot(LIE_KICK[0]), 'pitch': -120, 'knee': (0.1, -1, 0)},  # toes pointed
+    'legR': {'at': lie_foot(LIE_KICK[0]), 'pitch': -120, 'knee': (0.1, -1, 0)},
 }
 
 
 def device_lie(t):
-    """Lying with the tablet: the feet fluttering up behind him (twice a loop, opposite each
-    other), a small head bob, the palms tapping the tablet's edges in turn."""
+    """Lying with the tablet: the feet kicking up and down behind him in turn (three times a
+    loop), a small head bob, the palms tapping the tablet's near corners in turn."""
     tau = 2 * math.pi
-    ph = tau * 2 * t
     bob = math.sin(tau * 2 * t + 1)
-    p = merge(DEV_LIE, head=(DEV_LIE['head'][0] + 2 * bob, 3 * math.sin(tau * t), 0))
-    x, y, z = LIE_FEET
+    # (the head only bobs forward of DEV_LIE's: back from it, the back hair digs in)
+    p = merge(DEV_LIE, head=(DEV_LIE['head'][0] + 1.5 * (1 + bob), 2 * math.sin(tau * t), 0))
+    mid, swing = LIE_KICK
     for side, s in SIDES:
-        k = math.sin(ph) * s
-        p['leg' + side] = merge(DEV_LIE['leg' + side], at=(x, y + 0.22 * k, z + 0.08 * math.cos(ph) * s))
+        k = math.sin(tau * 3 * t) * s
+        p['leg' + side] = merge(DEV_LIE['leg' + side], at=lie_foot(mid + swing * k), pitch=-120 + 15 * k)
         tap = max(0.0, math.sin(tau * 2 * t + (0 if s > 0 else math.pi))) ** 2
-        p['arm' + side] = merge(DEV_LIE['arm' + side], hand=palm('DeviceLie', 0.05 * tap))
+        p['arm' + side] = merge(DEV_LIE['arm' + side], hand=palm('DeviceLie', 0.03 * tap))
     return p
 
 
@@ -982,54 +1004,59 @@ TABLES = {
         (21, merge(IDLE, hips={'loc': (0.02, 0, -0.08), 'rot': (0, 0, 0)})),
         (24, IDLE),
     ),
-    # Give Device's second press: from sitting with the tablet onto his stomach with it (the hips
-    # stay over the same spot of floor: the page moves his root, the model test holds them).
+    # Screen Time's second press: from sitting with the tablet onto his stomach with it (the hips
+    # stay over the same spot of floor: the page moves his root, the model test holds them). The
+    # page holds the tablet by its near edge all the way (clips.js DEVICE LieDown), so his palms
+    # set it down on the floor in front of him and push it out ahead as he lowers himself.
     'LieDown': keys(
         (0, 'devicesit@0'),
         (8, merge(
-            DEV_SIT,  # leaning forward, the feet pulled in, the hands going to the floor in front
+            DEV_SIT,  # leaning forward, the feet pulled in, the tablet going down in front
             hips={'loc': (0, 0, -1.2), 'rot': (10, 0, 0)},
             chest=(15, 0, 0),
             head=(-5, 0, 0),
-            armL={'shoulder': (0, 8), 'hand': (0.8, -1.3, 0.5), 'twist': 0, 'twist2': 0},
-            armR={'shoulder': (0, 8), 'hand': (0.8, -1.3, 0.5), 'twist': 0, 'twist2': 0},
+            armL={'shoulder': (0, 20), 'hand': (0.7, -1.55, 1.0), 'twist': 0, 'twist2': 0},
+            armR={'shoulder': (0, 20), 'hand': (0.7, -1.55, 1.0), 'twist': 0, 'twist2': 0},
             legL={'at': (0.7, -0.7, 0.45), 'pitch': -10, 'yaw': 6},
             legR={'at': (0.7, -0.7, 0.45), 'pitch': -10, 'yaw': 6},
         )),
         (16, merge(
-            DEV_LIE,  # on his hands and knees
-            hips={'loc': (0, 0, -0.75), 'rot': (55, 0, 0)},
-            chest=(10, 0, 0),
-            neck=(-10, 0, 0),
-            head=(-10, 0, 0),
-            armL={'shoulder': (0, 8), 'hand': (0.75, -1.6, 0.3), 'twist': 0, 'twist2': 0},
-            armR={'shoulder': (0, 8), 'hand': (0.75, -1.6, 0.3), 'twist': 0, 'twist2': 0},
-            legL={'at': KNEEL_FEET, 'pitch': -100},
-            legR={'at': KNEEL_FEET, 'pitch': -100},
+            DEV_LIE,  # on his knees, the tablet set down on the floor in front, his palms on it
+            hips={'loc': (0, 0, -0.8), 'rot': (60, 0, 0)},
+            chest=(15, 0, 0),
+            neck=(-25, 0, 0),
+            head=(8, 0, 0),
+            armL={'shoulder': (0, 20), 'hand': (0.7, -2.3, 0.5), 'twist': 0, 'twist2': 0},
+            armR={'shoulder': (0, 20), 'hand': (0.7, -2.3, 0.5), 'twist': 0, 'twist2': 0},
+            legL={'at': KNEEL_FEET, 'pitch': -100, 'knee': (0.25, -1, 0)},
+            legR={'at': KNEEL_FEET, 'pitch': -100, 'knee': (0.25, -1, 0)},
         )),
         (26, merge(
-            DEV_LIE,  # down onto his belly, the legs out straight behind
-            hips={'loc': (0, 0, -1.1), 'rot': (85, 0, 0)},
-            chest=(-28, 0, 0),
-            neck=(-5, 0, 0),
-            head=(-5, 0, 0),
-            armL={'shoulder': (0, 10), 'hand': (0.9, -1.8, 0.3), 'twist': 0, 'twist2': 0},
-            armR={'shoulder': (0, 10), 'hand': (0.9, -1.8, 0.3), 'twist': 0, 'twist2': 0},
-            legL={'at': (0.55, 1.45, 0.55), 'pitch': -100},
-            legR={'at': (0.55, 1.45, 0.55), 'pitch': -100},
+            DEV_LIE,  # down onto his belly, the legs out straight behind, the tablet pushed ahead
+            hips={'loc': (0, 0, -1.1), 'rot': (84, 0, 0)},
+            chest=(-12, 0, 0),
+            neck=(-48, 0, 0),
+            head=(18, 0, 0),
+            armL={'shoulder': (0, 40), 'hand': (0.7, -2.85, 0.55), 'twist': 0, 'twist2': 0},
+            armR={'shoulder': (0, 40), 'hand': (0.7, -2.85, 0.55), 'twist': 0, 'twist2': 0},
+            legL={'at': (0.5, 1.35, 0.6), 'pitch': -100},
+            legR={'at': (0.5, 1.35, 0.6), 'pitch': -100},
         )),
-        (31, merge(DEV_LIE, chest=(-25, 0, 0), legL={'at': (0.55, 1.2, 0.8), 'pitch': -105}, legR={'at': (0.55, 1.2, 0.8), 'pitch': -105})),
+        (31, merge(DEV_LIE, legL={'at': lie_foot(35), 'pitch': -110}, legR={'at': lie_foot(35), 'pitch': -110})),
         (36, 'devicelie@0'),
     ),
-    # Give Device's third press (or any other input): up from lying to Idle.
+    # Screen Time's third press (or any other input): up from lying to Idle (the tablet is put
+    # away from its first frame).
     'GetUp': keys(
         (0, 'devicelie@0'),
         (6, merge(
             DEV_LIE,  # pushing up, the hands coming in under the shoulders
-            hips={'loc': (0, 0, -1.0), 'rot': (75, 0, 0)},
-            chest=(-30, 0, 0),
-            armL={'shoulder': (0, 8), 'hand': (0.8, -1.4, 0.3), 'twist': 0, 'twist2': 0},
-            armR={'shoulder': (0, 8), 'hand': (0.8, -1.4, 0.3), 'twist': 0, 'twist2': 0},
+            hips={'loc': (0, 0, -1.05), 'rot': (76, 0, 0)},
+            chest=(-25, 0, 0),
+            neck=(-35, 0, 0),
+            head=(12, 0, 0),
+            armL={'shoulder': (0, 8), 'hand': (0.8, -1.45, 0.3), 'twist': 0, 'twist2': 0},
+            armR={'shoulder': (0, 8), 'hand': (0.8, -1.45, 0.3), 'twist': 0, 'twist2': 0},
             legL={'at': (0.55, 1.2, 0.55), 'pitch': -100},
             legR={'at': (0.55, 1.2, 0.55), 'pitch': -100},
         )),
@@ -1041,8 +1068,8 @@ TABLES = {
             head=(-5, 0, 0),
             armL={'shoulder': (0, 4), 'upper': (30, 20), 'lower': (50, 15), 'twist': 0, 'hand': None},
             armR={'shoulder': (0, 4), 'upper': (30, 20), 'lower': (50, 15), 'twist': 0, 'hand': None},
-            legL={'at': KNEEL_FEET, 'pitch': -100},
-            legR={'at': KNEEL_FEET, 'pitch': -100},
+            legL={'at': KNEEL_FEET, 'pitch': -100, 'knee': (0.25, -1, 0)},
+            legR={'at': KNEEL_FEET, 'pitch': -100, 'knee': (0.25, -1, 0)},
         )),
         (17, merge(
             CROUCH,  # the left foot forward

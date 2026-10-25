@@ -1,0 +1,100 @@
+/* Text effects in the invitation toy's lines (markup.js builds them: a span a letter, its index in
+   --i, its colour set inline), in the chat box, NEWT's bubble and the admin's preview alike.
+   Wave and shake move each letter in stepped jumps, like a sprite's frames, a little later down
+   the line (staggered by --i), each moving letter an inline-block that keeps its own width.
+   Sideways a letter only ever steps a pixel, and only to the right, so it never runs more than a
+   pixel into its neighbour whatever their phases, and the space before a shaken word never
+   narrows (spaces never move): a shake is a pixel's jitter across and up and down, a wave rises
+   and dips straight up and down. A letter with both does both at once (the wave on its translate,
+   the shake on its transform). Bold is the 600 weight the page loads; big is a fifth bigger, its
+   line height kept so the box doesn't grow. A word with a styled letter never breaks mid-word.
+   Letters not typed yet keep their place, unseen. Reduced motion stills the moves (the moves'
+   own rules weigh one class, so the stilling ones always win). */
+
+.inv-fx-word {
+  white-space: nowrap;
+}
+.inv-fx.is-unseen {
+  visibility: hidden;
+}
+.inv-fx-bold {
+  font-weight: 600;
+}
+.inv-fx-big {
+  font-size: 1.2em;
+  line-height: 1;
+}
+.inv-fx-moves {
+  display: inline-block;
+  white-space: pre;
+}
+:where(.inv-fx-moves).inv-fx-wave {
+  animation: inv-fx-wave 1s step-end infinite;
+  animation-delay: calc(var(--i, 0) * -0.09s);
+}
+:where(.inv-fx-moves).inv-fx-shake {
+  animation: inv-fx-shake 0.42s step-end infinite;
+  animation-delay: calc(var(--i, 0) * -0.13s);
+}
+:where(.inv-fx-moves.inv-fx-wave).inv-fx-shake {
+  animation:
+    inv-fx-wave 1s step-end infinite,
+    inv-fx-shake 0.42s step-end infinite;
+  animation-delay: calc(var(--i, 0) * -0.09s), calc(var(--i, 0) * -0.13s);
+}
+
+@keyframes inv-fx-wave {
+  0% {
+    translate: 0 0;
+  }
+  12.5% {
+    translate: 0 -0.12em;
+  }
+  25% {
+    translate: 0 -0.2em;
+  }
+  37.5% {
+    translate: 0 -0.12em;
+  }
+  50% {
+    translate: 0 0;
+  }
+  62.5% {
+    translate: 0 0.08em;
+  }
+  75% {
+    translate: 0 0.12em;
+  }
+  87.5% {
+    translate: 0 0.08em;
+  }
+}
+@keyframes inv-fx-shake {
+  0% {
+    transform: translate(1px, 0);
+  }
+  16.667% {
+    transform: translate(0, -1px);
+  }
+  33.333% {
+    transform: translate(1px, 1px);
+  }
+  50% {
+    transform: translate(0, 1px);
+  }
+  66.667% {
+    transform: translate(1px, -1px);
+  }
+  83.333% {
+    transform: translate(0, 0);
+  }
+}
+
+.is-still .inv-fx-moves {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .inv-fx-moves {
+    animation: none;
+  }
+}

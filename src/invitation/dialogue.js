@@ -3,9 +3,11 @@
 // safe to run (types.js DialogueScript: content.json `invitation.intro`, or the page's own
 // fallback): a face, clip or shot it doesn't know falls back (neutral, none, keep), a missing or
 // doubled id gets its own, a start that isn't there is the first box, text is capped at
-// DIALOGUE.maxText characters and choices at DIALOGUE.maxChoices; with no box at all it's null.
+// DIALOGUE.maxText letters and choices at DIALOGUE.maxChoices; with no box at all it's null.
+// A line may carry text effects' tags (markup.js: {red,wave|…}): it keeps them (the screen
+// draws them), and everything here counts the letters that show (an emoji is one).
 // createDialogue runs it:
-//   - the line types out at DIALOGUE.cps characters a second, a beat after punctuation
+//   - the line types out at DIALOGUE.cps letters a second, a beat after punctuation
 //     (DIALOGUE.pause); with reduced motion it shows at once;
 //   - advance (a tap, Space, Enter) finishes the typing first, then goes on: a box's `next`, else
 //     the box after it; `end`, the last box or a `next` that isn't there ends it;
@@ -13,22 +15,23 @@
 //     that reply's box (one that isn't there ends it);
 //   - Auto goes on by itself once the line is typed and the box's `auto` seconds have passed (or
 //     autoDelay's, from the line's length), never past a choice;
-//   - Skip goes to the next box with choices, typed, or to the end (a loop with no choice in it
-//     ends rather than going round);
-//   - the log keeps every line shown (its speaker and text) and every reply picked, in order;
+//   - Next (the top right's button; skip here) goes to the next box with choices, typed, or to
+//     the end (a loop with no choice in it ends rather than going round);
+//   - the log keeps every line shown (its speaker and plain text) and every reply picked, in order;
 //   - pause holds its clock (the Log or the "Skip intro?" question open): no typing, no Auto.
 // lookSway is the small, slow drift his look has on top of looking at the camera while he talks.
 
 import { DIALOGUE_CLIPS, FACE_NAMES } from './clips.js';
+import { clipMarkup, letterCount, plainText, visibleLetters } from './markup.js';
 
 /** @typedef {import('./types.js').DialogueScript} DialogueScript */
 /** @typedef {import('./types.js').DialogueBox} DialogueBox */
 /** @typedef {import('./types.js').DialogueShot} DialogueShot */
 
 /**
- * cps: characters typed a second; pause: extra seconds after a character before the next shows;
- * autoBase + autoPerChar × characters: Auto's wait once a line is typed, between autoMin and
- * autoMax seconds; maxText: characters a line keeps; maxChoices: replies a box keeps; maxAuto: the
+ * cps: letters typed a second; pause: extra seconds after a letter before the next shows;
+ * autoBase + autoPerChar × letters: Auto's wait once a line is typed, between autoMin and
+ * autoMax seconds; maxText: letters a line keeps (its tags aside); maxChoices: replies a box keeps; maxAuto: the
  * longest wait a box may ask for, seconds.
  */
 export const DIALOGUE = {
@@ -49,15 +52,14 @@ export const SHOT_NAMES = /** @type {DialogueShot[]} */ (['close', 'medium', 'wi
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const str = (v) => (typeof v === 'string' ? v : '');
-const clip = (s, n) => Array.from(s).slice(0, n).join('');
 
 /**
- * Seconds from a line's start until each character shows: the i-th (from 1) at i / cps, plus the
- * beats after the punctuation before it.
+ * Seconds from a line's start until each letter that shows does: the i-th (from 1) at i / cps,
+ * plus the beats after the punctuation before it (its tags take no time).
  * @param {string} text
  */
 function charTimes(text) {
-  const chars = Array.from(text);
+  const chars = visibleLetters(text);
   const out = new Array(chars.length);
   let at = 0;
   for (let i = 0; i < chars.length; i++) {
@@ -71,7 +73,7 @@ function charTimes(text) {
 }
 
 /**
- * How many characters of `text` show `elapsed` seconds into it.
+ * How many letters of `text` show `elapsed` seconds into it.
  * @param {string} text
  * @param {number} elapsed
  */
@@ -97,7 +99,7 @@ export function typeDuration(text) {
  */
 export function autoDelay(box) {
   if (typeof box.auto === 'number' && Number.isFinite(box.auto) && box.auto >= 0) return box.auto;
-  const n = Array.from(box.text ?? '').length;
+  const n = letterCount(box.text ?? '');
   return Math.min(DIALOGUE.autoMax, Math.max(DIALOGUE.autoMin, DIALOGUE.autoBase + n * DIALOGUE.autoPerChar));
 }
 
@@ -126,7 +128,7 @@ export function normalizeScript(raw) {
     /** @type {DialogueBox} */
     const box = {
       id: uniqueId(str(r.id), i),
-      text: clip(str(r.text), DIALOGUE.maxText),
+      text: clipMarkup(str(r.text), DIALOGUE.maxText),
       face: FACE_NAMES.includes(r.face) ? r.face : 'neutral',
       animation: r.animation === 'none' || DIALOGUE_CLIPS.includes(r.animation) ? r.animation : 'none',
       camera: SHOT_NAMES.includes(r.camera) ? r.camera : 'keep',
@@ -160,8 +162,8 @@ export function normalizeScript(raw) {
  * @property {DialogueBox|null} box  the box up now
  * @property {string} speaker  its name tab
  * @property {number} seq  counts the boxes shown (a new box: a new seq)
- * @property {number} shown  characters typed so far
- * @property {number} length  characters in the line
+ * @property {number} shown  letters typed so far (markup.js: the ones that show)
+ * @property {number} length  letters in the line
  * @property {boolean} typed  the whole line is up
  * @property {Array<{label: string, next: string}>|null} choices  the replies, once the line is typed
  * @property {boolean} auto
@@ -198,7 +200,7 @@ export function createDialogue(script, { reduced = false } = {}) {
   };
 
   /** @param {DialogueBox} b */
-  const lengthOf = (b) => Array.from(b.text).length;
+  const lengthOf = (b) => letterCount(b.text);
   /** Seconds into the line now. */
   const elapsed = () => (m.pausedAt ?? m.t) - m.start;
   /** Characters up now. */
@@ -232,7 +234,7 @@ export function createDialogue(script, { reduced = false } = {}) {
     m.start = m.pausedAt ?? m.t;
     m.forced = whole;
     m.typedAt = null;
-    m.log.push({ kind: 'line', speaker: b.speaker ?? script?.speaker ?? DIALOGUE.speaker, text: b.text });
+    m.log.push({ kind: 'line', speaker: b.speaker ?? script?.speaker ?? DIALOGUE.speaker, text: plainText(b.text) });
     markTyped();
   }
 
@@ -337,8 +339,8 @@ export function createDialogue(script, { reduced = false } = {}) {
       m.auto = on;
     },
     /**
-     * Skip: to the next box with choices (typed at once), or the end; at a box with choices, its
-     * line finishes.
+     * Next (the top right's button): to the next box with choices (typed at once), or the end;
+     * at a box with choices, its line finishes.
      * @param {number} t
      */
     skip(t) {

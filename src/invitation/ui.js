@@ -1,7 +1,7 @@
 // The invitation toy's page around the canvas: the status line ("Loading…", or what went wrong),
 // the toolbar along the bottom and the Settings sheet. The toolbar: Replay Intro, Wave, Sit (or
-// Stand), Give Device (Lie Down, Get Up: what its next press does), Run, Camera and Settings,
-// each a squircle with a 16×16 pixel icon (icons.js) and its label, the button's own text in a
+// Stand), Screen Time (Lie Down, Get Up: what its next press does), Run, Camera and Settings,
+// each a squircle with a Phosphor icon (icons.js) and its label, the button's own text in a
 // span (its name: no tooltip, no title=). With a mouse the label shows as a pixel tab over the
 // button on hover and keyboard focus; on touch the bar shows icons only, and a press held still
 // for HOLD_MS shows the label and swallows the click that follows (createHold; a quicker press
@@ -23,7 +23,8 @@
 // with its value beside it, a row of segments or a switch; Reset To Style; the pixel look's
 // ones resting at Pixel Size Off, the lines' while Outlines is off, the dither's while
 // Dithering is), Ground Cues (the ring and the dashed drop line under him while he's held: Off,
-// In the Mix or Always, In the Mix until it's picked: cues.js CUE_DEFAULT), and Wander, whether
+// In the Mix or Always, In the Mix until it's picked: cues.js CUE_DEFAULT), Rose Petals (petals
+// trailing the cursor or finger and bursting at a click: petalLayer.js; on until switched off), and Wander, whether
 // he walks about by himself, kept for the next visit (loadWander, in localStorage, every read and
 // write in try/catch)). The slider's steps are the screen's (pixels.js pixelSteps: two resolutions that come
 // to the same block there are one step, and one that comes to 1 px is Native), set by main.js
@@ -42,7 +43,7 @@
 //                        (an old address's ?drag= is ignored: the bead hold is the only carry)
 
 import { PIXEL_SIZES, resolutionOf, shownPixel, stepFor } from './pixels.js';
-import { LOOKS, MOTIONS, STYLES, isCustom, shaderOf, validLook } from './look.js';
+import { LOOKS, MOTIONS, STYLES, isCustom, petalsOn, shaderOf, validLook } from './look.js';
 import { SHADER_CONTROLS, controlFor, shaderText } from './shader.js';
 import { CUE_DEFAULT, CUE_LABELS, CUE_MODES } from './cues.js';
 import { LABEL_ICONS, iconSvg, installDither } from './icons.js';
@@ -76,22 +77,22 @@ export function slideIntent(dx, dy) {
  * him, and Wander is a setting.
  */
 export const BUTTONS = /** @type {const} */ (['Wave', 'Sit', 'Device', 'Run']);
-/** Each action button's label (Sit's and Give Device's change as he sits or lies: setSitLabel, setDeviceLabel). */
-export const BUTTON_LABELS = { Wave: 'Wave', Sit: 'Sit', Device: 'Give Device', Run: 'Run' };
+/** Each action button's label (Sit's and Screen Time's change as he sits or lies: setSitLabel, setDeviceLabel). */
+export const BUTTON_LABELS = { Wave: 'Wave', Sit: 'Sit', Device: 'Screen Time', Run: 'Run' };
 /** Replay Intro's label. */
 export const INTRO_LABEL = 'Replay Intro';
-/** Give Device's labels: what its next press does (none under way, sitting with the tablet, lying with it). */
-export const DEVICE_LABELS = /** @type {const} */ (['Give Device', 'Lie Down', 'Get Up']);
+/** Screen Time's labels: what its next press does (none under way, sitting with the tablet, lying with it). */
+export const DEVICE_LABELS = /** @type {const} */ (['Screen Time', 'Lie Down', 'Get Up']);
 /**
- * Give Device's label for the brain's output: its own deviceLabel when it's one of
- * DEVICE_LABELS, else from what's under way (sitting: Lie Down; lying: Get Up), else Give Device.
+ * Screen Time's label for the brain's output: its own deviceLabel when it's one of
+ * DEVICE_LABELS, else from what's under way (sitting: Lie Down; lying: Get Up), else Screen Time.
  * @param {{deviceLabel?: unknown, device?: 'sit'|'lie'|null}} o
  * @returns {typeof DEVICE_LABELS[number]}
  */
 export function deviceLabelOf(o) {
   const own = DEVICE_LABELS.find((l) => l === o.deviceLabel);
   if (own) return own;
-  return o.device === 'sit' ? 'Lie Down' : o.device === 'lie' ? 'Get Up' : 'Give Device';
+  return o.device === 'sit' ? 'Lie Down' : o.device === 'lie' ? 'Get Up' : 'Screen Time';
 }
 /**
  * The Camera pad's controls, in order: a key main.js acts on (camera.js orbitNudge, orbitZoom,
@@ -257,7 +258,7 @@ export function parseQuery(search) {
 }
 
 /**
- * A tool button: a squircle with its pixel icon and its label, the label its name.
+ * A tool button: a squircle with its icon and its label, the label its name.
  * @param {string} label
  * @param {string} attrs  its hook and state attributes
  * @param {string} [cls]  more classes
@@ -395,12 +396,13 @@ export function sheetHtml(look, steps = ALL_STEPS, { wander = true } = {}) {
   <fieldset class="inv-field"><legend>Motion</legend><div class="inv-segs">${motions}</div></fieldset>
   ${shaderHtml(l)}
   <fieldset class="inv-field"><legend>Ground Cues</legend><div class="inv-segs">${cues}</div><p class="inv-hint">The ring and the dashed line under NEWT while he’s held, showing where he is over the floor.</p></fieldset>
+  <div class="inv-field inv-play">${toggle('petals', 'Rose Petals', petalsOn(l))}<p class="inv-hint">Rose petals trail your cursor or finger and burst where you click or tap.</p></div>
   <div class="inv-field inv-play">${toggle('wander', 'Wander', wander, 'data-setting')}<p class="inv-hint">Left be, he walks about by himself now and then.</p></div>
 </section>`;
 }
 
 /**
- * A tool button's label and icon changed in place (Sit's, Give Device's): only its span's text and
+ * A tool button's label and icon changed in place (Sit's, Screen Time's): only its span's text and
  * its SVG, so the button, its focus and its hooks stay.
  * @param {HTMLElement} button
  * @param {string} label
@@ -824,7 +826,7 @@ export function bindUi(stage, { look, wander = true, onButton, onLook, onCamera,
       relabel($('[data-button="Sit"]'), label);
     },
     /**
-     * Give Device's label: what its next press does (DEVICE_LABELS), its label and its icon.
+     * Screen Time's label: what its next press does (DEVICE_LABELS), its label and its icon.
      * @param {typeof DEVICE_LABELS[number]} label
      */
     setDeviceLabel(label) {

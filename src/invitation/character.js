@@ -43,7 +43,7 @@
 // What he wears (accessories(dt, t): main.js runs it after the look): his earrings
 // (earrings.js: a black stud on each earlobe and a Latin cross on a one-texel chain, pixel
 // sprites snapped with his head), on his head bone, each chain swinging on the limp layer's
-// spring about straight down, pushed by the stud's acceleration; and Give Device's tablet
+// spring about straight down, pushed by the stud's acceleration; and Screen Time's tablet
 // (device.js) at his palms while he holds it (device.js deviceShown), its game moving on.
 //
 // Two Shader options say which of his own textures show under the pixel filter. Pixel Face (the
@@ -100,7 +100,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { BONES, CLIPS, DEVICE, EXTRA_FACES, FACES, SCALE } from './clips.js';
 import { LIMP, limbStep, restLimb } from './carry.js';
-import { PALM, createTablet, deviceFrame, deviceLift, deviceShown, deviceTilt } from './device.js';
+import { PALM, createTablet, deviceFrame, deviceGrip, deviceLift, deviceShown, deviceTilt } from './device.js';
 import { EARLOBES, EARRING, makeEarring } from './earrings.js';
 import { FACE_FALLBACK, FACE_LAYOUT, faceSpan, layoutFor, pickFaceSize } from './faceSheets.js';
 import { LOOKS, DEFAULT_LOOK } from './look.js';
@@ -430,7 +430,7 @@ export function createCharacter(gltf, opts = {}) {
   const limbSaved = limbs.map((l) => (l.b ? l.b.quaternion.clone() : new THREE.Quaternion()));
   let limpWeight = 0;
 
-  // --- What he wears: his earrings, and Give Device's tablet.
+  // --- What he wears: his earrings, and Screen Time's tablet.
   // (His head bone's own axes are turned from his model's: the glb's hips turn their children a
   // quarter round. Each earring's group takes that rest turn off, so EARLOBES and EARRING are in
   // his model's axes: +x his left, +z his front.)
@@ -732,7 +732,7 @@ export function createCharacter(gltf, opts = {}) {
   }
 
   /**
-   * Give Device's tablet: shown while its clips weigh enough, at his palms (his root's space,
+   * Screen Time's tablet: shown while its clips weigh enough, at his palms (his root's space,
    * model units: device.js deviceFrame), its game moved on to `t`.
    * @param {number} t
    */
@@ -747,7 +747,14 @@ export function createCharacter(gltf, opts = {}) {
     r.localToWorld(palmR.set(0, PALM, 0));
     root.worldToLocal(palmL);
     root.worldToLocal(palmR);
-    const f = deviceFrame(palmL, palmR, { x: 0, y: 0, z: 1 }, deviceTilt(weightOf), deviceLift(weightOf));
+    const f = deviceFrame(
+      palmL,
+      palmR,
+      { x: 0, y: 0, z: 1 },
+      deviceTilt(weightOf),
+      deviceLift(weightOf),
+      deviceGrip(weightOf),
+    );
     g.position.set(f.centre.x, f.centre.y, f.centre.z);
     across.set(f.right.x, f.right.y, f.right.z);
     down.set(f.normal.x, f.normal.y, f.normal.z);

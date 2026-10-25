@@ -17,6 +17,7 @@ import {
   DISSOLVE,
   ENVELOPE_TEXT,
   FLAP_OPEN,
+  HOVER_PULSE,
   SWAY,
   SWIPE,
   TIMES,
@@ -27,10 +28,17 @@ import {
   FLAP_TIP,
   letterCovers,
   sealBloom,
+  TURN,
+  turnGoal,
+  turnRoll,
+  turnStep,
   envelopeGesture,
   envelopeKey,
   hintFor,
+  hoverPulse,
+  hoverStep,
   particleAt,
+  releaseGesture,
   shedParticles,
 } from '../src/invitation/envelope.js';
 
@@ -102,6 +110,21 @@ test('a fast flick counts: 0.6 px/ms or more with |dy| of 24 px or more', () => 
   assert.equal(envelopeGesture(30, -30, 40, h), 'none', 'a fast diagonal');
   assert.equal(envelopeGesture(0, -30, 0, h), 'open', 'no time at all: as fast as can be');
   assert.ok(SWIPE.flick === 0.6 && SWIPE.flickMin === 24);
+});
+
+test('let go, a press that never strayed past the tap slop opens it; a drag out and back to its start does nothing', () => {
+  const h = 800;
+  assert.equal(releaseGesture({ dx: 2, dy: 1, far: 4, ms: 80 }, h), 'open', 'a real tap');
+  assert.equal(releaseGesture({ dx: 0, dy: 0, far: SWIPE.tap - 0.5, ms: 80 }, h), 'open', 'just under the slop');
+  assert.equal(releaseGesture({ dx: 0, dy: 0, far: 200, ms: 400 }, h), 'none', 'sideways out and back');
+  assert.equal(releaseGesture({ dx: 6, dy: 3, far: 220, ms: 500 }, h), 'none', 'sideways, back to 6 px off');
+  assert.equal(releaseGesture({ dx: 0, dy: 3, far: 120, ms: 400 }, h), 'none', 'up and back');
+  assert.equal(releaseGesture({ dx: 0, dy: 0, far: SWIPE.tap, ms: 80 }, h), 'none', 'at the slop it is no tap');
+  assert.equal(releaseGesture({ dx: 220, dy: 0, far: 220, ms: 400 }, h), 'none', 'sideways, let go out there');
+  // (Past the slop, it is the swipe the last offset makes.)
+  assert.equal(releaseGesture({ dx: 0, dy: -200, far: 200, ms: 300 }, h), 'open', 'a swipe up');
+  assert.equal(releaseGesture({ dx: 0, dy: 200, far: 200, ms: 300 }, h), 'skip', 'a swipe down');
+  assert.equal(releaseGesture({ dx: 0, dy: -30, far: 30, ms: 40 }, h), 'open', 'a flick up');
 });
 
 test('the keys: Enter, Space and ArrowUp open it; Escape and ArrowDown skip; the rest do nothing', () => {
@@ -408,4 +431,92 @@ test('with reduced motion it’s a short plain fade, no dissolve; a skip clears 
   s.skip(0);
   assert.equal(s.pose(0.01).dissolve, 0, 'a skip drops it, no dissolve');
   assert.ok(s.pose(TIMES.skip).backdrop < 0.01, 'the page clears');
+});
+
+test('hovered, the letter pulses slowly: from nothing to full and back every 2.8 s, so it shows clean between pulses', () => {
+  assert.equal(HOVER_PULSE.period, 2.8);
+  const P = HOVER_PULSE.period;
+  assert.equal(hoverPulse(1, 0), 0, 'it starts from nothing');
+  assert.ok(Math.abs(hoverPulse(1, P / 2) - 1) < 1e-9, 'full at the middle of a pulse');
+  assert.ok(hoverPulse(1, P) < 1e-9 && hoverPulse(1, 3 * P) < 1e-9, 'all the way back to nothing');
+  for (let t = 0; t < 3 * P; t += 0.05) {
+    const v = hoverPulse(1, t);
+    assert.ok(v >= 0 && v <= 1);
+    // (Eased in: half way in, half as strong.)
+    assert.ok(Math.abs(hoverPulse(0.5, t) - v / 2) < 1e-9);
+  }
+  // (Slowly: under a tenth of its strength for a good share of each pulse.)
+  let clean = 0;
+  for (let t = 0; t < P; t += P / 100) clean += hoverPulse(1, t) < 0.1 ? 1 : 0;
+  assert.ok(clean >= 15, `clean for ${clean}% of a pulse`);
+  // (Reduced motion: no pulse, a steady rim while it's hovered.)
+  assert.equal(hoverPulse(1, 0, true), hoverPulse(1, P / 3, true));
+  assert.ok(hoverPulse(1, 0, true) > 0.3);
+  assert.equal(hoverPulse(0, 1, true), 0);
+});
+
+test('the hover eases in as the pointer comes onto the letter and out as it leaves', () => {
+  let k = 0;
+  for (let i = 0; i < 3; i++) k = hoverStep(k, true, 0.05);
+  assert.ok(k > 0 && k < 1, `easing in: ${k}`);
+  for (let i = 0; i < 40; i++) k = hoverStep(k, true, 0.05);
+  assert.equal(k, 1);
+  k = hoverStep(k, false, 0.05);
+  assert.ok(k < 1 && k > 0);
+  for (let i = 0; i < 40; i++) k = hoverStep(k, false, 0.05);
+  assert.equal(k, 0);
+});
+
+test('the letter leans clearly toward the pointer’s x, and a sideways drag or a held arrow turns it further, 0.2–0.25 rad at most', () => {
+  assert.ok(TURN.max >= 0.2 && TURN.max <= 0.25 + 1e-9, `at most ${TURN.max}`);
+  assert.equal(turnGoal({}), 0, 'no pointer, no drag, no key: square on');
+  // (Toward the pointer: right of the middle turns its face right, enough to see at a glance.)
+  const half = turnGoal({ pointer: 0.5 });
+  assert.ok(half >= 0.08 && half <= 0.12, `a cursor halfway to the edge: ${half}`);
+  const right = turnGoal({ pointer: 1 });
+  assert.ok(right > half && right <= 0.16, `toward the right edge ${right}`);
+  assert.equal(turnGoal({ pointer: -1 }), -right);
+  assert.equal(turnGoal({ pointer: -0.5 }), -half);
+  // (Eased: most of it comes in the first half of the way out, none of it in a jump.)
+  assert.ok(half > right / 2 + 0.01, 'more than half of it by halfway');
+  const lean = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1].map((x) => turnGoal({ pointer: x }));
+  for (let i = 1; i < lean.length; i++) {
+    assert.ok(lean[i] > lean[i - 1], 'more, the further out');
+    assert.ok(lean[i] - lean[i - 1] < 0.03, `no jump: ${lean[i] - lean[i - 1]}`);
+  }
+  // (The stop's cursor, 170 px off the middle of a 1280 px screen: well past a degree.)
+  assert.ok(turnGoal({ pointer: 170 / 640 }) > 0.05, `${turnGoal({ pointer: 170 / 640 })}`);
+  assert.equal(turnGoal({ pointer: 4 }), right, 'never past the edge’s');
+  // (A sideways drag turns it further its way, more the further it goes, never past the most.)
+  const w = 1000;
+  const small = turnGoal({ pointer: 0, dx: 50, w });
+  const big = turnGoal({ pointer: 0, dx: 400, w });
+  assert.ok(small > 0 && big > small, `${small} then ${big}`);
+  // (A 300 px drag from the middle of a 1280 px screen, the cursor ending there: 0.2 or so.)
+  const drag = turnGoal({ pointer: 300 / 640, dx: 300, w: 1280 });
+  assert.ok(drag >= 0.18 && drag <= TURN.max + 1e-9, `the stop's drag: ${drag}`);
+  assert.ok(turnGoal({ pointer: 1, dx: 5000, w }) <= TURN.max + 1e-9);
+  assert.ok(turnGoal({ pointer: -1, dx: -5000, w }) >= -TURN.max - 1e-9);
+  assert.ok(turnGoal({ pointer: 1, dx: 5000, w }) > TURN.max - 0.01, 'all the way, dragged far');
+  // (A held arrow: further its way than any lean, and with the cursor its way, about the most.)
+  assert.ok(turnGoal({ key: 1 }) > right, 'ArrowRight');
+  assert.equal(turnGoal({ key: -1 }), -turnGoal({ key: 1 }), 'ArrowLeft');
+  assert.ok(turnGoal({ pointer: 0.5, key: 1 }) >= 0.2, 'ArrowRight, the cursor its way');
+  assert.ok(turnGoal({ pointer: 1, key: 1 }) <= TURN.max + 1e-9);
+  // (A yaw of a flat letter seen face on is only a narrowing: it rolls its top the same way too,
+  // a share of the turn, so the lean reads as one. Clockwise on the screen for a turn right.)
+  assert.ok(turnRoll(0) === 0, 'square on, no roll');
+  assert.ok(turnRoll(half) < 0 && turnRoll(-half) === -turnRoll(half), 'the top toward the cursor');
+  assert.ok(Math.abs(turnRoll(half)) >= 0.04 && Math.abs(turnRoll(TURN.max)) <= 0.15, `${turnRoll(half)}`);
+});
+
+test('the turn eases toward where it heads and springs back once let go; reduced motion keeps it square on', () => {
+  let a = 0;
+  const trace = [];
+  for (let i = 0; i < 60; i++) trace.push((a = turnStep(a, TURN.max, 1 / 60)));
+  assert.ok(trace[0] > 0 && trace[0] < TURN.max / 2, `eased: ${trace[0]} after a frame`);
+  assert.ok(Math.abs(a - TURN.max) < 0.01, `there within a second: ${a}`);
+  for (let i = 0; i < 90; i++) a = turnStep(a, 0, 1 / 60);
+  assert.ok(Math.abs(a) < 0.005, `back square on: ${a}`);
+  assert.equal(turnStep(0.1, 0.12, 1 / 60, true), 0);
 });

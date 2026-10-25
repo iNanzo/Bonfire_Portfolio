@@ -40,6 +40,7 @@ import {
   INVITATION_MORE,
   INVITATION_NO_HIDING,
   INVITATION_OPTIONS_FROM,
+  INVITATION_PREVIEWS,
   INVITATION_RANGES,
   INVITATION_SELECTS,
   INVITATION_STARTERS,
@@ -154,9 +155,9 @@ export const PAGES = [
     id: 'invitation',
     group: 'Toys',
     label: 'Invitation',
-    keys: ['invitation.defaults', 'invitation.speech', 'invitation.lines', 'invitation.intro'],
+    keys: ['invitation.defaults', 'invitation.speech', 'invitation.lines', 'invitation.text', 'invitation.intro'],
     blurb:
-      'NEWT’s toy at /invitation/: the look a first visit gets, how often he talks, what he says, and the intro he plays.',
+      'NEWT’s toy at /invitation/: the look a first visit gets, how often he talks, what he says, its text effects and the intro he plays.',
   },
 ];
 /** Old page addresses that still work (#effects was the one Effects page). */
@@ -877,6 +878,12 @@ export const CARD_META = { ...INVITATION_CARD_META };
  * typed (the invitation intro's box lists, as a box is renamed or its line rewritten).
  */
 export const OPTIONS_FROM = { ...INVITATION_OPTIONS_FROM };
+/**
+ * Text with a live preview under it, drawn as the toy draws it (form.js; the invitation's chat
+ * boxes and lines, their text effects' tags in the draft's colours: previewPalette).
+ */
+export const PREVIEWS = new Set([...INVITATION_PREVIEWS]);
+export { previewPalette } from './invitationSchema.js';
 
 const opts = (list, label = (v) => titleCase(String(v))) => list.map((v) => ({ value: v, label: label(v) }));
 /**

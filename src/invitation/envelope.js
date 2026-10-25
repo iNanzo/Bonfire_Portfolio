@@ -8,7 +8,9 @@
 // (envelopeKey), how it follows a finger with some give while the seal starts to open
 // (dragPose), the live hint while dragging (dragHint), the hint's words for a touch screen or a
 // mouse (hintFor), how it settles in as it arrives, the whole opening as functions of time
-// (pose), the seal shrinking away as it blooms (sealBloom: its petals are petals.js's), and the
+// (pose), the seal shrinking away as it blooms (sealBloom: its petals are petals.js's), the
+// hover's slow pulse (hoverStep, hoverPulse), the letter's turn toward the pointer and with a
+// sideways drag or the arrow keys (turnGoal, turnStep), and the
 // dissolve: where its noisy edge has reached on the letter (dissolveAt, DISSOLVE: the scene's
 // shader runs the same sums) and the specks it sheds there, drifting up and fading
 // (shedParticles, particleAt). Reduced motion: no bob or sway, no bloom (the seal simply fades
@@ -257,6 +259,20 @@ export function envelopeGesture(dx, dy, ms, viewportH) {
 }
 
 /**
+ * What a press on the envelope did once it's let go. It is a tap (open) only if the pointer
+ * never got as far as the tap slop from where it went down; past that, the swipe its last offset
+ * makes, so a drag out and back to its start (turning the letter, or up and down) does nothing.
+ * @param {{dx: number, dy: number, far: number, ms: number}} drag  the last offset across and
+ *   down, CSS px; the farthest it got along either axis, CSS px; how long it took
+ * @param {number} viewportH  the screen's height, CSS px
+ * @returns {'open'|'skip'|'none'}
+ */
+export function releaseGesture({ dx, dy, far, ms }, viewportH) {
+  if (far < SWIPE.tap) return 'open';
+  return envelopeGesture(dx, dy, ms, viewportH);
+}
+
+/**
  * What a key does on the envelope.
  * @param {string} key  KeyboardEvent.key
  * @returns {'open'|'skip'|null}
@@ -322,6 +338,80 @@ export function sealBloom(b) {
   const swell = 1 + 0.12 * Math.sin(Math.PI * Math.min(1, k / 0.3));
   const scale = k >= 1 ? 0 : k < 0.15 ? swell : Math.min(swell, 1.12 * (1 - smooth((k - 0.15) / 0.85)));
   return { scale, spin: 0.5 * easeOut(k) };
+}
+
+/**
+ * The letter's turn, radians: it leans up to `lean` toward the pointer's x, eased out (most of it
+ * by halfway to the edge: about 0.1 there, so it reads at a glance); a sideways drag (by `reach`
+ * of the screen's width, softly) or a held arrow key turns it up to `push` further; never more
+ * than `max` in all; it eases toward that over about `ease` seconds and springs back. (The
+ * paper's tones don't change with its yaw, so the whole range reads as one flat letter turning.)
+ */
+export const TURN = { lean: 0.14, push: 0.16, reach: 0.25, max: 0.24, ease: 0.12, roll: 0.45 };
+
+/**
+ * The roll that goes with a turn (radians about the screen's axis, clockwise for a turn right):
+ * `roll` of it, its top tipping the way it turns. A yaw of a flat letter seen face on only narrows
+ * it a little; with this it reads as leaning toward the cursor.
+ * @param {number} turn
+ */
+export const turnRoll = (turn) => -TURN.roll * turn;
+
+/**
+ * Where the letter's turn heads (radians, its face toward +x for more): toward the pointer
+ * (`pointer`: its x across the screen, −1 at the left edge to 1 at the right; null without one:
+ * on a touch screen, no finger down), plus a sideways drag (`dx` CSS px on a screen `w` wide) or a
+ * held arrow key (`key`: −1 ArrowLeft, 1 ArrowRight, else 0).
+ * @param {{pointer?: number|null, dx?: number, w?: number, key?: number}} o
+ */
+export function turnGoal({ pointer = null, dx = 0, w = 1, key = 0 }) {
+  const x = pointer === null ? 0 : Math.max(-1, Math.min(1, pointer));
+  const lean = TURN.lean * Math.sign(x) * (1 - (1 - Math.abs(x)) ** 2);
+  const push = TURN.push * (Math.tanh(dx / (TURN.reach * Math.max(1, w))) + key);
+  return Math.max(-TURN.max, Math.min(TURN.max, lean + push));
+}
+
+/**
+ * The turn a step on toward `goal`, eased (and back, once there's nothing turning it); reduced
+ * motion keeps it square on.
+ * @param {number} turn
+ * @param {number} goal
+ * @param {number} dt  seconds
+ * @param {boolean} [reduced]
+ */
+export function turnStep(turn, goal, dt, reduced = false) {
+  if (reduced) return 0;
+  return turn + (goal - turn) * (1 - Math.exp(-dt / TURN.ease));
+}
+
+/**
+ * The hover's pulse: one every `period` seconds; the hover eases in over `in` and out over `out`
+ * seconds; with reduced motion it's a steady `still`.
+ */
+export const HOVER_PULSE = { period: 2.8, in: 0.25, out: 0.4, still: 0.5 };
+
+/**
+ * The hover a step on: toward 1 while `on` (the pointer over the letter, keyboard focus, or a
+ * touch screen left alone), toward 0 otherwise.
+ * @param {number} k  0..1
+ * @param {boolean} on
+ * @param {number} dt  seconds
+ */
+export function hoverStep(k, on, dt) {
+  return on ? Math.min(1, k + dt / HOVER_PULSE.in) : Math.max(0, k - dt / HOVER_PULSE.out);
+}
+
+/**
+ * How strong the hover's gold rim and halo show round the letter: the hover (`k`, eased) times a
+ * slow pulse `t` seconds into it, from nothing to full and back to nothing (so between pulses the
+ * letter shows clean); with reduced motion, steady.
+ * @param {number} k
+ * @param {number} t
+ * @param {boolean} [reduced]
+ */
+export function hoverPulse(k, t, reduced = false) {
+  if (reduced) return k * HOVER_PULSE.still;
+  return k * (0.5 - 0.5 * Math.cos((2 * Math.PI * t) / HOVER_PULSE.period));
 }
 
 /**

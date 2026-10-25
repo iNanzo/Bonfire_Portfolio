@@ -926,11 +926,11 @@ test('buttons are disabled while he is held or falling', () => {
   assert.equal(out.buttonsEnabled, true);
 });
 
-test('Give Device: the first press sits him down with the tablet (SitDown, DeviceSit), the second lies him on his stomach with it (LieDown, DeviceLie), each the way he faced (no turn), the third gets him up (GetUp, idle); device and deviceLabel say which', () => {
+test('Screen Time: the first press sits him down with the tablet (SitDown, DeviceSit), the second lies him on his stomach with it (LieDown, DeviceLie), each the way he faced (no turn), the third gets him up (GetUp, idle); device and deviceLabel say which', () => {
   const s = sim({ camera: { x: 0, z: 6 }, yaw: 1.2 });
   let out = s.frame();
   assert.equal(out.device, null);
-  assert.equal(out.deviceLabel, 'Give Device');
+  assert.equal(out.deviceLabel, 'Screen Time');
   const yaw = s.w.body.yaw;
   /** He faces the way he did, and isn't turned. */
   const kept = (o, msg) => {
@@ -982,9 +982,9 @@ test('Give Device: the first press sits him down with the tablet (SitDown, Devic
   assert.equal(out.state, 'getUp');
   assert.equal(out.clip, 'GetUp');
   assert.equal(out.device, null);
-  assert.equal(out.deviceLabel, 'Give Device');
+  assert.equal(out.deviceLabel, 'Screen Time');
   out = s.until((o) => o.state === 'idle', 3);
-  assert.equal(out.deviceLabel, 'Give Device');
+  assert.equal(out.deviceLabel, 'Screen Time');
   // From plain sitting, the press hands him the tablet where he sits.
   const t = sim({ camera: { x: 0, z: 6 } });
   t.button('Sit');
@@ -1592,4 +1592,36 @@ test('the play area shrunk under him (a resize) as he stands: he walks back insi
     assert.ok(dist(clampTo(area.sight, body), body) < 0.1, `calm ${calm}: on screen ${JSON.stringify(body)}`);
     if (calm) assert.equal(states.at(-1), 'idle', 'then he stands');
   }
+});
+
+test('reset puts him back as he started (Replay Intro): idle on his feet, calm, no reaction, no talk; his wander as the visitor left it', () => {
+  const s = sim({ calm: false });
+  // (Wander turned off by the visitor, then stressed, mid-reaction, and in a dialogue.)
+  s.button('Wander');
+  for (let i = 0; i < 4; i++) {
+    s.tap();
+    s.run(0.2);
+  }
+  assert.ok(s.brain.snapshot().stress > 0, 'stressed');
+  s.w.dialogue = box(0, 'Wave', 'happy');
+  s.until((o) => o.state === 'talk', 5);
+  s.brain.reset();
+  s.w.dialogue = null;
+  const out = s.frame();
+  assert.equal(out.state, 'idle');
+  assert.equal(out.clip, 'gait');
+  assert.equal(out.move.speed, 0);
+  assert.equal(out.wander, false, 'his wander as the visitor left it');
+  const snap = s.brain.snapshot();
+  assert.equal(snap.stress, 0);
+  assert.equal(snap.reaction, null);
+  assert.deepEqual(snap.history, []);
+  assert.equal(snap.pending, null);
+  assert.equal(snap.talk, null);
+  assert.ok(Math.abs(snap.since - s.w.t) < 1e-9, 'his clock starts again from now');
+  // (Held when it's pressed: back on his feet all the same.)
+  s.grab();
+  assert.equal(s.w.out.state, 'held');
+  s.brain.reset();
+  assert.equal(s.frame().state, 'idle');
 });

@@ -1,5 +1,5 @@
 // NEWT's brain in the invitation toy: a pure state machine (idle, walk, react, flee, held, fall,
-// land, sitDown, sit, standUp, and Give Device's deviceSit, lieDown, deviceLie, getUp) that owns
+// land, sitDown, sit, standUp, and Screen Time's deviceSit, lieDown, deviceLie, getUp) that owns
 // every timer and every change of state. Each frame it
 // turns gestures and buttons into what he does, keeps his stress (taps, rough handling: a hard
 // shake, fast flings, a drop from high, never a gentle carry; it decays), and says which clip
@@ -11,7 +11,7 @@
 // it, and a glance it cut or that came due meanwhile comes after it), and thrashes every
 // TUNE.thrashMin–thrashMax s (sooner when he's shaken hard): Thrash
 // once, then Held again on its own clock; held, falling and landing he keeps the way he faced
-// when he was grabbed. Give Device (the button 'Device') alternates: sitting down with the
+// when he was grabbed. Screen Time (the button 'Device') alternates: sitting down with the
 // tablet (SitDown, then DeviceSit; from Sit, DeviceSit where he sits), lying on his stomach with
 // it (LieDown, then DeviceLie), getting up (GetUp); any other input gets him up from either first
 // (StandUp from sitting, GetUp from lying), a grab picks him straight up. Standing outside the
@@ -237,7 +237,7 @@ const GAIT_FACE = { idle: 'Idle', walk: 'Walk', flee: 'Run' };
 /** Sitting (Stand gets him up), and lying with the tablet. */
 const SITTING = new Set(['sitDown', 'sit', 'deviceSit']);
 const LYING = new Set(['lieDown', 'deviceLie']);
-/** The states Give Device's tablet goes through (entering any other puts it away). */
+/** The states Screen Time's tablet goes through (entering any other puts it away). */
 const DEVICE_STATES = new Set(['sitDown', 'deviceSit', 'lieDown', 'deviceLie']);
 /** A box's animation as the talk plays it: where its hold leaves him, and the ones that alias another. */
 const TALK_POSE = { Sit: 'sit', DeviceSit: 'sit', DeviceLie: 'lie' };
@@ -252,7 +252,8 @@ const EPS = 1e-9;
 export function createBrain({ seed = 1, calm = false, bounds = null, middle = null, tune = {} } = {}) {
   const T = { ...TUNE, ...tune };
   const rng = createRng(seed);
-  const m = {
+  /** How he starts out (and is put back by reset). */
+  const fresh = () => ({
     started: false,
     t: 0,
     state: 'idle',
@@ -292,7 +293,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     input: null,
     /** @type {TalkState|null} */
     talk: null,
-    /** Give Device under way: the sit down is the tablet's, and lies on down once he's sat. */
+    /** Screen Time under way: the sit down is the tablet's, and lies on down once he's sat. */
     device: false,
     lieAfter: false,
     /** Held: when he thrashes next, and since when he's hung still (grabbed, or his last thrash over). */
@@ -304,7 +305,8 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     lookUpAt: Infinity,
     /** @type {{from: number, until: number}|null} */
     lookUp: null,
-  };
+  });
+  const m = fresh();
 
   // ---- changes of state ---------------------------------------------------------------------
 
@@ -384,7 +386,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     return seated() || lyingDown();
   }
 
-  /** Give Device: sat down with the tablet, then lying with it, then up again (BrainOut.device). */
+  /** Screen Time: sat down with the tablet, then lying with it, then up again (BrainOut.device). */
   function giveDevice() {
     const st = m.state;
     if (st === 'deviceSit') lieDown();
@@ -1009,7 +1011,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     }
   }
 
-  /** Give Device under way: sitting with the tablet (or on his way down with it), or lying with it. */
+  /** Screen Time under way: sitting with the tablet (or on his way down with it), or lying with it. */
   function deviceNow() {
     const st = m.state;
     if (st === 'deviceSit') return 'sit';
@@ -1039,7 +1041,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
       reaction: st === 'react' ? m.reaction : null,
       talkReady: st === 'talk' && m.talk?.phase === 'on',
       device,
-      deviceLabel: device === 'sit' ? 'Lie Down' : device === 'lie' ? 'Get Up' : 'Give Device',
+      deviceLabel: device === 'sit' ? 'Lie Down' : device === 'lie' ? 'Get Up' : 'Screen Time',
     };
   }
 
@@ -1070,6 +1072,14 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
       stressStep(input);
       TIMERS[m.state](m.t - m.since, input.newt);
       return output();
+    },
+    /**
+     * Back as he started (Replay Intro resets the scene): idle on his feet, calm, no reaction,
+     * no talk, his clocks starting again from the next step; his wander stays as the visitor left it.
+     */
+    reset() {
+      const { wander } = m;
+      Object.assign(m, fresh(), { wander });
     },
     /** A plain copy of what the brain is doing (for ?test and the specs). */
     snapshot() {

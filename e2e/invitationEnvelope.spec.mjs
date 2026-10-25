@@ -3,8 +3,8 @@
 // touch). It's the front door and the loading screen: it shows over the toy on a white page
 // under a soft flurry of rose petals, with focus on it but no ring until a key is pressed, and
 // takes every press (a drag on it never turns the camera); the mouse over it or a touch stirs a
-// few petals; a click, Enter or a swipe up opens it (the seal blooms into petals first, and only
-// then the flap lifts with a burst of petals and the letter dissolves as the page behind clears)
+// few petals (the page's petal layer's); a click, Enter or a swipe up opens it (the seal blooms
+// into petals first, and only then the flap lifts with petals pouring out and the letter dissolves as the page behind clears)
 // and the intro starts by itself at its first box with no toolbar button pressed, its first line
 // and his gesture held until the letter no longer hides him; Escape, a
 // swipe down or Skip Intro skips it (a spill of petals; no intro, the toolbar back, focus on
@@ -35,6 +35,8 @@ async function envelopeUp(page, path = PAGE) {
 const envelope = (page) => page.locator('[data-envelope]');
 /** The envelope's own snapshot (its state, pose and petals). */
 const envSnap = (page) => page.evaluate(() => window.__invitation.envelope());
+/** The page's petal layer's snapshot (the cursor's and a finger's petals). */
+const layerSnap = (page) => page.evaluate(() => window.__invitation.petals());
 const skipIntro = (page) => page.locator('[data-intro-skip]:visible');
 /** The intro's script as the page reads it. */
 const script = (page) => page.evaluate(() => window.__invitation.intro());
@@ -162,14 +164,68 @@ test.describe('on a desktop', () => {
     expect(await page.evaluate(() => window.__invitation.clock())).toBe(t0);
   });
 
-  test('a drag across it never turns the camera, and a sideways drag neither opens nor skips it', async ({ page }) => {
+  test('its seal shows at its own size from the first frame, a reload too: no red box', async ({ page }) => {
+    const len = (/** @type {number[]} */ a, k = 0) => Math.hypot(a[k], a[k + 1]);
+    for (const reload of [false, true]) {
+      if (reload) await page.reload();
+      else await page.goto(PAGE);
+      await hooks(page);
+      await expect.poll(async () => Boolean((await envSnap(page))?.seal?.last), { timeout: 30_000 }).toBe(true);
+      const { seal } = await envSnap(page);
+      // (Placed before its first frame was drawn, at about the size it goes on showing: settling in
+      // it's a touch small; the red box was 37 times the size.)
+      expect(seal.first.frame).toBe(1);
+      for (const k of [0, 2]) {
+        const share = len(seal.first.axes, k) / len(seal.last.axes, k);
+        expect(share, `axis ${k / 2}`).toBeGreaterThan(0.85);
+        expect(share, `axis ${k / 2}`).toBeLessThan(1.15);
+      }
+      expect(len(seal.first.axes, 0) / len(seal.first.axes, 2)).toBeGreaterThan(0.8);
+      expect(len(seal.first.axes, 0) / len(seal.first.axes, 2)).toBeLessThan(1.25);
+    }
+  });
+
+  test('the mouse over the letter pulses a gold rim round it, slowly, clean between pulses; off it, it fades', async ({
+    page,
+  }) => {
+    await envelopeUp(page);
+    const hover = async () => (await envSnap(page)).hover;
+    const vp = page.viewportSize();
+    // (Off the letter, though on the page over the toy: no pulse.)
+    await page.mouse.move(8, vp.height - 8);
+    expect((await hover()).k).toBe(0);
+    await page.mouse.move(vp.width / 2, vp.height / 2, { steps: 4 });
+    await expect.poll(async () => (await hover()).k, { message: 'hovered' }).toBe(1);
+    // (Read often: the peak and the trough each last a fraction of the 2.8 s pulse, and slower
+    // reads can step right over them.)
+    const often = { intervals: [40], timeout: 10_000 };
+    await expect
+      .poll(async () => (await hover()).pulse, { ...often, message: 'a pulse at its peak' })
+      .toBeGreaterThan(0.9);
+    await expect
+      .poll(async () => (await hover()).pulse, { ...often, message: 'and back to nothing' })
+      .toBeLessThan(0.05);
+    await page.mouse.move(8, vp.height - 8, { steps: 4 });
+    await expect.poll(async () => (await hover()).pulse, { message: 'gone off the letter' }).toBe(0);
+  });
+
+  test('a drag across it never turns the camera, and a sideways drag turns the letter but neither opens nor skips it', async ({
+    page,
+  }) => {
     await envelopeUp(page);
     const before = (await snapshot(page)).camera;
     const vp = page.viewportSize();
     await page.mouse.move(vp.width * 0.3, vp.height * 0.5);
     await page.mouse.down();
     for (let i = 1; i <= 10; i++) await page.mouse.move(vp.width * 0.3 + i * 40, vp.height * 0.5 + i * 2);
+    // (Dragged right, it turns its face right, further than the cursor alone leans it.)
+    await expect
+      .poll(async () => (await envSnap(page)).turn.now, { message: 'turned by the drag' })
+      .toBeGreaterThan(0.16);
+    expect((await envSnap(page)).turn.now).toBeLessThanOrEqual(0.25);
     await page.mouse.up();
+    // (Let go, it springs back to its lean toward the cursor.)
+    await expect.poll(async () => (await envSnap(page)).turn.now, { message: 'sprung back' }).toBeLessThan(0.07);
     await page.mouse.down({ button: 'right' });
     await page.mouse.move(vp.width * 0.2, vp.height * 0.4, { steps: 6 });
     await page.mouse.up({ button: 'right' });
@@ -179,6 +235,27 @@ test.describe('on a desktop', () => {
     expect(s.camera.yaw).toBe(before.yaw);
     expect(s.camera.distance).toBe(before.distance);
     expect(s.camera.target).toEqual(before.target);
+  });
+
+  test('a drag out and back to where it started neither opens nor skips it, sideways or up', async ({ page }) => {
+    await envelopeUp(page);
+    const vp = page.viewportSize();
+    const cx = vp.width / 2;
+    const cy = vp.height / 2;
+    // (Right 200 px and back, then up 120 px and back to 3 px under the start.)
+    for (const [ax, ay, end] of [
+      [20, 0, 0],
+      [0, -12, 3],
+    ]) {
+      await page.mouse.move(cx, cy);
+      await page.mouse.down();
+      for (let i = 1; i <= 10; i++) await page.mouse.move(cx + i * ax, cy + i * ay);
+      for (let i = 9; i >= 0; i--) await page.mouse.move(cx + i * ax, cy + i * ay + (i ? 0 : end));
+      await page.mouse.up();
+      // (Let go, it springs back; it must still be floating.)
+      await expect.poll(async () => (await envSnap(page)).turn.now, { message: 'sprung back' }).toBeLessThan(0.07);
+      expect((await envSnap(page)).state).toBe('floating');
+    }
   });
 
   test('hovered it says how to open and skip it; a click opens it and the intro starts by itself, its greeting held until the letter clears him', async ({
@@ -208,17 +285,18 @@ test.describe('on a desktop', () => {
     expect((await snapshot(page)).toolbarTalking).toBe(true);
   });
 
-  test('it appears under a flurry of rose petals, and the mouse over it stirs a few more', async ({ page }) => {
+  test('it appears under a flurry of rose petals, and the mouse over it trails a few more', async ({ page }) => {
     await envelopeUp(page);
     expect((await envSnap(page)).petals.emitted.spawn).toBeGreaterThan(0);
     const vp = page.viewportSize();
     await page.mouse.move(vp.width * 0.95, vp.height * 0.95);
     await page.mouse.move(vp.width / 2, vp.height / 2, { steps: 6 });
-    await expect.poll(async () => (await envSnap(page)).petals.emitted.stir, { timeout: 10_000 }).toBeGreaterThan(0);
+    // (The cursor's petals are the page's petal layer's.)
+    await expect.poll(async () => (await layerSnap(page)).emitted.trail, { timeout: 10_000 }).toBeGreaterThan(0);
     expect((await envSnap(page)).state).toBe('floating');
   });
 
-  test('opened, the seal blooms into petals first; only then the flap lifts, with a burst of petals', async ({
+  test('opened, the seal blooms into petals first; only then the flap lifts, petals pouring out of its mouth once it’s half open', async ({
     page,
   }) => {
     await envelopeUp(page);
@@ -236,8 +314,38 @@ test.describe('on a desktop', () => {
       .toBe(true);
     expect(seen[0].petals.emitted.bloom).toBeGreaterThan(0);
     for (const e of seen) if (e.pose.flap > 0) expect(e.pose.bloom).toBe(1);
-    expect(seen.at(-1).petals.emitted.burst).toBeGreaterThan(0);
+    // (The pour waits for the flap to be about half open, then comes out of the mouth in force.)
+    for (const e of seen) if (e.pose.flap < e.flapOpen * 0.45) expect(e.petals.emitted.pour).toBe(0);
+    // The half-second stream can finish during the dissolve: fading starts only about
+    // 0.3 seconds after the flap crosses halfway. Require the complete stream, not a
+    // frame-rate-dependent partial count at the first fading frame.
+    await expect.poll(async () => (await envSnap(page))?.petals.emitted.pour ?? 0).toBe(30);
     await introStarted(page);
+  });
+
+  test('it leans toward the cursor; the arrows across turn it further while they’re held, and it springs back', async ({
+    page,
+  }) => {
+    await envelopeUp(page);
+    const turn = async () => (await envSnap(page)).turn.now;
+    const vp = page.viewportSize();
+    // (Halfway to either edge: a clear lean, 0.08 rad or more.)
+    await page.mouse.move(vp.width * 0.75, vp.height / 2, { steps: 3 });
+    await expect.poll(turn, { message: 'toward the cursor on the right' }).toBeGreaterThan(0.08);
+    await page.mouse.move(vp.width * 0.25, vp.height / 2, { steps: 3 });
+    await expect.poll(turn, { message: 'toward the cursor on the left' }).toBeLessThan(-0.08);
+    await page.mouse.move(vp.width / 2, vp.height / 2, { steps: 3 });
+    await expect.poll(async () => Math.abs(await turn()), { message: 'square on in the middle' }).toBeLessThan(0.01);
+    await page.keyboard.down('ArrowRight');
+    await expect.poll(turn, { message: 'ArrowRight held' }).toBeGreaterThan(0.14);
+    await page.keyboard.up('ArrowRight');
+    await expect.poll(async () => Math.abs(await turn()), { message: 'sprung back' }).toBeLessThan(0.01);
+    await page.keyboard.down('ArrowLeft');
+    await expect.poll(turn, { message: 'ArrowLeft held' }).toBeLessThan(-0.14);
+    await page.keyboard.up('ArrowLeft');
+    const s = await snapshot(page);
+    expect(s.envelope).toBe('floating');
+    expect(s.dialogue).toBeNull();
   });
 
   test('focused at boot it shows no ring; once Tab is pressed, the ring follows focus', async ({ page }) => {
@@ -282,6 +390,100 @@ test.describe('on a desktop', () => {
     await envelopeUp(page);
     await page.keyboard.press('ArrowUp');
     await introStarted(page);
+  });
+
+  test('Replay Intro resets the scene and brings the envelope back; opened, the intro starts as at boot', async ({
+    page,
+  }) => {
+    await envelopeUp(page);
+    const home = (await snapshot(page)).camera;
+    await page.keyboard.press('Escape');
+    await skipped(page);
+    // The scene moved on: NEWT sat down and the camera turned.
+    await page.evaluate(() => window.__invitation.press('Sit'));
+    await until(page, (s) => s.state === 'sit' || s.state === 'sitDown', 'sitting');
+    const vp = page.viewportSize();
+    await page.mouse.move(vp.width * 0.3, vp.height * 0.3);
+    await page.mouse.down({ button: 'right' });
+    await page.mouse.move(vp.width * 0.6, vp.height * 0.35, { steps: 6 });
+    await page.mouse.up({ button: 'right' });
+    await expect.poll(async () => (await snapshot(page)).camera.yaw, { message: 'turned' }).not.toBe(home.yaw);
+    await page.locator('.inv-btn-intro').click();
+    // The envelope again over a scene as it started: NEWT idle on his feet, the camera home.
+    await until(page, (s) => s.envelope === 'floating', 'the envelope back');
+    await expect(page.locator('.inv-envelope')).toBeVisible();
+    await expect(page.locator('.inv-hud')).toHaveAttribute('inert', '');
+    await expect(envelope(page)).toBeFocused();
+    const s = await snapshot(page);
+    expect(s.state).toBe('idle');
+    expect(s.held).toBe(false);
+    expect(s.dialogue).toBeNull();
+    expect(s.camera.yaw).toBeCloseTo(home.yaw, 6);
+    expect(s.camera.distance).toBeCloseTo(home.distance, 6);
+    await expect(page.locator('.inv-bubble')).toBeHidden();
+    // (Paused behind it, as at boot.)
+    const t0 = await page.evaluate(() => window.__invitation.clock());
+    const f0 = (await envSnap(page)).frames;
+    await expect.poll(async () => (await envSnap(page)).frames, { timeout: 10_000 }).toBeGreaterThan(f0 + 5);
+    expect(await page.evaluate(() => window.__invitation.clock())).toBe(t0);
+    // Opened, the intro starts by itself at its first box.
+    await page.keyboard.press('Enter');
+    await introStarted(page);
+  });
+
+  test('Replay Intro when no envelope can be made still plays the intro, over the reset scene', async ({ page }) => {
+    await envelopeUp(page);
+    await page.keyboard.press('Escape');
+    await skipped(page);
+    // (From now on a new canvas gets no WebGL: the envelope's renderer is refused, so there is none.)
+    await page.evaluate(() => {
+      const had = new Set(document.querySelectorAll('canvas'));
+      const get = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (type, ...rest) {
+        if (/webgl/.test(String(type)) && !had.has(this)) return null;
+        return get.call(this, type, ...rest);
+      };
+    });
+    const intro = await script(page);
+    await page.locator('.inv-btn-intro').click();
+    await until(page, (s) => s.dialogue?.id === intro.start, 'the intro at its first box');
+    const s = await snapshot(page);
+    expect(s.envelope).toBeNull();
+    await expect(page.locator('.inv-envelope')).toHaveCount(0);
+    await expect(page.locator('.inv-hud')).not.toHaveAttribute('inert', '');
+    await expect(page.locator('.inv-talk-box')).toBeVisible();
+  });
+
+  test('Replay Intro’s envelope brings its petals back, and none with Rose Petals off', async ({ page }) => {
+    const replayed = async () => {
+      await page.locator('.inv-btn-intro').click();
+      await until(page, (s) => s.envelope === 'floating', 'the envelope back');
+      // (Long enough for the flurry, on its first frame, and the swirl filling in.)
+      const f0 = (await envSnap(page)).frames;
+      await expect.poll(async () => (await envSnap(page)).frames, { timeout: 15_000 }).toBeGreaterThan(f0 + 60);
+      return (await envSnap(page)).petals;
+    };
+    await envelopeUp(page);
+    await page.keyboard.press('Escape');
+    await skipped(page);
+    const on = await replayed();
+    expect(on.emitted.spawn).toBeGreaterThan(0);
+    expect(on.emitted.swirl).toBeGreaterThan(0);
+    expect(on.live).toBeGreaterThan(0);
+    await page.keyboard.press('Escape');
+    await skipped(page);
+    // Rose Petals off in Settings: the next envelope has none at all.
+    await page.getByRole('button', { name: 'Settings' }).click();
+    const sw = page.getByRole('switch', { name: 'Rose Petals' });
+    await expect(sw).toBeChecked();
+    await sw.scrollIntoViewIfNeeded();
+    await sw.click();
+    await expect(sw).not.toBeChecked();
+    await page.keyboard.press('Escape');
+    await expect(sw).toBeHidden();
+    const off = await replayed();
+    expect(off.live).toBe(0);
+    expect(Object.values(off.emitted).reduce((a, b) => a + b, 0)).toBe(0);
   });
 
   test('Skip Intro on it skips it', async ({ page }) => {
@@ -369,17 +571,40 @@ test.describe('on a phone', () => {
     await noRing(page);
   });
 
-  test('a touch that slides across stirs the petals where it lands, and leaves it floating', async ({ page }) => {
+  test('a touch that slides across sheds petals where it goes and turns the letter its way, and leaves it floating', async ({
+    page,
+  }) => {
     await envelopeUp(page);
+    const turn = async () => (await envSnap(page)).turn.now;
+    expect(await turn()).toBe(0);
     const touch = await toucher(page);
     const vp = page.viewportSize();
     const at = { x: vp.width * 0.4, y: vp.height * 0.5 };
     await touch('touchStart', [at]);
-    for (let i = 1; i <= 4; i++) await touch('touchMove', [{ x: at.x + i * 20, y: at.y }]);
+    for (let i = 1; i <= 8; i++) await touch('touchMove', [{ x: at.x + i * 20, y: at.y }]);
+    await expect.poll(turn, { message: 'turned toward the finger' }).toBeGreaterThan(0.12);
     await touch('touchEnd', []);
-    const e = await envSnap(page);
-    expect(e.petals.emitted.stir).toBeGreaterThan(0);
+    const e = await layerSnap(page);
+    expect(e.emitted.ring + e.emitted.trail).toBeGreaterThan(0);
+    // (The finger lifted: nothing to lean toward; it springs back square on.)
+    await expect.poll(async () => Math.abs(await turn()), { message: 'sprung back' }).toBeLessThan(0.01);
     await until(page, (s) => s.envelope === 'floating', 'still floating');
+  });
+
+  test('a finger that slides across and back to where it started leaves it floating', async ({ page }) => {
+    await envelopeUp(page);
+    const touch = await toucher(page);
+    const vp = page.viewportSize();
+    const at = { x: vp.width / 2, y: vp.height / 2 };
+    await touch('touchStart', [at]);
+    for (let i = 1; i <= 8; i++) await touch('touchMove', [{ x: at.x + i * 15, y: at.y }]);
+    for (let i = 7; i >= 0; i--) await touch('touchMove', [{ x: at.x + i * 15, y: at.y }]);
+    await touch('touchEnd', []);
+    // (The finger lifted, it springs back square on; it must still be floating.)
+    await expect
+      .poll(async () => Math.abs((await envSnap(page)).turn.now), { message: 'sprung back' })
+      .toBeLessThan(0.01);
+    expect((await envSnap(page)).state).toBe('floating');
   });
 
   test('a short drag springs back and leaves it floating; left alone, the hint shows', async ({ page }) => {
