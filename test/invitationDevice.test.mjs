@@ -1,4 +1,4 @@
-// The tablet Give Device hands NEWT (src/invitation/device.js, placed by character.js), three.js
+// The tablet Screen Time hands NEWT (src/invitation/device.js, placed by character.js), three.js
 // in Node: a 1.6 × 1.2 × 0.08 model-unit pad (4:3, about his torso's width) in a cream bezel with
 // an unlit screen showing a 16×12 pixel game (nearest-filtered, so it stays pixels; it moves on
 // with the toy's clock and comes round the same), every part marked as his so the retro pass

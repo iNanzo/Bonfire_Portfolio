@@ -71,7 +71,7 @@ export const ICONS = {
   // Stand (Sit's label while he sits): the arrow up off it.
   stand:
     'M208.49,143.51a12,12,0,0,1-17,17L140,109V224a12,12,0,0,1-24,0V109L64.49,160.49a12,12,0,0,1-17-17l72-72a12,12,0,0,1,17,0ZM216,28H40a12,12,0,0,0,0,24H216a12,12,0,0,0,0-24Z',
-  // Give Device: a phone.
+  // Screen Time: a phone.
   device:
     'M176,12H80A28,28,0,0,0,52,40V216a28,28,0,0,0,28,28h96a28,28,0,0,0,28-28V40A28,28,0,0,0,176,12ZM76,76H180V180H76Zm4-40h96a4,4,0,0,1,4,4V52H76V40A4,4,0,0,1,80,36Zm96,184H80a4,4,0,0,1-4-4V204H180v12A4,4,0,0,1,176,220Z',
   // Lie Down (while he sits with the device): a fat arrow down.
@@ -119,7 +119,7 @@ export const LABEL_ICONS = {
   Wave: 'wave',
   Sit: 'sit',
   Stand: 'stand',
-  'Give Device': 'device',
+  'Screen Time': 'device',
   'Lie Down': 'lieDown',
   'Get Up': 'getUp',
   Run: 'run',

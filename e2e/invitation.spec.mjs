@@ -10,7 +10,7 @@
 // (a fifth of a desktop's), and running off to the rim never takes him off a phone's screen.
 // Playing with him: a tap makes him wave or start, a touch
 // drag holds him by the collar and letting go drops him (fall, then land), a finger on the floor
-// turns his head, each button plays its clip (Replay Intro, Wave, Sit, Give Device, Run, Camera
+// turns his head, each button plays its clip (Replay Intro, Wave, Sit, Screen Time, Run, Camera
 // and Settings: Phosphor icons beside their labels, a label shown on hover or focus with a mouse, on
 // a press held still on touch), a floor tap walks him there, and the cursor turns his
 // head on a desktop (down toward a cursor below him, up at one high over him, well round toward one
@@ -348,7 +348,7 @@ test.describe('on a phone', () => {
       ['Replay Intro', '[data-intro]'],
       ['Wave', '[data-button="Wave"]'],
       ['Sit', '[data-button="Sit"]'],
-      ['Give Device', '[data-button="Device"]'],
+      ['Screen Time', '[data-button="Device"]'],
       ['Run', '[data-button="Run"]'],
       ['Camera', '[data-camera-open]'],
       ['Settings', '[data-look-open]'],
@@ -834,8 +834,8 @@ test.describe('on a phone', () => {
     await expect(sit).toHaveText('Sit');
     await until(page, (s) => s.state === 'idle', 'up');
     await press('Device');
-    await until(page, (s) => s.button === 'Device', 'Give Device goes to the brain as Device');
-    await expect(page.locator('[data-button="Device"]')).toHaveText(/^(Give Device|Lie Down|Get Up)$/);
+    await until(page, (s) => s.button === 'Device', 'Screen Time goes to the brain as Device');
+    await expect(page.locator('[data-button="Device"]')).toHaveText(/^(Screen Time|Lie Down|Get Up)$/);
     await press('Run');
     await until(page, (s) => s.state === 'flee' && s.clip === 'Run', 'running', 30_000);
     // Wander is a setting now: a switch in Settings, kept for the next visit.
@@ -1648,7 +1648,7 @@ test.describe('on a desktop', () => {
       'Replay Intro true',
       'Wave true',
       'Sit true',
-      'Give Device true',
+      'Screen Time true',
       'Run true',
       'Camera true',
       'Settings false',
@@ -1684,7 +1684,7 @@ test.describe('on a desktop', () => {
     await page.keyboard.press('Escape');
     await expect(look).toBeFocused();
     expect(await toolbarInert(), 'the toolbar back in reach').toEqual(
-      ['Replay Intro', 'Wave', 'Sit', 'Give Device', 'Run', 'Camera', 'Settings'].map((name) => `${name} false`),
+      ['Replay Intro', 'Wave', 'Sit', 'Screen Time', 'Run', 'Camera', 'Settings'].map((name) => `${name} false`),
     );
   });
 

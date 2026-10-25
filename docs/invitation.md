@@ -139,7 +139,7 @@ loads behind it.
   shows, he wanders where you can see him and runs off within what was on screen.
 - **Leave him alone** for about 20 seconds and he sits down where he is, facing the way he was
   (the Sit button too: no turn to the camera).
-- **The toolbar:** Replay Intro (below), Wave, Sit (Stand once he's sitting), Give Device (Lie
+- **The toolbar:** Replay Intro (below), Wave, Sit (Stand once he's sitting), Screen Time (Lie
   Down while he sits with the tablet, Get Up while he lies), Run (he runs off for a few seconds,
   across the screen to one side or the other, or away from the cursor), Camera (the pad above)
   and Settings. Each is a rounded square with a Phosphor icon (bold weight: an envelope, a
@@ -151,7 +151,7 @@ loads behind it.
   Settings. The action buttons rest while he's being held or falling.
 - **The cursor** is pixel art too: an open hand over NEWT, a closed hand while you hold him or
   slide the view, a turning arrow while you turn it, and a pointing hand on the buttons.
-- **Give Device** hands him a tablet with a tiny pixel game on it. Each press does the next
+- **Screen Time** hands him a tablet with a tiny pixel game on it. Each press does the next
   thing: he sits down with it in both hands, playing (the button then says Lie Down); he lies
   down on his stomach with it, feet kicking behind him (the button says Get Up); he gets up and
   puts it away. He keeps the way he was facing throughout: no turn to the camera. Anything else you do (a tap, the floor, another button) gets him up
@@ -225,7 +225,7 @@ Now and then NEWT says something in a speech bubble over his head, in the page's
 | Running | he runs off; he's caught mid-run |
 | Carried | he's picked up, shaken, thrashes, dropped; he lands |
 | Moving | he walks to a floor tap; he wanders off by himself |
-| Sitting | he sits down by himself (not with Sit); he's still sitting after a quiet spell; he stands up (or gets up from lying); Give Device sits him down with the tablet; he lies down with it |
+| Sitting | he sits down by himself (not with Sit); he's still sitting after a quiet spell; he stands up (or gets up from lying); Screen Time sits him down with the tablet; he lies down with it |
 | Passive | standing about, after a quiet spell of 20 to 40 seconds |
 | Camera | the camera is spun round more than a turn in a few seconds; it's zoomed in very close |
 
@@ -314,7 +314,7 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     chain and cross aren't drawn (`uOn` 0: the vertex shader puts them outside the view), each anchor
     snapped to a texel's centre after his head's texel snap (`spriteShift` keeps them on whole
     texels), marked as his trim (retro.js `ID.trim`: drawn as he is, no outline round it), each
-    chain swinging on the same spring about straight down; and Give Device's tablet, `device.js`: 1.6 × 1.2 × 0.08 model units, a cream
+    chain swinging on the same spring about straight down; and Screen Time's tablet, `device.js`: 1.6 × 1.2 × 0.08 model units, a cream
     bezel and an unlit 16×12 game, nearest-filtered, placed at his palms from clips.js `DEVICE`,
     shown while DeviceSit, LieDown and DeviceLie weigh half or more (in his hands as he lies
     down) until StandUp or GetUp has any weight (put away as he starts to get up); `accessories`
@@ -558,7 +558,7 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     `thrashMin`–`thrashMax` s (3–7; within `thrashShaken` of a hard shake, never before he's
     hung `thrashRest`, 1.5 s), then Held again on its own clock. Held, falling and landing he
     keeps the yaw he had when grabbed (`move` 'stay'; `play.js` `bodyStep` never turns him
-    off the ground), and carries on from there. Give Device (`ButtonName` 'Device') goes sitDown →
+    off the ground), and carries on from there. Screen Time (`ButtonName` 'Device') goes sitDown →
     deviceSit, lieDown → deviceLie, getUp, each the way he faced (`move` 'stay', as a sit); `BrainOut.device` and `deviceLabel` say which, for the toolbar. The Run button with no pointer runs him from a spot beside him square to the
     camera (`TUNE.runFromGap`), across the view. `floor.js` `fitShadow(…, at)` moves the
     shadow camera to wherever he is, by whole shadow texels.
@@ -773,14 +773,14 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   grabbed by shows, client px), `say(text)` (a line in his bubble now, as talk would show it),
   `play(clip)` (Walk and Run step in place at their own pace), `face(name)` (holds any of
   `FACE_NAMES` on him, no blinks; null gives his face back to the brain) and `press(name)` (a
-  toolbar button's press as the brain gets it, Give Device's `Device` too). The snapshot's
+  toolbar button's press as the brain gets it, Screen Time's `Device` too). The snapshot's
   `motion` has the carry (`collar` on screen, `heldFor`, the `anchor`, the drag `plane`'s
   normal, `pushed` at the edge), `drag` the hold's (its own height `controls`, `aim`: where it aims his collar, client px, the `pointer`, the `gap` between them,
   CSS px, `holdY`, the `anchor` and its `depth` along the camera's level axis, away positive,
   the `blob` as set, his `hips`' floor point and `lowestFoot`, the `ring` and the drop `line`,
   `groundCues` as it plays and `pushed`); `view({yaw, elevation, zoom})` eases the camera there
   (radians; zoom the home distance over the distance); the limp layer (`limp.weight`, `limp.most`: the most a limb
-  has swung, radians) and Give Device (`device.state` and `label`, the tablet `shown` and its
+  has swung, radians) and Screen Time (`device.state` and `label`, the tablet `shown` and its
   `screen` point, his `turn` off the camera). The snapshot's `camera` has
   the point it looks at on the floor (`target`) and whether a pan holds it (`panned`), `area` is
   the play area (a disc: `r`), `sight` what's on screen (camera.js `orbitSight`), and `talk` is

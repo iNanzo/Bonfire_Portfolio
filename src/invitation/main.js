@@ -573,7 +573,7 @@ function start(s) {
   /** The toolbar as last set, so the DOM is only touched on a change. */
   const shown = {
     sit: 'Sit',
-    device: /** @type {string} */ ('Give Device'),
+    device: /** @type {string} */ ('Screen Time'),
     wander: /** @type {boolean|null} */ (null),
     enabled: true,
     cursor: 'arrow',
@@ -1453,7 +1453,7 @@ function start(s) {
   }
 
   /**
-   * The toolbar, only on a change: the Sit/Stand label, Give Device's (what its next press does:
+   * The toolbar, only on a change: the Sit/Stand label, Screen Time's (what its next press does:
    * the brain's deviceLabel, ui.js deviceLabelOf), Wander's switch, the buttons resting.
    * @param {import('./types.js').BrainOut} o
    */
@@ -1673,7 +1673,7 @@ function start(s) {
     return { x: r.left + ((at.x + 1) / 2) * r.width, y: r.top + ((1 - at.y) / 2) * r.height };
   }
 
-  /** The carry, the limp layer and Give Device, for ?test (snapshot().motion). */
+  /** The carry, the limp layer and Screen Time, for ?test (snapshot().motion). */
   function motionSnapshot() {
     const c = character;
     const carry = body.mode === 'held' ? body.carry : null;
@@ -1690,7 +1690,7 @@ function start(s) {
       limp: { weight: c?.limpWeight ?? 0, most: c ? Math.max(0, ...Object.values(c.limpAngles())) : 0 },
       device: {
         state: out?.device ?? null,
-        label: out?.deviceLabel ?? 'Give Device',
+        label: out?.deviceLabel ?? 'Screen Time',
         shown: tabletShown,
         turn: Math.abs(Math.atan2(Math.sin(off), Math.cos(off))),
         screen: c && tabletShown ? onScreen(c.tablet.getWorldPosition(new Vector3())) : null,
@@ -1882,7 +1882,7 @@ function start(s) {
         testIntro = value == null ? null : introFrom(value);
       },
       /**
-       * A toolbar button's press, as the brain gets it (Give Device's before the toolbar has one).
+       * A toolbar button's press, as the brain gets it (Screen Time's before the toolbar has one).
        * @param {import('./types.js').ButtonName} name
        */
       press(name) {

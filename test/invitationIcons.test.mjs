@@ -47,7 +47,7 @@ const LABELS = [
   'Wave',
   'Sit',
   'Stand',
-  'Give Device',
+  'Screen Time',
   'Lie Down',
   'Get Up',
   'Run',
@@ -89,7 +89,7 @@ test('the icons are the agreed Phosphor bold ones, and the module carries Phosph
     Wave: 'hand-waving',
     Sit: 'arrow-line-down',
     Stand: 'arrow-line-up',
-    'Give Device': 'device-mobile',
+    'Screen Time': 'device-mobile',
     'Lie Down': 'arrow-fat-line-down',
     'Get Up': 'arrow-fat-line-up',
     Run: 'sneaker-move',
@@ -117,6 +117,7 @@ test('every label the toolbar and the camera pad show has its own icon, no two a
     const name = LABEL_ICONS[label];
     assert.ok(name && ICONS[name], `${label}: an icon`);
   }
+  assert.equal(LABEL_ICONS['Give Device'], undefined, 'Screen Time, its label since round 17');
   const used = LABELS.map((label) => LABEL_ICONS[label]);
   assert.equal(new Set(used).size, used.length, 'one icon a label');
   const masks = new Map(await Promise.all(NAMES.map(async (n) => /** @type {const} */ ([n, await mask(n)]))));
