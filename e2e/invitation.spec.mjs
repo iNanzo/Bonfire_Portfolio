@@ -772,10 +772,11 @@ test.describe('on a phone', () => {
       [-1, (s) => s.headYaw < -0.15],
       [1, (s) => s.headYaw > 0.15],
     ]) {
-      const t0 = Date.now();
       await touch('touchStart', [{ x: body.x + side * 140, y: body.y + 40 }]);
       await until(page, ok, `his head turned ${side < 0 ? 'left' : 'right'}`);
-      await sleep(Math.max(0, 650 - (Date.now() - t0))); // (a press held this long is no floor tap)
+      // (A press held this long is no floor tap: 650 ms of the page's own clock from once it's
+      // seen the press, as a slow software-rendered frame can hold its handler back.)
+      await framesFor(page, 650);
       await touch('touchEnd');
     }
     expect((await snapshot(page)).state).toBe('idle');
