@@ -49,8 +49,9 @@ loading screen too: NEWT loads behind it.
   when you let go. It never turns more than about 14°.
 - **Open it:** tap or click it, press Enter, Space or the up arrow, swipe it up, or scroll up.
   The seal blooms into roses first (about half a second): it swells, then shrinks away while a
-  ring of petals unfurls out of it and lifts off, and the swirl is flung outward. Only then does
-  the flap lift, petals pouring up out of the envelope's inside, and the letter dissolves the way a weapon does on the Bonfire site:
+  ring of petals unfurls out of it and drifts up and off to either side, fading soon, and the
+  swirl is flung outward. Only then does the flap lift; as it passes half open, a stream of
+  petals rises out of the pocket's mouth (the bloom has cleared it by then), and the letter dissolves the way a weapon does on the Bonfire site:
   a ragged, burning edge sweeps up across it, shedding specks of paper, embers and wax that
   drift up and fade, while the white page behind clears onto NEWT, already turned to you, and
   the intro starts by itself (below): its first line, his face and his greeting wait until the
@@ -753,7 +754,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   second agree) on its own clock: each petal's position and velocity, its drag easing it into
   the air (a light wind with gusts, its `fall`, its own `valueNoise`), its flutter, rock and
   tumble added as drawn (`petalAt(petal, t)`, a bloom's and a ring's unfurling first). `emit(kind,
-  at, o)` launches the `FLOWS`: spawn, bloom (at the seal), ring (10–14 at even angles with a
+  at, o)` launches the `FLOWS`: spawn, bloom (at the seal: out round it, then drifting up and off
+  to its side and gone within 1.4 s, so the mouth is clear by the time the flap is half open), ring (10–14 at even angles with a
   little jitter, out with drag, about a second), trail (`o.v` the pointer's velocity: 0.2–0.4 of
   it, at most `TRAIL.maxLaunch`, with a sideways spread; a still finger's a soft puff), wake and
   spill. `letter(frame)` each frame (`LetterFrame`: its middle, axes, height, `opening` and
@@ -763,11 +765,12 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   spinning 0.5–0.6 rad/s and climbing 0.04–0.06 a second (the slow end), 24 petals filling in
   after 0.5 s, each strand's in a close run (`gap`) a whole turn up from the last, every fourth
   falling in from 1.5–2.1 times out, each pulled to its slot, drawn small at the ends)
-  while it floats, flung outward once it doesn't; the pour (16 born across its inside below the
-  mouth, just in front of the inside's face and behind the pocket's (`LETTER_DEPTHS`, the envelope's
+  while it floats, flung outward once it doesn't; the pour (`FLOWS.pour`: 26 over 0.5 s from
+  when the flap is half open, each born 0.015–0.05 under the mouth's V at its x (`LETTER_MOUTH`,
+  the envelope's), just in front of the inside's face and behind the pocket's (`LETTER_DEPTHS`, the envelope's
   envelopeLook.js `DEPTH`, which the frame can carry as `inside` and `pocket`), launched up its
-  axis and only gently forward so the pocket hides each till it has risen out of the mouth, in
-  step with the flap); and
+  axis at 0.95–1.35 a second and only gently forward, so the pocket hides each only for its first
+  moment and it stands a fifth of the letter or more over the mouth within half a second); and
   the wake (`WAKE`: the edge moving fastest away from its outward side sheds petals at a rate
   tied to its speed, drifting its way). `cut` (a skip), `at`, `live`; at most `POOL` (120; the
   oldest free petal goes first, the swirl kept), none with reduced motion. `createTrail` is the

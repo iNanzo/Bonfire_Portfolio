@@ -7,8 +7,8 @@
 // (FLOWS): a soft flurry as the letter appears; a slow helix swirl round it while it floats (a
 // few strands on an ellipse round the letter, climbing, every fourth spiralling in from further
 // out, each petal pulled to its slot, the back half behind the letter), flung outward as it
-// opens; a pour up out of its inside as the flap lifts; the seal blooming into a ring of petals
-// that unfurl and lift; a burst ring at a click; a cursor trail (createTrail spaces it, caps its
+// opens; a pour rising out of its pocket's mouth once the flap is half open; the seal blooming
+// into a ring of petals that unfurl and drift up and aside, clear of the mouth; a burst ring at a click; a cursor trail (createTrail spaces it, caps its
 // rate and keeps a held finger going); petals off the letter's trailing edge as it moves (the
 // wake); a spill down on a skip. Never more than POOL at once (the oldest go first, the swirl
 // kept), and none at all with reduced motion. Units: letter widths, x right, y up, z toward the
@@ -33,12 +33,20 @@ export const STEP = 1 / 60;
  * DEPTH): where the pour starts, behind the pocket, when its LetterFrame doesn't say.
  */
 export const LETTER_DEPTHS = { inside: 0.0095, pocket: 0.0325 };
+/**
+ * How deep the pocket's mouth is, a share of the letter's height under its top (envelopeLook.js
+ * SHAPE.mouth): its V's foot, in the middle; the pour starts just under it.
+ */
+export const LETTER_MOUTH = 0.25;
 
-/** How many each flow launches (a ring rolls its count; a trail step comes in 1–3). */
+/**
+ * How many each flow launches (a ring rolls its count; a trail step comes in 1–3). The pour starts
+ * once the flap is `from` open and comes over `over` seconds.
+ */
 export const FLOWS = {
   spawn: { n: 14 },
   swirl: { n: 24 },
-  pour: { n: 16 },
+  pour: { n: 26, from: 0.5, over: 0.5 },
   ring: { n: [10, 14] },
   trail: { n: [1, 3] },
   wake: { n: 1 },
@@ -238,6 +246,18 @@ export function valueNoise(x) {
  * @property {number} cutFor  how long it takes to go once it's cut, seconds
  */
 
+/**
+ * Which way a bloom's petal at angle `a` round the seal drifts off it: its own side (the `i`th of
+ * those straight up or down, alternately).
+ * @param {number} a
+ * @param {number} i
+ */
+const sideOf = (a, i) => {
+  const c = Math.cos(a);
+  if (Math.abs(c) > 0.2) return Math.sign(c);
+  return i % 2 ? 1 : -1;
+};
+
 /** A shared clamp and ease. */
 const clamp01 = (/** @type {number} */ v) => Math.min(1, Math.max(0, v));
 const easeOut = (/** @type {number} */ v) => 1 - (1 - clamp01(v)) ** 3;
@@ -365,6 +385,9 @@ export function createPetalFlow({ seed = 7, reduced = false } = {}) {
   let prev = null;
   let prevAt = 0;
   let wakeDue = 0;
+  /** When the pour started (the flap past FLOWS.pour.from), null before. */
+  /** @type {number|null} */
+  let pourAt = null;
   /** The swirl: its spin and how fast, since when it floats, when the next one comes, how many made. */
   let spin = 0;
   const spinRate = r(SWIRL.spin[0], SWIRL.spin[1]);
@@ -500,18 +523,22 @@ export function createPetalFlow({ seed = 7, reduced = false } = {}) {
       const a = ((i + r(-0.2, 0.2)) / n) * Math.PI * 2 + (bloom ? 0 : ringBase);
       const rr = bloom ? (o.radius ?? 0.09) * 0.35 : 0.02;
       const v = bloom ? 0.3 : r(0.7, 0.95);
+      // (A bloom's drift up and off to its side, so the mouth above the seal is clear by the time
+      // the flap is half open and the pour comes out of it; the ones straight up or down alternate.)
+      const side = sideOf(a, i);
       return make(
         kind,
         t,
         { x: at.x + Math.cos(a) * rr, y: at.y + Math.sin(a) * rr, z: at.z + r(0, 0.02) },
         {
-          vx: Math.cos(a) * v,
+          vx: Math.cos(a) * v + (bloom ? side * r(0.55, 0.7) : 0),
           vy: Math.sin(a) * v,
           vz: bloom ? r(0.15, 0.3) : r(0.05, 0.15),
           drag: bloom ? 2.5 : 3.5,
           fall: bloom ? -r(0.2, 0.3) : r(0.05, 0.12),
+          ...(bloom ? { drift: side * r(0.35, 0.45) } : {}),
           noise: r(0.02, 0.035),
-          life: bloom ? r(1.4, 1.8) : r(0.85, 1.15),
+          life: bloom ? r(1.1, 1.4) : r(0.85, 1.15),
           ...(bloom ? { size: r(BLOOM_SIZE[0], BLOOM_SIZE[1]) } : {}),
           // (Its tip points out from the middle, folded up toward the camera: the bud.)
           yaw: a - Math.PI / 2,
@@ -669,11 +696,12 @@ export function createPetalFlow({ seed = 7, reduced = false } = {}) {
    */
   function pourOne(F) {
     const a = r(-0.42, 0.42);
-    const down = r(0.02, 0.06 + (0.42 - Math.abs(a)) * 0.5 * F.h);
+    // (Just under the mouth's V at its x, so the pocket hides only its first moment.)
+    const mouth = F.h / 2 - LETTER_MOUTH * F.h * (1 - Math.abs(a) / 0.5);
     const inside = F.inside ?? LETTER_DEPTHS.inside;
     const pocket = F.pocket ?? LETTER_DEPTHS.pocket;
-    const at = local(F, a, F.h / 2 - down, inside + (pocket - inside) * r(0.05, 0.15));
-    const up = r(0.55, 0.95);
+    const at = local(F, a, mouth - r(0.015, 0.05), inside + (pocket - inside) * r(0.05, 0.15));
+    const up = r(0.95, 1.35);
     const out = r(0.06, 0.12);
     const side = a * r(0.4, 0.9);
     add(
@@ -811,8 +839,9 @@ export function createPetalFlow({ seed = 7, reduced = false } = {}) {
       if (reduced) return;
       if (L?.floating && !F?.floating) fling(F ?? L);
       if (F && prev && t > prevAt && t - prevAt < 0.25) wake(F, prev, t - prevAt);
-      if (F && F.opening > 0) {
-        const due = Math.round(FLOWS.pour.n * Math.min(1, F.opening / 0.85));
+      if (F && F.opening >= FLOWS.pour.from) {
+        pourAt ??= t;
+        const due = Math.min(FLOWS.pour.n, 1 + Math.floor(((t - pourAt) / FLOWS.pour.over) * FLOWS.pour.n));
         while (emitted.pour < due) pourOne(F);
       }
       L = F && { ...F, c: { ...F.c }, right: { ...F.right }, up: { ...F.up }, fwd: { ...F.fwd } };

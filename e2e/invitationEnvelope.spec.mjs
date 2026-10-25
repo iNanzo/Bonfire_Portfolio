@@ -296,7 +296,7 @@ test.describe('on a desktop', () => {
     expect((await envSnap(page)).state).toBe('floating');
   });
 
-  test('opened, the seal blooms into petals first; only then the flap lifts, petals pouring out of it', async ({
+  test('opened, the seal blooms into petals first; only then the flap lifts, petals pouring out of its mouth once it’s half open', async ({
     page,
   }) => {
     await envelopeUp(page);
@@ -314,7 +314,9 @@ test.describe('on a desktop', () => {
       .toBe(true);
     expect(seen[0].petals.emitted.bloom).toBeGreaterThan(0);
     for (const e of seen) if (e.pose.flap > 0) expect(e.pose.bloom).toBe(1);
-    expect(seen.at(-1).petals.emitted.pour).toBeGreaterThan(0);
+    // (The pour waits for the flap to be about half open, then comes out of the mouth in force.)
+    for (const e of seen) if (e.pose.flap < e.flapOpen * 0.45) expect(e.petals.emitted.pour).toBe(0);
+    expect(seen.at(-1).petals.emitted.pour).toBeGreaterThanOrEqual(20);
     await introStarted(page);
   });
 
