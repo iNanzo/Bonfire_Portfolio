@@ -11,6 +11,9 @@ import { PETAL_PX, QUIET, createPetalLayer, petalPx, quietAt, texelPx } from '..
 function fakePage() {
   /** @type {Record<string, (e: any) => void>} */
   const on = {};
+  const windowListeners = new Map();
+  let removed = false;
+  let cancelled = 0;
   let asked = 0;
   const canvas = {
     style: {},
@@ -20,7 +23,9 @@ function fakePage() {
     setAttribute() {},
     addEventListener() {},
     removeEventListener() {},
-    remove() {},
+    remove() {
+      removed = true;
+    },
     getContext() {
       asked++;
       return null;
@@ -30,10 +35,14 @@ function fakePage() {
     innerWidth: 800,
     innerHeight: 600,
     performance,
-    addEventListener() {},
-    removeEventListener() {},
+    addEventListener: (type, fn) => windowListeners.set(type, fn),
+    removeEventListener: (type, fn) => {
+      if (windowListeners.get(type) === fn) windowListeners.delete(type);
+    },
     requestAnimationFrame: () => 0,
-    cancelAnimationFrame() {},
+    cancelAnimationFrame() {
+      cancelled++;
+    },
     setTimeout: () => 0,
     requestIdleCallback: () => 0,
   };
@@ -41,7 +50,9 @@ function fakePage() {
     defaultView: win,
     createElement: () => canvas,
     addEventListener: (/** @type {string} */ type, /** @type {(e: any) => void} */ f) => (on[type] = f),
-    removeEventListener() {},
+    removeEventListener: (type, fn) => {
+      if (on[type] === fn) delete on[type];
+    },
   };
   /** @type {any[]} */
   const appended = [];
@@ -68,8 +79,35 @@ function fakePage() {
     down: (target = floor) => on.pointerdown?.({ ...press, target }),
     up: () => on.pointerup?.(press),
     button,
+    emit: (type, event = {}) => on[type]?.({ ...press, ...event }),
+    emitWindow: (type) => windowListeners.get(type)?.(),
+    listeners: () => Object.keys(on).length + windowListeners.size,
+    removed: () => removed,
+    cancelled: () => cancelled,
   };
 }
+
+test('a renderer-free layer handles lost pointers and resize, then removes every listener and its canvas on disposal', () => {
+  const page = fakePage();
+  const layer = createPetalLayer(page.root, { on: () => false });
+  assert.ok(page.listeners() > 0);
+  page.emitWindow('resize');
+  page.emit('pointerout', { isPrimary: false, relatedTarget: null });
+  page.emit('pointerout', { relatedTarget: page.button });
+  page.emit('pointerout', { relatedTarget: null });
+  page.emitWindow('blur');
+  page.emit('pointercancel');
+  assert.equal(layer.snapshot().running, false);
+  assert.equal(page.asked(), 0, 'lifecycle events never allocate a renderer');
+  layer.dispose();
+  assert.equal(page.listeners(), 0, 'all document and window listeners removed');
+  assert.equal(page.removed(), true, 'canvas removed');
+  assert.equal(page.cancelled(), 1, 'scheduled frame cancelled');
+  page.move();
+  page.down();
+  page.emitWindow('resize');
+  assert.equal(page.asked(), 0, 'disposed layer cannot respond to later input');
+});
 
 test('at boot it makes no WebGL context, only its listeners and an empty canvas over the page', () => {
   const page = fakePage();
