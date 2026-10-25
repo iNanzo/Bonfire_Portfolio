@@ -6,13 +6,27 @@ format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and ver
 
 ## [Unreleased]
 
-Round 16: a password lock for the site, and NEWT's toy opened from an envelope, with a new
-toolbar, a new way to carry him and more to do. Round 15, below it: an Uma Musume-style
+Round 17: a plainer cult altar, no vignette, and a cleaner mirror in Bonfire Live. Round
+16, below it: a password lock for the site, and NEWT's toy opened from an envelope, with a
+new toolbar, a new way to carry him and more to do. Round 15: an Uma Musume-style
 intro dialogue for NEWT. Round 14, below that: his second wave (a Default look, new
 controls, speech bubbles, the admin's Invitation page). Round 13: NEWT's toy at
 `/invitation/`. Round 11: the knight at home in every place, every module type-checked, and
 a campfire game on the bonfire, and a cleanup for what agents and test runs leave running.
 Round 10: menus and search, the knight's fixes, hygiene and performance.
+
+### The bonfire's look (round 17)
+
+- The Cult Altar no longer has its hooded stone statues: the two behind the altar and the
+  watcher at the front left are gone. The altar, the standing stones and the candles stand
+  where they did.
+- The vignette is gone: the site, Bonfire Live and the Painter no longer darken the
+  picture's edges into a black ring round the scene, and the Vignette setting leaves Live,
+  the Painter and the admin. Saved settings and scenes that still carry a vignette load as
+  before, without it.
+- Bonfire Live's Mirror folds on the fire instead of the screen's middle, so the fire stays
+  whole and the knights either side of it come back whole, in every Mirror Kind and in the
+  Mirror Flips drop hit.
 
 ### The password lock (round 16)
 
