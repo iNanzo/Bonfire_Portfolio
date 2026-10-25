@@ -360,7 +360,9 @@ export function createPack({
     clearTimeout(closeTimer);
     closeTimer = setTimeout(() => close(), CLOSE_DELAY);
   });
-  el.addEventListener('pointerover', (e) => {
+  // Layout changes can fire pointerover without the pointer moving (the knight's
+  // item arrives after its model loads). Keep the selected list until the user moves.
+  el.addEventListener('pointermove', (e) => {
     if (!hovering(e)) return;
     const slot = e.target.closest('[data-pack-slot]');
     if (slot && shown !== slot.dataset.packSlot) {
