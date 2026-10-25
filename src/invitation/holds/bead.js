@@ -47,8 +47,8 @@ const RAD = Math.PI / 180;
  * `ringFloor` while he's held. A height change keeps his spot on the floor till the
  * pointer moves `pinMove` CSS px; its gap to the cursor then eases out over HOLD.offsetEase, or at
  * `pinRate` CSS px a second for a bigger one. The top band: the stage's top `band`, where the
- * cursor going up lifts his hold height up to `bandLift` of his height more (smoothly, from where
- * he was grabbed), so a plain drag lifts him with no hidden control. Once his collar has been
+ * mouse going up lifts his hold height up to `bandLift` of his height more (smoothly, from where
+ * he was grabbed), so a plain drag lifts him with no hidden control (a finger has its second one). Once his collar has been
  * `floorGap` over his hang height it's kept there or higher, so his limp, swinging feet never brush it.
  */
 export const BEAD = {
@@ -542,8 +542,8 @@ export function createBeadHold(deps = {}) {
       view = camera;
       // (The hold height: eased in from his collar as he's grabbed, then following its goal.)
       // (Up into the stage's top band, the hold height lifts: the most he's lifted there over where
-      // he was grabbed.)
-      const u = bandShare(px.y, stage);
+      // he was grabbed. Not for a finger: it has a second finger, and its plane lifts him already.)
+      const u = touch ? 0 : bandShare(px.y, stage);
       if (band0 === null) band0 = u;
       const goalY = clamp(
         holdGoal + BEAD.bandLift * H * Math.max(0, u - band0),

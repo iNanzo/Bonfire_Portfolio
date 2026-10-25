@@ -137,7 +137,7 @@ the sheet and leaves the slider as it was.
 | Style | Default, DS, Soft, Custom | Default (what a first visit shows, set in the admin's Invitation page; as shipped, Soft with 6 colours, a full-strength dither, full-strength tinted lines on the outer ring, two toon bands and the highlight). DS: like the old handheld, 15-bit colour with a fine dither, dark 1-pixel lines, a hard shadow. Soft: fewer colours, pastel, a warm ring outside him and a softer, dithered shadow. Each sets every Shader option; Custom shows once one of them is yours (it can't be picked: choose a style, or Reset To Style, to go back). |
 | Motion | Smooth, Choppy | Smooth (the default) moves NEWT every frame. Choppy moves his arms, legs and head 15 times a second, like stop motion, while the camera and his walking about stay smooth. |
 | Ground Cues | Off, In the Mix, Always | The ring on the floor under NEWT while he's held and the dashed line from his collar down to it, so you can see where he is over the floor. In the Mix shows them while he's high or moving fast; Always all the time he's held. Until you pick one, the way he's carried (Drag) chooses. |
-| Drag | Today, Level, Tilt, Bead | Ways of carrying him (for this visit only; `?drag=` in the address picks one too). Bead (the default) keeps his collar on the cursor like a bead on a string, sliding toward and away from you over the floor; a wheel notch or a second finger lifts him straight up, and so does dragging him into the screen's top band. Today is how he was carried before; Level carries him over the floor at a height the wheel or a second finger sets; Tilt leans the plane he's dragged on back, so up the screen carries him away and up at once. |
+| Drag | Today, Level, Tilt, Bead | Ways of carrying him (for this visit only; `?drag=` in the address picks one too). Bead (the default) keeps his collar on the cursor like a bead on a string, sliding toward and away from you over the floor; a wheel notch or a second finger lifts him straight up, and so does dragging him into the screen's top band with a mouse. Today is how he was carried before; Level carries him over the floor at a height the wheel or a second finger sets; Tilt leans the plane he's dragged on back, so up the screen carries him away and up at once. |
 | Wander | On, Off | On (the default): left be, he strolls about by himself now and then. Kept for your next visit, like the rest. |
 
 **Shader** lays out the pixel look's own values, which the Style sets; any change shows at once
@@ -410,8 +410,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     far, lifting him a little: `beadPlane`), so
     a flick up lofts him toward the camera before he settles away; the wheel (0.1 of his height a
     notch) and a second finger (0.8 per 100 px) set the hold height, up to 2.4 over his hang
-    height (and the cursor up into the stage's top 18% lifts it up to 1.6 more, from where he was
-    grabbed, so a plain drag lifts him: `bandShare`), his collar kept 0.06 over his hang height
+    height (and the mouse up into the stage's top 18% lifts it up to 1.6 more, from where he was
+    grabbed, so a plain drag lifts him: `bandShare`; a finger has its second finger), his collar kept 0.06 over his hang height
     once it's been there (his limp feet off the floor), straight up over his spot on the floor (the gap to the cursor eased out from the next
     move over 0.12 s, or at 300 px a second for a bigger one), his tilt turning at most 15 rad/s; walls faced across the screen are side walls (`sideWall`: across only, never sliding
     in depth); his body on a one-sided Verlet rope (`ropeStep`, 0.55 long, slack on a drop,

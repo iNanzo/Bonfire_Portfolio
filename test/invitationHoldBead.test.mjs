@@ -313,7 +313,7 @@ test('bead, a finger (HoldStart.touch): per 100 px up held still he goes 0.55-0.
   }
 });
 
-test('bead, the top band (the stage’s top 18%): a plain drag up into it lifts him, 1.0 or more over his hold height at the top, his collar on the cursor, going less far away than without it; below it, nothing', () => {
+test('bead, the top band (the stage’s top 18%): a plain mouse drag up into it lifts him (a finger’s doesn’t), 1.0 or more over his hold height at the top, his collar on the cursor, going less far away than without it; below it, nothing', () => {
   for (const screen of ['phone', 'desktop']) {
     for (const elevation of [24, 36, 50]) {
       const r = rig(screen, { elevation });
@@ -335,6 +335,21 @@ test('bead, the top band (the stage’s top 18%): a plain drag up into it lifts 
         `${at}: lifted ${(top.anchor.y - base).toFixed(3)} at the top`,
       );
       const plain = run(8, true);
+      // (A finger has its second finger for height, and its own plane lifts him as he goes away:
+      // no band.)
+      const byFinger = (stage) =>
+        sim(r, {
+          path: ramp(c, { x: c.x, y: 8 }, 1.2, 2.2),
+          until: 3,
+          noStage: !stage,
+          given: { touch: true },
+        }).frames.at(-1);
+      const fa = byFinger(true);
+      const fb = byFinger(false);
+      assert.ok(
+        Math.abs(fa.holdY - fb.holdY) <= 1e-9,
+        `${at}: a finger's hold height ${fa.holdY.toFixed(3)} with the band, ${fb.holdY.toFixed(3)} without`,
+      );
       const d = (f) => depthAlong(f.anchor, r.camera.yaw) - depthAlong(below.anchor, r.camera.yaw);
       assert.ok(
         d(top) < d(plain) - 0.05 || d(plain) <= 0.05,
