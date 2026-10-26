@@ -28,7 +28,8 @@
 // distance to a centre on the texel grid, a two-texel rim; setLine: the drop line from his collar to the
 // ring, two texels wide and dashed in texels, turned to face the camera). The dust he raises
 // landing is on that layer too (setDust: dustLayer.js draws dust.js's puffs, dithered, the pass's
-// area grown to take them in). `bounds` is the default view's disc (area.js playArea), kept round the play
+// area grown to take them in), and a big drop's screen shake moves the canvas by a few CSS px
+// (setShake: camera.js shakeOffset; the camera never moves). `bounds` is the default view's disc (area.js playArea), kept round the play
 // area's middle (setArea: the play area itself is main.js's, area.js viewArea): what a desktop's
 // default view keeps in sight (pixels.js frameView) and the size of the shadow camera's box, moved
 // to wherever NEWT is (floor.js fitShadow), so his shadow is as fine anywhere in the area.
@@ -270,6 +271,8 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
   scene.add(dust.mesh);
   /** The dust's box this frame (dust.js dustBounds), for the pass's area; null: none. */
   let dustBox = /** @type {ReturnType<typeof dustBounds>} */ (null);
+  /** The shake's offset as last set, CSS px (setShake). */
+  const shakeNow = { x: 0, y: 0 };
 
   const retro = createRetro(renderer);
   let current = { preset, look };
@@ -718,6 +721,27 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
     /** The dust as last set, for ?test: how many puffs, and their box (null: none). */
     get dustState() {
       return { count: dust.count, box: dustBox ? { ...dustBox } : null };
+    },
+    /**
+     * The screen shake's offset, CSS px (camera.js shakeOffset): the canvas moved by it, rounded
+     * to device pixels so its texels stay whole (the stage behind is the paper's colour, so an
+     * edge it uncovers never shows); 0, 0 puts it back. The camera and the orbit never move.
+     * @param {number} x
+     * @param {number} y
+     */
+    setShake(x, y) {
+      const d = size.dpr || 1;
+      // (+ 0: a -0 rounded from a small negative is 0.)
+      const sx = Number.isFinite(x) ? Math.round(x * d) / d + 0 : 0;
+      const sy = Number.isFinite(y) ? Math.round(y * d) / d + 0 : 0;
+      if (sx === shakeNow.x && sy === shakeNow.y) return;
+      shakeNow.x = sx;
+      shakeNow.y = sy;
+      canvas.style.transform = sx || sy ? `translate(${sx}px, ${sy}px)` : '';
+    },
+    /** The shake's offset as last set, CSS px, for ?test. */
+    get shakeState() {
+      return { ...shakeNow };
     },
     /**
      * The dithered highlight on NEWT while the pointer is over him: 0 off to 1 full (retro.js

@@ -39,7 +39,8 @@
 // line, Ground Cues), the toolbar → the speech bubble (bubble.js: over his head as
 // posed, clear of the toolbar, the open Camera pad and Settings sheet, out of sight while the sheet covers his
 // head; near the top, beside his head, narrowed to fit there, or under his feet) → a landing's
-// dust (dropFx: dust.js through stage.setDust) → render. With Motion Choppy (look.js) his pose (the update and applyLook) only moves
+// dust and screen shake (dropFx: dust.js through stage.setDust, camera.js shakeOffset through
+// stage.setShake) → render. With Motion Choppy (look.js) his pose (the update and applyLook) only moves
 // on the clock's steps, 15 a second; his root, the camera and the rest move every frame. The
 // lowest his collar is carried comes from the Held clip at load (his collar over his lowest
 // sole, plus a gap).
@@ -151,6 +152,8 @@ import {
   orbitTurning,
   orbitWheel,
   orbitZoom,
+  shakeKick,
+  shakeOffset,
   shotView,
 } from './camera.js';
 import { cursorKind, installCursors } from './cursor.js';
@@ -176,6 +179,7 @@ import {
   petalsOn,
   saveLook,
   shaderOf,
+  shakeOn,
 } from './look.js';
 import { createGlance, createLook, glanceLook, glanceStep, lookStep, torsoStep } from './lookAt.js';
 import {
@@ -642,9 +646,14 @@ function start(s) {
   /** The dust he raises landing (dust.js), on random numbers of its own. */
   const dust = createDust();
   const dustRng = createRng(seed + 11);
-  /** The last landing seen (play.js BodyState.landing). */
+  /**
+   * The last landing seen (play.js BodyState.landing), and its screen shake (camera.js
+   * shakeKick: null for none, or once it's over) and when it began.
+   */
   const drop = {
     seen: /** @type {import('./play.js').Landing|null} */ (null),
+    kick: /** @type {import('./camera.js').ShakeKick|null} */ (null),
+    at: 0,
   };
   /**
    * The ground cues (cues.js): the blob's held look eased in, the ring's and the drop line's
@@ -1625,7 +1634,7 @@ function start(s) {
       footOffset: soleY() - root.position.y,
       released,
     });
-    // (Just landed: the dust.)
+    // (Just landed: the dust, and a big drop's shake.)
     if (body.landing && body.landing !== drop.seen) landed(body.landing);
     // (The hold's side clamp: its push, kept for the toss.)
     if (holdNow && holdNow.push !== undefined && body.carry) body.carry.push = holdNow.push;
@@ -1643,17 +1652,28 @@ function start(s) {
 
   /**
    * A landing (play.js BodyState.landing): the dust round his feet (dust.js dustLand, sized by
-   * how fast he came down).
+   * how fast he came down) and, from high enough, the screen shake (camera.js shakeKick: none
+   * with Screen Shake off or reduced motion).
    * @param {import('./play.js').Landing} at
    */
   function landed(at) {
     drop.seen = at;
     dustLand(dust, at, at.speed, t, dustRng);
+    drop.kick = shakeKick(at.speed, { on: shakeOn(look), reduced: reducedMotion() });
+    drop.at = t;
   }
 
-  /** The dust this frame: the puffs to the stage (dust.js dustPuffs). */
+  /**
+   * The dust and the shake this frame: the puffs to the stage (dust.js dustPuffs), and the
+   * shake's offset on its canvas (camera.js shakeOffset), cut short by a grab, Screen Shake
+   * switched off or reduced motion (the orbit never moves).
+   */
   function dropFx() {
     s.setDust(dustPuffs(dust, t));
+    const k = drop.kick;
+    if (k && (t - drop.at >= k.time || body.mode === 'held' || !shakeOn(look) || reducedMotion())) drop.kick = null;
+    const o = shakeOffset(drop.kick, t - drop.at);
+    s.setShake(o.x, o.y);
   }
 
   /**
@@ -1987,10 +2007,12 @@ function start(s) {
     };
   }
 
-  /** The last landing and the dust as drawn, for ?test (snapshot().drop). */
+  /** The last landing, the dust as drawn and the screen shake (its offset, CSS px, and its kick), for ?test (snapshot().drop). */
   const dropSnapshot = () => ({
     landing: body.landing ? { ...body.landing } : null,
     dust: s.dustState,
+    shake: s.shakeState,
+    kick: drop.kick ? { ...drop.kick } : null,
   });
 
   /** The admin's intro preview for ?test: the origin it listens to, the box asked for, its viewport, and whether it waits to start. */
