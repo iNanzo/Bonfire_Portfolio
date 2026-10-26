@@ -26,13 +26,12 @@
 // the replies dither in one after another, a press that goes on flashes the box, the ▼ bobs in
 // steps, and reduced motion fades plainly. The box has no dither of its own: it rises in with a
 // plain fade, and a new line takes the old one's place at once, typing from its start, so
-// their letters never show together. The box adapts to the screen and its line, as before round
-// 18 held it at three rows: on a desktop, a half-width and a half-height window, a phone and a
-// phone held sideways, a short line keeps its three rows (two on a short screen) and a long one
-// grows it to the heights it had then, up to about half the screen (two fifths on a short one),
-// his head clear over it; a line taller than that scrolls inside it (the box keeps its size as
-// it types): it follows the typing, then a finger, the wheel or the arrow keys scroll it, with
-// cues where there's more.
+// their letters never show together. The box keeps the shape it had before round 18 and grows
+// little: on a desktop, a half-width and a half-height window, a phone and a phone held
+// sideways, a short line keeps its three rows (two on a short screen) at the height it had then,
+// and a long one grows it by a row at most, his head clear over it; a line taller than that
+// scrolls inside it (the box keeps its size as it types): it follows the typing, then a finger,
+// the wheel or the arrow keys scroll it, with cues where there's more.
 import { readFileSync } from 'node:fs';
 import { test, expect } from '@playwright/test';
 import { routeToEnd } from './helpers/dialogue-route.mjs';
@@ -491,7 +490,7 @@ const LONG_LINE =
   'This line runs on and on, far longer than three rows of the box on a phone, so the box grows. ' +
   'It keeps going with more words about nothing much at all, then a few more, and still more, ' +
   'until at last it reaches the very end of it.';
-/** A line taller than half of any screen: 24 short rows of its own (about 180 letters). */
+/** A line taller than the box on any screen: 24 short rows of its own (about 180 letters). */
 const TALL_LINE = Array.from({ length: 24 }, (_, i) => `Row ${i + 1}.`).join('\n');
 /** The long line's view: how far it's scrolled, its room, its height, and the cues. */
 const lineView = (page) =>
@@ -513,7 +512,7 @@ const lineView = (page) =>
     };
   });
 /**
- * A line taller than the box's room (about half the screen) scrolls in the box: the box keeps
+ * A line taller than the box's room (four rows) scrolls in the box: the box keeps
  * its size, the view follows the typing (the newest row in view), and once it's all typed a
  * finger (`tap`) or the wheel and the keys scroll it, with the cues saying where there's more; a
  * tap still goes on.
@@ -601,7 +600,7 @@ const scrollStill = (page) =>
 
 /**
  * The box as laid out, client px: its height and its name tab's top, its line's row height, how
- * many rows show and how many it has, whether it scrolls, and the screen's height.
+ * many rows show and how many it has, and whether it scrolls.
  */
 const boxShape = (page) =>
   page.evaluate(() => {
@@ -615,19 +614,17 @@ const boxShape = (page) =>
       shows: t.clientHeight / row,
       rows: t.scrollHeight / row,
       canScroll: t.classList.contains('can-scroll'),
-      screen: document.querySelector('.inv-talk').getBoundingClientRect().height,
     };
   });
 /**
- * The box takes its line's shape at this screen's size, as it did before round 18 held it at
- * three rows: a short line in its least rows (three; two on a short screen), a long one in all of
- * its rows, growing the box (`was`: the heights it had then, px), up to about half the screen
- * (two fifths on a short one) in whole rows; a taller line scrolls in that; and the shot frames
- * NEWT's head clear over the box each time.
+ * The box takes its line's shape at this screen's size: a short line in its least rows (three;
+ * two on a short screen), as before round 18 (`was`: its height then, px); a longer one grows it
+ * by a row at most (`most`: four rows' height; three on a short screen) and scrolls past that; a
+ * tall line holds it there; and the shot frames NEWT's head clear over the box each time.
  * @param {import('@playwright/test').Page} page
- * @param {{touch: boolean, short: boolean, was: {short: number, long: number}}} o
+ * @param {{touch: boolean, short: boolean, was: number, most: number}} o
  */
-async function boxAdapts(page, { touch, short, was }) {
+async function boxAdapts(page, { touch, short, was, most }) {
   const errors = watch(page);
   await calm(page);
   // (The fixture's first three boxes, one after another: a short line, a long one, a tall one.)
@@ -640,7 +637,7 @@ async function boxAdapts(page, { touch, short, was }) {
   await page.evaluate((i) => window.__invitation.setIntro(i), intro);
   await open(page, touch);
   const least = short ? 2 : 3;
-  const share = short ? 0.4 : 0.5;
+  const cap = least + 1;
   /** @type {Record<string, any>} */
   const shapes = {};
   for (const kind of ['short', 'long', 'tall']) {
@@ -671,70 +668,75 @@ async function boxAdapts(page, { touch, short, was }) {
     }
   }
   const { short: sh, long: lo, tall: ta } = shapes;
-  // (The rows that fit: about half the screen, less the box's padding and border, in whole rows.)
-  const chrome = sh.height - sh.shows * sh.row;
-  const fit = Math.floor((share * sh.screen - chrome) / sh.row + 1e-3);
   // A short line: the box's least rows, as before.
   expect(sh.shows, 'a short line in the least rows').toBeCloseTo(least, 1);
   expect(sh.canScroll).toBe(false);
-  expect(Math.abs(sh.height - was.short), `${sh.height} px, as it was (${was.short})`).toBeLessThan(1.5);
-  // A long line: all of its rows, the box grown with it (as before: give or take a row's wrap),
-  // and scrolling only past what fits.
-  expect(lo.shows, 'all of its rows that fit').toBeCloseTo(Math.max(least, Math.min(Math.round(lo.rows), fit)), 1);
-  expect(lo.canScroll, 'scrolls only past what fits').toBe(Math.round(lo.rows) > fit);
-  if (Math.round(lo.rows) > least) expect(lo.height, 'grown with its line').toBeGreaterThan(sh.height + lo.row - 1);
-  expect(Math.abs(lo.height - was.long), `${lo.height} px, as it was (${was.long})`).toBeLessThan(lo.row + 1.5);
-  // A tall line: the box up to about half the screen and never more, its rows whole, the rest scrolling.
-  expect(ta.height, 'never more than its share of the screen').toBeLessThanOrEqual(share * ta.screen + 0.5);
-  expect(ta.height, 'up to it, within a row').toBeGreaterThan(share * ta.screen - ta.row - 0.5);
-  expect(ta.shows, 'whole rows').toBeCloseTo(fit, 1);
+  expect(Math.abs(sh.height - was), `${sh.height} px, as it was (${was})`).toBeLessThan(1.5);
+  // A long line: all of its rows up to a row more than that, the box grown with it; past the
+  // cap it scrolls.
+  expect(lo.shows, 'its rows, a row more at most').toBeCloseTo(Math.max(least, Math.min(Math.round(lo.rows), cap)), 1);
+  expect(lo.canScroll, 'scrolls only past the cap').toBe(Math.round(lo.rows) > cap);
+  if (Math.round(lo.rows) > least)
+    expect(Math.abs(lo.height - most), `${lo.height} px, a row up (${most})`).toBeLessThan(1.5);
+  expect(lo.height, 'never more than a row up').toBeLessThanOrEqual(sh.height + sh.row + 0.5);
+  // A tall line: the box at its cap and never more, the rest scrolling.
+  expect(Math.abs(ta.height - most), `${ta.height} px, at the cap (${most})`).toBeLessThan(1.5);
+  expect(ta.shows, `${cap} rows`).toBeCloseTo(cap, 1);
   expect(ta.rows).toBeGreaterThan(ta.shows + 1);
   expect(ta.canScroll, 'the rest scrolls').toBe(true);
   expect(errors).toEqual([]);
 }
 
-/** The five screens the box adapts to, and its heights there before round 18 (px; c5fa4f6). */
+/**
+ * The five screens the box adapts to: its height there for a short line before round 18 (px;
+ * c5fa4f6), and at its cap, a row more (four rows; three on a short screen).
+ */
 const SCREENS = [
   {
     name: 'on a desktop, 1280×800',
     use: { viewport: { width: 1280, height: 800 } },
     touch: false,
     short: false,
-    was: { short: 153, long: 183 },
+    was: 153,
+    most: 183,
   },
   {
     name: 'in a half-width window, 640×800',
     use: { viewport: { width: 640, height: 800 } },
     touch: false,
     short: false,
-    was: { short: 133, long: 158 },
+    was: 133,
+    most: 158,
   },
   {
     name: 'in a half-height window, 1280×400',
     use: { viewport: { width: 1280, height: 400 } },
     touch: false,
     short: true,
-    was: { short: 89, long: 135 },
+    was: 89,
+    most: 112,
   },
   {
     name: 'on a phone, 390×844',
     use: { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true },
     touch: true,
     short: false,
-    was: { short: 133, long: 235 },
+    was: 133,
+    most: 158,
   },
   {
     name: 'on a phone held sideways, 844×390',
     use: { viewport: { width: 844, height: 390 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true },
     touch: true,
     short: true,
-    was: { short: 89, long: 135 },
+    was: 89,
+    most: 112,
   },
 ];
 for (const screen of SCREENS)
   test.describe(`the chat box ${screen.name}`, () => {
     test.use(screen.use);
-    test(`a short line keeps ${screen.short ? 'two' : 'three'} rows, a long one grows the box up to about ${screen.short ? 'two fifths' : 'half'} of the screen, a taller one scrolls`, async ({
+    test(`a short line keeps ${screen.short ? 'two' : 'three'} rows, a long one grows the box a row at most (${screen.short ? 'three' : 'four'}), then it scrolls`, async ({
       page,
     }) => {
       await boxAdapts(page, screen);
@@ -742,7 +744,7 @@ for (const screen of SCREENS)
   });
 
 test.describe('on a phone', () => {
-  test('a line taller than half the screen scrolls in the box: it follows the typing, then a finger scrolls it', async ({
+  test('a line taller than four rows scrolls in the box: it follows the typing, then a finger scrolls it', async ({
     page,
   }) => {
     await longLineScrolls(page, true);
@@ -1257,7 +1259,7 @@ test.describe('on a phone', () => {
 });
 
 test.describe('on a desktop', () => {
-  test('a line taller than half the screen scrolls in the box: it follows the typing, then the wheel and keys scroll it', async ({
+  test('a line taller than four rows scrolls in the box: it follows the typing, then the wheel and keys scroll it', async ({
     page,
   }) => {
     await longLineScrolls(page, false);

@@ -559,7 +559,7 @@ test('the chat screen’s feedback: the buttons’ dither in the toolbar’s sty
   );
 });
 
-test('a long line grows the box up to about half the screen, then scrolls in it, following the typing a row at a time', async () => {
+test('a long line grows the box a row at most (four rows, three on a short screen), then scrolls in it, following the typing a row at a time', async () => {
   const { followRow, talkHtml, FOLLOW_JUMP } = await import('../src/invitation/dialogueUi.js');
   const row = 25;
   const view = { rowH: row, clientHeight: 3 * row };
@@ -581,42 +581,43 @@ test('a long line grows the box up to about half the screen, then scrolls in it,
     assert.ok(at >= 0, `a rule for ${sel}`);
     return css.slice(at, css.indexOf('}', at));
   };
-  // (The layer is a size container, so the box's room is measured against the screen it covers.)
-  assert.match(rule('.inv-talk'), /container-type: size/);
-  // (Never held at a few rows any more: a long line grows the box, as it did before round 18.)
-  assert.ok(!/max-height: calc\(\d \* 1\.42em\)/.test(css), 'no fixed rows');
-  // (At least three rows on a phone and a desktop, two on a short screen, so a short line keeps
-  // the box's shape; a longer line grows it a row at a time up to about half the screen (two
-  // fifths on a short one), the box's own padding and border taken off, in whole rows; past that
-  // it scrolls.)
-  const border = Number(/border: (\d+)px solid/.exec(rule('.inv-talk-box'))?.[1]);
-  assert.equal(border, 3);
-  const at = (media) => {
-    const i = css.indexOf(media);
-    assert.ok(i >= 0, media);
-    return i;
+  // (Rows, not a share of the screen: no size container, nothing measured in cqh.)
+  assert.ok(!/container-type|cqh/.test(css), 'no share of the screen');
+  // (Three rows at least on a phone and a desktop, two on a short screen, so a short line keeps
+  // the shape the box had before round 18; a longer line grows it by a row at most, four rows
+  // (three on a short screen), and past that it scrolls.)
+  /** The rules inside the `@media` starting `media` (to its closing brace). */
+  const media = (start) => {
+    const i = css.indexOf(start);
+    assert.ok(i >= 0, start);
+    let depth = 0;
+    for (let j = css.indexOf('{', i); j < css.length; j++) {
+      if (css[j] === '{') depth++;
+      else if (css[j] === '}' && --depth === 0) return css.slice(i, j + 1);
+    }
+    assert.fail(`${start} unclosed`);
   };
+  /** A declaration of `.inv-talk-text` in `block` (or the base rule's, when the block has none). */
+  const textRows = (block, prop) => {
+    const at = block.indexOf('.inv-talk-text {');
+    const own =
+      at >= 0
+        ? new RegExp(`${prop}: calc\\((\\d) \\* 1\\.42em\\)`).exec(block.slice(at, block.indexOf('}', at)))
+        : null;
+    return Number((own ?? new RegExp(`${prop}: calc\\((\\d) \\* 1\\.42em\\)`).exec(rule('.inv-talk-text')))?.[1]);
+  };
+  const base = css.slice(0, css.indexOf('@media'));
   const layouts = [
-    { name: 'a phone', from: 0, rows: 3, share: 50 },
-    { name: 'a desktop', from: at('@media (min-width: 700px)'), rows: 3, share: 50 },
-    { name: 'a short screen', from: at('@media (orientation: landscape)'), rows: 2, share: 40 },
+    { name: 'a phone', block: base, least: 3 },
+    { name: 'a desktop', block: media('@media (min-width: 700px)'), least: 3 },
+    { name: 'a short screen', block: media('@media (orientation: landscape)'), least: 2 },
   ];
-  const firstMin = /min-height: calc\((\d) \* 1\.42em\)/.exec(rule('.inv-talk-text'))?.[1];
-  for (const { name, from, rows, share } of layouts) {
-    const box = rule('.inv-talk-box', from);
-    const text = rule('.inv-talk-text', from);
-    const [, top, bottom] = /padding: (\d+)px \d+px (\d+)px/.exec(box) ?? [];
-    assert.ok(top && bottom, `${name}: the box's padding`);
-    const chrome = Number(top) + Number(bottom) + 2 * border;
-    const min = /min-height: calc\((\d) \* 1\.42em\)/.exec(text)?.[1] ?? firstMin;
-    assert.equal(Number(min), rows, `${name}: ${rows} rows at least`);
-    const cap = /max-height: round\(down, calc\((\d+)cqh - (\d+)px\), 1\.42em\)/.exec(text);
-    assert.ok(cap, `${name}: grows up to a share of the screen, in whole rows`);
-    assert.equal(Number(cap[1]), share, `${name}: ${share}% of the screen`);
-    assert.equal(Number(cap[2]), chrome, `${name}: the box's padding and border off (${chrome} px)`);
+  for (const { name, block, least } of layouts) {
+    assert.equal(textRows(block, 'min-height'), least, `${name}: ${least} rows at least`);
+    assert.equal(textRows(block, 'max-height'), least + 1, `${name}: a row more at most`);
   }
   // (A short screen's box is shorter: no 132 px floor under its two rows.)
-  assert.match(rule('.inv-talk-box', at('@media (orientation: landscape)')), /min-height: 0/);
+  assert.match(rule('.inv-talk-box', css.indexOf('@media (orientation: landscape)')), /min-height: 0/);
   // (Its line hidden past the room, its scrollbar unseen; once it's all typed the wheel, a finger
   // and the keys scroll it.)
   const text = rule('.inv-talk-text');

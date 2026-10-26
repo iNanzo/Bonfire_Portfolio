@@ -260,7 +260,7 @@ export const TEXT_COLORS_MAX = 24;
 export const COLOR_NAME_MAX = 20;
 /**
  * A line longer than this (characters) outgrows the chat box's three lines on a phone (measured at
- * 390×844: 100 fit, 110 take four), growing it up over NEWT: a warning.
+ * 390×844: 100 fit, 110 take four): the box grows a line, and past four it scrolls: a warning.
  */
 export const INTRO_TEXT_LONG = 100;
 /** The most choices a box offers (types.js DialogueBox: 2–3 replies). */
@@ -582,7 +582,10 @@ const BOX_CHECKS = {
     introText(v, p, INTRO_TEXT_MAX, check, true, true);
     const n = typeof v === 'string' ? letterCount(v.trim()) : 0;
     if (n > INTRO_TEXT_LONG && n <= INTRO_TEXT_MAX)
-      check.warn(check.at(p), `Over ${INTRO_TEXT_LONG} characters: on a phone it outgrows the box’s three lines.`);
+      check.warn(
+        check.at(p),
+        `Over ${INTRO_TEXT_LONG} characters: on a phone it outgrows the box’s three lines, and past four it scrolls.`,
+      );
   },
   face: (v, p, check) => check.oneOf(v, FACE_NAMES, p),
   animation: (v, p, check) => check.oneOf(v, INTRO_ANIMATIONS, p),

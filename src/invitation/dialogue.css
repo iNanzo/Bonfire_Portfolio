@@ -32,8 +32,6 @@
   touch-action: none;
   cursor: pointer;
   outline: none;
-  /* (A size container: the box grows with its line up to a share of the screen it covers, cqh.) */
-  container-type: size;
 }
 /* (Closing as the intro ends: the whole screen fades out, from script (dialogueUi.js
    fadeAway), and from its first step a press goes to the stage under it.) */
@@ -165,12 +163,10 @@
   position: relative;
   margin: 0;
   /* (Three lines' room at least, so a short line keeps the box's shape; a longer line grows the
-     box with it, a row at a time, up to about half the screen (the box's padding and border, 56
-     px, taken off, in whole rows), and only past that does it scroll inside it, dialogueUi.js
-     keeping the newest row in view as it types. Without round(): the same room, a part row.) */
+     box by a row at most, and past four rows it scrolls inside it, dialogueUi.js keeping the
+     newest row in view as it types.) */
   min-height: calc(3 * 1.42em);
-  max-height: calc(50cqh - 56px);
-  max-height: round(down, calc(50cqh - 56px), 1.42em);
+  max-height: calc(4 * 1.42em);
   overflow-y: hidden;
   scrollbar-width: none;
   font-size: 18px;
@@ -435,8 +431,6 @@
     font-size: 18px;
   }
   .inv-talk-text {
-    max-height: calc(50cqh - 64px);
-    max-height: round(down, calc(50cqh - 64px), 1.42em);
     font-size: 21px;
   }
   .inv-talk-top {
@@ -466,11 +460,10 @@
     padding: 18px 18px 20px;
     bottom: calc(8px + env(safe-area-inset-bottom));
   }
-  /* (Two rows at least, and up to two fifths of the screen: more of it is left for him.) */
+  /* (Two rows at least and three at most: more of the screen is left for him.) */
   .inv-talk-text {
     min-height: calc(2 * 1.42em);
-    max-height: calc(40cqh - 44px);
-    max-height: round(down, calc(40cqh - 44px), 1.42em);
+    max-height: calc(3 * 1.42em);
     font-size: 16px;
   }
   .inv-talk-choices {
