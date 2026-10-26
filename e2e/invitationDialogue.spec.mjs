@@ -613,11 +613,14 @@ const scrollStill = (page) =>
   );
 
 /**
- * Records every frame from now on (stopFrames returns them): when (performance.now()), what was
- * done last (window.__mark), which line is up (its letters' first node), how many of its letters
- * show of all, the old line's copy going (its mask, its fade's keyframes and its letters), the replies'
- * copy going (its mask), the name tab (its mask and opacity, while it shows), the box's fade
- * (data-fade: out, in or none) and the ▼.
+ * Records, from now on (stopFrames returns them): each frame (performance.now(), what was done
+ * last: window.__mark, which line is up: its letters' first node, how many of its letters show
+ * of all, whether the old line's copy is there, and the box's fade: data-fade); and each change
+ * of the box's fade as it happens (a frame after a press can come late on a busy page, after a
+ * phase has gone): when it's noted (once the frame that made it is done: never before it came),
+ * the press it came from (the last click's or key's own time), the old line's copy (its letters,
+ * its fade's keyframes and length), the replies' copy's keyframes, the name tab's (and length),
+ * and the new line's letters that show.
  */
 const recordFrames = (page) =>
   page.evaluate(() => {
@@ -626,34 +629,57 @@ const recordFrames = (page) =>
     const boxEl = document.querySelector('.inv-talk-box');
     const lines = new Map();
     const rec = (window.__frames = []);
-    const css = (el) => getComputedStyle(el);
+    const fades = (window.__fades = []);
+    for (const type of ['click', 'keydown'])
+      window.addEventListener(type, (e) => (window.__pressAt = e.timeStamp), true);
+    /** An element's own animations' keyframes: each opacity, or each mask. */
+    const keys = (el) =>
+      el
+        .getAnimations()
+        .filter((a) => !(a instanceof CSSAnimation))
+        .flatMap((a) =>
+          a.effect.getKeyframes().map((k) => (k.opacity !== undefined ? `opacity ${k.opacity}` : k.maskImage)),
+        );
+    /** How long its own animations last, ms. */
+    const lasts = (el) =>
+      el
+        .getAnimations()
+        .filter((a) => !(a instanceof CSSAnimation))
+        .map((a) => a.effect.getTiming().duration);
+    const shown = () => typed.querySelectorAll('.inv-fx:not(.is-unseen)').length;
+    window.__fadeWatch = new MutationObserver(() => {
+      const ghost = document.querySelector('.inv-talk-ghost');
+      const replies = document.querySelector('.inv-talk-choices.is-ghost');
+      fades.push({
+        at: performance.now(),
+        mark: window.__mark ?? '',
+        press: window.__pressAt ?? 0,
+        fade: boxEl.dataset.fade ?? '',
+        ghost: ghost
+          ? {
+              letters: ghost.querySelectorAll('.inv-fx:not(.is-unseen)').length,
+              keys: keys(ghost),
+              lasts: lasts(ghost),
+            }
+          : null,
+        replies: replies ? keys(replies) : null,
+        name: name.hidden ? null : keys(name),
+        nameLasts: name.hidden ? [] : lasts(name),
+        letters: shown(),
+      });
+    });
+    window.__fadeWatch.observe(boxEl, { attributes: true, attributeFilter: ['data-fade'] });
     const tick = () => {
       const head = typed.firstChild;
       if (head && !lines.has(head)) lines.set(head, lines.size);
-      const ghost = document.querySelector('.inv-talk-ghost');
-      const replies = document.querySelector('.inv-talk-choices.is-ghost');
       rec.push({
         at: performance.now(),
         mark: window.__mark ?? '',
         line: head ? lines.get(head) : -1,
-        letters: typed.querySelectorAll('.inv-fx:not(.is-unseen)').length,
+        letters: shown(),
         all: typed.querySelectorAll('.inv-fx').length,
-        ghost: ghost
-          ? {
-              mask: css(ghost).maskImage,
-              // (Its fade's keyframes: each opacity, or each mask.)
-              keys: ghost
-                .getAnimations()
-                .flatMap((a) =>
-                  a.effect.getKeyframes().map((k) => (k.opacity !== undefined ? `opacity ${k.opacity}` : k.maskImage)),
-                ),
-              letters: ghost.querySelectorAll('.inv-fx:not(.is-unseen)').length,
-            }
-          : null,
-        replies: replies ? css(replies).maskImage : null,
-        name: name.hidden ? null : { mask: css(name).maskImage, opacity: Number(css(name).opacity) },
+        ghost: Boolean(document.querySelector('.inv-talk-ghost')),
         fade: boxEl.dataset.fade ?? '',
-        next: !document.querySelector('.inv-talk-next').hidden,
       });
       window.__framesTick = requestAnimationFrame(tick);
     };
@@ -662,74 +688,73 @@ const recordFrames = (page) =>
 const stopFrames = (page) =>
   page.evaluate(() => {
     cancelAnimationFrame(window.__framesTick);
-    return window.__frames;
+    window.__fadeWatch.disconnect();
+    return { rec: window.__frames, fades: window.__fades };
   });
 /** A dither tile as the computed style gives one. */
 const TILE = /^url\("data:image\/png;base64,[^"]+"\)$/;
 /**
- * From the frame a press brought a new line on (`i`) to its first letter: first the old line's
- * copy goes, dithered (`plain`: a plain fade, reduced motion), the name tab with it (and the
- * replies' copy, a reply picked); then the name tab comes in the same way, the copy gone; then
- * (a letter's time on) the line types from its start, nothing fading. Never the copy and a new
- * letter together, and the first letter no sooner than the two fades.
+ * A fade's keyframes: a plain one, its opacity one way; or the dither's held steps, each a tile
+ * of its own, then nothing (out) or no mask (in).
  */
-function dithersOutThenIn(rec, i, what, { replies = false, plain = false } = {}) {
-  const first = rec.findIndex((r, j) => j >= i && r.letters > 0);
-  expect(first, `${what}: it types`).toBeGreaterThan(i);
-  const span = rec.slice(i, first);
-  const out = span.filter((r) => r.fade === 'out');
-  const inn = span.filter((r) => r.fade === 'in');
-  expect(out.length, `${what}: the old line goes`).toBeGreaterThan(0);
-  expect(inn.length, `${what}: then the next comes`).toBeGreaterThan(0);
-  expect(span[0].fade, `${what}: out from the press`).toBe('out');
-  const lastIn = span.findLastIndex((r) => r.fade === 'in');
+function fadeKeys(k, what, { plain, out }) {
+  if (plain) {
+    expect(k, `${what}: a plain fade`).toEqual(out ? ['opacity 1', 'opacity 0'] : ['opacity 0', 'opacity 1']);
+    return;
+  }
+  const tiles = out ? k : k.slice(0, -1);
+  if (!out) expect(k.at(-1), `${what}: whole at the end`).toBe('none');
+  expect(tiles.length, `${what}: a few steps`).toBeGreaterThanOrEqual(3);
+  for (const t of tiles) expect(t, `${what}: each step a tile`).toMatch(TILE);
+  expect(new Set(tiles).size, `${what}: each step its own`).toBe(tiles.length);
+}
+/**
+ * What the press noted as `what` did: at the press the old line's copy goes, dithered (`plain`:
+ * a plain fade, reduced motion), with the name tab (and the replies' copy, `replies`), none of
+ * the new line showing; once that's had its time the copy is gone and the name tab comes in
+ * the same way, still none of it; then that's over; and only after both does the line type,
+ * from its start. In no frame do the old line and a new letter show together.
+ */
+function dithersOutThenIn({ rec, fades }, what, { replies = false, plain = false } = {}) {
+  const mine = fades.filter((f) => f.mark === what);
   expect(
-    span.findLastIndex((r) => r.fade === 'out'),
-    `${what}: out, then in`,
-  ).toBeLessThan(span.findIndex((r) => r.fade === 'in'));
+    mine.map((f) => f.fade),
+    `${what}: out, then in, then over`,
+  ).toEqual(['out', 'in', '']);
+  const [out, inn, over] = mine;
+  // Out, from the press.
+  expect(out.at - out.press, `${what}: out from the press`).toBeLessThan(100);
+  expect(out.ghost, `${what}: the old line's copy going`).not.toBeNull();
+  expect(out.ghost.letters, `${what}: the old line in it`).toBeGreaterThan(0);
+  fadeKeys(out.ghost.keys, `${what}: the old line going`, { plain, out: true });
+  if (out.name) fadeKeys(out.name, `${what}: its name going with it`, { plain, out: true });
+  if (replies) {
+    expect(out.replies, `${what}: the replies' copy going`).not.toBeNull();
+    fadeKeys(out.replies, `${what}: the replies going`, { plain, out: true });
+  } else expect(out.replies, `${what}: no replies to go`).toBeNull();
+  expect(out.letters, `${what}: none of the new line yet`).toBe(0);
+  // In, once out has had its time: the copies gone, the name tab coming.
+  // (Each way its own length: about a sixth of a second dithered, half that plainly.)
+  const [shortest, longest] = plain ? [50, 120] : [150, 200];
+  for (const ms of [...out.ghost.lasts, ...out.nameLasts]) {
+    expect(ms, `${what}: out over its length`).toBeGreaterThanOrEqual(shortest);
+    expect(ms, `${what}: a short fade`).toBeLessThanOrEqual(longest);
+  }
+  expect(inn.at - out.press, `${what}: in once out's had its time`).toBeGreaterThan(shortest);
+  expect([inn.ghost, inn.replies, inn.letters], `${what}: the old line gone, nothing typed`).toEqual([null, null, 0]);
+  if (inn.name) fadeKeys(inn.name, `${what}: its name coming`, { plain, out: false });
+  for (const ms of inn.nameLasts) expect(ms, `${what}: in over its length`).toBeGreaterThanOrEqual(shortest);
+  // Over, once in has had its time too; then the line types, from its start.
+  expect(over.at - out.press, `${what}: over once both have had their time`).toBeGreaterThan(2 * shortest);
+  const first = rec.find((r) => r.mark === what && r.at > over.at && r.letters > 0);
+  expect(first, `${what}: it types`).toBeTruthy();
+  expect(first.fade, `${what}: nothing fading as it types`).toBe('');
+  if (!plain) expect(first.letters, `${what}: from its start`).toBeLessThan(first.all);
+  expect(first.at - out.press, `${what}: once out and in are over`).toBeGreaterThan(300);
   expect(
-    span.slice(0, lastIn).every((r) => r.fade),
-    `${what}: out straight into in`,
-  ).toBe(true);
-  // (After it, until its first letter: nothing going, nothing typed.)
-  for (const r of span.slice(lastIn + 1))
-    expect([r.fade, r.ghost, r.replies, r.letters], `${what}: the letter's wait`).toEqual(['', null, null, 0]);
-  const look = plain ? /^none$/ : TILE;
-  for (const r of out) {
-    expect(r.ghost, `${what}: the old line's copy going`).not.toBeNull();
-    expect(r.ghost.letters, `${what}: the old line in it`).toBeGreaterThan(0);
-    expect(r.ghost.mask, `${what}: going ${plain ? 'plainly' : 'dithered'}`).toMatch(look);
-    if (r.name) expect(r.name.mask, `${what}: its name going with it`).toMatch(look);
-    if (replies) expect(r.replies, `${what}: the replies going`).toMatch(look);
-    expect(r.letters, `${what}: none of the new line yet`).toBe(0);
-  }
-  // (Its name tab coming dithered, or plainly; whole in a last frame before the fade's over.)
-  for (const r of inn) {
-    expect([r.ghost, r.replies], `${what}: the old line gone`).toEqual([null, null]);
-    if (r.name)
-      expect(r.name.mask, `${what}: its name coming ${plain ? 'plainly' : 'dithered'}`).toMatch(
-        plain ? look : /^url\(|^none$/,
-      );
-    expect([r.letters, r.next], `${what}: nothing typed yet`).toEqual([0, false]);
-  }
-  if (!plain && inn.some((r) => r.name))
-    expect(
-      inn.some((r) => TILE.test(r.name?.mask ?? '')),
-      `${what}: its name dithering in`,
-    ).toBe(true);
-  // (Its fade: a plain one, its opacity down; or the dither's steps, each a tile, then nothing.)
-  const keys = out[0].ghost.keys;
-  if (plain) expect(keys, `${what}: a plain fade`).toEqual(['opacity 1', 'opacity 0']);
-  else {
-    expect(keys.length, `${what}: a few steps`).toBeGreaterThanOrEqual(3);
-    for (const k of keys) expect(k, `${what}: each step a tile`).toMatch(TILE);
-    expect(new Set(keys).size, `${what}: each step its own`).toBe(keys.length);
-    if (out.length >= 6) expect(new Set(out.map((r) => r.ghost.mask)).size, `${what}: stepping`).toBeGreaterThan(1);
-  }
-  const typing = rec[first];
-  expect([typing.fade, typing.ghost], `${what}: typing, nothing fading`).toEqual(['', null]);
-  if (!plain) expect(typing.letters, `${what}: from its start`).toBeLessThan(typing.all);
-  expect(typing.at - rec[i].at, `${what}: once out and in are over`).toBeGreaterThan(280);
+    rec.filter((r) => r.mark === what && r.at >= out.at && r.at < over.at && r.letters > 0).length,
+    `${what}: no letter of it while it fades`,
+  ).toBe(0);
 }
 
 /**
@@ -1638,19 +1663,21 @@ test.describe('on a desktop', () => {
     // Reduced motion: plain quick fades, in the same order.
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await act('reduced', () => goOn(page));
-    const rec = await stopFrames(page);
+    const seen = await stopFrames(page);
+    const { rec } = seen;
     const comes = rec.flatMap((r, i) => (i > 0 && r.line !== rec[i - 1].line ? [i] : []));
     const by = Object.fromEntries(comes.map((i) => [rec[i].mark, i]));
     expect(Object.keys(by).sort()).toEqual(['auto', 'click', 'next', 'reduced', 'reply', 'space']);
-    for (const what of ['click', 'space']) dithersOutThenIn(rec, by[what], what);
-    dithersOutThenIn(rec, by.reply, 'a reply picked', { replies: true });
-    dithersOutThenIn(rec, by.reduced, 'reduced motion', { plain: true });
-    // Nothing else dithers: Auto's next line types at once, Next's shows whole at once.
+    for (const what of ['click', 'space']) dithersOutThenIn(seen, what);
+    dithersOutThenIn(seen, 'reply', { replies: true });
+    dithersOutThenIn(seen, 'reduced', { plain: true });
+    // The old line and a new letter never show together.
+    expect(rec.filter((r) => r.ghost && r.letters > 0).length, 'never both').toBe(0);
+    // Nothing else fades: Auto's next line types at once, Next's shows whole at once.
     for (const what of ['auto', 'next']) {
+      expect(seen.fades.filter((f) => f.mark === what).length, `${what}: no fade`).toBe(0);
       const i = by[what];
       const first = rec.findIndex((r, j) => j >= i && r.letters > 0);
-      for (const r of rec.slice(i, first + 1))
-        expect([r.fade, r.ghost, r.replies], `${what}: no fade`).toEqual(['', null, null]);
       expect(rec[first].at - rec[i].at, `${what}: no wait`).toBeLessThan(150);
     }
     expect(rec[by.next].letters, 'Next: the line whole at once').toBe(rec[by.next].all);
