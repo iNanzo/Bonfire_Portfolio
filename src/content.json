@@ -2340,7 +2340,7 @@
         },
         {
           "id": "nanzo2",
-          "speaker": "",
+          "speaker": "Nanzo",
           "text": "It's the username I've been using online since I was like 12, including the {pink,bold,big|Chiikawa©} {bold|TikTok©}. But I consider the mask a separate persona.",
           "face": "neutral",
           "animation": "Talk",
@@ -2388,7 +2388,7 @@
         },
         {
           "id": "winja1",
-          "speaker": "",
+          "speaker": "Winja",
           "text": "{purple,bold,big|Winja}, short for the {wave,purple|\"Winning Ninja\"}, is the first username I really started using online.\n\nMostly on {bold,red,big|Roblox©} (c. 2008), where I got my first taste of gamedev alongside {gold,bold,big|Scratch©}.",
           "face": "neutral",
           "animation": "Think",
@@ -2400,7 +2400,7 @@
         },
         {
           "id": "winja2",
-          "speaker": "",
+          "speaker": "Winja",
           "text": "{purple|He} was banished long ago (both of my accounts got hacked). {bold|But somehow, {purple|He} returned.} {purple|He's} like the {purple,shake|wise, evil, eldritch cryptid wolf.}",
           "face": "neutral",
           "animation": "Talk",
