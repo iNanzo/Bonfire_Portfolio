@@ -6,15 +6,55 @@ format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and ver
 
 ## [Unreleased]
 
-Round 17: NEWT's envelope reworked, rose petals all through his toy, text effects for
+Round 18: NEWT's intro with italic, styled names and replies, dithered feedback, long lines
+that scroll and a dark dither under its box; dust and screen shake when he lands; and no
+more Pixel Shirt. Round 17, below it: NEWT's envelope reworked, rose petals all through his toy, text effects for
 his words, an intro preview in the admin, and a plainer cult altar, no vignette and a cleaner mirror in Bonfire Live. Round
-16, below it: a password lock for the site, and NEWT's toy opened from an envelope, with a
+16: a password lock for the site, and NEWT's toy opened from an envelope, with a
 new toolbar, a new way to carry him and more to do. Round 15: an Uma Musume-style
 intro dialogue for NEWT. Round 14, below that: his second wave (a Default look, new
 controls, speech bubbles, the admin's Invitation page). Round 13: NEWT's toy at
 `/invitation/`. Round 11: the knight at home in every place, every module type-checked, and
 a campfire game on the bonfire, and a cleanup for what agents and test runs leave running.
 Round 10: menus and search, the knight's fixes, hygiene and performance.
+
+### NEWT's intro (round 18)
+
+- A new `italic` text effect slants a word: `{italic|so}`. Pixelify Sans has no italic of its
+  own, so each letter leans where it stands and the line never reflows. It combines with the
+  others, as in `{italic,gold|really}`.
+- The speaker's name on the intro's tab and its replies can carry text tags too. They show
+  styled on the tab, on the reply buttons and in the Log, and a screen reader hears them
+  plain. The admin previews each name and reply under its field.
+- Every button on the intro's screen (Auto, Next, Log, Skip Intro, the replies) fills with a
+  light dither on hover and a heavier one pressed, in the toolbar's style. The screen
+  dithers in as it opens, the replies dither in one after another, the line that was up
+  dithers out as the next one comes, and going on dips the box with a flash of dither. With
+  reduced motion these are quick plain fades.
+- A line longer than the box scrolls inside it, and the box keeps its size: the newest row
+  stays in view as it types, then the wheel, a finger or the arrow and Page keys scroll it,
+  with small pixel triangles where there's more above or below.
+- A dark dither rises from the bottom of the screen behind the chat box, densest behind it
+  and fading out just over its top. It fits the box on a phone or a desktop, rises with a
+  taller box, and never covers the text.
+- In the admin's Invitation page, typing in an intro line while the Intro Preview plays it
+  keeps the focus in the field, so there's no clicking back in after each edit.
+
+### NEWT's landings (round 18)
+
+- NEWT lands in a puff of dust: a ring of small dithered puffs bursts out from his feet along
+  the floor and is gone in under a second. The harder he lands, the bigger and fuller the
+  ring; set down gently, there's none.
+- Dropped from high, he shakes the screen for about a third of a second, a few pixels, more
+  the harder he lands. The Settings sheet's new Screen Shake switch (On or Off, on by
+  default) turns it off, and it never shakes with reduced motion.
+
+### NEWT's look (round 18)
+
+- Pixel Shirt, the blocky black-and-white pixel plaid on his shirt at the coarser
+  resolutions, is gone from Settings and the admin's Invitation page. His shirt shows its own
+  plaid at every resolution. A look saved with Pixel Shirt on still loads, without it, and the
+  admin reads a Default look that still has it with a warning.
 
 ### NEWT's envelope (round 17)
 
