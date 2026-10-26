@@ -1068,19 +1068,27 @@ test.describe('on a desktop', () => {
     await useBehaviorIntro(page);
     /** A dither tile, as the computed style gives one. */
     const TILE = /^url\("data:image\/png;base64,[^"]+"\)$/;
-    // Opening: the layer dithers in, its mask a dither tile part way through (each step held).
-    await replayIntro(page).click();
-    const opening = await page.evaluate(() => {
+    // Opening: the layer dithers in, its mask a dither tile part way through (each step held),
+    // read the moment it shows (its animation held there, then finished).
+    await page.evaluate(() => {
       const layer = document.querySelector('.inv-talk');
-      const a = layer.getAnimations().find((x) => x.animationName === 'inv-talk-dither-in');
-      if (!a) return null;
-      a.pause();
-      a.currentTime = 0.4 * a.effect.getTiming().duration;
-      const mid = getComputedStyle(layer).maskImage;
-      a.finish();
-      return { mid, after: getComputedStyle(layer).maskImage };
+      new MutationObserver((_, watch) => {
+        if (layer.hidden) return;
+        watch.disconnect();
+        getComputedStyle(layer).animationName; // (its animation made now)
+        const a = layer.getAnimations().find((x) => x.animationName === 'inv-talk-dither-in');
+        if (!a) return (window.opening = { none: true });
+        a.pause();
+        a.currentTime = 0.4 * a.effect.getTiming().duration;
+        const mid = getComputedStyle(layer).maskImage;
+        a.finish();
+        window.opening = { mid, after: getComputedStyle(layer).maskImage };
+      }).observe(layer, { attributes: true, attributeFilter: ['hidden'] });
     });
-    expect(opening, 'the layer’s dither-in').not.toBeNull();
+    await replayIntro(page).click();
+    await expect.poll(() => page.evaluate(() => window.opening ?? null)).not.toBeNull();
+    const opening = await page.evaluate(() => window.opening);
+    expect(opening.none, 'the layer’s dither-in').toBeUndefined();
     expect(opening.mid).toMatch(TILE);
     expect(opening.after).toBe('none');
     await until(page, (s) => s.dialogue && s.state === 'talk' && !s.dialogue.waiting, 'the intro under way');
@@ -1110,18 +1118,14 @@ test.describe('on a desktop', () => {
           masks: ghost.getAnimations().flatMap((a) => a.effect.getKeyframes().map((k) => k.maskImage ?? '')),
         });
       }).observe(ghost, { childList: true });
-      document.addEventListener(
-        'click',
-        () =>
-          requestAnimationFrame(() =>
-            window.seen.flash.push(
-              document
-                .querySelector('.inv-talk-flash')
-                .getAnimations()
-                .flatMap((a) => a.effect.getKeyframes().map((k) => k.backgroundImage ?? '')),
-            ),
-          ),
-        true,
+      // (After the layer's own click handler: the flash it started, read at once.)
+      document.addEventListener('click', () =>
+        window.seen.flash.push(
+          document
+            .querySelector('.inv-talk-flash')
+            .getAnimations()
+            .flatMap((a) => a.effect.getKeyframes().map((k) => k.backgroundImage ?? '')),
+        ),
       );
     });
     const before = await snapshot(page);
