@@ -1411,6 +1411,7 @@ test.describe('on a desktop', () => {
         if (layer.hidden) return;
         observer.disconnect();
         const boxEl = layer.querySelector('.inv-talk-box');
+        const dim = layer.querySelector('.inv-talk-dim');
         const css = (el) => getComputedStyle(el);
         window.opening = {
           layer: css(layer).animationName,
@@ -1418,6 +1419,10 @@ test.describe('on a desktop', () => {
           box: css(boxEl).animationName,
           boxEasing: css(boxEl).animationTimingFunction,
           boxMask: css(boxEl).maskImage,
+          dim: css(dim).animationName,
+          dimLook: css(dim).backgroundImage.startsWith('linear-gradient('),
+          dimMask: css(dim).maskImage,
+          dimTakes: css(dim).pointerEvents,
         };
       }).observe(layer, { attributes: true, attributeFilter: ['hidden'] });
     });
@@ -1429,6 +1434,11 @@ test.describe('on a desktop', () => {
       box: 'inv-talk-rise',
       boxEasing: 'ease-out',
       boxMask: 'none',
+      // (The gentle dim behind the box, as before round 18: a smooth gradient fading in plainly.)
+      dim: 'inv-talk-fade',
+      dimLook: true,
+      dimMask: 'none',
+      dimTakes: 'none',
     });
     await until(page, (s) => s.dialogue && s.state === 'talk' && !s.dialogue.waiting, 'the intro under way');
     // No dither of the box's own: no bands in it, no copy of a line going, its fill plain.

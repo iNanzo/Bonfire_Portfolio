@@ -3,8 +3,8 @@
    Sans. A wide box along the bottom (inside the safe area, where the toolbar was: it hides while
    the intro runs) with the speaker's name on a tab at its top left, the line typed out in it and
    a small bouncing ▼ at its bottom right once it's up; Auto, Next and Log at the top right; the
-   replies stacked in the middle of the screen, under his face; the Log and the "Skip the Intro?"
-   question as cards over it all. Phone first (390×844), roomier on a
+   replies stacked in the middle of the screen, under his face; a gentle dim along the bottom
+   behind the box; the Log and the "Skip the Intro?" question as cards over it all. Phone first (390×844), roomier on a
    desktop and lower on a phone held sideways. The layer takes every press, so the canvas under
    it gets none, until the intro ends. The lines' text effects: markup.css.
    Feedback in the toolbar's style, ordered dither (the tiles dialogueUi.js draws on the layer:
@@ -41,6 +41,21 @@
 .inv-talk.is-leaving {
   pointer-events: none;
   cursor: auto;
+}
+
+/* (The dim: darker at the very bottom, gone by the middle; it never takes a press itself.) */
+.inv-talk-dim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgb(58 51 45 / 26%) 0%,
+    rgb(58 51 45 / 12%) 20%,
+    rgb(58 51 45 / 3%) 36%,
+    transparent 48%
+  );
+  pointer-events: none;
+  animation: inv-talk-fade 0.35s ease-out;
 }
 
 .inv-talk-top {
@@ -499,7 +514,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .inv-talk-next,
-  .inv-talk-box {
+  .inv-talk-box,
+  .inv-talk-dim {
     animation: none;
   }
   .inv-talk-choices:not(.is-waiting) .inv-talk-choice {

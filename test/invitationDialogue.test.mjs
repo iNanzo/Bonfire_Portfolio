@@ -602,7 +602,7 @@ test('the chat screen’s feedback: the buttons’ dither in the toolbar’s sty
   assert.match(rule('.inv-talk-next'), /animation: inv-talk-bob [\d.]+s steps\(/);
   // (Reduced motion: the box comes without its rise, the replies with a quick plain fade.)
   const reduced = css.slice(css.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
-  assert.match(reduced, /\.inv-talk-box \{\s*animation: none;/);
+  assert.match(reduced, /\.inv-talk-box[,\s][^}]*\{\s*animation: none;/);
   assert.match(
     reduced,
     /\.inv-talk-choices:not\(\.is-waiting\) \.inv-talk-choice \{\s*animation: inv-talk-fade 0\.1\d?s/,
@@ -733,14 +733,29 @@ test('a long line grows the box a row at most (four rows, three on a short scree
   assert.match(free, /overscroll-behavior: contain/);
 });
 
-test('the chat box has no dark dither of its own: no bands in it, nothing receding on hover', async () => {
+test('the chat box has no dark dither of its own; behind it, the gentle plain dim it had before round 18', async () => {
   const ui = await import('../src/invitation/dialogueUi.js');
   assert.equal('SHADE_BANDS' in ui, false, 'no bands');
-  assert.ok(!/inv-talk-shade|inv-talk-dim/.test(ui.talkHtml()), 'nothing in the box, nor behind it');
+  const markup = ui.talkHtml();
+  assert.ok(!/inv-talk-shade/.test(markup), 'nothing in the box');
   const css = readFileSync(new URL('../src/invitation/dialogue.css', import.meta.url), 'utf8');
   assert.ok(!/inv-talk-shade|is-receding|--talk-band|--talk-sink-steps/.test(css), 'no rules for it');
   const src = readFileSync(new URL('../src/invitation/dialogueUi.js', import.meta.url), 'utf8');
   assert.ok(!/is-receding/.test(src), 'no hover, focus or press makes anything recede');
+  // (The dim: first in the layer, under all of it, hidden from a screen reader.)
+  assert.match(markup, /^<div class="inv-talk-dim" aria-hidden="true"><\/div>/);
+  const at = css.indexOf('.inv-talk-dim {');
+  assert.ok(at >= 0, 'a rule for the dim');
+  const dim = css.slice(at, css.indexOf('}', at));
+  // (A smooth gradient of the ink up from the bottom, gone by the middle: no dither, no tiles.)
+  assert.match(dim, /background: linear-gradient\(\s*to top,/);
+  assert.match(dim, /transparent 48%/);
+  assert.ok(!/mask|url\(|var\(--talk-ink-/.test(dim), 'plain, not dithered');
+  assert.match(dim, /pointer-events: none/);
+  // (It fades in plainly with the screen; reduced motion, it's just there.)
+  assert.match(dim, /animation: inv-talk-fade 0\.35s ease-out/);
+  const reduced = css.slice(css.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
+  assert.match(reduced, /\.inv-talk-dim[,\s][\s\S]*?animation: none/);
 });
 
 // ---- the screen's presses on stand-in elements ---------------------------------------------

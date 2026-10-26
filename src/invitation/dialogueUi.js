@@ -6,7 +6,7 @@
 // Next (to the next question, or the end) and Log at the top right of the screen, Skip Intro at its top
 // left (on screen all through the intro: it ends it at once, no question), the replies as buttons
 // stacked in the middle of it when a box has them (laid out out of sight from the box's start, so
-// main.js frames him over them: clearSpace),
+// main.js frames him over them: clearSpace), a gentle dim along the bottom behind the box,
 // the Log (a scrollable list of the lines shown and the replies picked, a dialog of its own) and
 // a "Skip the Intro?" question for Escape. As the intro ends the whole screen fades out
 // (fadeAway), out of reach from its first step, so free play comes back at once. Rendering
@@ -319,7 +319,8 @@ function styleHolders(root, palette) {
 /** The layer's markup (hidden until open). */
 export function talkHtml() {
   const t = TALK_TEXT;
-  return `<div class="inv-talk-top" role="toolbar" aria-label="${t.layer}">
+  return `<div class="inv-talk-dim" aria-hidden="true"></div>
+  <div class="inv-talk-top" role="toolbar" aria-label="${t.layer}">
     <button type="button" class="inv-btn inv-talk-btn" data-talk="auto" aria-pressed="false">${t.auto}</button>
     <button type="button" class="inv-btn inv-talk-btn" data-talk="skip">${t.next}</button>
     <button type="button" class="inv-btn inv-talk-btn" data-talk="log" aria-haspopup="dialog" aria-expanded="false">${t.log}</button>
