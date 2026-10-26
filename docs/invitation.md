@@ -328,32 +328,35 @@ envelope back over a fresh scene to open again (above). It's laid out like Uma M
 toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
 
 - **The screen:** a wide box along the bottom with his name on a tab at its top left and his
-  line typed out in it, a small ▼ bobbing in pixel steps at its bottom right once the line is all
-  there, Auto, Next and Log at the top right, and **Skip Intro** at the top left. The box is
-  its plain cream, with no dither of its own. A line's own line breaks (as the admin types them)
-  show. The box adapts to the screen and to its line: three rows at least (two on a short
-  screen, such as a phone held sideways or a half-height window), and a longer line grows it,
-  a row at a time, up to about half the screen (two fifths on a short one), the shot framing
-  NEWT over it as it is. It takes its size as the line starts, so it never grows while it types.
-  Only a line taller than that scrolls inside it: as it types the newest row stays in view, and
-  once it's all there the wheel, a finger dragged over it, or the arrow and Page keys scroll it,
-  with small pixel triangles at its right where there's more above or below (a line finished at
-  once by a tap stays where it was, the cue showing the rest). A 240-letter line fits without
-  scrolling on a phone, a desktop and a half-width or half-height window; one with many line
-  breaks of its own scrolls. The toolbar goes while the intro runs and comes back after it.
-- **Feedback,** in the toolbar's style (its ordered Bayer dither, in the ink): every button on the
-  screen (Auto, Next, Log, Skip Intro, the replies, the Log's and the question's) fills with a
-  light dither on hover and a heavier one pressed (a finger held on one too, where a phone's own
-  pressed state can't be relied on). The dither shows right up to its words, which sit on no
-  plate: a crisp outline of the button's own colour rings each letter (a reply's styled ones
-  too), 2 px out from its sides and 1 px at its corners, a dither cell's width, so the press
-  never runs into them. The replies dither in one after another, and a
-  tap or a key that goes on dips the box a step with a flash of dither. The box itself fades
-  plainly: it rises into place with a quick fade as the intro opens, a new line takes the old
-  one's place at once and types from its start (the two never overlap), and the whole screen
-  fades out quickly as the intro ends (out of reach from the first step, so play comes back at
-  once). With reduced motion the box comes without its rise and the replies fade in plainly,
-  with no dip and no bob.
+  line typed out in it, a small ▼ bobbing at its bottom right once the line is all there, Auto,
+  Next and Log at the top right, **Skip Intro** at the top left, and a gentle dim along the
+  bottom of the screen behind the box. It looks as it did before round 18's dither effects:
+  plain cream and paper, no dither on the box or the buttons. A line's own line breaks (as the
+  admin types them) show. The box keeps its shape: three rows (two on a short screen, such as a
+  phone held sideways or a half-height window), and a longer line grows it by one row at most,
+  to four rows (three on a short screen), the shot framing NEWT over it as it is. It takes its
+  size as the line starts, so it never grows while it types. A line longer than that scrolls
+  inside it: as it types the newest row stays in view, and once it's all there the wheel, a
+  finger dragged over it, or the arrow and Page keys scroll it, with small pixel triangles at its
+  right where there's more above or below (a line finished at once by a tap stays where it was,
+  the cue showing the rest). On a phone about 100 letters fill the three rows; a 230-letter
+  line fits a desktop's four rows and scrolls on a phone or a short screen.
+  The toolbar goes while the intro runs and comes back after it.
+- **Feedback,** plain: under a mouse the box and every button on the screen (Auto, Next, Log,
+  Skip Intro, the replies, the Log's and the question's) turn a step warmer, a button lifting a
+  pixel (Auto and Log while on turn a step lighter); pressed (a finger held on one too, where a
+  phone's own pressed state can't be relied on) they turn a step darker and go down, a button
+  its drop, the box 2 px. The box does neither while the replies are up or the Log or the
+  question is open, when a press on it goes nowhere. The replies pop in together, the box rises
+  into place with a quick plain fade as the intro opens, and the whole screen fades out quickly
+  as the intro ends (out of reach from the first step, so play comes back at once).
+- **The click fade,** its one dither: a tap, click, Space or Enter that goes on to the next box,
+  or a reply picked, dithers the line that was up away with its name tab (and the replies, when
+  one was picked) in a few Bayer steps of the toy's dither, in about a sixth of a second; then
+  the next box's name tab dithers in the same way, and only then does its line type, from its
+  first letter, so the two lines never show together. Auto and Next change lines at once. With
+  reduced motion the two fades are quick and plain, and the box comes without its rise, the
+  replies without their pop and the ▼ without its bob.
 - **Going on:** a tap or click anywhere first finishes the line, then goes on to the next box;
   Space and Enter do the same (after a click or tap on Auto, Next or Log too; from the keyboard,
   a focused button presses itself). Some boxes ask a question: two or three replies show as buttons
@@ -991,30 +994,34 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   grab, Screen Shake switched off (look.js `shake`, `shakeOn`: left out until it's picked, on) or
   reduced motion ends it at once.
 - **The intro:** `dialogue.js` (pure, on an injected clock: `normalizeScript` makes any
-  `DialogueScript` safe, types.js; `createDialogue(script, {reduced})` with `start`, `step`,
+  `DialogueScript` safe, types.js; `createDialogue(script, {reduced, lead})` with `start`, `step`,
   `advance`, `choose`, `setAuto`, `skip` (the Next button), `pause`, `end`, `view` and `log`
-  (plain text); `DIALOGUE`: 32 letters a second with a beat after punctuation, Auto's wait
+  (plain text), a line `advance` or `choose` brings on typing `lead` seconds after it comes
+  (main.js passes dialogueUi.js `TALK_LEAD`, the click fade's two ways); `DIALOGUE`: 32 letters
+  a second with a beat after punctuation, Auto's wait
   1.1 s plus 0.035 s a letter between 1.4 and 6 s, 240 letters and 3 replies at most, all
   counting the letters that show (markup.js); `lookSway`; main.js runs
   `content.js` `introScript()` through `normalizeScript` as a safety net, `playScript`),
   `dialogueUi.js` and `dialogue.css` (the screen: a modal layer over the stage that takes every
   press; the line in a live region once, whole; `REPLY_SETTLE`, `REPLY_ROOM`; a long line's
   view `followRow` (the newest row in view, never back up; a jump over `FOLLOW_JUMP` letters
-  stays put), `.can-scroll` once it's typed and outgrows the most the box grows to (the layer a
-  size container, `.inv-talk-text`'s `max-height` whole rows of `50cqh`, `40cqh` on a short
-  screen, less the box's padding and border; its `min-height` three rows, two on a short
-  screen), the `.inv-talk-more` cues; its feedback from
-  `TALK_DITHER`'s tiles, `talkTile` (icons.js `ditherMask` drawn at 2 px a cell) installed on the
-  layer as `--talk-ink-N` and `--talk-mask-N`: the buttons' hover and press backgrounds, the
-  `inv-talk-dither-in` keyframes stepping the replies' `mask-image`, and from script the press
-  flash (`pressFlash`); the box's own plain fades: `inv-talk-rise` as it opens (CSS), and the
-  end (`fadeAway`: `.is-leaving` and inert at once, the layer's opacity down over `LEAVE_MS`,
-  then hidden; `close({cut})` drops it at once for a replay or the
-  preview); `holdPressed` (`.is-pressed` from a pointerdown until it lifts, is cancelled or
-  leaves the button) and the words' outline (`.inv-talk .inv-btn`'s `text-shadow`: twelve
-  whole-pixel shadows with no blur, a pixel out all eight ways and two out from each side, in
-  `--talk-btn-fill`, which its `background-color` takes too: paper, the replies' `--talk-fill`,
-  `--inv-on` while Auto or Log is on; markup.js's letters inherit it)),
+  stays put), `.can-scroll` once it's typed and outgrows the box's four rows
+  (`.inv-talk-text`'s `max-height`, three rows on a short screen; its `min-height` three rows,
+  two on a short screen; the line's type on `.inv-talk-view`), the `.inv-talk-more` cues; the
+  plain hover and press (`.inv-talk .inv-btn`'s `--talk-btn-fill`: paper, the replies'
+  `--talk-fill`, `--inv-on` while Auto or Log is on, and its `color-mix` steps
+  `--talk-btn-hover` and `--talk-btn-down`; the box's own, while the layer is neither
+  `.is-choosing` nor `.is-modal`) and `holdPressed` (`.is-pressed` from a pointerdown on a
+  button or the box until it lifts, is cancelled or leaves it); the click fade (`clickFade`,
+  `TALK_FADE`: from a press that brings on the next box (`press`), the old line's copy
+  `.inv-talk-ghost`, the replies' `.inv-talk-choices.is-ghost` and the name tab out through
+  `fadeFrames`' held `mask-image` steps of `talkTile`'s tiles (icons.js `ditherMask` drawn at
+  2 px a cell), then the name tab and the line in, the box's `data-fade` saying which, each
+  phase timed on the page clock as frames are shown; the new line's letters, ▼ and replies
+  unseen meanwhile; reduced motion, plain opacity fades); the plain fades: `inv-talk-rise` as
+  the box opens and `inv-talk-fade` on the `.inv-talk-dim` gradient (CSS), and the end
+  (`fadeAway`: `.is-leaving` and inert at once, the layer's opacity down over `LEAVE_MS`, then
+  hidden; `close({cut})` drops it at once for a replay or the preview)),
   brain.js's `talk` state (`BrainIn.dialogue`: the
   box's seq, animation, face and whether it's typing; any clip, clips.js `DIALOGUE_CLIPS`:
   `DIALOGUE_WAYS` says which step in place (main.js moves the step phase on by brain.js

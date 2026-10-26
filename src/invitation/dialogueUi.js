@@ -25,14 +25,15 @@
 // round the layer's buttons. A screen reader hears each line whole once, as plain text, from a
 // live region (the typed text is hidden from it), and the Log lists it plain too; the replies are buttons, and focus goes to the first reply
 // when they show, into the Log and the question when they open and back when they close.
-// A long line grows the box with it up to about half the screen (dialogue.css; the box takes its
-// size from the line's start, so it never grows as it types), and a longer one scrolls inside
-// that: the view follows the typing a row at a time (followRow); once it's all typed the wheel, a
-// finger and the arrow and Page keys scroll it, with pixel cues over and under it where there's more.
+// A long line grows the box by a row at most (dialogue.css: four rows, three on a short screen;
+// the box takes its size from the line's start, so it never grows as it types), and a longer one
+// scrolls inside it: the view follows the typing a row at a time (followRow); once it's all
+// typed the wheel, a finger and the arrow and Page keys scroll it, with pixel cues over and
+// under it where there's more.
 // It's plain, as before round 18 (dialogue.css): a light hover where there's a mouse, and a
 // button or the box pressed shows a step darker and down (a press held with a finger too,
-// holdPressed: CSS :active isn't reliable on touch), the replies pop in, the box
-// rises in with a plain fade and the screen fades out plainly at the end. Its one dither: a press
+// holdPressed: CSS :active isn't reliable on touch), the replies pop in, the box rises in with
+// a plain fade and the screen fades out plainly at the end. Its one dither: a press
 // that goes on, or a reply picked, brings the next box on with the click fade (clickFade,
 // TALK_FADE): the old line (a copy of it, where it was) dithers out with its name tab and the
 // replies picked, then the new name tab and line dither in, and only then does it type (the
@@ -601,8 +602,9 @@ export function createDialogueUi(
   }
 
   /**
-   * A long line's view: scrollable once it's all typed and it outgrows the most the box grows to
-   * (the wheel, a finger, the keys), and the cues over and under it where there's more.
+   * A long line's view: scrollable once it's all typed and it outgrows the box's four rows (three
+   * on a short screen; the wheel, a finger, the keys), and the cues over and under it where
+   * there's more.
    */
   function scrollState() {
     const over = text.scrollHeight > text.clientHeight + 1;
