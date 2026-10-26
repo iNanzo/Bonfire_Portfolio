@@ -559,7 +559,7 @@ test('the chat screen’s feedback: the buttons’ dither in the toolbar’s sty
   );
 });
 
-test('a long line scrolls in the box: it follows the typing a row at a time, and the box keeps its size', async () => {
+test('a long line grows the box up to about half the screen, then scrolls in it, following the typing a row at a time', async () => {
   const { followRow, talkHtml, FOLLOW_JUMP } = await import('../src/invitation/dialogueUi.js');
   const row = 25;
   const view = { rowH: row, clientHeight: 3 * row };
@@ -581,20 +581,51 @@ test('a long line scrolls in the box: it follows the typing a row at a time, and
     assert.ok(at >= 0, `a rule for ${sel}`);
     return css.slice(at, css.indexOf('}', at));
   };
-  // (Three rows' room, no more and no less, on a phone and a desktop; two on a phone held sideways.)
+  // (The layer is a size container, so the box's room is measured against the screen it covers.)
+  assert.match(rule('.inv-talk'), /container-type: size/);
+  // (Never held at a few rows any more: a long line grows the box, as it did before round 18.)
+  assert.ok(!/max-height: calc\(\d \* 1\.42em\)/.test(css), 'no fixed rows');
+  // (At least three rows on a phone and a desktop, two on a short screen, so a short line keeps
+  // the box's shape; a longer line grows it a row at a time up to about half the screen (two
+  // fifths on a short one), the box's own padding and border taken off, in whole rows; past that
+  // it scrolls.)
+  const border = Number(/border: (\d+)px solid/.exec(rule('.inv-talk-box'))?.[1]);
+  assert.equal(border, 3);
+  const at = (media) => {
+    const i = css.indexOf(media);
+    assert.ok(i >= 0, media);
+    return i;
+  };
+  const layouts = [
+    { name: 'a phone', from: 0, rows: 3, share: 50 },
+    { name: 'a desktop', from: at('@media (min-width: 700px)'), rows: 3, share: 50 },
+    { name: 'a short screen', from: at('@media (orientation: landscape)'), rows: 2, share: 40 },
+  ];
+  const firstMin = /min-height: calc\((\d) \* 1\.42em\)/.exec(rule('.inv-talk-text'))?.[1];
+  for (const { name, from, rows, share } of layouts) {
+    const box = rule('.inv-talk-box', from);
+    const text = rule('.inv-talk-text', from);
+    const [, top, bottom] = /padding: (\d+)px \d+px (\d+)px/.exec(box) ?? [];
+    assert.ok(top && bottom, `${name}: the box's padding`);
+    const chrome = Number(top) + Number(bottom) + 2 * border;
+    const min = /min-height: calc\((\d) \* 1\.42em\)/.exec(text)?.[1] ?? firstMin;
+    assert.equal(Number(min), rows, `${name}: ${rows} rows at least`);
+    const cap = /max-height: round\(down, calc\((\d+)cqh - (\d+)px\), 1\.42em\)/.exec(text);
+    assert.ok(cap, `${name}: grows up to a share of the screen, in whole rows`);
+    assert.equal(Number(cap[1]), share, `${name}: ${share}% of the screen`);
+    assert.equal(Number(cap[2]), chrome, `${name}: the box's padding and border off (${chrome} px)`);
+  }
+  // (A short screen's box is shorter: no 132 px floor under its two rows.)
+  assert.match(rule('.inv-talk-box', at('@media (orientation: landscape)')), /min-height: 0/);
+  // (Its line hidden past the room, its scrollbar unseen; once it's all typed the wheel, a finger
+  // and the keys scroll it.)
   const text = rule('.inv-talk-text');
-  assert.match(text, /min-height: calc\(3 \* 1\.42em\)/);
-  assert.match(text, /max-height: calc\(3 \* 1\.42em\)/);
   assert.match(text, /overflow-y: hidden/);
-  const side = rule('.inv-talk-text', css.indexOf('@media (orientation: landscape)'));
-  assert.match(side, /min-height: calc\(2 \* 1\.42em\)/);
-  assert.match(side, /max-height: calc\(2 \* 1\.42em\)/);
-  // (Once it's all typed: the wheel, a finger and the keys scroll it, its scrollbar unseen.)
+  assert.match(text, /scrollbar-width: none/);
   const free = rule('.inv-talk-text.can-scroll');
   assert.match(free, /overflow-y: auto/);
   assert.match(free, /touch-action: pan-y/);
   assert.match(free, /overscroll-behavior: contain/);
-  assert.match(text, /scrollbar-width: none/);
 });
 
 test('the chat box has no dark dither of its own: no bands in it, nothing receding on hover', async () => {

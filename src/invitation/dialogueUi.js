@@ -25,9 +25,10 @@
 // round the layer's buttons. A screen reader hears each line whole once, as plain text, from a
 // live region (the typed text is hidden from it), and the Log lists it plain too; the replies are buttons, and focus goes to the first reply
 // when they show, into the Log and the question when they open and back when they close.
-// A line longer than the box shows scrolls inside it (the box keeps its size): the view follows
-// the typing a row at a time (followRow); once it's all typed the wheel, a finger and the arrow
-// and Page keys scroll it, with pixel cues over and under it where there's more.
+// A long line grows the box with it up to about half the screen (dialogue.css; the box takes its
+// size from the line's start, so it never grows as it types), and a longer one scrolls inside
+// that: the view follows the typing a row at a time (followRow); once it's all typed the wheel, a
+// finger and the arrow and Page keys scroll it, with pixel cues over and under it where there's more.
 // Feedback in the toolbar's style, its ordered dither (TALK_DITHER's tiles on the layer, CSS in
 // dialogue.css): the buttons' hover and press (a press held with a finger too, holdPressed: CSS
 // :active isn't reliable on touch; the button's words on a plate of its fill, so the dither never
@@ -478,8 +479,8 @@ export function createDialogueUi(
   }
 
   /**
-   * A long line's view: scrollable once it's all typed and it outgrows the box (the wheel, a
-   * finger, the keys), and the cues over and under it where there's more.
+   * A long line's view: scrollable once it's all typed and it outgrows the most the box grows to
+   * (the wheel, a finger, the keys), and the cues over and under it where there's more.
    */
   function scrollState() {
     const over = text.scrollHeight > text.clientHeight + 1;

@@ -259,7 +259,7 @@ export const TEXT_COLORS_MAX = 24;
 /** The longest colour name, in characters. */
 export const COLOR_NAME_MAX = 20;
 /**
- * A line longer than this (characters) scrolls past the chat box's three lines on a phone (measured at
+ * A line longer than this (characters) outgrows the chat box's three lines on a phone (measured at
  * 390×844: 100 fit, 110 take four), growing it up over NEWT: a warning.
  */
 export const INTRO_TEXT_LONG = 100;
@@ -582,7 +582,7 @@ const BOX_CHECKS = {
     introText(v, p, INTRO_TEXT_MAX, check, true, true);
     const n = typeof v === 'string' ? letterCount(v.trim()) : 0;
     if (n > INTRO_TEXT_LONG && n <= INTRO_TEXT_MAX)
-      check.warn(check.at(p), `Over ${INTRO_TEXT_LONG} characters: on a phone it scrolls past the box’s three lines.`);
+      check.warn(check.at(p), `Over ${INTRO_TEXT_LONG} characters: on a phone it outgrows the box’s three lines.`);
   },
   face: (v, p, check) => check.oneOf(v, FACE_NAMES, p),
   animation: (v, p, check) => check.oneOf(v, INTRO_ANIMATIONS, p),

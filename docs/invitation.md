@@ -331,12 +331,16 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   line typed out in it, a small ▼ bobbing in pixel steps at its bottom right once the line is all
   there, Auto, Next and Log at the top right, and **Skip Intro** at the top left. The box is
   its plain cream, with no dither of its own. A line's own line breaks (as the admin types them)
-  show. A line
-  longer than the box's three rows (two on a phone held sideways) scrolls inside it, and the box
-  keeps its size: as it types the newest row stays in view, and once it's all there the wheel, a
-  finger dragged over it, or the arrow and Page keys scroll it, with small pixel triangles at its
-  right where there's more above or below (a line finished at once by a tap stays where it was,
-  the cue showing the rest). The toolbar goes while the intro runs and comes back after it.
+  show. The box adapts to the screen and to its line: three rows at least (two on a short
+  screen, such as a phone held sideways or a half-height window), and a longer line grows it,
+  a row at a time, up to about half the screen (two fifths on a short one), the shot framing
+  NEWT over it as it is. It takes its size as the line starts, so it never grows while it types.
+  Only a line taller than that scrolls inside it: as it types the newest row stays in view, and
+  once it's all there the wheel, a finger dragged over it, or the arrow and Page keys scroll it,
+  with small pixel triangles at its right where there's more above or below (a line finished at
+  once by a tap stays where it was, the cue showing the rest). A 240-letter line fits without
+  scrolling on a phone, a desktop and a half-width or half-height window; one with many line
+  breaks of its own scrolls. The toolbar goes while the intro runs and comes back after it.
 - **Feedback,** in the toolbar's style (its ordered Bayer dither, in the ink): every button on the
   screen (Auto, Next, Log, Skip Intro, the replies, the Log's and the question's) fills with a
   light dither on hover and a heavier one pressed (a finger held on one too, where a phone's own
@@ -993,7 +997,10 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   `dialogueUi.js` and `dialogue.css` (the screen: a modal layer over the stage that takes every
   press; the line in a live region once, whole; `REPLY_SETTLE`, `REPLY_ROOM`; a long line's
   view `followRow` (the newest row in view, never back up; a jump over `FOLLOW_JUMP` letters
-  stays put), `.can-scroll` once it's typed and outgrows the box, the `.inv-talk-more` cues; its feedback from
+  stays put), `.can-scroll` once it's typed and outgrows the most the box grows to (the layer a
+  size container, `.inv-talk-text`'s `max-height` whole rows of `50cqh`, `40cqh` on a short
+  screen, less the box's padding and border; its `min-height` three rows, two on a short
+  screen), the `.inv-talk-more` cues; its feedback from
   `TALK_DITHER`'s tiles, `talkTile` (icons.js `ditherMask` drawn at 2 px a cell) installed on the
   layer as `--talk-ink-N` and `--talk-mask-N`: the buttons' hover and press backgrounds, the
   `inv-talk-dither-in` keyframes stepping the replies' `mask-image`, and from script the press
