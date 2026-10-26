@@ -26,10 +26,8 @@
 // a line dithers out over the next, a press that goes on flashes the box, the ▼ bobs in steps,
 // and reduced motion fades plainly. A line longer than the box scrolls inside it (the box keeps
 // its size): it follows the typing, then a finger, the wheel or the arrow keys scroll it, with
-// cues where there's more. A dark dither sits inside the box, up from its bottom edge under the
-// text (only its lightest bands over the line), and recedes, stepped, while the box is hovered,
-// pressed or has focus in it; with reduced motion it goes a step lighter in place. A new line
-// waits for the old one to dither out, so their letters never show together.
+// cues where there's more. A new line waits for the old one to dither out, so their letters
+// never show together.
 import { readFileSync } from 'node:fs';
 import { test, expect } from '@playwright/test';
 import { routeToEnd } from './helpers/dialogue-route.mjs';
@@ -538,170 +536,7 @@ async function longLineScrolls(page, tap) {
   expect(errors).toEqual([]);
 }
 
-/** The dark dither in the box, against the box and its line: client px, each band's coverage (of 16) from the layer's tiles. */
-const shadeInBox = (page) =>
-  page.evaluate(() => {
-    const r = (el) => el.getBoundingClientRect();
-    const layer = document.querySelector('.inv-talk');
-    const boxEl = document.querySelector('.inv-talk-box');
-    const shade = boxEl.querySelector('.inv-talk-shade');
-    const key = (v) => v.trim().replace(/^url\(["']?|["']?\)$/g, '');
-    const tiles = new Map(
-      [1, 2, 3, 4, 6, 8].map((n) => [key(getComputedStyle(layer).getPropertyValue(`--talk-ink-${n}`)), n]),
-    );
-    const kids = [...boxEl.children];
-    const b = r(boxEl);
-    const t = r(document.querySelector('.inv-talk-text'));
-    const s = r(shade);
-    const edge = parseFloat(getComputedStyle(boxEl).borderBottomWidth);
-    return {
-      inBox: shade.parentElement === boxEl,
-      fromScreen: Boolean(document.querySelector('.inv-talk-dim')),
-      under: ['.inv-talk-flash', '.inv-talk-name', '.inv-talk-view', '.inv-talk-next'].every(
-        (sel) => kids.indexOf(shade) < kids.indexOf(boxEl.querySelector(sel)),
-      ),
-      box: { top: b.top, bottom: b.bottom - edge, left: b.left + edge, right: b.right - edge },
-      shade: { top: s.top, bottom: s.bottom, left: s.left, right: s.right, height: s.height },
-      text: { top: t.top, bottom: t.bottom },
-      band: parseFloat(getComputedStyle(boxEl).getPropertyValue('--talk-band')),
-      receding: boxEl.classList.contains('is-receding'),
-      bands: [...shade.children].map((el) => {
-        const bg = getComputedStyle(el).backgroundImage;
-        const tr = getComputedStyle(el).translate;
-        return {
-          top: r(el).top,
-          bottom: r(el).bottom,
-          n: bg === 'none' ? 0 : (tiles.get(key(bg)) ?? -1),
-          sunk: tr === 'none' ? 0 : parseFloat(tr.split(' ')[1] ?? '0'),
-        };
-      }),
-    };
-  });
-/**
- * The dark dither inside the chat box: the ink's bands up from its bottom edge, densest there,
- * under the name tab and the line, only the light ones over the line's lowest row, the same
- * along a taller box's bottom; hovered (a finger's press on a phone), it recedes, stepped, and
- * comes back after; focus in the box does the same; with reduced motion, a step lighter in place.
- */
-async function darkInsideBox(page, tap) {
-  const errors = watch(page);
-  await calm(page);
-  await useBehaviorIntro(page);
-  await open(page, tap);
-  // (The mouse is still where Replay Intro was, under the box: off it, the dither rests.)
-  if (!tap) await page.mouse.move(5, 5);
-  await expect.poll(async () => (await shadeInBox(page)).receding, { message: 'at rest' }).toBe(false);
-  await expect
-    .poll(async () => (await shadeInBox(page)).bands.every((b) => b.sunk === 0), { message: 'all the way up' })
-    .toBe(true);
-  const d = await shadeInBox(page);
-  expect(d.inBox && !d.fromScreen, 'in the box, nothing from the screen’s bottom').toBe(true);
-  expect(d.under, 'under the flash, the name tab, the line and the ▼').toBe(true);
-  // (Along the box's bottom edge inside its border, four bands of the box's own size.)
-  expect(Math.abs(d.shade.bottom - d.box.bottom)).toBeLessThan(1);
-  expect(Math.abs(d.shade.left - d.box.left)).toBeLessThan(1);
-  expect(Math.abs(d.shade.right - d.box.right)).toBeLessThan(1);
-  expect(d.band).toBe(tap ? 12 : 14);
-  expect(d.shade.height).toBeCloseTo(4 * d.band, 0);
-  expect(
-    d.bands.map((b) => b.n),
-    'lightest at the top, densest at the bottom',
-  ).toEqual([1, 2, 3, 4]);
-  // (The text reads: its upper rows clear, and only the lightest bands under its lowest row.)
-  expect(d.shade.top).toBeGreaterThan(d.text.top + 20);
-  for (const b of d.bands)
-    if (b.bottom > d.text.top + 0.5 && b.top < d.text.bottom - 0.5)
-      expect(b.n, `a band over the line, ${b.n}/16`).toBeLessThanOrEqual(2);
-  expect(d.receding).toBe(false);
-
-  // Hovered (a finger held on it, on a phone), it recedes: the bands sink one band, 2 px a step.
-  await page.evaluate(() => {
-    const band = document.querySelector('.inv-talk-shade > span');
-    window.sink = new Set();
-    const tick = () => {
-      const tr = getComputedStyle(band).translate;
-      window.sink.add(tr === 'none' ? 0 : parseFloat(tr.split(' ')[1] ?? '0'));
-      window.sinkFrame = requestAnimationFrame(tick);
-    };
-    tick();
-  });
-  const boxR = await box(page).boundingBox();
-  const at = { x: boxR.x + boxR.width * 0.4, y: boxR.y + boxR.height * 0.45 };
-  const cdp = tap ? await page.context().newCDPSession(page) : null;
-  const finger = (type) =>
-    cdp.send('Input.dispatchTouchEvent', {
-      type,
-      touchPoints: type === 'touchEnd' ? [] : [{ x: at.x, y: at.y, id: 1, radiusX: 2, radiusY: 2, force: 1 }],
-    });
-  if (tap) await finger('touchStart');
-  else await page.mouse.move(at.x, at.y);
-  await expect
-    .poll(async () => (await shadeInBox(page)).bands.every((b) => b.sunk === d.band), { message: 'sunk a band' })
-    .toBe(true);
-  expect((await shadeInBox(page)).receding).toBe(true);
-  const steps = await page.evaluate(() => {
-    cancelAnimationFrame(window.sinkFrame);
-    return [...window.sink];
-  });
-  for (const y of steps) expect(y % 2, `${y} px: whole 2 px steps`).toBe(0);
-  expect(steps.filter((y) => y > 0 && y < d.band).length, 'stepped down, not a jump').toBeGreaterThan(0);
-  // Off it (or the finger up), it comes back up.
-  if (tap) await finger('touchEnd');
-  else await page.mouse.move(5, 5);
-  await expect
-    .poll(async () => (await shadeInBox(page)).bands.every((b) => b.sunk === 0), { message: 'back up' })
-    .toBe(true);
-  expect((await shadeInBox(page)).receding).toBe(false);
-
-  if (!tap) {
-    // Focus in the box recedes it too, and focus back out lets it come back.
-    await page.evaluate(() => {
-      const t = document.querySelector('.inv-talk-text');
-      t.tabIndex = -1;
-      t.focus();
-    });
-    await expect.poll(async () => (await shadeInBox(page)).receding).toBe(true);
-    await page.evaluate(() => document.querySelector('.inv-talk').focus());
-    await expect.poll(async () => (await shadeInBox(page)).receding).toBe(false);
-    // Reduced motion: no sinking, a step lighter where it is.
-    await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.mouse.move(at.x, at.y);
-    await expect.poll(async () => (await shadeInBox(page)).bands.map((b) => b.n)).toEqual([0, 1, 2, 3]);
-    expect(
-      (await shadeInBox(page)).bands.every((b) => b.sunk === 0),
-      'no move',
-    ).toBe(true);
-    await page.mouse.move(5, 5);
-    await expect.poll(async () => (await shadeInBox(page)).bands.map((b) => b.n)).toEqual([1, 2, 3, 4]);
-    await page.emulateMedia({ reducedMotion: 'no-preference' });
-  }
-
-  // A taller box: the dither stays along its bottom edge, the same size.
-  const grow = await page.addStyleTag({ content: '.inv-talk-box { padding-top: 120px !important; }' });
-  await expect
-    .poll(
-      async () => {
-        const g = await shadeInBox(page);
-        return (
-          g.box.top < d.box.top - 60 &&
-          Math.abs(g.shade.bottom - g.box.bottom) < 1 &&
-          Math.abs(g.shade.height - d.shade.height) < 1
-        );
-      },
-      { message: 'along the taller box’s bottom' },
-    )
-    .toBe(true);
-  await grow.evaluate((el) => el.remove());
-  expect(errors).toEqual([]);
-}
-
 test.describe('on a phone', () => {
-  test('a dark dither inside the box, up from its bottom edge under the text, recedes while it’s pressed', async ({
-    page,
-  }) => {
-    await darkInsideBox(page, true);
-  });
-
   test('a long line scrolls in the box: it follows the typing, then a finger or the wheel and keys scroll it', async ({
     page,
   }) => {
@@ -1223,12 +1058,6 @@ test.describe('on a phone', () => {
 });
 
 test.describe('on a desktop', () => {
-  test('a dark dither inside the box, up from its bottom edge under the text, recedes while it’s hovered', async ({
-    page,
-  }) => {
-    await darkInsideBox(page, false);
-  });
-
   test('a long line scrolls in the box: it follows the typing, then a finger or the wheel and keys scroll it', async ({
     page,
   }) => {

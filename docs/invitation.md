@@ -329,15 +329,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
 
 - **The screen:** a wide box along the bottom with his name on a tab at its top left and his
   line typed out in it, a small ▼ bobbing in pixel steps at its bottom right once the line is all
-  there, Auto, Next and Log at the top right, **Skip Intro** at the top left, and a dark dither
-  inside the box (the ink's ordered dither in bands up from its bottom edge, densest there and
-  fading out upward, under the line and the name tab: the denser bands fill the space under the
-  line and only the lightest reach its lowest row, so the text always reads; sized to the box on
-  a phone, a desktop or a phone held sideways, and a long line scrolls over it where it is).
-  Hovering the box, focus in it or a finger on it makes the dither recede a little: it sinks a
-  band in 2 px steps over a quarter of a second, leaving every row a step lighter, and comes back
-  up after (with reduced motion it just goes a step lighter where it is). A line's own line
-  breaks (as the admin types them) show. A line
+  there, Auto, Next and Log at the top right, and **Skip Intro** at the top left. The box is
+  its plain cream, with no dither of its own. A line's own line breaks (as the admin types them)
+  show. A line
   longer than the box's three rows (two on a phone held sideways) scrolls inside it, and the box
   keeps its size: as it types the newest row stays in view, and once it's all there the wheel, a
   finger dragged over it, or the arrow and Page keys scroll it, with small pixel triangles at its
@@ -1009,10 +1003,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   (`ditherAway`: `.is-leaving` and inert at once, the layer's mask through the fade's steps over
   `TALK_DITHER.leaveMs`, then hidden; `close({cut})` drops it at once for a replay or the
   preview); `holdPressed` (`.is-pressed` from a pointerdown until it lifts, is cancelled or
-  leaves the button) and `.inv-talk-label` (a button's words on a plate of its inherited fill);
-  the dark dither in the box, `.inv-talk-shade` (`SHADE_BANDS` on `--talk-ink-N`, four bands of
-  `--talk-band` each per layout, sinking one in `--talk-sink-steps` steps under `.is-receding`:
-  a pointer on the box or focus in it)), brain.js's `talk` state (`BrainIn.dialogue`: the
+  leaves the button) and `.inv-talk-label` (a button's words on a plate of its inherited fill)),
+  brain.js's `talk` state (`BrainIn.dialogue`: the
   box's seq, animation, face and whether it's typing; any clip, clips.js `DIALOGUE_CLIPS`:
   `DIALOGUE_WAYS` says which step in place (main.js moves the step phase on by brain.js
   `talkPhase`) and which dangle him (`dangleLift`: his lowest point `DANGLE.gap` over the

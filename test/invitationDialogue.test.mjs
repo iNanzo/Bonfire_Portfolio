@@ -625,82 +625,14 @@ test('a long line scrolls in the box: it follows the typing a row at a time, and
   assert.match(text, /scrollbar-width: none/);
 });
 
-test('a dark dither inside the box: the ink’s bands up from its bottom edge, light over the text, receding on hover', async () => {
-  const { SHADE_BANDS, talkHtml, TALK_DITHER } = await import('../src/invitation/dialogueUi.js');
+test('the chat box has no dark dither of its own: no bands in it, nothing receding on hover', async () => {
   const ui = await import('../src/invitation/dialogueUi.js');
-  assert.equal('talkRise' in ui, false, 'no dither behind the box any more');
-  const markup = talkHtml();
-  assert.ok(!/inv-talk-dim/.test(markup), 'nothing rising from the screen’s bottom');
-  // (In the box, its first child: under the flash, the name tab, the line and the ▼.)
-  const boxAt = markup.indexOf('<section class="inv-talk-box">');
-  const shadeAt = markup.indexOf('<span class="inv-talk-shade" aria-hidden="true">');
-  assert.ok(boxAt >= 0 && shadeAt > boxAt, 'inside the box');
-  for (const later of ['inv-talk-flash', 'inv-talk-name', 'inv-talk-view', 'inv-talk-next'])
-    assert.ok(markup.indexOf(`class="${later}`) > shadeAt, `under ${later}`);
-  const shade =
-    /<span class="inv-talk-shade" aria-hidden="true">((?:<span class="inv-talk-shade-\d+"><\/span>)+)<\/span>/.exec(
-      markup,
-    )?.[1];
-  assert.ok(shade, 'its bands');
-  const bands = [...shade.matchAll(/inv-talk-shade-(\d+)/g)].map((m) => Number(m[1]));
-  assert.deepEqual(bands, SHADE_BANDS);
-  // (Lightest at the top, densest at the bottom edge; lighter than the old dither's 6/16 base.)
-  assert.ok(bands.length >= 3 && bands.every((n, i) => i === 0 || n > bands[i - 1]), `denser further down: ${bands}`);
-  assert.ok(bands.at(-1) <= 4, 'its densest band a light one');
-  for (const n of bands) assert.ok(TALK_DITHER.ink.includes(n), `${n}: an ink tile`);
-
+  assert.equal('SHADE_BANDS' in ui, false, 'no bands');
+  assert.ok(!/inv-talk-shade|inv-talk-dim/.test(ui.talkHtml()), 'nothing in the box, nor behind it');
   const css = readFileSync(new URL('../src/invitation/dialogue.css', import.meta.url), 'utf8');
-  assert.ok(!/inv-talk-dim|--talk-rise/.test(css), 'the dither behind the box is gone');
-  const rule = (sel, from = 0) => {
-    const at = css.indexOf(`${sel} {`, from);
-    assert.ok(at >= 0, `a rule for ${sel}`);
-    return css.slice(at, css.indexOf('}', at));
-  };
-  // (Along the box's bottom edge, inside its border, clipped to its round corners; four bands of
-  // --talk-band each, the box's own size on a phone, a desktop and a phone held sideways.)
-  const box = rule('.inv-talk-shade');
-  assert.match(box, /position: absolute/);
-  assert.match(box, /bottom: 0/);
-  assert.match(box, /overflow: hidden/);
-  assert.match(box, /height: calc\(4 \* var\(--talk-band\)\)/);
-  assert.match(box, /pointer-events: none/);
-  assert.ok(!/gradient/.test(box), 'dithered, not a smooth gradient');
-  const sizes = [
-    rule('.inv-talk-box'),
-    rule('.inv-talk-box', css.indexOf('@media (min-width: 700px)')),
-    rule('.inv-talk-box', css.indexOf('@media (orientation: landscape)')),
-  ].map((r) => {
-    const band = Number(/--talk-band: (\d+)px/.exec(r)?.[1]);
-    const pad = Number(/padding: \d+px \d+px (\d+)px/.exec(r)?.[1]);
-    const steps = Number(/--talk-sink-steps: (\d+)/.exec(r)?.[1]);
-    return { band, pad, steps };
-  });
-  for (const { band, pad, steps } of sizes) {
-    assert.ok(band % 2 === 0, `${band}: whole 2 px cells`);
-    // (The two densest bands in the padding under the line; only the lightest two reach its rows.)
-    assert.ok(2 * band <= pad, `${band} px bands, ${pad} px under the line`);
-    assert.equal(steps, band / 2, 'it sinks 2 px a step');
-  }
-  for (const n of bands)
-    assert.match(rule(`.inv-talk-shade-${n}`), new RegExp(String.raw`background-image: var\(--talk-ink-${n}\)`));
-  // (Hovered, focused in, or pressed: it sinks a band, stepped, which leaves every row a step
-  // lighter; back on leave. Reduced motion: no move, a step lighter where it is.)
-  assert.match(rule('.inv-talk-shade > span'), /transition: translate 0\.2\d?s steps\(var\(--talk-sink-steps\), end\)/);
-  assert.match(rule('.inv-talk-box.is-receding .inv-talk-shade > span'), /translate: 0 var\(--talk-band\)/);
-  const reduced = css.slice(css.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
-  assert.match(
-    rule('.inv-talk-shade > span', css.indexOf('@media (prefers-reduced-motion: reduce)')),
-    /transition: none/,
-  );
-  assert.match(reduced, /\.inv-talk-box\.is-receding \.inv-talk-shade > span \{[^}]*translate: none/);
-  bands.forEach((n, i) => {
-    const lighter = i === 0 ? 'none' : `var\\(--talk-ink-${bands[i - 1]}\\)`;
-    assert.match(
-      reduced,
-      new RegExp(String.raw`\.inv-talk-box\.is-receding \.inv-talk-shade-${n} \{[^}]*background-image: ${lighter}`),
-      `band ${n} a step lighter`,
-    );
-  });
+  assert.ok(!/inv-talk-shade|is-receding|--talk-band|--talk-sink-steps/.test(css), 'no rules for it');
+  const src = readFileSync(new URL('../src/invitation/dialogueUi.js', import.meta.url), 'utf8');
+  assert.ok(!/is-receding/.test(src), 'no hover, focus or press makes anything recede');
 });
 
 // ---- the screen's presses on stand-in elements ---------------------------------------------

@@ -2,9 +2,8 @@
    cream fill, a dark 3 px outline with the buttons' chunky drop, big rounded corners, Pixelify
    Sans. A wide box along the bottom (inside the safe area, where the toolbar was: it hides while
    the intro runs) with the speaker's name on a tab at its top left, the line typed out in it and
-   a small bouncing ▼ at its bottom right once it's up, and a dark dither inside it, up from its
-   bottom edge (receding a little on hover); Auto, Next and Log at the top right; the replies
-   stacked in the middle of the screen, under his face; the Log and the "Skip the Intro?"
+   a small bouncing ▼ at its bottom right once it's up; Auto, Next and Log at the top right; the
+   replies stacked in the middle of the screen, under his face; the Log and the "Skip the Intro?"
    question as cards over it all. Phone first (390×844), roomier on a
    desktop and lower on a phone held sideways. The layer takes every press, so the canvas under
    it gets none, until the intro ends. The lines' text effects: markup.css.
@@ -15,7 +14,7 @@
    ends (from script, out of reach from its first step), and the replies one after another; a
    line dithers out before the next shows (the ghost, from script) and a press that goes on dips
    the box with a flash of dither (the flash, from script); the ▼ bobs in pixel steps. Reduced
-   motion: quick plain fades, no bob, no dip, no sinking. */
+   motion: quick plain fades, no bob, no dip. */
 
 @import './markup.css';
 
@@ -108,50 +107,6 @@
   background: var(--talk-fill);
   box-shadow: 0 4px 0 var(--talk-ink);
   animation: inv-talk-rise 0.24s steps(3, end);
-  /* (The dark dither's bands, and the 2 px steps it sinks one in.) */
-  --talk-band: 12px;
-  --talk-sink-steps: 6;
-}
-/* (The dark dither inside the box: the ink's ordered dither in bands up from its bottom edge,
-   densest there and fading out upward, under the flash, the name tab, the line and the ▼. The two
-   denser bands sit in the padding under the line and only the two lightest reach its lowest row,
-   so the text reads as ever; --talk-band sizes them to the box on a phone, a desktop and a phone
-   held sideways, and a long line scrolls over them where they are. Hovered, with focus in it or
-   pressed (.is-receding, dialogueUi.js) it recedes: the bands sink one band, 2 px a step, which
-   leaves every row a step lighter, and come back up as it ends.) */
-.inv-talk-shade {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  flex-direction: column;
-  height: calc(4 * var(--talk-band));
-  overflow: hidden;
-  border-radius: 0 0 19px 19px;
-  pointer-events: none;
-}
-.inv-talk-shade > span {
-  flex: 1 1 0;
-  background-repeat: repeat;
-  background-size: 8px 8px;
-  image-rendering: pixelated;
-  transition: translate 0.24s steps(var(--talk-sink-steps), end);
-}
-.inv-talk-box.is-receding .inv-talk-shade > span {
-  translate: 0 var(--talk-band);
-}
-.inv-talk-shade-1 {
-  background-image: var(--talk-ink-1);
-}
-.inv-talk-shade-2 {
-  background-image: var(--talk-ink-2);
-}
-.inv-talk-shade-3 {
-  background-image: var(--talk-ink-3);
-}
-.inv-talk-shade-4 {
-  background-image: var(--talk-ink-4);
 }
 /* (A press that goes on: the ink's dither over the box's fill for a moment, under its tab and its
    line, dialogueUi.js pressFlash.) */
@@ -464,8 +419,6 @@
     bottom: calc(24px + env(safe-area-inset-bottom));
     min-height: 150px;
     padding: 28px 30px 30px;
-    --talk-band: 14px;
-    --talk-sink-steps: 7;
   }
   .inv-talk-name {
     left: 22px;
@@ -501,8 +454,6 @@
     min-height: 0;
     padding: 18px 18px 20px;
     bottom: calc(8px + env(safe-area-inset-bottom));
-    --talk-band: 10px;
-    --talk-sink-steps: 5;
   }
   .inv-talk-text {
     min-height: calc(2 * 1.42em);
@@ -529,24 +480,5 @@
   .inv-talk:not([hidden]),
   .inv-talk-choices:not(.is-waiting) .inv-talk-choice {
     animation: inv-talk-fade 0.12s linear both;
-  }
-  /* (The dark dither in the box doesn't sink: it goes a step lighter where it is.) */
-  .inv-talk-shade > span {
-    transition: none;
-  }
-  .inv-talk-box.is-receding .inv-talk-shade > span {
-    translate: none;
-  }
-  .inv-talk-box.is-receding .inv-talk-shade-1 {
-    background-image: none;
-  }
-  .inv-talk-box.is-receding .inv-talk-shade-2 {
-    background-image: var(--talk-ink-1);
-  }
-  .inv-talk-box.is-receding .inv-talk-shade-3 {
-    background-image: var(--talk-ink-2);
-  }
-  .inv-talk-box.is-receding .inv-talk-shade-4 {
-    background-image: var(--talk-ink-3);
   }
 }

@@ -6,10 +6,7 @@
 // Next (to the next question, or the end) and Log at the top right of the screen, Skip Intro at its top
 // left (on screen all through the intro: it ends it at once, no question), the replies as buttons
 // stacked in the middle of it when a box has them (laid out out of sight from the box's start, so
-// main.js frames him over them: clearSpace), a dark dither inside the box (the ink's Bayer bands,
-// SHADE_BANDS, up from its bottom edge under the line and the name tab, the denser ones under the
-// line and only the lightest over its lowest row; it recedes a little while the box is hovered,
-// has focus in it or is pressed: .is-receding),
+// main.js frames him over them: clearSpace),
 // the Log (a scrollable list of the lines shown and the replies picked, a dialog of its own) and
 // a "Skip the Intro?" question for Escape. As the intro ends the whole screen dithers out
 // (ditherAway), out of reach from its first step, so free play comes back at once. Rendering
@@ -65,15 +62,15 @@ export const REPLY_SETTLE = 450;
 
 /**
  * The screen's dither, the toolbar's (icons.js ditherMask, a Bayer 4×4 at n/16): ink, the
- * coverages of the ink tiles (--talk-ink-N: the buttons' hover and press, the press flash, the
- * dark dither in the box); fade, the steps of a dithered fade (--talk-mask-N, mask tiles: the
+ * coverages of the ink tiles (--talk-ink-N: the buttons' hover and press, the press flash);
+ * fade, the steps of a dithered fade (--talk-mask-N, mask tiles: the
  * layer and the replies dithering in, a line dithering out as the next comes); fadeMs, how long
  * a line takes to dither out (main.js has the runner hold the next line's typing that long:
  * dialogue.js lead); pressMs, the press flash on the box; leaveMs, the whole screen dithering
  * out as the intro ends (ditherAway).
  */
 export const TALK_DITHER = {
-  ink: [1, 2, 3, 4, 6, 8],
+  ink: [2, 4, 6],
   fade: [0, 2, 4, 6, 8, 10, 12, 14],
   fadeMs: 180,
   pressMs: 150,
@@ -137,12 +134,6 @@ export function followRow({ mid, rowH, clientHeight, scrollTop }) {
   const want = Math.max(0, Math.round((Math.floor(mid / rowH) + 1) * rowH - clientHeight));
   return want > scrollTop ? want : scrollTop;
 }
-
-/**
- * The dark dither in the box, its bands top to bottom: the ink's coverage in each, out of 16
- * (lightest at the top, densest along the box's bottom edge; dialogue.css sizes them).
- */
-export const SHADE_BANDS = [1, 2, 3, 4];
 
 /**
  * A press held on a button in `root` shows as pressed (`cls` on it, dialogue.css) from its
@@ -320,7 +311,6 @@ export function talkHtml() {
   <button type="button" class="inv-btn inv-talk-btn inv-talk-skip-intro" data-intro-skip>${label(t.skipIntro)}</button>
   <div class="inv-talk-choices" role="group" aria-label="${t.replies}" hidden></div>
   <section class="inv-talk-box">
-    <span class="inv-talk-shade" aria-hidden="true">${SHADE_BANDS.map((n) => `<span class="inv-talk-shade-${n}"></span>`).join('')}</span>
     <span class="inv-talk-flash" aria-hidden="true"></span>
     <p class="inv-talk-name" aria-hidden="true"></p>
     <div class="inv-talk-view">
@@ -585,38 +575,6 @@ export function createDialogueUi(
   text.addEventListener('scroll', cues, { passive: true });
   if (typeof view?.ResizeObserver === 'function') new view.ResizeObserver(() => scrollState()).observe(text);
 
-  /**
-   * The pointers on the box (a mouse's or a pen's while it hovers; a finger's from its press till
-   * it lifts) and whether focus is in it: while any is, its dark dither recedes (dialogue.css).
-   */
-  const onBox = /** @type {Set<number>} */ (new Set());
-  let focusInBox = false;
-  const recede = () => boxEl.classList.toggle('is-receding', onBox.size > 0 || focusInBox);
-  /** Nothing on the box (the layer opened or closed): the dither as it rests. */
-  const restShade = () => {
-    onBox.clear();
-    focusInBox = false;
-    recede();
-  };
-  boxEl.addEventListener('pointerenter', (e) => {
-    onBox.add(e.pointerId);
-    recede();
-  });
-  for (const type of ['pointerleave', 'pointercancel'])
-    boxEl.addEventListener(type, (e) => {
-      onBox.delete(/** @type {PointerEvent} */ (e).pointerId);
-      recede();
-    });
-  boxEl.addEventListener('focusin', () => {
-    focusInBox = true;
-    recede();
-  });
-  boxEl.addEventListener('focusout', (e) => {
-    const to = e.relatedTarget;
-    focusInBox = to instanceof Node && boxEl.contains(to);
-    recede();
-  });
-
   /** The Log was opened with a pointer (a click or a tap), not from the keyboard. */
   let logByPointer = false;
 
@@ -768,7 +726,6 @@ export function createDialogueUi(
       fading?.cancel();
       fading = null;
       ghost.replaceChildren();
-      restShade();
       reach();
       doc.addEventListener('keydown', onKey);
       layer.focus({ preventScroll: true });
@@ -785,13 +742,11 @@ export function createDialogueUi(
       doc.removeEventListener('keydown', onKey);
       if (cut || layer.hidden) {
         layer.hidden = true;
-        restShade();
         return;
       }
       const masks = [...TALK_DITHER.fade].reverse().map((n) => tiles.mask.get(n));
       leaving = ditherAway(layer, { masks, reduced: reduced() }, () => {
         leaving = null;
-        restShade();
       });
     },
     /**
