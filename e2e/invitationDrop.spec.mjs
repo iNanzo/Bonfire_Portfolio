@@ -120,6 +120,33 @@ test.describe('landing, on a desktop', () => {
     await grab(page, 'body');
     for (let i = 0; i < 12; i++) await page.mouse.wheel(0, 100);
     await until(page, (s) => s.drag.lowestFoot < 0.1, 'lowered to the floor');
+    // Reaching the floor is not yet a gentle release: the wheel's lowering motion and
+    // the dangling pose can still contribute to the throw. Wait for both to settle
+    // across simulation time, including the release velocity's sampling window.
+    let stillSince = null;
+    let previous = null;
+    await expect
+      .poll(
+        async () => {
+          const s = await snapshot(page);
+          const a = s.drag.anchor;
+          const h = s.drag.hips;
+          const point = a && h ? [a.x, a.y, a.z, h.x, h.z, s.drag.lowestFoot] : null;
+          const quiet =
+            s.held &&
+            s.drag.lowestFoot < 0.1 &&
+            s.motion.limp.most < 0.03 &&
+            point &&
+            previous &&
+            point.every((v, i) => Math.abs(v - previous[i]) < 0.001);
+          previous = point;
+          if (!quiet) stillSince = null;
+          else stillSince ??= s.motion.heldFor;
+          return stillSince !== null && s.motion.heldFor - stillSince >= 0.25;
+        },
+        { message: 'still at the floor before the gentle set-down', timeout: 30_000, intervals: [100] },
+      )
+      .toBe(true);
     watching = watchLanding(page);
     await page.mouse.up();
     w = await watching;
