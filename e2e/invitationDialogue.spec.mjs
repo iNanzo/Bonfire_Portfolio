@@ -545,6 +545,29 @@ test.describe('on a phone', () => {
 
   test('the Log lists the lines shown and closes again; the intro waits meanwhile', async ({ page }) => {
     await calm(page);
+    // Own the script shape and the expected visible words: the Log strips styling tags.
+    const lines = [
+      { text: '{#c8323c,wave|Hello} from {bold|NEWT}.', plain: 'Hello from NEWT.' },
+      { text: 'A {shake|second} line.', plain: 'A second line.' },
+      { text: 'See you there.', plain: 'See you there.' },
+    ];
+    await page.evaluate(
+      (lines) =>
+        window.__invitation.setIntro({
+          speaker: 'NEWT',
+          start: 'log-0',
+          boxes: lines.map(({ text }, i) => ({
+            id: `log-${i}`,
+            text,
+            face: 'happy',
+            animation: 'Talk',
+            camera: 'close',
+            next: i + 1 < lines.length ? `log-${i + 1}` : '',
+            end: i === lines.length - 1,
+          })),
+        }),
+      lines,
+    );
     await open(page, true);
     const seen = [];
     for (let i = 0; i < 3; i++) {
@@ -561,7 +584,9 @@ test.describe('on a phone', () => {
     await expect(log.getByRole('button', { name: 'Close' })).toBeFocused();
     const items = log.locator('li');
     expect(await items.count()).toBe(s.dialogue.log);
-    for (const text of seen) await expect(log).toContainText(text);
+    for (const text of seen) await expect(log).toContainText(lines.find((line) => line.text === text).plain);
+    await expect(items.first()).toContainText('Hello from NEWT.');
+    await expect(log).not.toContainText('{');
     await until(page, (x) => x.dialogue.paused && x.dialogue.logOpen, 'paused under the Log');
     // (A tap in the Log never goes on.)
     await log.locator('li').first().tap();
