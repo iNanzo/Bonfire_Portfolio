@@ -534,7 +534,9 @@ async function longLineScrolls(page, tap) {
     await expect.poll(async () => (await lineView(page)).top).toBeLessThan(before + 1);
     expect((await snapshot(page)).dialogue.seq).toBe(seq);
   }
-  // A tap still goes on, and the next line starts from its top.
+  // A tap still goes on, and the next line starts from its top. (Once the line's at rest: a
+  // touch while a finger's fling still scrolls it only stops the fling, as a phone has it.)
+  await scrollStill(page);
   await goOn(page, tap);
   await until(page, (x) => x.dialogue?.seq > seq, 'on to the next line');
   v = await lineView(page);
@@ -542,6 +544,23 @@ async function longLineScrolls(page, tap) {
   expect(v.canScroll).toBe(false);
   expect(errors).toEqual([]);
 }
+/** Until the long line's view stops moving: its scroll the same for five frames running. */
+const scrollStill = (page) =>
+  page.evaluate(
+    () =>
+      new Promise((done) => {
+        const t = document.querySelector('.inv-talk-text');
+        let last = t.scrollTop;
+        let same = 0;
+        const tick = () => {
+          same = t.scrollTop === last ? same + 1 : 0;
+          last = t.scrollTop;
+          if (same >= 5) done(true);
+          else requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }),
+  );
 
 /**
  * The box as laid out, client px: its height and its name tab's top, its line's row height, how
