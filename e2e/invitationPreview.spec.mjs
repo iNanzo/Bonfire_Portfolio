@@ -5,7 +5,9 @@
 // state with the box's face; it says which box is playing and where Next goes, follows a reply to
 // its box, and a restart plays the box again from the start. A message from another origin (a
 // window of the site's own, opened from the admin page) is ignored, and so is everything when the
-// address it's given isn't its framer's. Every wait is on a state. (The stand-in admin page is a
+// address it's given isn't its framer's. In the real admin's Invitation page, typing in a box's
+// text keeps the focus in the field while the preview plays the box again with each edit (the
+// toy never pulls the focus into its frame). Every wait is on a state. (The stand-in admin page is a
 // page of the real local admin server, playwright.config.mjs's, at its own origin: Chrome blocks a
 // made-up public origin from framing a local server.)
 import { test, expect } from '@playwright/test';
@@ -170,4 +172,37 @@ test('a message from another origin is ignored; so is all of it when the address
   await expect.poll(() => lost.evaluate(() => window.__invitation.clock())).toBeGreaterThan(t0 + 1);
   expect((await snapshot(lost)).dialogue).toBeNull();
   expect(await said(page)).toEqual([]);
+});
+
+test('typing in the admin’s Invitation page keeps the focus while the preview plays the box again', async ({
+  page,
+}) => {
+  test.slow();
+  await page.goto(`${ADMIN}/#invitation`);
+  await expect(page.locator('.page-title')).toBeVisible();
+  // (What the toy says to the admin page: each 'playing' is a box played again.)
+  await page.evaluate(() => {
+    window.played = 0;
+    addEventListener('message', (e) => {
+      if (e.data?.type === 'invitation-intro-preview-state' && e.data.state === 'playing') window.played += 1;
+    });
+  });
+  const pane = page.locator('.intro-preview');
+  await expect(pane.locator('.preview-state')).toHaveText('Ready', { timeout: 30_000 });
+  await pane.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.played), { timeout: 30_000 }).toBeGreaterThan(0);
+  await page.locator('[data-path="invitation.intro.boxes[0]"] .card-toggle').first().click();
+  const field = page.locator('[data-path="invitation.intro.boxes[0].text"] textarea');
+  await field.click();
+  await field.press('ControlOrMeta+A');
+  let typed = '';
+  for (const word of ['Focus', ' stays', ' in', ' the field.']) {
+    const before = await page.evaluate(() => window.played);
+    await page.keyboard.type(word);
+    typed += word;
+    // (The edit settles, the box plays again with it, and the field still has the focus.)
+    await expect.poll(() => page.evaluate(() => window.played), { timeout: 30_000 }).toBeGreaterThan(before);
+    await expect(field, `focus kept after “${typed}”`).toBeFocused();
+  }
+  await expect(field).toHaveValue(typed);
 });

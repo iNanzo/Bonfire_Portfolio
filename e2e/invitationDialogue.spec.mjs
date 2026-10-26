@@ -19,7 +19,13 @@
 // intro()). Tests requiring a specific script shape install a fixture; the admin integration
 // tests exercise the current content. Every wait is on a state (the script as
 // content.js reads it). Down every reply each box shows its face (the four dialogue faces from
-// their own sheets) and plays its animation.
+// their own sheets) and plays its animation. The screen answers in the toolbar's style: its
+// buttons dither on hover and press, it dithers in as it opens and the replies one after another,
+// a line dithers out over the next, a press that goes on flashes the box, the ▼ bobs in steps,
+// and reduced motion fades plainly. A line longer than the box scrolls inside it (the box keeps
+// its size): it follows the typing, then a finger, the wheel or the arrow keys scroll it, with
+// cues where there's more. A dark dither rises from the bottom behind the box, up to its top
+// and fading out over it, and grows with it.
 import { readFileSync } from 'node:fs';
 import { test, expect } from '@playwright/test';
 import { routeToEnd } from './helpers/dialogue-route.mjs';
@@ -330,7 +336,272 @@ async function movesStayLegible(page, tap) {
   expect(errors).toEqual([]);
 }
 
+/** An intro whose name, line, replies and second name carry tags (the test's own words). */
+const TAGGED_INTRO = {
+  speaker: '{gold,wave|Newt}',
+  start: 'a',
+  boxes: [
+    {
+      id: 'a',
+      speaker: '',
+      text: 'So {italic|very} happy.',
+      face: 'happy',
+      animation: 'Talk',
+      camera: 'medium',
+      next: '',
+      end: false,
+      auto: 0,
+      choices: [
+        { label: '{red,italic|Yes}!', next: 'b' },
+        { label: '{bold|No}', next: 'b' },
+      ],
+    },
+    {
+      id: 'b',
+      speaker: '{#3a7bd5,italic|Narrator}',
+      text: 'Done.',
+      face: 'neutral',
+      animation: 'none',
+      camera: 'keep',
+      next: '',
+      end: true,
+      auto: 0,
+      choices: [],
+    },
+  ],
+};
+/**
+ * Tags in a reply and a name show styled (the name tab, the reply buttons, the Log's names and
+ * replies), while a screen reader gets them plain (the live region, the buttons' names, the
+ * Log's own plain text); an italic word's letters slant about -10 deg, each keeping its width.
+ */
+async function tagsShowStyled(page, tap) {
+  const errors = watch(page);
+  await calm(page);
+  await page.evaluate((i) => window.__invitation.setIntro(i), TAGGED_INTRO);
+  await open(page, tap);
+  const name = page.locator('.inv-talk-name');
+  await expect(name).toHaveText('Newt');
+  await expect(name).toHaveAttribute('aria-hidden', 'true');
+  await expect(name.locator('.inv-fx-wave').first()).toHaveCSS('color', 'rgb(201, 130, 42)');
+  await expect(page.locator('.inv-talk-live')).toHaveText('Newt: So very happy.');
+  await goOn(page, tap);
+  await until(page, (x) => x.dialogue.typed, 'the line up');
+  // Italic: each letter slanted in place (a skew about -10 deg), as wide as it is upright.
+  const slant = await page.evaluate(() => {
+    const letters = [...document.querySelectorAll('.inv-talk-typed .inv-fx-italic')];
+    return letters.map((e) => {
+      const c = getComputedStyle(e);
+      const m = new DOMMatrix(c.transform);
+      const upright = document.createElement('span');
+      upright.className = 'inv-fx';
+      upright.textContent = e.textContent;
+      e.after(upright);
+      const widths = [e.getBoundingClientRect().width, upright.getBoundingClientRect().width];
+      upright.remove();
+      // (Its layout box: offsetWidth is the box before the transform.)
+      return {
+        ch: e.textContent,
+        display: c.display,
+        skew: (Math.atan(m.c) * 180) / Math.PI,
+        box: e.offsetWidth,
+        upright: widths[1],
+      };
+    });
+  });
+  expect(slant.map((l) => l.ch).join('')).toBe('very');
+  for (const l of slant) {
+    expect(l.display).toBe('inline-block');
+    expect(l.skew).toBeGreaterThan(-12);
+    expect(l.skew).toBeLessThan(-8);
+    expect(Math.abs(l.box - l.upright), `${l.ch} keeps its width`).toBeLessThan(1);
+  }
+  // The replies: styled words, plain names.
+  await until(page, (x) => Boolean(x.dialogue?.choices), 'the replies');
+  const yes = page.getByRole('button', { name: 'Yes!', exact: true });
+  await expect(yes).toBeVisible();
+  await expect(yes.locator('.inv-fx-italic').first()).toHaveCSS('color', 'rgb(200, 50, 60)');
+  await expect(yes).toHaveText('Yes!');
+  await expect(page.getByRole('button', { name: 'No', exact: true }).locator('.inv-fx-bold')).toHaveCount(2);
+  await pick(page, 0, tap);
+  await until(page, (x) => x.dialogue?.id === 'b', 'on to b');
+  await expect(name).toHaveText('Narrator');
+  await expect(name.locator('.inv-fx-italic').first()).toHaveCSS('color', 'rgb(58, 123, 213)');
+  // The Log: the names and the reply styled, read plain, never a tag.
+  const logBtn = page.getByRole('button', { name: 'Log', exact: true });
+  if (tap) await logBtn.tap();
+  else await logBtn.click();
+  const list = page.locator('.inv-talk-log-list');
+  await expect(list.locator('.inv-talk-log-who .inv-talk-styled .inv-fx-wave').first()).toHaveCSS(
+    'color',
+    'rgb(201, 130, 42)',
+  );
+  await expect(list.locator('.inv-talk-log-reply .inv-talk-styled .inv-fx-italic')).toHaveCount(3);
+  await expect(list.locator('.inv-talk-log-reply .inv-talk-sr')).toHaveText('Yes!');
+  await expect(list).not.toContainText('{');
+  expect(await list.locator('.inv-talk-styled').first().getAttribute('aria-hidden')).toBe('true');
+  expect(errors).toEqual([]);
+}
+
+/** A line longer than the box shows (the test's own words, about 230 letters). */
+const LONG_LINE =
+  'This line runs on and on, far longer than the box has room for, so it has to scroll. ' +
+  'It keeps going with more words about nothing much at all, then a few more, and still more, ' +
+  'until at last it reaches the very end of it.';
+/** The long line's view: how far it's scrolled, its room, its height, and the cues. */
+const lineView = (page) =>
+  page.evaluate(() => {
+    const t = document.querySelector('.inv-talk-text');
+    const shown = [...document.querySelectorAll('.inv-talk-typed .inv-fx:not(.is-unseen)')];
+    const last = shown.at(-1)?.getBoundingClientRect();
+    const r = t.getBoundingClientRect();
+    return {
+      typed: Boolean(window.__invitation.snapshot().dialogue?.typed),
+      top: t.scrollTop,
+      room: t.scrollHeight - t.clientHeight,
+      height: r.height,
+      box: document.querySelector('.inv-talk-box').getBoundingClientRect().height,
+      newestInView: !last || (last.bottom <= r.bottom + 1 && last.top >= r.top - 1),
+      canScroll: t.classList.contains('can-scroll'),
+      up: !document.querySelector('.inv-talk-more-up').hidden,
+      down: !document.querySelector('.inv-talk-more-down').hidden,
+    };
+  });
+/**
+ * A long line scrolls in the box: the box keeps its size, the view follows the typing (the
+ * newest row in view), and once it's all typed a finger (`tap`) or the wheel and the keys scroll
+ * it, with the cues saying where there's more; a tap still goes on.
+ */
+async function longLineScrolls(page, tap) {
+  const errors = watch(page);
+  await calm(page);
+  const intro = structuredClone(behaviorIntro);
+  const first = intro.boxes.find((b) => b.id === intro.start);
+  first.text = LONG_LINE;
+  first.choices = [];
+  await page.evaluate((i) => window.__invitation.setIntro(i), intro);
+  await open(page, tap);
+  const start = await lineView(page);
+  // Typing: the newest letter always in view, the view scrolled down to it by the end.
+  for (const part of [0.25, 0.5, 0.75]) {
+    await until(page, (x) => x.dialogue.shown >= Math.floor(x.dialogue.length * part), `typed ${part * 100}%`);
+    const v = await lineView(page);
+    expect(v.newestInView, `the newest row in view at ${part * 100}%`).toBe(true);
+    if (!v.typed) expect(v.canScroll, 'not scrollable while it types').toBe(false);
+  }
+  await until(page, (x) => x.dialogue.typed, 'the line up');
+  let v = await lineView(page);
+  expect(v.room, 'longer than the box').toBeGreaterThan(10);
+  expect(v.top, 'scrolled to its end').toBeGreaterThan(v.room - 2);
+  expect(v.box, 'the box keeps its size').toBeCloseTo(start.box, 0);
+  expect(v.canScroll).toBe(true);
+  expect(v.up && !v.down, 'the cue says there’s more above').toBe(true);
+  const seq = (await snapshot(page)).dialogue.seq;
+  const text = page.locator('.inv-talk-text');
+  const r = await text.boundingBox();
+  if (tap) {
+    // A finger dragged down the line scrolls it back up, and goes nowhere.
+    const cdp = await page.context().newCDPSession(page);
+    const at = (y) => [{ x: r.x + r.width / 2, y }];
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: at(r.y + 4) });
+    for (let k = 1; k <= 8; k++)
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: at(r.y + 4 + k * 12) });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  } else {
+    // The wheel over the line scrolls it back up.
+    await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
+    await page.mouse.wheel(0, -400);
+  }
+  await expect.poll(async () => (await lineView(page)).top, { message: 'scrolled back up' }).toBeLessThan(v.top - 10);
+  v = await lineView(page);
+  expect(v.down, 'the cue says there’s more below').toBe(true);
+  expect((await snapshot(page)).dialogue.seq, 'scrolling never goes on').toBe(seq);
+  if (!tap) {
+    // The arrow keys scroll it a row at a time.
+    const before = v.top;
+    await page.keyboard.press('ArrowDown');
+    await expect.poll(async () => (await lineView(page)).top).toBeGreaterThan(before);
+    await page.keyboard.press('ArrowUp');
+    await expect.poll(async () => (await lineView(page)).top).toBeLessThan(before + 1);
+    expect((await snapshot(page)).dialogue.seq).toBe(seq);
+  }
+  // A tap still goes on, and the next line starts from its top.
+  await goOn(page, tap);
+  await until(page, (x) => x.dialogue?.seq > seq, 'on to the next line');
+  v = await lineView(page);
+  expect(v.top).toBe(0);
+  expect(v.canScroll).toBe(false);
+  expect(errors).toEqual([]);
+}
+
+/** The dark dither behind the box, against the box: client px. */
+const dimAgainstBox = (page) =>
+  page.evaluate(() => {
+    const r = (sel) => document.querySelector(sel).getBoundingClientRect();
+    const bands = [...document.querySelectorAll('.inv-talk-dim > span')];
+    const text = r('.inv-talk-text');
+    const hit = document.elementFromPoint(text.left + text.width / 2, text.top + text.height / 2);
+    return {
+      boxTop: r('.inv-talk-box').top,
+      baseTop: bands.at(-1).getBoundingClientRect().top,
+      dimTop: r('.inv-talk-dim').top,
+      dimBottom: r('.inv-talk-dim').bottom,
+      layerBottom: r('.inv-talk').bottom,
+      tiles: bands.map((b) => getComputedStyle(b).backgroundImage),
+      textOnTop: Boolean(hit?.closest('.inv-talk-box')),
+    };
+  });
+/**
+ * A dark dither rises from the screen's bottom behind the chat box: densest behind it up to its
+ * top, fading out in bands above it, under the box (its text on top), and it follows the box
+ * when the box grows.
+ */
+async function darkBehindBox(page, tap) {
+  const errors = watch(page);
+  await calm(page);
+  await useBehaviorIntro(page);
+  await open(page, tap);
+  const behind = (d) =>
+    d.baseTop <= d.boxTop + 0.5 && d.baseTop >= d.boxTop - 8.5 && d.dimTop < d.boxTop - 40 && d.dimTop > d.boxTop - 80;
+  await expect.poll(async () => behind(await dimAgainstBox(page)), { message: 'up to the box’s top' }).toBe(true);
+  const d = await dimAgainstBox(page);
+  expect(Math.abs(d.dimBottom - d.layerBottom)).toBeLessThan(1);
+  for (const t of d.tiles) expect(t).toMatch(/^url\("data:image\/png/);
+  expect(new Set(d.tiles).size, 'each band its own coverage').toBe(d.tiles.length);
+  expect(d.textOnTop, 'the line over it').toBe(true);
+  // A taller box: the dither rises with it.
+  const grow = await page.addStyleTag({ content: '.inv-talk-box { padding-top: 120px !important; }' });
+  await expect
+    .poll(
+      async () => {
+        const g = await dimAgainstBox(page);
+        return g.boxTop < d.boxTop - 60 && behind(g);
+      },
+      { message: 'up to the taller box’s top' },
+    )
+    .toBe(true);
+  await grow.evaluate((el) => el.remove());
+  await expect.poll(async () => behind(await dimAgainstBox(page))).toBe(true);
+  expect(errors).toEqual([]);
+}
+
 test.describe('on a phone', () => {
+  test('a dark dither rises from the bottom behind the box, to its top and fading out over it, and grows with it', async ({
+    page,
+  }) => {
+    await darkBehindBox(page, true);
+  });
+
+  test('a long line scrolls in the box: it follows the typing, then a finger or the wheel and keys scroll it', async ({
+    page,
+  }) => {
+    await longLineScrolls(page, true);
+  });
+
+  test('tags in a reply and a name show styled, read plain; an italic word slants in place', async ({ page }) => {
+    await tagsShowStyled(page, true);
+  });
+
   test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
 
   test('a shaken or waved word stays legible: no letter runs more than a pixel into the next, in the bubble or the box', async ({
@@ -510,7 +781,11 @@ test.describe('on a phone', () => {
     const log = (await snapshot(page)).dialogue.log;
     await page.touchscreen.tap(spot.x, spot.y);
     await until(page, (s) => Boolean(s.dialogue.choices), 'its replies');
-    const hit = await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.className ?? '', spot);
+    // (Its words are letters in it: the reply is what's under them.)
+    const hit = await page.evaluate(
+      ({ x, y }) => document.elementFromPoint(x, y)?.closest('.inv-talk-choice')?.className ?? '',
+      spot,
+    );
     expect(hit, 'the spot is a reply now').toContain('inv-talk-choice');
     await page.clock.runFor(150);
     await page.touchscreen.tap(spot.x, spot.y);
@@ -777,6 +1052,133 @@ test.describe('on a phone', () => {
 });
 
 test.describe('on a desktop', () => {
+  test('a dark dither rises from the bottom behind the box, to its top and fading out over it, and grows with it', async ({
+    page,
+  }) => {
+    await darkBehindBox(page, false);
+  });
+
+  test('a long line scrolls in the box: it follows the typing, then a finger or the wheel and keys scroll it', async ({
+    page,
+  }) => {
+    await longLineScrolls(page, false);
+  });
+
+  test('the buttons dither on hover and press; the box dithers in, a line dithers out over the next, a press flashes it', async ({
+    page,
+  }) => {
+    const errors = watch(page);
+    await calm(page);
+    await useBehaviorIntro(page);
+    /** A dither tile, as the computed style gives one. */
+    const TILE = /^url\("data:image\/png;base64,[^"]+"\)$/;
+    // Opening: the layer dithers in, its mask a dither tile part way through (each step held),
+    // read the moment it shows (its animation held there, then finished).
+    await page.evaluate(() => {
+      const layer = document.querySelector('.inv-talk');
+      new MutationObserver((_, observer) => {
+        if (layer.hidden) return;
+        observer.disconnect();
+        getComputedStyle(layer).animationName; // (its animation made now)
+        const a = layer.getAnimations().find((x) => x.animationName === 'inv-talk-dither-in');
+        if (!a) return (window.opening = { none: true });
+        a.pause();
+        a.currentTime = 0.4 * a.effect.getTiming().duration;
+        const mid = getComputedStyle(layer).maskImage;
+        a.finish();
+        window.opening = { mid, after: getComputedStyle(layer).maskImage };
+      }).observe(layer, { attributes: true, attributeFilter: ['hidden'] });
+    });
+    await replayIntro(page).click();
+    await expect.poll(() => page.evaluate(() => window.opening ?? null)).not.toBeNull();
+    const opening = await page.evaluate(() => window.opening);
+    expect(opening.none, 'the layer’s dither-in').toBeUndefined();
+    expect(opening.mid).toMatch(TILE);
+    expect(opening.after).toBe('none');
+    await until(page, (s) => s.dialogue && s.state === 'talk' && !s.dialogue.waiting, 'the intro under way');
+    // The ▼ bobs in steps.
+    await expect(page.locator('.inv-talk-next')).toHaveCSS('animation-timing-function', /steps/);
+    // Hover: a light dither of the ink; pressed: a heavier one; neither on a button at rest.
+    const auto = page.getByRole('button', { name: 'Auto', exact: true });
+    const bg = () => auto.evaluate((e) => getComputedStyle(e).backgroundImage);
+    expect(await bg()).toBe('none');
+    await auto.hover();
+    const hover = await bg();
+    expect(hover).toMatch(TILE);
+    await page.mouse.down();
+    const pressed = await bg();
+    expect(pressed).toMatch(TILE);
+    expect(pressed).not.toBe(hover);
+    await page.mouse.move(5, 5);
+    await page.mouse.up();
+    // A press that goes on: the box flashes the ink's dither; the line before dithers out over the next.
+    await page.evaluate(() => {
+      window.seen = { flash: [], ghost: [] };
+      const ghost = document.querySelector('.inv-talk-ghost');
+      new MutationObserver(() => {
+        if (!ghost.childElementCount) return;
+        window.seen.ghost.push({
+          text: ghost.textContent,
+          masks: ghost.getAnimations().flatMap((a) => a.effect.getKeyframes().map((k) => k.maskImage ?? '')),
+        });
+      }).observe(ghost, { childList: true });
+      // (After the layer's own click handler: the flash it started, read at once.)
+      document.addEventListener('click', () =>
+        window.seen.flash.push(
+          document
+            .querySelector('.inv-talk-flash')
+            .getAnimations()
+            .flatMap((a) => a.effect.getKeyframes().map((k) => k.backgroundImage ?? '')),
+        ),
+      );
+    });
+    const before = await snapshot(page);
+    if (!before.dialogue.typed) {
+      await goOn(page);
+      await until(page, (s) => s.dialogue.typed, 'the line up');
+    }
+    const line = await shownLine(page);
+    await goOn(page);
+    await until(page, (s) => s.dialogue?.seq > before.dialogue.seq, 'the next line');
+    const seen = await page.evaluate(() => window.seen);
+    expect(
+      seen.flash.at(-1)?.some((v) => TILE.test(v) || /^url\(/.test(v)),
+      'the press flash',
+    ).toBe(true);
+    expect(seen.ghost.length, 'the line before, dithering out').toBeGreaterThan(0);
+    expect(seen.ghost[0].text.replace(/\s+/g, ' ').trim()).toBe(line.replace(/\s+/g, ' ').trim());
+    expect(seen.ghost[0].masks.filter((m) => /^url\(/.test(m)).length).toBeGreaterThanOrEqual(6);
+    await expect(page.locator('.inv-talk-ghost')).toBeEmpty();
+    expect(errors).toEqual([]);
+  });
+
+  test('the replies dither in one after another; with reduced motion the screen fades plainly', async ({ page }) => {
+    await calm(page);
+    await useBehaviorIntro(page);
+    const { ask } = askAndBefore(await script(page));
+    test.skip(!ask, 'this script has no replies');
+    await open(page);
+    await page.getByRole('button', { name: 'Next', exact: true }).click();
+    await until(page, (s) => s.dialogue.id === ask.id && Boolean(s.dialogue.choices), 'at the replies');
+    const looks = await page.locator('.inv-talk-choice').evaluateAll((els) =>
+      els.map((e) => ({
+        name: getComputedStyle(e).animationName,
+        delay: parseFloat(getComputedStyle(e).animationDelay),
+      })),
+    );
+    expect(looks.length).toBeGreaterThan(1);
+    for (const l of looks) expect(l.name).toBe('inv-talk-dither-in');
+    for (let i = 1; i < looks.length; i++) expect(looks[i].delay).toBeGreaterThan(looks[i - 1].delay);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await expect(page.locator('.inv-talk')).toHaveCSS('animation-name', 'inv-talk-fade');
+    await expect(page.locator('.inv-talk-choice').first()).toHaveCSS('animation-name', 'inv-talk-fade');
+    await expect(page.locator('.inv-talk-next')).toHaveCSS('animation-name', 'none');
+  });
+
+  test('tags in a reply and a name show styled, read plain; an italic word slants in place', async ({ page }) => {
+    await tagsShowStyled(page, false);
+  });
+
   test('a shaken or waved word stays legible: no letter runs more than a pixel into the next, in the bubble or the box', async ({
     page,
   }) => {

@@ -295,14 +295,17 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
 
 ## Text Effects
 
-His bubble lines and the intro's lines can style words with tags, `{styles|text}`:
+His bubble lines and the intro's lines, the speakers' names on the intro's tab and its replies
+can style words with tags, `{styles|text}`:
 
 - **Colors:** a name from the admin's Text Effects colors (`{red|NEWT}`; as shipped red, gold,
   rose and ink), or a hex color of its own (`{#e44544|NEWT}`, `#rgb` or `#rrggbb`).
 - **Effects:** `wave` (each letter bobs up and down, a little later down the line), `shake`
   (each letter jitters a pixel across and up and down, out of step with its neighbours, so the
-  word trembles but stays legible), `bold` and `big` (a fifth bigger). They combine with commas:
-  `{red,wave|Hey!}`, and both moves together wave with the jitter on top.
+  word trembles but stays legible), `bold`, `big` (a fifth bigger) and `italic` (Pixelify Sans
+  has no italic of its own, so each letter is slanted about 10 degrees where it stands, keeping
+  its width: the line never reflows). They combine with commas: `{red,wave|Hey!}`,
+  `{italic,gold|really}`, and both moves together wave with the jitter on top.
 - **Nesting:** a tag can hold one more, which adds to it (its color wins):
   `{gold|a {wave|big} deal}`. Deeper isn't allowed.
 - **Braces:** write `\{` and `\}` for a brace; a backslash anywhere else is itself, and `*`,
@@ -313,7 +316,10 @@ moving letter keeps its own width and only ever steps a pixel sideways, to the r
 runs into the next letter by more than a pixel and the space before a shaken word never closes. A
 styled word never breaks across two rows. The typing, Auto's wait, how long a bubble stays up and
 the length limits count only the letters that show; a screen reader and the Log get the line as
-plain text. The admin checks every tag as you type and previews each line under its box.
+plain text. A styled name shows styled on the tab and in the Log, and a styled reply on its button
+and in the Log, while a screen reader hears them plain (the live region, the button's name, the
+Log's own plain copy). The admin checks every tag as you type and previews each line, name and
+reply under its field.
 
 ## The Intro
 
@@ -322,10 +328,23 @@ envelope back over a fresh scene to open again (above). It's laid out like Uma M
 toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
 
 - **The screen:** a wide box along the bottom with his name on a tab at its top left and his
-  line typed out in it, a small bouncing ▼ at its bottom right once the line is all there, Auto,
-  Next and Log at the top right, **Skip Intro** at the top left, and a gentle dim along the bottom
-  behind the box. A line's own line breaks (as the admin types them) show. The toolbar goes while
-  the intro runs and comes back after it.
+  line typed out in it, a small ▼ bobbing in pixel steps at its bottom right once the line is all
+  there, Auto, Next and Log at the top right, **Skip Intro** at the top left, and a dark dither
+  rising from the bottom of the screen behind the box (the ink's ordered dither, densest behind the
+  box up to its top and fading out in lighter bands just over it, under the box and its name tab
+  so never over the text; sized to the box on a phone or a desktop, and rising with it when it's
+  taller). A line's own line breaks (as the admin types them) show. A line
+  longer than the box's three rows (two on a phone held sideways) scrolls inside it, and the box
+  keeps its size: as it types the newest row stays in view, and once it's all there the wheel, a
+  finger dragged over it, or the arrow and Page keys scroll it, with small pixel triangles at its
+  right where there's more above or below (a line finished at once by a tap stays where it was,
+  the cue showing the rest). The toolbar goes while the intro runs and comes back after it.
+- **Feedback,** in the toolbar's style (its ordered Bayer dither, in the ink): every button on the
+  screen (Auto, Next, Log, Skip Intro, the replies, the Log's and the question's) fills with a
+  light dither on hover and a heavier one pressed. The screen dithers in as it opens, the replies
+  dither in one after another, the line that was up dithers out over the next as it comes, and a
+  tap or a key that goes on dips the box a step with a flash of dither. With reduced motion these
+  are quick plain fades, with no dip and no bob.
 - **Going on:** a tap or click anywhere first finishes the line, then goes on to the next box;
   Space and Enter do the same (after a click or tap on Auto, Next or Log too; from the keyboard,
   a focused button presses itself). Some boxes ask a question: two or three replies show as buttons
@@ -694,6 +713,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   over 1 s, the shake on `transform`, a pixel's jitter over 0.42 s, so a letter with both runs
   both; sideways only ever 0 to 1px, so no letter runs more than a pixel into its neighbour
   whatever their phases; `.inv-fx-bold` the 600 weight, `.inv-fx-big` 1.2em at line height 1,
+  `.inv-fx-italic` an inline-block (not on a space) skewed `--inv-fx-skew` (-10deg) round its
+  middle, its layout box unchanged, the shake's steps keeping the skew after their translate,
   stilled by `prefers-reduced-motion` and the bubble's `is-still`). A broken tag
   still shows: a stray brace as itself, an unknown style as plain letters. `dialogue.js`,
   `speech.js`, `bubble.js` and `dialogueUi.js` count, time and type by its letters; the Log, the
@@ -968,7 +989,16 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   counting the letters that show (markup.js); `lookSway`; main.js runs
   `content.js` `introScript()` through `normalizeScript` as a safety net, `playScript`),
   `dialogueUi.js` and `dialogue.css` (the screen: a modal layer over the stage that takes every
-  press; the line in a live region once, whole; `REPLY_SETTLE`, `REPLY_ROOM`), brain.js's `talk` state (`BrainIn.dialogue`: the
+  press; the line in a live region once, whole; `REPLY_SETTLE`, `REPLY_ROOM`; a long line's
+  view `followRow` (the newest row in view, never back up; a jump over `FOLLOW_JUMP` letters
+  stays put), `.can-scroll` once it's typed and outgrows the box, the `.inv-talk-more` cues; its feedback from
+  `TALK_DITHER`'s tiles, `talkTile` (icons.js `ditherMask` drawn at 2 px a cell) installed on the
+  layer as `--talk-ink-N` and `--talk-mask-N`: the buttons' hover and press backgrounds, the
+  `inv-talk-dither-in` keyframes stepping the layer's and the replies' `mask-image`, and from
+  script the ghost (`ditherOut`, a copy of the line before, masked out step by step) and the press
+  flash (`pressFlash`); the dark dither's bands `.inv-talk-dim-N` on `--talk-ink-N`, the dim
+  `--talk-rise` (`talkRise`: the box's top as laid out, in whole 8 px tiles, kept by a
+  ResizeObserver on the layer and the box's border box) plus `--talk-fade` tall), brain.js's `talk` state (`BrainIn.dialogue`: the
   box's seq, animation, face and whether it's typing; any clip, clips.js `DIALOGUE_CLIPS`:
   `DIALOGUE_WAYS` says which step in place (main.js moves the step phase on by brain.js
   `talkPhase`) and which dangle him (`dangleLift`: his lowest point `DANGLE.gap` over the
@@ -1061,7 +1091,10 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   (he walks in again); anything else is dropped (`readPreview`). On its next step `main.js`
   drops any intro under way (the camera stays on him) and starts the dialogue from that box
   the way Replay Intro does, with Auto off, so it holds once the line is typed; a tap or a
-  reply goes on as in the intro. It answers its framer, at that origin only, with
+  reply goes on as in the intro. It never takes the focus from the admin's page
+  (`keepFocusOut`: every `focus()` in the frame does nothing while the frame doesn't have the
+  focus, since Chrome lets a framed page's `focus()` pull it out of the field being typed in);
+  once the frame is clicked or tapped into, focus moves in it as ever. It answers its framer, at that origin only, with
   `{type: 'invitation-intro-preview-state', state}`: `ready` once he's drawn, `playing` with
   the `box` up, its `next` (`nextBox`: where the admin's Next goes, null at replies or the end)
   and whether it has `choices`, and `done` as it ends. With `?test` too, the snapshot's

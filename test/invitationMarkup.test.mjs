@@ -67,11 +67,41 @@ test('hex colours, #rgb and #rrggbb, any case', () => {
 });
 
 test('effects, and colour with effects in one tag ({red,wave|…}); spaces round the commas are fine', () => {
-  assert.deepEqual(TEXT_EFFECTS, ['wave', 'shake', 'bold', 'big']);
+  assert.deepEqual(TEXT_EFFECTS, ['wave', 'shake', 'bold', 'big', 'italic']);
   for (const fx of TEXT_EFFECTS) assert.deepEqual(parseMarkup(`{${fx}|x}`, palette).runs[0].style, { [fx]: true });
   const p = parseMarkup('{red, wave ,BIG|hey}', palette);
   assert.deepEqual(p.errors, []);
   assert.deepEqual(p.runs[0].style, { color: red, wave: true, big: true });
+});
+
+test('italic: a style of its own, with a colour and the other effects; its letters drawn slanted in place', () => {
+  const p = parseMarkup('{red,italic|so} {italic,wave|very} {ITALIC|x}', palette);
+  assert.deepEqual(p.errors, []);
+  assert.deepEqual(p.runs[0].style, { color: red, italic: true });
+  assert.deepEqual(p.runs[2].style, { wave: true, italic: true });
+  assert.equal(p.plain, 'so very x');
+  // (Nested: the inner tag adds italic to the outer's colour.)
+  assert.deepEqual(parseMarkup('{gold|a {italic|b}}', palette).runs[1].style, {
+    color: palette.get('gold'),
+    italic: true,
+  });
+  // (A colour can't be called italic: it's an effect's name.)
+  assert.deepEqual([...paletteOf([{ name: 'italic', color: '#123456' }])], []);
+  // (The letter plan: an italic word kept whole.)
+  const plan = letterPlan(parseMarkup('{italic|a b}', palette));
+  assert.equal(plan[0].whole, true);
+  // (The unknown style message names it.)
+  assert.match(parseMarkup('{slanty|x}', palette).errors[0].message, /italic/);
+  // (markup.css: an italic letter is an inline-block slanted about -10 deg, so its box keeps its
+  // width and place; a shake keeps the slant through its steps.)
+  const css = readFileSync(new URL('../src/invitation/markup.css', import.meta.url), 'utf8');
+  const rule = /\.inv-fx-italic\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
+  assert.match(rule, /display:\s*inline-block/);
+  assert.match(rule, /--inv-fx-skew:\s*-(9|10|11)deg/);
+  assert.match(rule, /transform:\s*skewX\(var\(--inv-fx-skew\)\)/);
+  const shake = /@keyframes inv-fx-shake\s*\{([\s\S]*?)\n\}/.exec(css)?.[1] ?? '';
+  assert.ok(shake, 'the shake’s keyframes');
+  for (const t of shake.match(/transform:[^;]*/g) ?? []) assert.match(t, /skewX\(var\(--inv-fx-skew, 0deg\)\)/, t);
 });
 
 test('one level of nesting: the inner tag adds to the outer (its colour wins); deeper is an error', () => {
@@ -215,7 +245,8 @@ function fxKeyframes() {
           const [x, y] = v.trim().split(/\s+/).map(len);
           return { at: Number(at), x, y: y ?? zero };
         }
-        const m = /^translate(X|Y)?\(([^)]*)\)$/.exec(v.trim());
+        // (A shake keeps an italic letter's slant: markup.css's skew after its step.)
+        const m = /^translate(X|Y)?\(([^)]*)\)(?: skewX\(var\(--inv-fx-skew, 0deg\)\))?$/.exec(v.trim());
         assert.ok(m, `${name} ${at}%: a translation (${v})`);
         const [a, b] = m[2].split(',').map(len);
         if (m[1] === 'Y') return { at: Number(at), x: zero, y: a };

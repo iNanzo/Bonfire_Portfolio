@@ -11,6 +11,7 @@
 // introScript() (content.json's intro, or one mended), which the runner plays as it is.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { DIALOGUE_CLIPS, FACE_NAMES } from '../src/invitation/clips.js';
 import {
   DIALOGUE,
@@ -337,7 +338,6 @@ test('Play Intro’s script is content.js introScript(): the runner plays it as 
 /** content.js, reading content.json's `invitation` as `virtual:invitation-content` (vite.config.js). */
 async function loadContent() {
   const { register } = await import('node:module');
-  const { readFileSync } = await import('node:fs');
   const inv = JSON.parse(readFileSync(new URL('../src/content.json', import.meta.url), 'utf8')).invitation ?? {};
   const sub = `export default ${JSON.stringify(inv)}`;
   const hooks = `export async function resolve(spec, ctx, next) {
@@ -377,6 +377,64 @@ test('the chat screen’s markup: Title Case labels, a live region for the line,
   assert.equal((log.match(/<li/g) ?? []).length, 2);
 });
 
+test('tags in the names and the replies: kept for the screen to draw; the log has them plain, and styled to show', () => {
+  const d = run({
+    speaker: '{red,wave|NEWT}',
+    start: 'ask',
+    boxes: [
+      {
+        id: 'ask',
+        text: 'Ready?',
+        face: 'smug',
+        animation: 'Think',
+        camera: 'wide',
+        choices: [
+          { label: '{gold,italic|Yes}!', next: 'b' },
+          { label: '{red| }', next: 'b' },
+          { label: 'No', next: 'b' },
+        ],
+      },
+      { id: 'b', speaker: '{#3a7bd5|Narrator}', text: 'Great', face: 'happy', animation: 'Cheer', camera: 'medium' },
+    ],
+  });
+  d.advance(0);
+  const v = d.view;
+  assert.equal(v.speaker, '{red,wave|NEWT}', 'the name tab draws its tags');
+  assert.deepEqual(
+    v.choices?.map((c) => c.label),
+    ['{gold,italic|Yes}!', 'No'],
+    'a reply that shows nothing is dropped; the rest keep their tags',
+  );
+  d.choose(0, 0);
+  assert.equal(d.view.speaker, '{#3a7bd5|Narrator}');
+  assert.deepEqual(d.log, [
+    { kind: 'line', speaker: 'NEWT', styled: '{red,wave|NEWT}', text: 'Ready?' },
+    { kind: 'reply', text: 'Yes!', styled: '{gold,italic|Yes}!' },
+    { kind: 'line', speaker: 'Narrator', styled: '{#3a7bd5|Narrator}', text: 'Great' },
+  ]);
+});
+
+test('the Log draws the names and replies styled (for the eye) and reads them plain (for a screen reader)', async () => {
+  const { logHtml } = await import('../src/invitation/dialogueUi.js');
+  const log = logHtml([
+    { kind: 'line', speaker: 'NEWT <3', styled: '{red|NEWT} <3', text: 'hi' },
+    { kind: 'reply', text: 'Yes & no', styled: '{gold,italic|Yes} & no' },
+    { kind: 'line', speaker: 'Plain', styled: 'Plain', text: 'as ever' },
+  ]);
+  // (A styled one: a holder the screen fills with its letters, hidden from a screen reader, beside its plain text.)
+  assert.match(
+    log,
+    /<span class="inv-talk-styled" aria-hidden="true" data-styled="\{red\|NEWT\} &lt;3"><\/span><span class="inv-talk-sr">NEWT &lt;3<\/span>/,
+  );
+  assert.match(
+    log,
+    /data-styled="\{gold,italic\|Yes\} &amp; no"><\/span><span class="inv-talk-sr">Yes &amp; no<\/span>/,
+  );
+  // (One with no tags, as ever: its text.)
+  assert.match(log, /<span class="inv-talk-log-who">Plain<\/span> as ever/);
+  assert.ok(!/data-styled="[^"]*"[^>]*>[^<]*\{/.test(log), 'no tag ever shows as text');
+});
+
 test('text effects: typing, Auto’s wait and the cap count the letters that show; the log keeps plain text', () => {
   const styled = 'I’m {red,wave|NEWT}!';
   const plain = 'I’m NEWT!';
@@ -408,4 +466,135 @@ test('text effects: typing, Auto’s wait and the cap count the letters that sho
     [plain],
     'the Log lists it plain',
   );
+});
+
+test('the chat screen’s feedback, in the toolbar’s style: dither tiles, a dithered fade, stepped moves', async () => {
+  const { TALK_DITHER, talkTile, talkHtml } = await import('../src/invitation/dialogueUi.js');
+  // (A tile is the toolbar's Bayer 4×4 drawn at two CSS px a cell: 8×8, its cells inside the next coverage's.)
+  for (const n of [...TALK_DITHER.ink, ...TALK_DITHER.fade]) {
+    const t = talkTile(n);
+    assert.equal(t.length, 64, `${n}: 8×8`);
+    assert.equal(t.filter(Boolean).length, n * 4, `${n}/16 of it`);
+    for (let y = 0; y < 8; y += 2)
+      for (let x = 0; x < 8; x += 2) {
+        const c = t[y * 8 + x];
+        assert.ok(
+          [t[y * 8 + x + 1], t[(y + 1) * 8 + x], t[(y + 1) * 8 + x + 1]].every((v) => v === c),
+          'a 2 px cell',
+        );
+      }
+  }
+  const more = talkTile(8);
+  assert.ok(
+    talkTile(4).every((on, i) => !on || more[i]),
+    'a lighter tile’s cells are in the heavier one',
+  );
+  // (The fade goes up from nothing, in even steps, short of whole: the last step is no mask at all.)
+  assert.equal(TALK_DITHER.fade[0], 0);
+  assert.ok(TALK_DITHER.fade.every((n, i) => i === 0 || n > TALK_DITHER.fade[i - 1]) && TALK_DITHER.fade.at(-1) < 16);
+  assert.ok(TALK_DITHER.fadeMs >= 120 && TALK_DITHER.fadeMs <= 260, 'a short fade');
+  const markup = talkHtml();
+  assert.match(markup, /class="inv-talk-flash" aria-hidden="true"/);
+  assert.match(markup, /class="inv-talk-ghost" aria-hidden="true"/);
+
+  const css = readFileSync(new URL('../src/invitation/dialogue.css', import.meta.url), 'utf8');
+  const rule = (sel) => {
+    const at = css.indexOf(`${sel} {`);
+    assert.ok(at >= 0, `a rule for ${sel}`);
+    return css.slice(at, css.indexOf('}', at));
+  };
+  // (Hover a light ink dither, press a heavier one, on every button in the layer, as on the toolbar.)
+  assert.match(rule('.inv-talk .inv-btn:hover:not(:disabled)'), /background-image: var\(--talk-ink-2\)/);
+  assert.match(rule('.inv-talk .inv-btn:active:not(:disabled)'), /background-image: var\(--talk-ink-6\)/);
+  assert.match(rule('.inv-talk .inv-btn'), /background-size: 8px 8px/);
+  // (The layer dithers in: its mask through the fade's steps, a step at a time.)
+  const fade = /@keyframes inv-talk-dither-in \{([\s\S]*?)\n\}/.exec(css)?.[1] ?? '';
+  const steps = [...fade.matchAll(/mask-image: var\(--talk-mask-(\d+)\)/g)].map((m) => Number(m[1]));
+  assert.deepEqual(steps, TALK_DITHER.fade);
+  assert.match(fade, /100% \{\s*mask-image: none;/);
+  assert.match(rule('.inv-talk:not([hidden])'), /animation: inv-talk-dither-in/);
+  // (The replies dither in one after another.)
+  assert.match(rule('.inv-talk-choices:not(.is-waiting) .inv-talk-choice'), /animation: inv-talk-dither-in/);
+  const delays = [2, 3].map((n) =>
+    Number(
+      /animation-delay: ([\d.]+)s/.exec(
+        rule(`.inv-talk-choices:not(.is-waiting) .inv-talk-choice:nth-child(${n})`),
+      )?.[1],
+    ),
+  );
+  assert.ok(delays[0] > 0 && delays[1] > delays[0], `staggered: ${delays}`);
+  // (The ▼ steps, a pixel sprite's bob.)
+  assert.match(rule('.inv-talk-next'), /animation: inv-talk-bob [\d.]+s steps\(/);
+  // (Reduced motion: quick plain fades instead.)
+  const reduced = css.slice(css.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
+  assert.match(reduced, /animation: inv-talk-fade 0\.1\d?s/);
+});
+
+test('a long line scrolls in the box: it follows the typing a row at a time, and the box keeps its size', async () => {
+  const { followRow, talkHtml, FOLLOW_JUMP } = await import('../src/invitation/dialogueUi.js');
+  const row = 25;
+  const view = { rowH: row, clientHeight: 3 * row };
+  // (The first three rows show as they are; the fourth brings its row into view at the bottom.)
+  assert.equal(followRow({ ...view, mid: 12, scrollTop: 0 }), 0);
+  assert.equal(followRow({ ...view, mid: 2 * row + 12, scrollTop: 0 }), 0);
+  assert.equal(followRow({ ...view, mid: 3 * row + 12, scrollTop: 0 }), row);
+  assert.equal(followRow({ ...view, mid: 5 * row + 3, scrollTop: row }), 3 * row);
+  // (It only ever follows down: a row already in view leaves the scroll as it is.)
+  assert.equal(followRow({ ...view, mid: 12, scrollTop: 2 * row }), 2 * row);
+  assert.ok(FOLLOW_JUMP >= 4 && FOLLOW_JUMP <= 40, 'a jump (the line finished at once) leaves the view where it is');
+  const markup = talkHtml();
+  assert.match(markup, /class="inv-talk-more inv-talk-more-up" aria-hidden="true" hidden/);
+  assert.match(markup, /class="inv-talk-more inv-talk-more-down" aria-hidden="true" hidden/);
+
+  const css = readFileSync(new URL('../src/invitation/dialogue.css', import.meta.url), 'utf8');
+  const rule = (sel, from = 0) => {
+    const at = css.indexOf(`${sel} {`, from);
+    assert.ok(at >= 0, `a rule for ${sel}`);
+    return css.slice(at, css.indexOf('}', at));
+  };
+  // (Three rows' room, no more and no less, on a phone and a desktop; two on a phone held sideways.)
+  const text = rule('.inv-talk-text');
+  assert.match(text, /min-height: calc\(3 \* 1\.42em\)/);
+  assert.match(text, /max-height: calc\(3 \* 1\.42em\)/);
+  assert.match(text, /overflow-y: hidden/);
+  const side = rule('.inv-talk-text', css.indexOf('@media (orientation: landscape)'));
+  assert.match(side, /min-height: calc\(2 \* 1\.42em\)/);
+  assert.match(side, /max-height: calc\(2 \* 1\.42em\)/);
+  // (Once it's all typed: the wheel, a finger and the keys scroll it, its scrollbar unseen.)
+  const free = rule('.inv-talk-text.can-scroll');
+  assert.match(free, /overflow-y: auto/);
+  assert.match(free, /touch-action: pan-y/);
+  assert.match(free, /overscroll-behavior: contain/);
+  assert.match(text, /scrollbar-width: none/);
+});
+
+test('a dark dither rises from the bottom behind the box: sized to it, fading out over it, never a gradient', async () => {
+  const { talkRise, talkHtml, TALK_DITHER } = await import('../src/invitation/dialogueUi.js');
+  // (From the screen's bottom to the box's top, in whole 8 px tiles, never short of it.)
+  assert.equal(talkRise(844, 844 - 160), 160);
+  assert.equal(talkRise(844, 844 - 161), 168);
+  assert.equal(talkRise(800, 800 - 199.5), 200);
+  assert.equal(talkRise(500, 600), 0, 'a box off the bottom: none');
+  const markup = talkHtml();
+  const dim = /<div class="inv-talk-dim" aria-hidden="true">([\s\S]*?)<\/div>/.exec(markup)?.[1] ?? '';
+  const bands = [...dim.matchAll(/class="inv-talk-dim-(\d+)"/g)].map((m) => Number(m[1]));
+  // (Lightest at the top, densest behind the box; every coverage one of the ink's tiles.)
+  assert.ok(bands.length >= 4, `bands: ${bands}`);
+  assert.ok(
+    bands.every((n, i) => i === 0 || n > bands[i - 1]),
+    'denser further down',
+  );
+  for (const n of bands) assert.ok(TALK_DITHER.ink.includes(n), `${n}: an ink tile`);
+
+  const css = readFileSync(new URL('../src/invitation/dialogue.css', import.meta.url), 'utf8');
+  const at = css.indexOf('.inv-talk-dim {');
+  const rule = css.slice(at, css.indexOf('}', at));
+  assert.match(rule, /height: calc\(var\(--talk-rise, \d+px\) \+ var\(--talk-fade\)\)/);
+  assert.ok(!/gradient/.test(rule), 'dithered, not a smooth gradient');
+  for (const n of bands)
+    assert.match(
+      css,
+      new RegExp(String.raw`\.inv-talk-dim-${n} \{[^}]*background-image: var\(--talk-ink-${n}\)`),
+      `band ${n}`,
+    );
 });
