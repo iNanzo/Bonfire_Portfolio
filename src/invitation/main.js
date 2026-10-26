@@ -1628,7 +1628,9 @@ function start(s) {
       t,
       collar: c.bonePos(COLLAR, { x: 0, y: 0, z: 0 }),
       target,
-      footOffset: soleY() - root.position.y,
+      // A dangling toe can touch before the ankle-based sole. Use the same
+      // lowest point as the visible floor clearance, so contact is not delayed.
+      footOffset: lowestY() - root.position.y,
       released,
     });
     // (Just landed: the dust, and a big drop's shake.)
