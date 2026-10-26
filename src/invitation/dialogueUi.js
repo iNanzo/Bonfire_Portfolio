@@ -24,6 +24,9 @@
 // round the layer's buttons. A screen reader hears each line whole once, as plain text, from a
 // live region (the typed text is hidden from it), and the Log lists it plain too; the replies are buttons, and focus goes to the first reply
 // when they show, into the Log and the question when they open and back when they close.
+// A line longer than the box shows scrolls inside it (the box keeps its size): the view follows
+// the typing a row at a time (followRow); once it's all typed the wheel, a finger and the arrow
+// and Page keys scroll it, with pixel cues over and under it where there's more.
 // Feedback in the toolbar's style, its ordered dither (TALK_DITHER's tiles on the layer, CSS in
 // dialogue.css): the buttons' hover and press, the screen and the replies dithering in; from
 // here, the line before dithering out over the next (ditherOut) and a press that goes on
@@ -107,6 +110,23 @@ function installTalkDither(layer, ink) {
   return urls;
 }
 
+/**
+ * A line that shows more letters than this in one frame was finished at once (a tap, reduced
+ * motion): the view stays where it is rather than following it down (the cue says there's more).
+ */
+export const FOLLOW_JUMP = 12;
+
+/**
+ * Where a long line's view scrolls to as it types, px: the newest letter's row (its middle at
+ * `mid` px down the text) in view at the bottom, rows `rowH` px tall, the view `clientHeight`
+ * tall; only ever down, so a row already in view leaves it as it is.
+ * @param {{mid: number, rowH: number, clientHeight: number, scrollTop: number}} o
+ */
+export function followRow({ mid, rowH, clientHeight, scrollTop }) {
+  const want = Math.max(0, Math.round((Math.floor(mid / rowH) + 1) * rowH - clientHeight));
+  return want > scrollTop ? want : scrollTop;
+}
+
 /** The words on the screen: labels in Title Case, the rest sentences. */
 export const TALK_TEXT = {
   layer: 'Intro',
@@ -172,6 +192,8 @@ export function talkHtml() {
     <div class="inv-talk-view">
       <p class="inv-talk-text" aria-hidden="true"><span class="inv-talk-typed"></span></p>
       <p class="inv-talk-ghost" aria-hidden="true"></p>
+      <span class="inv-talk-more inv-talk-more-up" aria-hidden="true" hidden></span>
+      <span class="inv-talk-more inv-talk-more-down" aria-hidden="true" hidden></span>
     </div>
     <p class="inv-talk-live" role="status" aria-live="polite" aria-atomic="true"></p>
     <p class="inv-talk-hint">${t.goOn}</p>
@@ -236,6 +258,8 @@ export function createDialogueUi(
   const ghost = $('.inv-talk-ghost');
   const flash = $('.inv-talk-flash');
   const boxEl = $('.inv-talk-box');
+  const moreUp = $('.inv-talk-more-up');
+  const moreDown = $('.inv-talk-more-down');
   const live = $('.inv-talk-live');
   const next = $('.inv-talk-next');
   const choices = $('.inv-talk-choices');
@@ -259,6 +283,10 @@ export function createDialogueUi(
     settle: 0,
     next: false,
     auto: false,
+    /** the line is all typed (the visitor may scroll it) */
+    typed: false,
+    /** its rows' height, px (read once a line) */
+    rowH: 0,
   };
 
   const modal = () => !logBox.hidden || !ask.hidden;
@@ -342,6 +370,53 @@ export function createDialogueUi(
     );
   }
 
+  /**
+   * A long line's view: scrollable once it's all typed and it outgrows the box (the wheel, a
+   * finger, the keys), and the cues over and under it where there's more.
+   */
+  function scrollState() {
+    const over = text.scrollHeight > text.clientHeight + 1;
+    text.classList.toggle('can-scroll', shown.typed && over);
+    cues();
+  }
+  /** The pixel cues: more above (scrolled down), more below (only once it's all typed). */
+  function cues() {
+    const top = text.scrollTop;
+    moreUp.hidden = top <= 1;
+    moreDown.hidden = !shown.typed || top + text.clientHeight >= text.scrollHeight - 1;
+  }
+  /** The newest letter's row kept in view as the line types (followRow). */
+  function follow() {
+    const span = shown.spans[shown.n - 1];
+    if (!span) return;
+    if (!shown.rowH) shown.rowH = parseFloat(getComputedStyle(text).lineHeight) || 25;
+    const to = followRow({
+      mid: span.offsetTop + span.offsetHeight / 2,
+      rowH: shown.rowH,
+      clientHeight: text.clientHeight,
+      scrollTop: text.scrollTop,
+    });
+    if (to !== text.scrollTop) text.scrollTop = to;
+    cues();
+  }
+  /**
+   * The keys that scroll a long line once it's all typed: the arrows a row, Page Up and Down a
+   * view less a row. Whether it took the key.
+   * @param {string} key
+   */
+  function scrollKey(key) {
+    if (!text.classList.contains('can-scroll')) return false;
+    const row = shown.rowH || 25;
+    const page = Math.max(row, text.clientHeight - row);
+    const by = { ArrowDown: row, ArrowUp: -row, PageDown: page, PageUp: -page }[key];
+    if (!by) return false;
+    text.scrollTop += by;
+    cues();
+    return true;
+  }
+  text.addEventListener('scroll', cues, { passive: true });
+  if (typeof view?.ResizeObserver === 'function') new view.ResizeObserver(() => scrollState()).observe(text);
+
   /** The Log was opened with a pointer (a click or a tap), not from the keyboard. */
   let logByPointer = false;
 
@@ -410,6 +485,11 @@ export function createDialogueUi(
       stops[to].focus();
       return;
     }
+    // (A long line, all typed: the arrows and Page Up and Down scroll it.)
+    if (!modal() && scrollKey(e.key)) {
+      e.preventDefault();
+      return;
+    }
     if (e.key !== ' ' && e.key !== 'Enter') return;
     const target = /** @type {HTMLElement|null} */ (e.target instanceof HTMLElement ? e.target : null);
     // (A focused button presses itself: a reply's press waits for them to settle, in the click.)
@@ -464,12 +544,12 @@ export function createDialogueUi(
     if (modal() && !on) e.preventDefault();
   });
   // (Nothing under the layer takes a wheel or a context menu while it's up; the Log's own list
-  // still scrolls with a wheel or trackpad.)
+  // still scrolls with a wheel or trackpad, and so does a long line once it's all typed.)
   layer.addEventListener(
     'wheel',
     (e) => {
       const t = /** @type {Element|null} */ (e.target instanceof Element ? e.target : null);
-      if (!t?.closest('.inv-talk-log-list')) e.preventDefault();
+      if (!t?.closest('.inv-talk-log-list, .inv-talk-text.can-scroll')) e.preventDefault();
     },
     { passive: false },
   );
@@ -507,6 +587,12 @@ export function createDialogueUi(
         const line = parseMarkup(v.box.text, palette);
         shown.spans = renderMarkup(typed, line);
         shown.n = -1;
+        // (A new line from its top, not scrollable till it's typed.)
+        shown.typed = false;
+        shown.rowH = 0;
+        text.scrollTop = 0;
+        text.classList.remove('can-scroll');
+        moreUp.hidden = moreDown.hidden = true;
         // (The name with its tags, for the eye; a screen reader hears it plain, with the line.)
         renderMarkup(name, parseMarkup(v.speaker, palette));
         name.hidden = !v.speaker;
@@ -514,8 +600,15 @@ export function createDialogueUi(
         live.textContent = who ? `${who}: ${line.plain}` : line.plain;
       }
       if (v.shown !== shown.n) {
+        const was = shown.n;
         revealLetters(shown.spans, v.shown, shown.n);
         shown.n = v.shown;
+        // (Typing: the newest row in view. Finished at once: the view stays, the cue says there's more.)
+        if (was >= 0 && v.shown - was <= FOLLOW_JUMP) follow();
+      }
+      if (v.typed !== shown.typed) {
+        shown.typed = v.typed;
+        scrollState();
       }
       const showNext = v.typed && !v.choices;
       if (showNext !== shown.next) next.hidden = !(shown.next = showNext);

@@ -134,15 +134,66 @@
   position: relative;
 }
 .inv-talk-text {
+  position: relative;
   margin: 0;
-  /* (Three lines' room, so a longer line never grows the box as it types.) */
+  /* (Three lines' room, no more: a longer line scrolls inside it, the box never grows over him;
+     dialogueUi.js keeps the newest row in view as it types.) */
   min-height: calc(3 * 1.42em);
+  max-height: calc(3 * 1.42em);
+  overflow-y: hidden;
+  scrollbar-width: none;
   font-size: 18px;
   line-height: 1.42;
   letter-spacing: 0.01em;
   overflow-wrap: break-word;
   /* (The admin's own line breaks show.) */
   white-space: pre-line;
+}
+.inv-talk-text::-webkit-scrollbar {
+  display: none;
+}
+/* (All typed and longer than the box: the wheel, a finger and the keys scroll it.) */
+.inv-talk-text.can-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+/* (The pixel cues beside the line where there's more of it: a little stepped triangle over it,
+   one under it, just inside the box's right edge.) */
+.inv-talk-more {
+  position: absolute;
+  right: -14px;
+  width: 2px;
+  height: 2px;
+  background: var(--talk-ink);
+  pointer-events: none;
+}
+.inv-talk-more-up {
+  top: 2px;
+  box-shadow:
+    -2px 2px 0 var(--talk-ink),
+    0 2px 0 var(--talk-ink),
+    2px 2px 0 var(--talk-ink),
+    -4px 4px 0 var(--talk-ink),
+    -2px 4px 0 var(--talk-ink),
+    0 4px 0 var(--talk-ink),
+    2px 4px 0 var(--talk-ink),
+    4px 4px 0 var(--talk-ink);
+}
+.inv-talk-more-down {
+  bottom: 2px;
+  box-shadow:
+    -2px -2px 0 var(--talk-ink),
+    0 -2px 0 var(--talk-ink),
+    2px -2px 0 var(--talk-ink),
+    -4px -4px 0 var(--talk-ink),
+    -2px -4px 0 var(--talk-ink),
+    0 -4px 0 var(--talk-ink),
+    2px -4px 0 var(--talk-ink),
+    4px -4px 0 var(--talk-ink);
+}
+.inv-talk-more[hidden] {
+  display: none;
 }
 /* (The line before, dithering out over the next as it comes: dialogueUi.js ditherOut.) */
 .inv-talk-ghost {
@@ -402,6 +453,7 @@
   }
   .inv-talk-text {
     min-height: calc(2 * 1.42em);
+    max-height: calc(2 * 1.42em);
   }
   .inv-talk-text,
   .inv-talk-ghost {

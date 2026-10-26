@@ -22,7 +22,9 @@
 // their own sheets) and plays its animation. The screen answers in the toolbar's style: its
 // buttons dither on hover and press, it dithers in as it opens and the replies one after another,
 // a line dithers out over the next, a press that goes on flashes the box, the ▼ bobs in steps,
-// and reduced motion fades plainly.
+// and reduced motion fades plainly. A line longer than the box scrolls inside it (the box keeps
+// its size): it follows the typing, then a finger, the wheel or the arrow keys scroll it, with
+// cues where there's more.
 import { readFileSync } from 'node:fs';
 import { test, expect } from '@playwright/test';
 import { routeToEnd } from './helpers/dialogue-route.mjs';
@@ -440,7 +442,104 @@ async function tagsShowStyled(page, tap) {
   expect(errors).toEqual([]);
 }
 
+/** A line longer than the box shows (the test's own words, about 230 letters). */
+const LONG_LINE =
+  'This line runs on and on, far longer than the box has room for, so it has to scroll. ' +
+  'It keeps going with more words about nothing much at all, then a few more, and still more, ' +
+  'until at last it reaches the very end of it.';
+/** The long line's view: how far it's scrolled, its room, its height, and the cues. */
+const lineView = (page) =>
+  page.evaluate(() => {
+    const t = document.querySelector('.inv-talk-text');
+    const shown = [...document.querySelectorAll('.inv-talk-typed .inv-fx:not(.is-unseen)')];
+    const last = shown.at(-1)?.getBoundingClientRect();
+    const r = t.getBoundingClientRect();
+    return {
+      typed: Boolean(window.__invitation.snapshot().dialogue?.typed),
+      top: t.scrollTop,
+      room: t.scrollHeight - t.clientHeight,
+      height: r.height,
+      box: document.querySelector('.inv-talk-box').getBoundingClientRect().height,
+      newestInView: !last || (last.bottom <= r.bottom + 1 && last.top >= r.top - 1),
+      canScroll: t.classList.contains('can-scroll'),
+      up: !document.querySelector('.inv-talk-more-up').hidden,
+      down: !document.querySelector('.inv-talk-more-down').hidden,
+    };
+  });
+/**
+ * A long line scrolls in the box: the box keeps its size, the view follows the typing (the
+ * newest row in view), and once it's all typed a finger (`tap`) or the wheel and the keys scroll
+ * it, with the cues saying where there's more; a tap still goes on.
+ */
+async function longLineScrolls(page, tap) {
+  const errors = watch(page);
+  await calm(page);
+  const intro = structuredClone(behaviorIntro);
+  const first = intro.boxes.find((b) => b.id === intro.start);
+  first.text = LONG_LINE;
+  first.choices = [];
+  await page.evaluate((i) => window.__invitation.setIntro(i), intro);
+  await open(page, tap);
+  const start = await lineView(page);
+  // Typing: the newest letter always in view, the view scrolled down to it by the end.
+  for (const part of [0.25, 0.5, 0.75]) {
+    await until(page, (x) => x.dialogue.shown >= Math.floor(x.dialogue.length * part), `typed ${part * 100}%`);
+    const v = await lineView(page);
+    expect(v.newestInView, `the newest row in view at ${part * 100}%`).toBe(true);
+    if (!v.typed) expect(v.canScroll, 'not scrollable while it types').toBe(false);
+  }
+  await until(page, (x) => x.dialogue.typed, 'the line up');
+  let v = await lineView(page);
+  expect(v.room, 'longer than the box').toBeGreaterThan(10);
+  expect(v.top, 'scrolled to its end').toBeGreaterThan(v.room - 2);
+  expect(v.box, 'the box keeps its size').toBeCloseTo(start.box, 0);
+  expect(v.canScroll).toBe(true);
+  expect(v.up && !v.down, 'the cue says there’s more above').toBe(true);
+  const seq = (await snapshot(page)).dialogue.seq;
+  const text = page.locator('.inv-talk-text');
+  const r = await text.boundingBox();
+  if (tap) {
+    // A finger dragged down the line scrolls it back up, and goes nowhere.
+    const cdp = await page.context().newCDPSession(page);
+    const at = (y) => [{ x: r.x + r.width / 2, y }];
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: at(r.y + 4) });
+    for (let k = 1; k <= 8; k++)
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: at(r.y + 4 + k * 12) });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  } else {
+    // The wheel over the line scrolls it back up.
+    await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
+    await page.mouse.wheel(0, -400);
+  }
+  await expect.poll(async () => (await lineView(page)).top, { message: 'scrolled back up' }).toBeLessThan(v.top - 10);
+  v = await lineView(page);
+  expect(v.down, 'the cue says there’s more below').toBe(true);
+  expect((await snapshot(page)).dialogue.seq, 'scrolling never goes on').toBe(seq);
+  if (!tap) {
+    // The arrow keys scroll it a row at a time.
+    const before = v.top;
+    await page.keyboard.press('ArrowDown');
+    await expect.poll(async () => (await lineView(page)).top).toBeGreaterThan(before);
+    await page.keyboard.press('ArrowUp');
+    await expect.poll(async () => (await lineView(page)).top).toBeLessThan(before + 1);
+    expect((await snapshot(page)).dialogue.seq).toBe(seq);
+  }
+  // A tap still goes on, and the next line starts from its top.
+  await goOn(page, tap);
+  await until(page, (x) => x.dialogue?.seq > seq, 'on to the next line');
+  v = await lineView(page);
+  expect(v.top).toBe(0);
+  expect(v.canScroll).toBe(false);
+  expect(errors).toEqual([]);
+}
+
 test.describe('on a phone', () => {
+  test('a long line scrolls in the box: it follows the typing, then a finger or the wheel and keys scroll it', async ({
+    page,
+  }) => {
+    await longLineScrolls(page, true);
+  });
+
   test('tags in a reply and a name show styled, read plain; an italic word slants in place', async ({ page }) => {
     await tagsShowStyled(page, true);
   });
@@ -891,6 +990,12 @@ test.describe('on a phone', () => {
 });
 
 test.describe('on a desktop', () => {
+  test('a long line scrolls in the box: it follows the typing, then a finger or the wheel and keys scroll it', async ({
+    page,
+  }) => {
+    await longLineScrolls(page, false);
+  });
+
   test('the buttons dither on hover and press; the box dithers in, a line dithers out over the next, a press flashes it', async ({
     page,
   }) => {

@@ -194,7 +194,7 @@ export const INVITATION_HELP = {
     'How Next and the choices point to this box. Lowercase letters, numbers and dashes, and no other box’s.',
   [`${BOX}.speaker`]:
     'Another name on the tab for this box alone, such as ??? before he’s said his; tags style it. Empty: the intro’s Speaker.',
-  [`${BOX}.text`]: `What he says, typed out; {red,wave|tags} style it (Text Effects). Up to ${INTRO_TEXT_MAX} letters; past ${INTRO_TEXT_LONG} it outgrows a phone’s box.`,
+  [`${BOX}.text`]: `What he says, typed out; {red,wave|tags} style it (Text Effects). Up to ${INTRO_TEXT_MAX} letters; past ${INTRO_TEXT_LONG} it scrolls in a phone’s box.`,
   [`${BOX}.face`]: 'His face while he says it. He still blinks on Neutral.',
   [`${BOX}.animation`]:
     'As the line starts: Once plays, then he talks; Loops keeps on. In Place walks on the spot; Dangling holds him up. Down, he gets up first. None: as he was.',

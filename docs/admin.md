@@ -188,7 +188,7 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     box's card is titled by its line, with its id, face, move, shot and where it goes under
     it. A box has its **ID** (how Next and the choices point to it), a **Speaker Override**
     (such as ??? before he's said his name; empty: the intro's Speaker; tags style it too), its **Text** (typed
-    out letter by letter, up to 240 letters; past 100 it outgrows the box's three lines on
+    out letter by letter, up to 240 letters; past 100 it scrolls past the box's three lines on
     a phone; its tags style it, with a **Preview** under it), a **Face** (every face he has; he still blinks on Neutral), an **Animation** (any
     of his: Once plays and then he talks, Loops keeps going, In Place walks or runs on the spot,
     Dangling holds him up off the floor, sitting or lying down gets him down first; None: as he was), a **Camera**

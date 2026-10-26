@@ -529,3 +529,41 @@ test('the chat screen’s feedback, in the toolbar’s style: dither tiles, a di
   const reduced = css.slice(css.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
   assert.match(reduced, /animation: inv-talk-fade 0\.1\d?s/);
 });
+
+test('a long line scrolls in the box: it follows the typing a row at a time, and the box keeps its size', async () => {
+  const { followRow, talkHtml, FOLLOW_JUMP } = await import('../src/invitation/dialogueUi.js');
+  const row = 25;
+  const view = { rowH: row, clientHeight: 3 * row };
+  // (The first three rows show as they are; the fourth brings its row into view at the bottom.)
+  assert.equal(followRow({ ...view, mid: 12, scrollTop: 0 }), 0);
+  assert.equal(followRow({ ...view, mid: 2 * row + 12, scrollTop: 0 }), 0);
+  assert.equal(followRow({ ...view, mid: 3 * row + 12, scrollTop: 0 }), row);
+  assert.equal(followRow({ ...view, mid: 5 * row + 3, scrollTop: row }), 3 * row);
+  // (It only ever follows down: a row already in view leaves the scroll as it is.)
+  assert.equal(followRow({ ...view, mid: 12, scrollTop: 2 * row }), 2 * row);
+  assert.ok(FOLLOW_JUMP >= 4 && FOLLOW_JUMP <= 40, 'a jump (the line finished at once) leaves the view where it is');
+  const markup = talkHtml();
+  assert.match(markup, /class="inv-talk-more inv-talk-more-up" aria-hidden="true" hidden/);
+  assert.match(markup, /class="inv-talk-more inv-talk-more-down" aria-hidden="true" hidden/);
+
+  const css = readFileSync(new URL('../src/invitation/dialogue.css', import.meta.url), 'utf8');
+  const rule = (sel, from = 0) => {
+    const at = css.indexOf(`${sel} {`, from);
+    assert.ok(at >= 0, `a rule for ${sel}`);
+    return css.slice(at, css.indexOf('}', at));
+  };
+  // (Three rows' room, no more and no less, on a phone and a desktop; two on a phone held sideways.)
+  const text = rule('.inv-talk-text');
+  assert.match(text, /min-height: calc\(3 \* 1\.42em\)/);
+  assert.match(text, /max-height: calc\(3 \* 1\.42em\)/);
+  assert.match(text, /overflow-y: hidden/);
+  const side = rule('.inv-talk-text', css.indexOf('@media (orientation: landscape)'));
+  assert.match(side, /min-height: calc\(2 \* 1\.42em\)/);
+  assert.match(side, /max-height: calc\(2 \* 1\.42em\)/);
+  // (Once it's all typed: the wheel, a finger and the keys scroll it, its scrollbar unseen.)
+  const free = rule('.inv-talk-text.can-scroll');
+  assert.match(free, /overflow-y: auto/);
+  assert.match(free, /touch-action: pan-y/);
+  assert.match(free, /overscroll-behavior: contain/);
+  assert.match(text, /scrollbar-width: none/);
+});
