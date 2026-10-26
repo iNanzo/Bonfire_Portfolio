@@ -9,12 +9,13 @@
    it gets none, until the intro ends. The lines' text effects: markup.css.
    Feedback in the toolbar's style, ordered dither (the tiles dialogueUi.js draws on the layer:
    --talk-ink-N, the ink at N/16; --talk-mask-N, a mask at N/16): every button's hover a light ink
-   dither and its press a heavier one (a finger's too, .is-pressed), its words on a plate over
-   it; the replies dither in one after another (their mask through the fade's steps); a press
-   that goes on dips the box with a flash of dither (the flash, from script); the ▼ bobs in pixel
-   steps. The box has no dither of its own: it rises in with a plain quick fade, a new line takes
-   the old one's place at once, and the screen fades out plainly as the intro ends (from script,
-   out of reach from its first step). Reduced motion: no rise, no bob, no dip, quick plain fades. */
+   dither and its press a heavier one (a finger's too, .is-pressed), right up to its words, which
+   a crisp 2 px outline of the button's own fill keeps clear of it; the replies dither in one
+   after another (their mask through the fade's steps); a press that goes on dips the box with a
+   flash of dither (the flash, from script); the ▼ bobs in pixel steps. The box has no dither of
+   its own: it rises in with a plain quick fade, a new line takes the old one's place at once, and
+   the screen fades out plainly as the intro ends (from script, out of reach from its first step).
+   Reduced motion: no rise, no bob, no dip, quick plain fades. */
 
 @import './markup.css';
 
@@ -63,12 +64,43 @@
 }
 /* (Every button in the layer: the toolbar's ordered dither of the ink, light on hover, heavier
    pressed, its 2 px cells crisp. Pressed is :active, or .is-pressed for a finger held on it,
-   where :active isn't reliable (dialogueUi.js holdPressed); its words stay on a plate of the
-   button's own fill over either dither, .inv-talk-label, a line at a time on a reply of two.) */
+   where :active isn't reliable (dialogueUi.js holdPressed). Either dither shows right up to its
+   words: no plate under them, just a crisp outline round each letter, 2 px out from its sides
+   and 1 px at its corners (a dither cell's width clear of it; whole-pixel shadows, no blur; a
+   reply's styled letters inherit it), in the button's own fill, --talk-btn-fill, which its
+   background takes too, so the two never differ: paper, the replies' cream, the on colour of
+   Auto and Log while they're on. The outline fades with the fill.) */
 .inv-talk .inv-btn {
+  --talk-btn-fill: var(--inv-paper, #fbf9f5);
+  background-color: var(--talk-btn-fill);
   background-repeat: repeat;
   background-size: 8px 8px;
   image-rendering: pixelated;
+  text-shadow:
+    1px 0 var(--talk-btn-fill),
+    -1px 0 var(--talk-btn-fill),
+    0 1px var(--talk-btn-fill),
+    0 -1px var(--talk-btn-fill),
+    1px 1px var(--talk-btn-fill),
+    -1px 1px var(--talk-btn-fill),
+    1px -1px var(--talk-btn-fill),
+    -1px -1px var(--talk-btn-fill),
+    2px 0 var(--talk-btn-fill),
+    -2px 0 var(--talk-btn-fill),
+    0 2px var(--talk-btn-fill),
+    0 -2px var(--talk-btn-fill);
+  transition:
+    transform 60ms ease-out,
+    box-shadow 60ms ease-out,
+    background-color 120ms,
+    text-shadow 120ms;
+}
+.inv-talk .inv-talk-choice {
+  --talk-btn-fill: var(--talk-fill);
+}
+.inv-talk .inv-btn[aria-pressed='true'],
+.inv-talk .inv-btn[aria-expanded='true'] {
+  --talk-btn-fill: var(--inv-on, #f4cf7a);
 }
 @media (hover: hover) and (pointer: fine) {
   .inv-talk .inv-btn:hover:not(:disabled) {
@@ -80,13 +112,6 @@
   background-image: var(--talk-ink-6);
   transform: translateY(3px);
   box-shadow: 0 1px 0 var(--talk-ink);
-}
-.inv-talk-label {
-  margin: 0 -4px;
-  padding: 1px 4px;
-  background-color: inherit;
-  -webkit-box-decoration-break: clone;
-  box-decoration-break: clone;
 }
 
 /* --- The box and its name tab. */
@@ -245,7 +270,6 @@
   min-height: 54px;
   padding: 8px 16px;
   border-radius: 16px;
-  background: var(--talk-fill);
   font-size: 17px;
   line-height: 1.2;
 }

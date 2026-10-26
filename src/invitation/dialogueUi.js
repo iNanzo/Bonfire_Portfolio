@@ -31,11 +31,11 @@
 // finger and the arrow and Page keys scroll it, with pixel cues over and under it where there's more.
 // Feedback in the toolbar's style, its ordered dither (TALK_DITHER's tiles on the layer, CSS in
 // dialogue.css): the buttons' hover and press (a press held with a finger too, holdPressed: CSS
-// :active isn't reliable on touch; the button's words on a plate of its fill, so the dither never
-// runs through them), the replies dithering in, and from here a press that goes on dipping the
-// box with a flash of dither (pressFlash); reduced motion, quick plain fades. The box itself has
-// no dither: it rises in with a plain fade (CSS), a new line takes the old one's place at once,
-// and the screen fades out plainly at the end.
+// :active isn't reliable on touch; the dither shows right up to the button's words, which a 2 px
+// outline of its fill keeps clear of it), the replies dithering in, and from here a press that
+// goes on dipping the box with a flash of dither (pressFlash); reduced motion, quick plain fades.
+// The box itself has no dither: it rises in with a plain fade (CSS), a new line takes the old
+// one's place at once, and the screen fades out plainly at the end.
 
 /** @typedef {import('./dialogue.js').DialogueView} DialogueView */
 /** @typedef {import('./dialogue.js').LogEntry} LogEntry */
@@ -284,21 +284,15 @@ function styleHolders(root, palette) {
     renderMarkup(el, parseMarkup(el.dataset.styled ?? '', palette));
 }
 
-/**
- * A button's words on a plate of its own fill (dialogue.css), over its hover's and press's dither.
- * @param {string} s
- */
-const label = (s) => `<span class="inv-talk-label">${s}</span>`;
-
 /** The layer's markup (hidden until open). */
 export function talkHtml() {
   const t = TALK_TEXT;
   return `<div class="inv-talk-top" role="toolbar" aria-label="${t.layer}">
-    <button type="button" class="inv-btn inv-talk-btn" data-talk="auto" aria-pressed="false">${label(t.auto)}</button>
-    <button type="button" class="inv-btn inv-talk-btn" data-talk="skip">${label(t.next)}</button>
-    <button type="button" class="inv-btn inv-talk-btn" data-talk="log" aria-haspopup="dialog" aria-expanded="false">${label(t.log)}</button>
+    <button type="button" class="inv-btn inv-talk-btn" data-talk="auto" aria-pressed="false">${t.auto}</button>
+    <button type="button" class="inv-btn inv-talk-btn" data-talk="skip">${t.next}</button>
+    <button type="button" class="inv-btn inv-talk-btn" data-talk="log" aria-haspopup="dialog" aria-expanded="false">${t.log}</button>
   </div>
-  <button type="button" class="inv-btn inv-talk-btn inv-talk-skip-intro" data-intro-skip>${label(t.skipIntro)}</button>
+  <button type="button" class="inv-btn inv-talk-btn inv-talk-skip-intro" data-intro-skip>${t.skipIntro}</button>
   <div class="inv-talk-choices" role="group" aria-label="${t.replies}" hidden></div>
   <section class="inv-talk-box">
     <span class="inv-talk-flash" aria-hidden="true"></span>
@@ -313,13 +307,13 @@ export function talkHtml() {
     <span class="inv-talk-next" aria-hidden="true" hidden>▼</span>
   </section>
   <section class="inv-talk-log" role="dialog" aria-modal="true" aria-labelledby="inv-talk-log-title" hidden>
-    <header class="inv-talk-log-head"><h2 id="inv-talk-log-title">${t.logTitle}</h2><button type="button" class="inv-btn inv-btn-small" data-talk="log-close">${label(t.close)}</button></header>
+    <header class="inv-talk-log-head"><h2 id="inv-talk-log-title">${t.logTitle}</h2><button type="button" class="inv-btn inv-btn-small" data-talk="log-close">${t.close}</button></header>
     <ol class="inv-talk-log-list"></ol>
   </section>
   <section class="inv-talk-ask" role="alertdialog" aria-modal="true" aria-labelledby="inv-talk-ask-title" aria-describedby="inv-talk-ask-hint" hidden>
     <h2 id="inv-talk-ask-title">${t.ask}</h2>
     <p class="inv-hint" id="inv-talk-ask-hint">${t.askHint}</p>
-    <div class="inv-talk-ask-row"><button type="button" class="inv-btn" data-talk="no">${label(t.no)}</button><button type="button" class="inv-btn" data-talk="yes">${label(t.yes)}</button></div>
+    <div class="inv-talk-ask-row"><button type="button" class="inv-btn" data-talk="no">${t.no}</button><button type="button" class="inv-btn" data-talk="yes">${t.yes}</button></div>
   </section>`;
 }
 
@@ -731,7 +725,7 @@ export function createDialogueUi(
         choices.innerHTML = (own ?? [])
           .map(
             (c, i) =>
-              `<button type="button" class="inv-btn inv-talk-choice" data-choice="${i}" aria-label="${attr(plainText(c.label))}"><span class="inv-talk-choice-text inv-talk-label" aria-hidden="true" data-styled="${attr(c.label)}"></span></button>`,
+              `<button type="button" class="inv-btn inv-talk-choice" data-choice="${i}" aria-label="${attr(plainText(c.label))}"><span class="inv-talk-choice-text" aria-hidden="true" data-styled="${attr(c.label)}"></span></button>`,
           )
           .join('');
         styleHolders(choices, palette);

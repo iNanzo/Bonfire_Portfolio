@@ -344,13 +344,16 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
 - **Feedback,** in the toolbar's style (its ordered Bayer dither, in the ink): every button on the
   screen (Auto, Next, Log, Skip Intro, the replies, the Log's and the question's) fills with a
   light dither on hover and a heavier one pressed (a finger held on one too, where a phone's own
-  pressed state can't be relied on), its words on a plate of the button's own colour so the
-  press never hides them. The replies dither in one after another, and a tap or a key that goes
-  on dips the box a step with a flash of dither. The box itself fades plainly: it rises into
-  place with a quick fade as the intro opens, a new line takes the old one's place at once and
-  types from its start (the two never overlap), and the whole screen fades out quickly as the
-  intro ends (out of reach from the first step, so play comes back at once). With reduced motion
-  the box comes without its rise and the replies fade in plainly, with no dip and no bob.
+  pressed state can't be relied on). The dither shows right up to its words, which sit on no
+  plate: a crisp outline of the button's own colour rings each letter (a reply's styled ones
+  too), 2 px out from its sides and 1 px at its corners, a dither cell's width, so the press
+  never runs into them. The replies dither in one after another, and a
+  tap or a key that goes on dips the box a step with a flash of dither. The box itself fades
+  plainly: it rises into place with a quick fade as the intro opens, a new line takes the old
+  one's place at once and types from its start (the two never overlap), and the whole screen
+  fades out quickly as the intro ends (out of reach from the first step, so play comes back at
+  once). With reduced motion the box comes without its rise and the replies fade in plainly,
+  with no dip and no bob.
 - **Going on:** a tap or click anywhere first finishes the line, then goes on to the next box;
   Space and Enter do the same (after a click or tap on Auto, Next or Log too; from the keyboard,
   a focused button presses itself). Some boxes ask a question: two or three replies show as buttons
@@ -1008,7 +1011,10 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   end (`fadeAway`: `.is-leaving` and inert at once, the layer's opacity down over `LEAVE_MS`,
   then hidden; `close({cut})` drops it at once for a replay or the
   preview); `holdPressed` (`.is-pressed` from a pointerdown until it lifts, is cancelled or
-  leaves the button) and `.inv-talk-label` (a button's words on a plate of its inherited fill)),
+  leaves the button) and the words' outline (`.inv-talk .inv-btn`'s `text-shadow`: twelve
+  whole-pixel shadows with no blur, a pixel out all eight ways and two out from each side, in
+  `--talk-btn-fill`, which its `background-color` takes too: paper, the replies' `--talk-fill`,
+  `--inv-on` while Auto or Log is on; markup.js's letters inherit it)),
   brain.js's `talk` state (`BrainIn.dialogue`: the
   box's seq, animation, face and whether it's typing; any clip, clips.js `DIALOGUE_CLIPS`:
   `DIALOGUE_WAYS` says which step in place (main.js moves the step phase on by brain.js

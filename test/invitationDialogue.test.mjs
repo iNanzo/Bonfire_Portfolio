@@ -384,9 +384,9 @@ test('the chat screen’s markup: Title Case labels, a live region for the line,
   assert.match(markup, /data-talk="auto" aria-pressed="false"/);
   // (The top right's Next jumps to the next question or the end; Skip Intro, top left, ends it.)
   assert.equal(TALK_TEXT.next, 'Next');
-  assert.match(markup, />Next<\/span><\/button>/);
+  assert.match(markup, />Next<\/button>/);
   assert.ok(!/>Skip<\/(span|button)>/.test(markup), 'no Skip button any more');
-  assert.match(markup, /data-intro-skip><span class="inv-talk-label">Skip Intro<\/span><\/button>/);
+  assert.match(markup, /data-intro-skip>Skip Intro<\/button>/);
   const log = logHtml([
     { kind: 'line', speaker: 'NEWT', text: 'a <b> & c' },
     { kind: 'reply', text: 'Yes' },
@@ -822,20 +822,54 @@ test('the intro’s end: the screen takes no press from the start, fades out pla
   assert.equal('ditherAway' in ui, false, 'no dithered end any more');
 });
 
-test('a held press keeps its label above the dither; the pressed class looks as :active does', async () => {
+test('a button’s words on no plate: a crisp 2 px ring of its own fill round each letter, the dither up to it; the pressed class looks as :active does', async () => {
   const { talkHtml } = await import('../src/invitation/dialogueUi.js');
   const markup = talkHtml();
-  // (Every button's words on a plate of the button's own fill.)
-  for (const b of ['auto', 'skip', 'log', 'log-close', 'no', 'yes'])
-    assert.match(markup, new RegExp(`data-talk="${b}"[^>]*><span class="inv-talk-label">[^<]+</span></button>`), b);
-  assert.match(markup, /data-intro-skip><span class="inv-talk-label">Skip Intro<\/span><\/button>/);
+  const src = readFileSync(new URL('../src/invitation/dialogueUi.js', import.meta.url), 'utf8');
   const css = readFileSync(new URL('../src/invitation/dialogue.css', import.meta.url), 'utf8');
-  const at = css.indexOf('.inv-talk-label {');
-  assert.ok(at >= 0, 'a rule for the label');
-  const label = css.slice(at, css.indexOf('}', at));
-  assert.match(label, /background-color: inherit/);
-  assert.match(label, /box-decoration-break: clone/);
-  // (Pressed with a finger: the press's heavier dither and the press-down, as :active has them.)
+  // (No plate left: the words straight in each button, a reply's styled letters in its holder.)
+  assert.ok(!/inv-talk-label/.test(markup + src + css), 'no plate element or class left');
+  for (const b of ['auto', 'skip', 'log', 'log-close', 'no', 'yes'])
+    assert.match(markup, new RegExp(`data-talk="${b}"[^>]*>[^<]+</button>`), b);
+  assert.match(markup, /data-intro-skip>Skip Intro<\/button>/);
+  assert.match(
+    src,
+    /class="inv-btn inv-talk-choice"[^>]*><span class="inv-talk-choice-text" aria-hidden="true" data-styled=/,
+  );
+  const rule = (sel) => {
+    const at = css.indexOf(`${sel} {`);
+    assert.ok(at >= 0, `a rule for ${sel}`);
+    return css.slice(at, css.indexOf('}', at));
+  };
+  // (The outline: crisp shadows round the letters, no blur, in the button's own fill, the one its
+  // background takes, so the two never differ; markup.js's letters inherit it. A ring 2 px out
+  // from each side and 1 px out at each corner: a dither cell's width clear round a letter.)
+  const btn = rule('.inv-talk .inv-btn');
+  assert.match(btn, /--talk-btn-fill: var\(--inv-paper/);
+  assert.match(btn, /background-color: var\(--talk-btn-fill\);/);
+  const rings = (/text-shadow:([^;]+);/.exec(btn)?.[1] ?? '').split(',').map((v) => v.trim());
+  const ways = new Set();
+  for (const r of rings) {
+    const m = /^(0|-?[12]px) (0|-?[12]px) var\(--talk-btn-fill\)$/.exec(r);
+    assert.ok(m, `a whole-pixel shadow in the fill, no blur: ${r}`);
+    ways.add([m[1], m[2]].map((v) => parseInt(v, 10)).join(','));
+  }
+  const ring = [...['-1,-1', '-1,0', '-1,1', '0,-1', '0,1', '1,-1', '1,0', '1,1'], ...['-2,0', '2,0', '0,-2', '0,2']];
+  assert.equal(rings.length, ring.length, 'no shadow twice');
+  assert.deepEqual([...ways].sort(), ring.sort(), 'the eight ways a pixel out, the four sides two');
+  assert.match(btn, /transition:[^;]*background-color 120ms[^;]*text-shadow 120ms/, 'the outline fades with the fill');
+  // (Each fill: the replies' cream; Auto's and Log's colour when on.)
+  assert.match(rule('.inv-talk .inv-talk-choice'), /--talk-btn-fill: var\(--talk-fill\);/);
+  assert.match(
+    rule(".inv-talk .inv-btn[aria-pressed='true'],\n.inv-talk .inv-btn[aria-expanded='true']"),
+    /--talk-btn-fill: var\(--inv-on/,
+  );
+  // (No other text-shadow in the layer or on the letters to break the ring.)
+  assert.equal(css.match(/text-shadow:/g)?.length, 1);
+  const fx = readFileSync(new URL('../src/invitation/markup.css', import.meta.url), 'utf8');
+  assert.ok(!/text-shadow/.test(fx), 'markup.css leaves the letters their inherited outline');
+  // (Hover and press keep their dither; a finger's press has the press's dither and press-down too.)
+  assert.match(rule('.inv-talk .inv-btn:hover:not(:disabled)'), /background-image: var\(--talk-ink-2\)/);
   const pressed =
     /\.inv-talk \.inv-btn:active:not\(:disabled\),\n\.inv-talk \.inv-btn\.is-pressed:not\(:disabled\) \{([^}]*)\}/.exec(
       css,
