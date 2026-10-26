@@ -194,6 +194,56 @@ test('a line after another types at once, from its first letter, as the first on
   assert.equal(r.step(0.5 + 1 / DIALOGUE.cps + 1e-6).shown, 1);
 });
 
+test('a line a press brings on waits its lead, then types from its first letter; Auto, Next and the first line don’t wait', () => {
+  const lead = 0.32;
+  const letter = 1 / DIALOGUE.cps;
+  const d = run(SCRIPT, { lead });
+  assert.equal(d.step(letter + 1e-6).shown, 1, 'the first line types at once');
+  assert.equal(d.advance(0.1), 'typed');
+  assert.equal(d.advance(0.2), 'next');
+  assert.equal(d.view.box?.id, 'me');
+  assert.equal(d.step(0.2 + lead - 1e-3).shown, 0, 'it waits its lead (the screen fades the lines meanwhile)');
+  assert.equal(d.view.typed, false);
+  assert.equal(d.step(0.2 + lead + letter + 1e-6).shown, 1, 'then its first letter');
+  const v = d.step(0.2 + lead + typeDuration('I am NEWT') + 1e-6);
+  assert.ok(v.typed && v.shown === v.length, 'typed as long after its lead as the first');
+  // (A tap in its lead finishes it at once, as any tap does.)
+  assert.equal(d.advance(0.8), 'next');
+  assert.equal(d.advance(0.85), 'typed');
+  assert.ok(d.view.typed, 'finished in its lead');
+  // (Paused in its lead: the lead waits too.)
+  const p = run(SCRIPT, { lead });
+  p.advance(0);
+  p.advance(0.1);
+  p.pause(true, 0.15);
+  p.pause(false, 1.15);
+  assert.equal(p.step(1.1 + lead - 1e-3).shown, 0, 'still waiting after the pause');
+  assert.equal(p.step(1.1 + lead + letter + 1e-6).shown, 1);
+  // (A reply picked: its box waits the lead too.)
+  const r = run(SCRIPT, { lead });
+  r.skip(0);
+  assert.ok(r.choose(0, 0.5));
+  assert.equal(r.view.box?.id, 'yes');
+  assert.equal(r.step(0.5 + lead - 1e-3).shown, 0);
+  assert.equal(r.step(0.5 + lead + letter + 1e-6).shown, 1);
+  // (Auto going on by itself doesn't: nothing fades.)
+  const a = run(SCRIPT, { lead });
+  a.setAuto(true, 0);
+  let t = 0;
+  while (a.view.box?.id === 'hi' && t < 20) a.step((t += 1 / 60));
+  assert.equal(a.view.box?.id, 'me');
+  assert.equal(a.step(t + letter + 1e-6).shown, 1, 'Auto’s box types at once');
+  // (Next goes to the box with replies typed whole, as ever.)
+  const n = run(SCRIPT, { lead });
+  n.skip(0.1);
+  assert.ok(n.view.typed && n.view.box?.id === 'ask');
+  // (A lead that isn't a number: none.)
+  const z = run(SCRIPT, { lead: NaN });
+  z.advance(0);
+  z.advance(0.1);
+  assert.equal(z.step(0.1 + letter + 1e-6).shown, 1);
+});
+
 test('the last box ends it, and so does a next that isn’t there', () => {
   const d = run({ speaker: 'NEWT', start: 'a', boxes: [{ id: 'a', text: 'one', next: 'gone' }] });
   d.advance(0);
@@ -557,6 +607,60 @@ test('the chat screen’s feedback: the buttons’ dither in the toolbar’s sty
     reduced,
     /\.inv-talk-choices:not\(\.is-waiting\) \.inv-talk-choice \{\s*animation: inv-talk-fade 0\.1\d?s/,
   );
+});
+
+test('a press that goes on, or a reply picked: the old line dithers out, then the next in, each in a few held Bayer steps', async () => {
+  const { TALK_FADE, TALK_LEAD, fadeFrames, talkTile } = await import('../src/invitation/dialogueUi.js');
+  // (Short: about a sixth of a second each way, and the next line types once both are over.)
+  assert.ok(TALK_FADE.ms >= 150 && TALK_FADE.ms <= 200, `each way ${TALK_FADE.ms} ms`);
+  assert.equal(TALK_LEAD, (2 * TALK_FADE.ms) / 1000, 'the runner’s lead: out, then in');
+  assert.ok(TALK_FADE.plainMs > 0 && TALK_FADE.plainMs < TALK_FADE.ms, 'reduced motion: a quicker plain fade');
+  // (The steps: the coverages, heavy to light, each the toolbar's Bayer tile at 2 px a cell.)
+  const { steps } = TALK_FADE;
+  assert.ok(steps.length >= 2 && steps.length <= 4, `a few steps: ${steps}`);
+  assert.ok(
+    steps.every((n, i) => n > 0 && n < 16 && (i === 0 || n < steps[i - 1])),
+    'down from heavy to light',
+  );
+  for (const n of [0, ...steps]) assert.equal(talkTile(n).filter(Boolean).length, n * 4, `${n}/16`);
+  const masks = new Map([0, ...steps].map((n) => [n, `url(tile-${n})`]));
+  const out = fadeFrames(true, masks);
+  const inn = fadeFrames(false, masks);
+  assert.deepEqual(
+    out.map((f) => f.maskImage),
+    [...steps.map((n) => `url(tile-${n})`), 'url(tile-0)'],
+    'out: lighter step by step, then nothing (held there till it goes)',
+  );
+  assert.deepEqual(
+    inn.map((f) => f.maskImage),
+    [...[...steps].reverse().map((n) => `url(tile-${n})`), 'none'],
+    'in: heavier step by step, then whole',
+  );
+  for (const frames of [out, inn]) {
+    assert.deepEqual(
+      frames.map((f) => f.offset),
+      frames.map((_, i) => i / (frames.length - 1)),
+      'even steps',
+    );
+    for (const f of frames) assert.equal(f.easing, 'steps(1, end)', 'each held: a dither steps, it never blends');
+  }
+
+  // (The old line's copy, over the new one where it was, takes no press; nor do the replies'.)
+  const css = readFileSync(new URL('../src/invitation/dialogue.css', import.meta.url), 'utf8');
+  const rule = (sel) => {
+    const at = css.indexOf(`${sel} {`);
+    assert.ok(at >= 0, `a rule for ${sel}`);
+    return css.slice(at, css.indexOf('}', at));
+  };
+  const ghost = rule('.inv-talk-ghost');
+  for (const d of [/position: absolute/, /inset: 0/, /overflow: hidden/, /pointer-events: none/])
+    assert.match(ghost, d);
+  assert.match(rule('.inv-talk-choices.is-ghost'), /pointer-events: none/);
+  // (The line's type is its view's, so the copy is set just as the line was.)
+  const view = rule('.inv-talk-view');
+  for (const d of [/font-size: 18px/, /line-height: 1\.42/, /white-space: pre-line/, /overflow-wrap: break-word/])
+    assert.match(view, d);
+  assert.ok(!/font-size/.test(rule('.inv-talk-text')), 'the line takes its view’s type');
 });
 
 test('a long line grows the box a row at most (four rows, three on a short screen), then scrolls in it, following the typing a row at a time', async () => {

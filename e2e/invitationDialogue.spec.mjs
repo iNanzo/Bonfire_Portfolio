@@ -135,6 +135,16 @@ function reachable(intro) {
 }
 
 /**
+ * With the page's clock paused (page.clock.pauseAt), runs it on a frame at a time until the
+ * replies are on the screen: once the press that brought their box on has dithered it in.
+ */
+async function runUntilReplies(page) {
+  const showing = () =>
+    page.evaluate(() => !document.querySelector('.inv-talk-choices:not(.is-ghost)').classList.contains('is-waiting'));
+  for (let i = 0; i < 120 && !(await showing()); i++) await page.clock.runFor(16);
+  expect(await showing(), 'the replies on the screen').toBe(true);
+}
+/**
  * Picks reply `i` once the replies show and have settled (dialogueUi.js REPLY_SETTLE: a press
  * straight after the one that finished the line goes nowhere).
  */
@@ -599,6 +609,126 @@ const scrollStill = (page) =>
   );
 
 /**
+ * Records every frame from now on (stopFrames returns them): when (performance.now()), what was
+ * done last (window.__mark), which line is up (its letters' first node), how many of its letters
+ * show of all, the old line's copy going (its mask, its fade's keyframes and its letters), the replies'
+ * copy going (its mask), the name tab (its mask and opacity, while it shows), the box's fade
+ * (data-fade: out, in or none) and the ▼.
+ */
+const recordFrames = (page) =>
+  page.evaluate(() => {
+    const typed = document.querySelector('.inv-talk-typed');
+    const name = document.querySelector('.inv-talk-name');
+    const boxEl = document.querySelector('.inv-talk-box');
+    const lines = new Map();
+    const rec = (window.__frames = []);
+    const css = (el) => getComputedStyle(el);
+    const tick = () => {
+      const head = typed.firstChild;
+      if (head && !lines.has(head)) lines.set(head, lines.size);
+      const ghost = document.querySelector('.inv-talk-ghost');
+      const replies = document.querySelector('.inv-talk-choices.is-ghost');
+      rec.push({
+        at: performance.now(),
+        mark: window.__mark ?? '',
+        line: head ? lines.get(head) : -1,
+        letters: typed.querySelectorAll('.inv-fx:not(.is-unseen)').length,
+        all: typed.querySelectorAll('.inv-fx').length,
+        ghost: ghost
+          ? {
+              mask: css(ghost).maskImage,
+              // (Its fade's keyframes: each opacity, or each mask.)
+              keys: ghost
+                .getAnimations()
+                .flatMap((a) =>
+                  a.effect.getKeyframes().map((k) => (k.opacity !== undefined ? `opacity ${k.opacity}` : k.maskImage)),
+                ),
+              letters: ghost.querySelectorAll('.inv-fx:not(.is-unseen)').length,
+            }
+          : null,
+        replies: replies ? css(replies).maskImage : null,
+        name: name.hidden ? null : { mask: css(name).maskImage, opacity: Number(css(name).opacity) },
+        fade: boxEl.dataset.fade ?? '',
+        next: !document.querySelector('.inv-talk-next').hidden,
+      });
+      window.__framesTick = requestAnimationFrame(tick);
+    };
+    tick();
+  });
+const stopFrames = (page) =>
+  page.evaluate(() => {
+    cancelAnimationFrame(window.__framesTick);
+    return window.__frames;
+  });
+/** A dither tile as the computed style gives one. */
+const TILE = /^url\("data:image\/png;base64,[^"]+"\)$/;
+/**
+ * From the frame a press brought a new line on (`i`) to its first letter: first the old line's
+ * copy goes, dithered (`plain`: a plain fade, reduced motion), the name tab with it (and the
+ * replies' copy, a reply picked); then the name tab comes in the same way, the copy gone; then
+ * (a letter's time on) the line types from its start, nothing fading. Never the copy and a new
+ * letter together, and the first letter no sooner than the two fades.
+ */
+function dithersOutThenIn(rec, i, what, { replies = false, plain = false } = {}) {
+  const first = rec.findIndex((r, j) => j >= i && r.letters > 0);
+  expect(first, `${what}: it types`).toBeGreaterThan(i);
+  const span = rec.slice(i, first);
+  const out = span.filter((r) => r.fade === 'out');
+  const inn = span.filter((r) => r.fade === 'in');
+  expect(out.length, `${what}: the old line goes`).toBeGreaterThan(0);
+  expect(inn.length, `${what}: then the next comes`).toBeGreaterThan(0);
+  expect(span[0].fade, `${what}: out from the press`).toBe('out');
+  const lastIn = span.findLastIndex((r) => r.fade === 'in');
+  expect(
+    span.findLastIndex((r) => r.fade === 'out'),
+    `${what}: out, then in`,
+  ).toBeLessThan(span.findIndex((r) => r.fade === 'in'));
+  expect(
+    span.slice(0, lastIn).every((r) => r.fade),
+    `${what}: out straight into in`,
+  ).toBe(true);
+  // (After it, until its first letter: nothing going, nothing typed.)
+  for (const r of span.slice(lastIn + 1))
+    expect([r.fade, r.ghost, r.replies, r.letters], `${what}: the letter's wait`).toEqual(['', null, null, 0]);
+  const look = plain ? /^none$/ : TILE;
+  for (const r of out) {
+    expect(r.ghost, `${what}: the old line's copy going`).not.toBeNull();
+    expect(r.ghost.letters, `${what}: the old line in it`).toBeGreaterThan(0);
+    expect(r.ghost.mask, `${what}: going ${plain ? 'plainly' : 'dithered'}`).toMatch(look);
+    if (r.name) expect(r.name.mask, `${what}: its name going with it`).toMatch(look);
+    if (replies) expect(r.replies, `${what}: the replies going`).toMatch(look);
+    expect(r.letters, `${what}: none of the new line yet`).toBe(0);
+  }
+  // (Its name tab coming dithered, or plainly; whole in a last frame before the fade's over.)
+  for (const r of inn) {
+    expect([r.ghost, r.replies], `${what}: the old line gone`).toEqual([null, null]);
+    if (r.name)
+      expect(r.name.mask, `${what}: its name coming ${plain ? 'plainly' : 'dithered'}`).toMatch(
+        plain ? look : /^url\(|^none$/,
+      );
+    expect([r.letters, r.next], `${what}: nothing typed yet`).toEqual([0, false]);
+  }
+  if (!plain && inn.some((r) => r.name))
+    expect(
+      inn.some((r) => TILE.test(r.name?.mask ?? '')),
+      `${what}: its name dithering in`,
+    ).toBe(true);
+  // (Its fade: a plain one, its opacity down; or the dither's steps, each a tile, then nothing.)
+  const keys = out[0].ghost.keys;
+  if (plain) expect(keys, `${what}: a plain fade`).toEqual(['opacity 1', 'opacity 0']);
+  else {
+    expect(keys.length, `${what}: a few steps`).toBeGreaterThanOrEqual(3);
+    for (const k of keys) expect(k, `${what}: each step a tile`).toMatch(TILE);
+    expect(new Set(keys).size, `${what}: each step its own`).toBe(keys.length);
+    if (out.length >= 6) expect(new Set(out.map((r) => r.ghost.mask)).size, `${what}: stepping`).toBeGreaterThan(1);
+  }
+  const typing = rec[first];
+  expect([typing.fade, typing.ghost], `${what}: typing, nothing fading`).toEqual(['', null]);
+  if (!plain) expect(typing.letters, `${what}: from its start`).toBeLessThan(typing.all);
+  expect(typing.at - rec[i].at, `${what}: once out and in are over`).toBeGreaterThan(280);
+}
+
+/**
  * The box as laid out, client px: its height and its name tab's top, its line's row height, how
  * many rows show and how many it has, and whether it scrolls.
  */
@@ -933,6 +1063,8 @@ test.describe('on a phone', () => {
     const log = (await snapshot(page)).dialogue.log;
     await page.touchscreen.tap(spot.x, spot.y);
     await until(page, (s) => Boolean(s.dialogue.choices), 'its replies');
+    // (On the screen once the question has come in: the tap that brought it dithers it in.)
+    await runUntilReplies(page);
     // (Its words are letters in it: the reply is what's under them.)
     const hit = await page.evaluate(
       ({ x, y }) => document.elementFromPoint(x, y)?.closest('.inv-talk-choice')?.className ?? '',
@@ -1271,8 +1403,6 @@ test.describe('on a desktop', () => {
     const errors = watch(page);
     await calm(page);
     await useBehaviorIntro(page);
-    /** A dither tile, as the computed style gives one. */
-    const TILE = /^url\("data:image\/png;base64,[^"]+"\)$/;
     // Opening: nothing on the screen dithers in; the box rises into place with a plain fade
     // (read the moment the layer shows).
     await page.evaluate(() => {
@@ -1368,62 +1498,62 @@ test.describe('on a desktop', () => {
     expect(errors).toEqual([]);
   });
 
-  test('a new line takes the old one’s place at once and types from its start: the two never show together', async ({
+  test('a press that goes on dithers the old line out, then the next one in, then it types; a reply picked too; Auto and Next change lines plainly', async ({
     page,
   }) => {
     const errors = watch(page);
     await calm(page);
     await useBehaviorIntro(page);
+    const { ask } = askAndBefore(await script(page));
+    test.skip(!ask, 'this script has no replies');
     await open(page);
-    // Every frame from here: the toy's clock, which line is up (its letters' first node), how
-    // many of its letters show, and anything else in the box with words in it.
-    await page.evaluate(() => {
-      const typed = document.querySelector('.inv-talk-typed');
-      const view = document.querySelector('.inv-talk-view');
-      const lines = new Map();
-      const rec = (window.swap = []);
-      const tick = () => {
-        const head = typed.firstChild;
-        if (head && !lines.has(head)) lines.set(head, lines.size);
-        rec.push({
-          t: window.__invitation.clock(),
-          line: head ? lines.get(head) : -1,
-          letters: typed.querySelectorAll('.inv-fx:not(.is-unseen)').length,
-          all: typed.querySelectorAll('.inv-fx').length,
-          others: [...view.children].filter((el) => !el.matches('.inv-talk-text') && el.textContent.trim()).length,
-        });
-        window.swapFrame = requestAnimationFrame(tick);
-      };
-      tick();
-    });
-    for (const press of [() => goOn(page), () => page.keyboard.press('Space')]) {
+    await recordFrames(page);
+    /** Notes what's done next, in every frame from here, and waits for its line to come. */
+    const act = async (what, doIt) => {
       const s = await snapshot(page);
       if (!s.dialogue.typed) {
-        await press();
+        await goOn(page);
         await until(page, (x) => x.dialogue.typed, 'the line up');
       }
-      await press();
-      await until(page, (x) => x.dialogue?.seq > s.dialogue.seq, 'the next line');
-      await until(page, (x) => x.dialogue.typed, 'typed out');
-    }
-    const rec = await page.evaluate(() => {
-      cancelAnimationFrame(window.swapFrame);
-      return window.swap;
+      await page.evaluate((m) => (window.__mark = m), what);
+      await doIt();
+      await until(page, (x) => !x.dialogue || x.dialogue.seq > s.dialogue.seq, `${what}: the next line`);
+      await until(page, (x) => !x.dialogue || x.dialogue.typed, `${what}: typed`);
+      // (Its letters all up on the screen too, nothing fading.)
+      await expect
+        .poll(() => page.evaluate(() => document.querySelectorAll('.inv-talk-typed .inv-fx.is-unseen').length))
+        .toBe(0);
+    };
+    await act('click', () => goOn(page));
+    await act('space', () => page.keyboard.press('Space'));
+    await act('next', () => page.getByRole('button', { name: 'Next', exact: true }).click());
+    expect((await snapshot(page)).dialogue.id).toBe(ask.id);
+    await act('reply', () => pick(page, 0));
+    const auto = page.getByRole('button', { name: 'Auto', exact: true });
+    await act('auto', async () => {
+      await auto.click();
+      await page.mouse.move(5, 5);
     });
+    await auto.click();
+    // Reduced motion: plain quick fades, in the same order.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await act('reduced', () => goOn(page));
+    const rec = await stopFrames(page);
     const comes = rec.flatMap((r, i) => (i > 0 && r.line !== rec[i - 1].line ? [i] : []));
-    expect(comes.length, 'two new lines').toBe(2);
-    for (const i of comes) {
-      expect(rec[i].letters, 'from its start, not whole').toBeLessThan(rec[i].all);
-      // (Its first letter a letter's time after it came, 1/32 s, give or take a frame: no wait
-      // for the line before to go.)
+    const by = Object.fromEntries(comes.map((i) => [rec[i].mark, i]));
+    expect(Object.keys(by).sort()).toEqual(['auto', 'click', 'next', 'reduced', 'reply', 'space']);
+    for (const what of ['click', 'space']) dithersOutThenIn(rec, by[what], what);
+    dithersOutThenIn(rec, by.reply, 'a reply picked', { replies: true });
+    dithersOutThenIn(rec, by.reduced, 'reduced motion', { plain: true });
+    // Nothing else dithers: Auto's next line types at once, Next's shows whole at once.
+    for (const what of ['auto', 'next']) {
+      const i = by[what];
       const first = rec.findIndex((r, j) => j >= i && r.letters > 0);
-      expect(first).toBeGreaterThanOrEqual(i);
-      expect(rec[first].t - rec[i].t, 'typing at once').toBeLessThan(0.12);
+      for (const r of rec.slice(i, first + 1))
+        expect([r.fade, r.ghost, r.replies], `${what}: no fade`).toEqual(['', null, null]);
+      expect(rec[first].at - rec[i].at, `${what}: no wait`).toBeLessThan(150);
     }
-    expect(
-      rec.filter((r) => r.others > 0).length,
-      'nothing else in the box with words: the old line gone the frame the new one came',
-    ).toBe(0);
+    expect(rec[by.next].letters, 'Next: the line whole at once').toBe(rec[by.next].all);
     expect(errors).toEqual([]);
   });
 
@@ -1799,6 +1929,8 @@ test.describe('on a desktop', () => {
       await page.clock.runFor(16);
       await page.keyboard.press(key);
       await until(page, (s) => s.dialogue.id === ask.id && Boolean(s.dialogue.choices), `${key}: its replies`);
+      // (On the screen once the question has come in: the press that brought it dithers it in.)
+      await runUntilReplies(page);
       const log = (await snapshot(page)).dialogue.log;
       await page.clock.runFor(16);
       await page.keyboard.press(key);

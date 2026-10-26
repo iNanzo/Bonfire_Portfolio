@@ -12,10 +12,13 @@
    dither and its press a heavier one (a finger's too, .is-pressed), right up to its words, which
    a crisp 2 px outline of the button's own fill keeps clear of it; the replies dither in one
    after another (their mask through the fade's steps); a press that goes on dips the box with a
-   flash of dither (the flash, from script); the ▼ bobs in pixel steps. The box has no dither of
-   its own: it rises in with a plain quick fade, a new line takes the old one's place at once, and
-   the screen fades out plainly as the intro ends (from script, out of reach from its first step).
-   Reduced motion: no rise, no bob, no dip, quick plain fades. */
+   flash of dither (the flash, from script); the ▼ bobs in pixel steps. The box rises in with a
+   plain quick fade, and the screen fades out plainly as the intro ends (from script, out of reach
+   from its first step). A press that goes on, or a reply picked, dithers the old line out with
+   its name tab (and the replies) and then the next one in, from script (dialogueUi.js
+   clickFade): the old line's copy (.inv-talk-ghost) over the new one's place, the replies' copy
+   (.inv-talk-choices.is-ghost), both out of reach. Reduced motion: no rise, no bob, no dip,
+   quick plain fades. */
 
 @import './markup.css';
 
@@ -156,8 +159,15 @@
   letter-spacing: 0.03em;
   transform: translateY(-62%);
 }
+/* (The line's type is its view's, so the old line's copy going over it is set as it was.) */
 .inv-talk-view {
   position: relative;
+  font-size: 18px;
+  line-height: 1.42;
+  letter-spacing: 0.01em;
+  overflow-wrap: break-word;
+  /* (The admin's own line breaks show.) */
+  white-space: pre-line;
 }
 .inv-talk-text {
   position: relative;
@@ -169,12 +179,6 @@
   max-height: calc(4 * 1.42em);
   overflow-y: hidden;
   scrollbar-width: none;
-  font-size: 18px;
-  line-height: 1.42;
-  letter-spacing: 0.01em;
-  overflow-wrap: break-word;
-  /* (The admin's own line breaks show.) */
-  white-space: pre-line;
 }
 .inv-talk-text::-webkit-scrollbar {
   display: none;
@@ -221,6 +225,15 @@
 }
 .inv-talk-more[hidden] {
   display: none;
+}
+/* (The line before, dithering out over the next one's place as a press goes on: dialogueUi.js
+   clickFade, scrolled where it was.) */
+.inv-talk-ghost {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  overflow: hidden;
+  pointer-events: none;
 }
 .inv-talk-next {
   position: absolute;
@@ -277,6 +290,13 @@
 }
 .inv-talk-choices:not(.is-waiting) .inv-talk-choice:nth-child(3) {
   animation-delay: 0.16s;
+}
+/* (The replies picked, dithering out where they were: clickFade's copy, out of reach.) */
+.inv-talk-choices.is-ghost {
+  pointer-events: none;
+}
+.inv-talk-choices.is-ghost .inv-talk-choice {
+  animation: none;
 }
 
 /* --- The Log and the question: cards over everything, the Log's list scrolling. */
@@ -430,7 +450,7 @@
     left: 22px;
     font-size: 18px;
   }
-  .inv-talk-text {
+  .inv-talk-view {
     font-size: 21px;
   }
   .inv-talk-top {
@@ -460,11 +480,13 @@
     padding: 18px 18px 20px;
     bottom: calc(8px + env(safe-area-inset-bottom));
   }
+  .inv-talk-view {
+    font-size: 16px;
+  }
   /* (Two rows at least and three at most: more of the screen is left for him.) */
   .inv-talk-text {
     min-height: calc(2 * 1.42em);
     max-height: calc(3 * 1.42em);
-    font-size: 16px;
   }
   .inv-talk-choices {
     top: 38%;
