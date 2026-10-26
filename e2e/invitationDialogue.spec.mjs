@@ -1072,9 +1072,9 @@ test.describe('on a desktop', () => {
     // read the moment it shows (its animation held there, then finished).
     await page.evaluate(() => {
       const layer = document.querySelector('.inv-talk');
-      new MutationObserver((_, watch) => {
+      new MutationObserver((_, observer) => {
         if (layer.hidden) return;
-        watch.disconnect();
+        observer.disconnect();
         getComputedStyle(layer).animationName; // (its animation made now)
         const a = layer.getAnimations().find((x) => x.animationName === 'inv-talk-dither-in');
         if (!a) return (window.opening = { none: true });
