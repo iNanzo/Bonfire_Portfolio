@@ -51,23 +51,29 @@ test('site colors, arrow steps, and the mix', () => {
   assert.deepEqual([...kinds].sort(), ['made', 'site']);
 });
 
-test('recolored scenery: any flame, new colors each landing, readable; off brings the site’s back', () => {
+test('recolored scenery: any flame, new colors each landing, readable; off brings the site’s back', (t) => {
+  // Replays a background-colour collision: distinct scenery palettes can share a dark void.
+  let seed = 204;
+  t.mock.method(Math, 'random', () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 4294967296;
+  });
   const settings = { colors: 'site', scheme: 'auto', sceneColors: 'on' };
   const colors = createColors(settings);
   const site = { ...base };
   const settle = () => {
     while (colors.update(0.05));
   };
-  const voids = new Set();
+  const palettes = new Set();
   for (const key of ['ember', 'ember', Object.keys(flames).find((k) => k !== 'ember')]) {
     colors.landed(key);
     settle();
     assert.ok(colors.scenery, `${key}: a site palette recolors the scenery too`);
-    assert.equal(base.void, colors.scenery.void);
+    for (const [name, value] of Object.entries(colors.scenery)) assert.equal(base[name], value, `${name} settles`);
     assert.ok(contrast(flames[key].ramp[2], base.void) >= 4.5, 'the flame’s tips still read on the new background');
-    voids.add(base.void);
+    palettes.add(JSON.stringify(colors.scenery));
   }
-  assert.equal(voids.size, 3, 'a new set every landing, even for the same flame');
+  assert.equal(palettes.size, 3, 'a new set every landing, even for the same flame');
   assert.notEqual(base.stone, site.stone);
   settings.sceneColors = 'off';
   colors.landed('ember');

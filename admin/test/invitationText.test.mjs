@@ -46,11 +46,27 @@ test('content.json’s text colours pass, and content without them (or the whole
   const c = content();
   assert.ok(Array.isArray(c.invitation.text?.colors), 'content.json has its colours');
   assert.deepEqual(validateContent(c).errors, []);
-  const old = content();
+  // Legacy content uses built-in colours, not the current admin draft's custom palette.
+  const old = withInvitation({
+    text: { colors: DEFAULT_TEXT_COLORS },
+    lines: { wave: ['{red,wave|Hello!}'] },
+    intro: intro('{gold|Welcome!}'),
+  });
   delete old.invitation.text;
   assert.deepEqual(validateContent(old).errors, [], 'no invitation.text');
   assert.deepEqual(problems({ text: { colors: DEFAULT_TEXT_COLORS } }).errors, []);
   assert.deepEqual(problems({ text: {} }).errors, [], 'every part optional');
+});
+
+test('removing a custom palette still rejects lines and intro boxes that use its colours', () => {
+  const inv = {
+    text: { colors: [{ name: 'moss', color: '#4a7a3b' }] },
+    lines: { wave: ['{moss|Hello!}'] },
+    intro: intro('{moss,wave|Welcome!}'),
+  };
+  assert.deepEqual(errorsAt(inv), []);
+  delete inv.text;
+  assert.deepEqual(errorsAt(inv), ['invitation.intro.boxes[0].text', 'invitation.lines.wave[0]']);
 });
 
 test('the colours: a list of {name, color}, each name its own and no effect’s, each a #rrggbb', () => {
