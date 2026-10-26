@@ -949,7 +949,7 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   sheet is in, above), and main.js plays a clip the glb lacks (an older copy cached from before
   the gestures) as Idle.
 - **Tests:** `test/invitationCharacter.test.mjs`, `invitationLook`, `invitationLooks`,
-  `invitationShader`, `invitationRetro`, `invitationGovernor`, `invitationAtlas`,
+  `invitationShader`, `invitationRetro`, `invitationGovernor`,
   `invitationFace`, `invitationFaceExtra`, `invitationFaceBlink`, `invitationCharacterFaces`,
   `invitationArea`, `invitationCamera` and `invitationPlay` (with `invitationBrain`,
   `invitationMotion`, `invitationGesture` and `invitationModel`), `invitationDialogue` (the
