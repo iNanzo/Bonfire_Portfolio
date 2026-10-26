@@ -26,7 +26,9 @@
 // ring under him while he's held, Ground Cues, and setPointerMarker, the cursor marker where the
 // pointer meets the floor, faded as the view gets low: both drawn by ring.js's shader from the
 // distance to a centre on the texel grid, a two-texel rim; setLine: the drop line from his collar to the
-// ring, two texels wide and dashed in texels, turned to face the camera). `bounds` is the default view's disc (area.js playArea), kept round the play
+// ring, two texels wide and dashed in texels, turned to face the camera). The dust he raises
+// landing is on that layer too (setDust: dustLayer.js draws dust.js's puffs, dithered, the pass's
+// area grown to take them in). `bounds` is the default view's disc (area.js playArea), kept round the play
 // area's middle (setArea: the play area itself is main.js's, area.js viewArea): what a desktop's
 // default view keeps in sight (pixels.js frameView) and the size of the shadow camera's box, moved
 // to wherever NEWT is (floor.js fitShadow), so his shadow is as fine anywhere in the area.
@@ -57,6 +59,8 @@ import { createGovernor, governReset, governStep, percentile } from './governor.
 import { blockAt, frameView, resolutionOf, texelGrid } from './pixels.js';
 import { FLOOR_SIZE, createFloor, fitShadow, floorLook } from './floor.js';
 import { createRetro, decalMaterial, subjectBoxes } from './retro.js';
+import { dustBounds } from './dust.js';
+import { createDustLayer } from './dustLayer.js';
 import { RING_FRAGMENT, elevationAt, markerFade, ringRadius, snapToTexel, texelSize } from './ring.js';
 import { parseQuery } from './ui.js';
 
@@ -261,6 +265,11 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
   line.visible = false;
   line.frustumCulled = false;
   scene.add(blob, marker, line);
+  // (The dust he raises landing: dust.js moves it, setDust.)
+  const dust = createDustLayer(LAYERS.decal);
+  scene.add(dust.mesh);
+  /** The dust's box this frame (dust.js dustBounds), for the pass's area; null: none. */
+  let dustBox = /** @type {ReturnType<typeof dustBounds>} */ (null);
 
   const retro = createRetro(renderer);
   let current = { preset, look };
@@ -302,8 +311,8 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
   const up = new THREE.Vector3();
   const centre = new THREE.Vector3();
   const toLight = new THREE.Vector3();
-  /** The visible decals' corners this frame, for the pass's area (scratch: reused). */
-  const corners = Array.from({ length: 8 }, () => new THREE.Vector3());
+  /** The visible decals' corners this frame and the dust's box's, for the pass's area (scratch: reused). */
+  const corners = Array.from({ length: 16 }, () => new THREE.Vector3());
   /** @type {any[]} */
   const extra = [];
 
@@ -346,6 +355,7 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
     container.style.backgroundColor = `#${f.background.toString(16).padStart(6, '0')}`;
     marker.material.color.setStyle(p.marker.color, THREE.SRGBColorSpace);
     line.material.color.setStyle(p.marker.color, THREE.SRGBColorSpace);
+    dust.setColor(p.marker.color);
     retro.setParams(p, l);
     container.dataset.pixel = l.pixelSize;
     placeSun();
@@ -471,7 +481,7 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
   const hit = new THREE.Vector3();
   const FLOOR = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
-  own.add(floor.mesh).add(hemi).add(sun).add(sun.target).add(blob).add(marker).add(line);
+  own.add(floor.mesh).add(hemi).add(sun).add(sun.target).add(blob).add(marker).add(line).add(dust.mesh);
   const decals = [blob, marker];
   /** NEWT, once he's in the scene (the one child the stage didn't add), or null. */
   function subjectNow() {
@@ -500,6 +510,16 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
           corners[i * 4 + j].set(d.position.x + (j & 1 ? r : -r), d.position.y, d.position.z + (j & 2 ? r : -r)),
         );
     }
+    // (The dust round his feet, as high as it rises.)
+    if (dustBox)
+      for (let j = 0; j < 8; j++)
+        extra.push(
+          corners[8 + j].set(
+            j & 1 ? dustBox.maxX : dustBox.minX,
+            j & 4 ? dustBox.top : 0,
+            j & 2 ? dustBox.maxZ : dustBox.minZ,
+          ),
+        );
     retro.setBoxes(
       subjectBoxes({ center: centre, radius: SUBJECT.radius, light: toLight, camera, w: grid.w, h: grid.h, extra }),
     );
@@ -687,6 +707,19 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
       return { visible: line.visible, alpha: line.visible ? line.material.opacity / MARKER.opacity : 0 };
     },
     /**
+     * The dust he raises landing, this frame (dust.js dustPuffs: each puff's middle, radius and
+     * strength): drawn on the decal layer (dustLayer.js), the retro pass's area grown to take it in.
+     * @param {readonly import('./dust.js').PuffNow[]} puffs
+     */
+    setDust(puffs) {
+      dust.set(puffs);
+      dustBox = dustBounds(/** @type {import('./dust.js').PuffNow[]} */ (puffs));
+    },
+    /** The dust as last set, for ?test: how many puffs, and their box (null: none). */
+    get dustState() {
+      return { count: dust.count, box: dustBox ? { ...dustBox } : null };
+    },
+    /**
      * The dithered highlight on NEWT while the pointer is over him: 0 off to 1 full (retro.js
      * setHover: a rim in the pixel look, a tint in his materials at Off).
      * @param {number} k
@@ -848,6 +881,7 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
       }
       lastFrame = now;
       placeBoxes();
+      dust.setPixel(!grid.off);
       let timer = null;
       if (timerExt && pending.length < 4) {
         timer = gl.createQuery();
@@ -874,6 +908,7 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
         m.material.map?.dispose();
         m.material.dispose();
       }
+      dust.dispose();
       sun.shadow.map?.dispose();
       renderer.dispose();
       canvas.remove();

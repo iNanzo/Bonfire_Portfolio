@@ -38,7 +38,8 @@
 // under his hips), the marker (or, while he's held, the ring under him and the dashed drop
 // line, Ground Cues), the toolbar → the speech bubble (bubble.js: over his head as
 // posed, clear of the toolbar, the open Camera pad and Settings sheet, out of sight while the sheet covers his
-// head; near the top, beside his head, narrowed to fit there, or under his feet) → render. With Motion Choppy (look.js) his pose (the update and applyLook) only moves
+// head; near the top, beside his head, narrowed to fit there, or under his feet) → a landing's
+// dust (dropFx: dust.js through stage.setDust) → render. With Motion Choppy (look.js) his pose (the update and applyLook) only moves
 // on the clock's steps, 15 a second; his root, the camera and the rest move every frame. The
 // lowest his collar is carried comes from the Held clip at load (his collar over his lowest
 // sole, plus a gap).
@@ -157,6 +158,7 @@ import { loadCharacter } from './character.js';
 import { ANKLE_HEIGHT, BONES, COLLAR, DIALOGUE_WAYS, FACE_NAMES, FACE_TRACK, SCALE, fadeFor } from './clips.js';
 import { createDialogue, lookSway, normalizeScript } from './dialogue.js';
 import { REPLY_SETTLE, createDialogueUi } from './dialogueUi.js';
+import { createDust, dustLand, dustPuffs } from './dust.js';
 import { createEnvelopeScene } from './envelopeScene.js';
 import { createPetalLayer } from './petalLayer.js';
 import { nextBox, previewOrigin, previewState, readPreview } from './preview.js';
@@ -637,6 +639,13 @@ function start(s) {
   let squashing = false;
   /** The hold's own random numbers (a stream of their own: the rest stay as seeded). */
   const holdRng = createRng(seed + 7);
+  /** The dust he raises landing (dust.js), on random numbers of its own. */
+  const dust = createDust();
+  const dustRng = createRng(seed + 11);
+  /** The last landing seen (play.js BodyState.landing). */
+  const drop = {
+    seen: /** @type {import('./play.js').Landing|null} */ (null),
+  };
   /**
    * The ground cues (cues.js): the blob's held look eased in, the ring's and the drop line's
    * strengths, when the ring last pulsed, whether he was pushed at the edge last frame, where the
@@ -1616,6 +1625,8 @@ function start(s) {
       footOffset: soleY() - root.position.y,
       released,
     });
+    // (Just landed: the dust.)
+    if (body.landing && body.landing !== drop.seen) landed(body.landing);
     // (The hold's side clamp: its push, kept for the toss.)
     if (holdNow && holdNow.push !== undefined && body.carry) body.carry.push = holdNow.push;
     // (The hold's own body: its tilt in place of the swing. Never his heading: held, falling and
@@ -1628,6 +1639,21 @@ function start(s) {
       : null;
     // (On his model's own scale, clips.js SCALE.)
     root.scale.set(SCALE * (sq?.xz ?? 1), SCALE * (sq?.y ?? 1), SCALE * (sq?.xz ?? 1));
+  }
+
+  /**
+   * A landing (play.js BodyState.landing): the dust round his feet (dust.js dustLand, sized by
+   * how fast he came down).
+   * @param {import('./play.js').Landing} at
+   */
+  function landed(at) {
+    drop.seen = at;
+    dustLand(dust, at, at.speed, t, dustRng);
+  }
+
+  /** The dust this frame: the puffs to the stage (dust.js dustPuffs). */
+  function dropFx() {
+    s.setDust(dustPuffs(dust, t));
   }
 
   /**
@@ -1808,6 +1834,7 @@ function start(s) {
     last = ms;
     try {
       step(dt, ms / 1000);
+      dropFx();
       s.render();
     } catch {
       lost = true;
@@ -1960,6 +1987,12 @@ function start(s) {
     };
   }
 
+  /** The last landing and the dust as drawn, for ?test (snapshot().drop). */
+  const dropSnapshot = () => ({
+    landing: body.landing ? { ...body.landing } : null,
+    dust: s.dustState,
+  });
+
   /** The admin's intro preview for ?test: the origin it listens to, the box asked for, its viewport, and whether it waits to start. */
   const previewSnapshot = () => ({
     origin: previewFrom,
@@ -2047,6 +2080,7 @@ function start(s) {
         options,
         motion: motionSnapshot(),
         drag: dragSnapshot(),
+        drop: dropSnapshot(),
       }),
       /**
        * Ease the camera to `yaw` and `elevation` (radians, as snapshot().camera has them) and a

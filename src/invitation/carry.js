@@ -539,14 +539,15 @@ export function toss(c) {
 
 /**
  * One frame of falling: gravity, soft bounces off the edges, and a landing once his lowest
- * foot reaches the floor (the root is then lifted so that foot sits on it, and stops).
+ * foot reaches the floor (the root is then lifted so that foot sits on it, and stops; `impact`
+ * is the velocity he hit it with, which sizes the dust and the shake: dust.js landingSpeed).
  * @param {XYZ} root
  * @param {XYZ} vel
  * @param {number} footY  his lowest foot's world height, with the root where it is now
  * @param {number} dt
  * @param {Bounds|null} bounds
  * @param {{x: number, z: number}|null} [tilt]  the swing, relaxed back to upright as he falls
- * @returns {{root: XYZ, vel: XYZ, landed: boolean, tilt: {x: number, z: number}|null}}
+ * @returns {{root: XYZ, vel: XYZ, landed: boolean, tilt: {x: number, z: number}|null, impact?: XYZ}}
  */
 export function fallStep(root, vel, footY, dt, bounds, tilt = null) {
   const v = { x: vel.x, y: vel.y - CARRY.fallGravity * dt, z: vel.z };
@@ -625,7 +626,7 @@ export function fallStep(root, vel, footY, dt, bounds, tilt = null) {
   const foot = footY + (r.y - root.y);
   if (foot <= CARRY.floorY) {
     r.y += CARRY.floorY - foot;
-    return { root: r, vel: { x: 0, y: 0, z: 0 }, landed: true, tilt: t2 };
+    return { root: r, vel: { x: 0, y: 0, z: 0 }, landed: true, tilt: t2, impact: v };
   }
   return { root: r, vel: v, landed: false, tilt: t2 };
 }
