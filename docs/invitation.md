@@ -330,10 +330,14 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
 - **The screen:** a wide box along the bottom with his name on a tab at its top left and his
   line typed out in it, a small ▼ bobbing in pixel steps at its bottom right once the line is all
   there, Auto, Next and Log at the top right, **Skip Intro** at the top left, and a dark dither
-  rising from the bottom of the screen behind the box (the ink's ordered dither, densest behind the
-  box up to its top and fading out in lighter bands just over it, under the box and its name tab
-  so never over the text; sized to the box on a phone or a desktop, and rising with it when it's
-  taller). A line's own line breaks (as the admin types them) show. A line
+  inside the box (the ink's ordered dither in bands up from its bottom edge, densest there and
+  fading out upward, under the line and the name tab: the denser bands fill the space under the
+  line and only the lightest reach its lowest row, so the text always reads; sized to the box on
+  a phone, a desktop or a phone held sideways, and a long line scrolls over it where it is).
+  Hovering the box, focus in it or a finger on it makes the dither recede a little: it sinks a
+  band in 2 px steps over a quarter of a second, leaving every row a step lighter, and comes back
+  up after (with reduced motion it just goes a step lighter where it is). A line's own line
+  breaks (as the admin types them) show. A line
   longer than the box's three rows (two on a phone held sideways) scrolls inside it, and the box
   keeps its size: as it types the newest row stays in view, and once it's all there the wheel, a
   finger dragged over it, or the arrow and Page keys scroll it, with small pixel triangles at its
@@ -341,10 +345,13 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   the cue showing the rest). The toolbar goes while the intro runs and comes back after it.
 - **Feedback,** in the toolbar's style (its ordered Bayer dither, in the ink): every button on the
   screen (Auto, Next, Log, Skip Intro, the replies, the Log's and the question's) fills with a
-  light dither on hover and a heavier one pressed. The screen dithers in as it opens, the replies
-  dither in one after another, the line that was up dithers out over the next as it comes, and a
-  tap or a key that goes on dips the box a step with a flash of dither. With reduced motion these
-  are quick plain fades, with no dip and no bob.
+  light dither on hover and a heavier one pressed (a finger held on one too, where a phone's own
+  pressed state can't be relied on), its words on a plate of the button's own colour so the
+  press never hides them. The screen dithers in as it opens and all of it dithers out as the
+  intro ends (out of reach from the first step, so play comes back at once), the replies dither
+  in one after another, the line that was up dithers out before the next one types (the two
+  never overlap), and a tap or a key that goes on dips the box a step with a flash of dither.
+  With reduced motion these are quick plain fades, with no dip and no bob.
 - **Going on:** a tap or click anywhere first finishes the line, then goes on to the next box;
   Space and Enter do the same (after a click or tap on Auto, Next or Log too; from the keyboard,
   a focused button presses itself). Some boxes ask a question: two or three replies show as buttons
@@ -982,8 +989,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   grab, Screen Shake switched off (look.js `shake`, `shakeOn`: left out until it's picked, on) or
   reduced motion ends it at once.
 - **The intro:** `dialogue.js` (pure, on an injected clock: `normalizeScript` makes any
-  `DialogueScript` safe, types.js; `createDialogue(script, {reduced})` with `start`, `step`,
-  `advance`, `choose`, `setAuto`, `skip` (the Next button), `pause`, `end`, `view` and `log`
+  `DialogueScript` safe, types.js; `createDialogue(script, {reduced, lead})` (lead: the seconds
+  a line after another waits before it types) with `start`, `step`, `advance`, `choose`,
+  `setAuto`, `skip` (the Next button), `pause`, `end`, `view` and `log`
   (plain text); `DIALOGUE`: 32 letters a second with a beat after punctuation, Auto's wait
   1.1 s plus 0.035 s a letter between 1.4 and 6 s, 240 letters and 3 replies at most, all
   counting the letters that show (markup.js); `lookSway`; main.js runs
@@ -995,10 +1003,16 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   `TALK_DITHER`'s tiles, `talkTile` (icons.js `ditherMask` drawn at 2 px a cell) installed on the
   layer as `--talk-ink-N` and `--talk-mask-N`: the buttons' hover and press backgrounds, the
   `inv-talk-dither-in` keyframes stepping the layer's and the replies' `mask-image`, and from
-  script the ghost (`ditherOut`, a copy of the line before, masked out step by step) and the press
-  flash (`pressFlash`); the dark dither's bands `.inv-talk-dim-N` on `--talk-ink-N`, the dim
-  `--talk-rise` (`talkRise`: the box's top as laid out, in whole 8 px tiles, kept by a
-  ResizeObserver on the layer and the box's border box) plus `--talk-fade` tall), brain.js's `talk` state (`BrainIn.dialogue`: the
+  script the ghost (`ditherOut`, a copy of the line before, masked out step by step; the next
+  line's letters and ▼ wait unseen while it goes, and main.js passes `TALK_DITHER.fadeMs` as the
+  runner's `lead` so it starts typing then), the press flash (`pressFlash`) and the end
+  (`ditherAway`: `.is-leaving` and inert at once, the layer's mask through the fade's steps over
+  `TALK_DITHER.leaveMs`, then hidden; `close({cut})` drops it at once for a replay or the
+  preview); `holdPressed` (`.is-pressed` from a pointerdown until it lifts, is cancelled or
+  leaves the button) and `.inv-talk-label` (a button's words on a plate of its inherited fill);
+  the dark dither in the box, `.inv-talk-shade` (`SHADE_BANDS` on `--talk-ink-N`, four bands of
+  `--talk-band` each per layout, sinking one in `--talk-sink-steps` steps under `.is-receding`:
+  a pointer on the box or focus in it)), brain.js's `talk` state (`BrainIn.dialogue`: the
   box's seq, animation, face and whether it's typing; any clip, clips.js `DIALOGUE_CLIPS`:
   `DIALOGUE_WAYS` says which step in place (main.js moves the step phase on by brain.js
   `talkPhase`) and which dangle him (`dangleLift`: his lowest point `DANGLE.gap` over the

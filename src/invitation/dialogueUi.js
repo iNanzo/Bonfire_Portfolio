@@ -12,9 +12,9 @@
 // has focus in it or is pressed: .is-receding),
 // the Log (a scrollable list of the lines shown and the replies picked, a dialog of its own) and
 // a "Skip the Intro?" question for Escape. As the intro ends the whole screen dithers out
-// (ditherAway), out of reach from its first step, so free play comes back at once. Rendering only: dialogue.js runs the script, and
-// main.js hands each frame's view here (render) and turns what's pressed (`onAction`) into the
-// runner's calls.
+// (ditherAway), out of reach from its first step, so free play comes back at once. Rendering
+// only: dialogue.js runs the script, and main.js hands each frame's view here (render) and turns
+// what's pressed (`onAction`) into the runner's calls.
 //
 // The whole layer is a modal dialog over the stage: a tap or click anywhere off its buttons goes
 // on (finishes the line, then the next box), so nothing reaches the canvas (no drags, no orbit).
@@ -34,10 +34,11 @@
 // Feedback in the toolbar's style, its ordered dither (TALK_DITHER's tiles on the layer, CSS in
 // dialogue.css): the buttons' hover and press (a press held with a finger too, holdPressed: CSS
 // :active isn't reliable on touch; the button's words on a plate of its fill, so the dither never
-// runs through them), the screen and the replies dithering in; from
-// here, the line before dithering out as the next comes (ditherOut: the next one's letters wait
-// unseen till it's gone, so the two never show at once) and a press that goes on dipping the box
-// with a flash of dither (pressFlash); reduced motion, quick plain fades.
+// runs through them), the screen and the replies dithering in; from here, the line before
+// dithering out as the next comes (ditherOut: the next one's letters wait unseen till it's gone,
+// so the two never show at once), a press that goes on dipping the box with a flash of dither
+// (pressFlash) and the screen dithering out at the end (ditherAway); reduced motion, quick plain
+// fades.
 
 /** @typedef {import('./dialogue.js').DialogueView} DialogueView */
 /** @typedef {import('./dialogue.js').LogEntry} LogEntry */
