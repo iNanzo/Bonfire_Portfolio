@@ -1706,8 +1706,9 @@ test.describe('on a desktop', () => {
     }
     // Done, Pixel Size (its slider and the buttons at its two ends), Dithering, Outlines, Style,
     // Motion, the 16 Shader options (Reset To Style rests until one is the user's own; no Pixel
-    // Shirt), Ground Cues, Rose Petals and Wander (no Drag row: the bead hold is the only carry).
-    expect(stops.size, [...stops].join(', ')).toBe(27);
+    // Shirt), Ground Cues, Rose Petals, Screen Shake and Wander (no Drag row: the bead hold is
+    // the only carry).
+    expect(stops.size, [...stops].join(', ')).toBe(28);
     // Focus on the page (a click on empty space): Tab comes back into the sheet.
     await page.mouse.click(200, 120);
     await page.keyboard.press('Tab');
