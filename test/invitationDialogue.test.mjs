@@ -796,6 +796,103 @@ test('a press held on a button shows pressed until it lifts, is cancelled or sli
   assert.ok(!pressed(t2.next), 'disposed');
 });
 
+/** A stand-in for the layer as ditherAway uses it, its animations kept to finish by hand. */
+function leavingLayer({ animates = true } = {}) {
+  /** @type {any[]} */
+  const anims = [];
+  /** @type {any} */
+  const el = {
+    hidden: false,
+    classes: new Set(),
+    attrs: new Set(),
+    toggleAttribute: (n, on) => (on ? el.attrs.add(n) : el.attrs.delete(n)),
+    hasAttribute: (n) => el.attrs.has(n),
+  };
+  el.classList = {
+    add: (c) => el.classes.add(c),
+    remove: (c) => el.classes.delete(c),
+    contains: (c) => el.classes.has(c),
+  };
+  if (animates)
+    el.animate = (frames, o) => {
+      const a = { frames, o, onfinish: null, cancelled: false, cancel: () => (a.cancelled = true) };
+      anims.push(a);
+      return a;
+    };
+  return { el, anims };
+}
+
+test('the intro’s end: the screen takes no press from the start, dithers out through the fade’s steps, then hides', async () => {
+  const { ditherAway, TALK_DITHER } = await import('../src/invitation/dialogueUi.js');
+  const masks = [...TALK_DITHER.fade].reverse().map((n) => `url("mask-${n}")`);
+  const order = [];
+  const { el, anims } = leavingLayer();
+  ditherAway(el, { masks, reduced: false }, () => order.push(el.hidden ? 'done, hidden' : 'done, showing'));
+  // (1. At once: out of reach, so free play has every press and key; still on screen.)
+  assert.equal(el.hidden, false, 'still showing');
+  assert.ok(el.classList.contains('is-leaving') && el.hasAttribute('inert'), 'out of reach at once');
+  // (2. Its mask through the fade's steps the other way, each held, about 0.2 s.)
+  assert.equal(anims.length, 1);
+  const { frames, o } = anims[0];
+  assert.deepEqual(
+    frames.map((f) => f.maskImage),
+    ['none', ...masks],
+    'from whole to none of it',
+  );
+  assert.ok(
+    frames.every((f) => /^steps\(1/.test(f.easing)),
+    'each step held',
+  );
+  assert.ok(o.duration >= 160 && o.duration <= 260, `about 0.2 s: ${o.duration}`);
+  assert.deepEqual(order, [], 'not done yet');
+  // (3. Then hidden, back in reach for next time, its mask let go, and done.)
+  anims[0].onfinish();
+  assert.equal(el.hidden, true);
+  assert.ok(!el.classList.contains('is-leaving') && !el.hasAttribute('inert'), 'ready to open again');
+  assert.equal(anims[0].cancelled, true, 'its mask let go, so it opens whole');
+  assert.deepEqual(order, ['done, hidden']);
+
+  // (Reduced motion: a quick plain fade, then the same.)
+  const r = leavingLayer();
+  ditherAway(r.el, { masks, reduced: true });
+  const fade = r.anims[0];
+  assert.deepEqual(
+    fade.frames.map((f) => f.opacity),
+    [1, 0],
+  );
+  assert.ok(fade.o.duration <= 150, 'quick');
+  fade.onfinish();
+  assert.equal(r.el.hidden, true);
+
+  // (No tiles drawn, or nothing animates: a plain fade, or hidden at once.)
+  const n = leavingLayer();
+  ditherAway(n.el, { masks: masks.map(() => undefined), reduced: false });
+  assert.deepEqual(
+    n.anims[0].frames.map((f) => f.opacity),
+    [1, 0],
+  );
+  const still = leavingLayer({ animates: false });
+  let done = false;
+  ditherAway(still.el, { masks, reduced: false }, () => (done = true));
+  assert.ok(still.el.hidden && done, 'hidden at once');
+
+  // (Opened again before it had gone: the stop puts it back as it was, never hidden after.)
+  const back = leavingLayer();
+  let ended = false;
+  const stop = ditherAway(back.el, { masks, reduced: false }, () => (ended = true));
+  stop();
+  assert.equal(back.anims[0].cancelled, true);
+  assert.ok(!back.el.classList.contains('is-leaving') && !back.el.hasAttribute('inert'));
+  back.anims[0].onfinish?.();
+  assert.ok(!back.el.hidden && !ended, 'a late finish changes nothing');
+
+  // (The leaving screen lets presses through to the stage under it.)
+  const css = readFileSync(new URL('../src/invitation/dialogue.css', import.meta.url), 'utf8');
+  const at = css.indexOf('.inv-talk.is-leaving {');
+  assert.ok(at >= 0);
+  assert.match(css.slice(at, css.indexOf('}', at)), /pointer-events: none/);
+});
+
 test('a held press keeps its label above the dither; the pressed class looks as :active does', async () => {
   const { talkHtml } = await import('../src/invitation/dialogueUi.js');
   const markup = talkHtml();

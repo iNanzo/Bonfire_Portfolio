@@ -11,7 +11,8 @@
 // line and only the lightest over its lowest row; it recedes a little while the box is hovered,
 // has focus in it or is pressed: .is-receding),
 // the Log (a scrollable list of the lines shown and the replies picked, a dialog of its own) and
-// a "Skip the Intro?" question for Escape. Rendering only: dialogue.js runs the script, and
+// a "Skip the Intro?" question for Escape. As the intro ends the whole screen dithers out
+// (ditherAway), out of reach from its first step, so free play comes back at once. Rendering only: dialogue.js runs the script, and
 // main.js hands each frame's view here (render) and turns what's pressed (`onAction`) into the
 // runner's calls.
 //
@@ -67,13 +68,15 @@ export const REPLY_SETTLE = 450;
  * dark dither in the box); fade, the steps of a dithered fade (--talk-mask-N, mask tiles: the
  * layer and the replies dithering in, a line dithering out as the next comes); fadeMs, how long
  * a line takes to dither out (main.js has the runner hold the next line's typing that long:
- * dialogue.js lead); pressMs, the press flash on the box.
+ * dialogue.js lead); pressMs, the press flash on the box; leaveMs, the whole screen dithering
+ * out as the intro ends (ditherAway).
  */
 export const TALK_DITHER = {
   ink: [1, 2, 3, 4, 6, 8],
   fade: [0, 2, 4, 6, 8, 10, 12, 14],
   fadeMs: 180,
   pressMs: 150,
+  leaveMs: 200,
 };
 
 /**
@@ -184,6 +187,61 @@ export function holdPressed(root, cls = 'is-pressed') {
     root.removeEventListener('pointerdown', down);
     win?.removeEventListener('pointerup', leave);
     win?.removeEventListener('pointercancel', leave);
+  };
+}
+
+/**
+ * Run keyframes on `el` (none where the page can't animate: the tests' stand-in document).
+ * @param {Element} el
+ * @param {Keyframe[]} frames
+ * @param {KeyframeAnimationOptions} o
+ */
+const play = (el, frames, o) => (typeof el.animate === 'function' ? el.animate(frames, o) : null);
+/** Each value held until the next (a dither steps, it never blends). @param {Keyframe[]} frames */
+const held = (frames) => frames.map((f) => ({ ...f, easing: 'steps(1, end)' }));
+
+/**
+ * The chat screen going at the intro's end, in this order: from the start it takes no press, tap
+ * or key (`is-leaving` and inert: free play has them at once), it dithers out through the fade's
+ * steps the other way over TALK_DITHER.leaveMs (reduced motion, or no tiles: a quick plain
+ * fade), then it hides, its fade let go so it opens whole next time, and `done` runs. Returns a
+ * stop: the screen back as it was, never hidden after (opened again before it had gone).
+ * @param {HTMLElement} el
+ * @param {{masks: (string|undefined)[], reduced: boolean}} o  masks: the fade's tiles from the
+ *   most covered to none (--talk-mask-N, TALK_DITHER.fade the other way)
+ * @param {() => void} [done]
+ * @returns {() => void}
+ */
+export function ditherAway(el, { masks, reduced }, done) {
+  el.classList.add('is-leaving');
+  el.toggleAttribute('inert', true);
+  const plain = reduced || !masks.length || masks.some((m) => !m);
+  const fade = plain
+    ? play(el, [{ opacity: 1 }, { opacity: 0 }], { duration: 120, easing: 'linear', fill: 'forwards' })
+    : play(el, held([{ maskImage: 'none' }, ...masks.map((m) => ({ maskImage: String(m) }))]), {
+        duration: TALK_DITHER.leaveMs,
+        fill: 'forwards',
+      });
+  let over = false;
+  const reachable = () => {
+    el.classList.remove('is-leaving');
+    el.toggleAttribute('inert', false);
+  };
+  const gone = () => {
+    if (over) return;
+    over = true;
+    el.hidden = true;
+    reachable();
+    fade?.cancel();
+    done?.();
+  };
+  if (fade) fade.onfinish = gone;
+  else gone();
+  return () => {
+    if (over) return;
+    over = true;
+    fade?.cancel();
+    reachable();
   };
 }
 
@@ -374,15 +432,8 @@ export function createDialogueUi(
   };
 
   const reduced = () => Boolean(view?.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
-  /**
-   * Run keyframes on `el` (none where the page can't animate: the tests' stand-in document).
-   * @param {Element} el
-   * @param {Keyframe[]} frames
-   * @param {KeyframeAnimationOptions} o
-   */
-  const play = (el, frames, o) => (typeof el.animate === 'function' ? el.animate(frames, o) : null);
-  /** Each value held until the next (a dither steps, it never blends). @param {Keyframe[]} frames */
-  const held = (frames) => frames.map((f) => ({ ...f, easing: 'steps(1, end)' }));
+  /** The screen going at the intro's end (ditherAway's stop), or null. */
+  let leaving = /** @type {(() => void)|null} */ (null);
 
   /**
    * The line before, dithering out (ditherOut), or null: the new line's letters, its ▼ and its
@@ -673,8 +724,10 @@ export function createDialogueUi(
   layer.addEventListener('contextmenu', (e) => e.preventDefault());
 
   return {
-    /** Show the layer, its Log and question closed, focus in it. */
+    /** Show the layer, its Log and question closed, focus in it (whole, if it was still going). */
     open() {
+      leaving?.();
+      leaving = null;
       layer.hidden = false;
       logBox.hidden = true;
       ask.hidden = true;
@@ -688,19 +741,33 @@ export function createDialogueUi(
       doc.addEventListener('keydown', onKey);
       layer.focus({ preventScroll: true });
     },
-    /** Hide it. */
-    close() {
-      layer.hidden = true;
-      restShade();
+    /**
+     * Hide it: dithered out (ditherAway: out of reach at once, so free play has every press
+     * meanwhile), or with `cut` at once (the intro dropped for a replay or the admin's preview).
+     * @param {{cut?: boolean}} [o]
+     */
+    close({ cut = false } = {}) {
+      leaving?.();
+      leaving = null;
       live.textContent = '';
       doc.removeEventListener('keydown', onKey);
+      if (cut || layer.hidden) {
+        layer.hidden = true;
+        restShade();
+        return;
+      }
+      const masks = [...TALK_DITHER.fade].reverse().map((n) => tiles.mask.get(n));
+      leaving = ditherAway(layer, { masks, reduced: reduced() }, () => {
+        leaving = null;
+        restShade();
+      });
     },
     /**
      * Show a view: the name, the line typed so far, the ▼, the replies, Auto; only what changed.
      * @param {DialogueView} v
      */
     render(v) {
-      if (layer.hidden || !v.box) return;
+      if (layer.hidden || leaving || !v.box) return;
       if (v.seq !== shown.seq) {
         // (The line before dithers out as this one comes; the first comes with the layer.)
         if (shown.seq >= 0) ditherOut();
@@ -772,8 +839,9 @@ export function createDialogueUi(
     setPalette(colours) {
       palette = colours;
     },
+    /** Open (not hidden, nor going). */
     get showing() {
-      return !layer.hidden;
+      return !layer.hidden && !leaving;
     },
     get logOpen() {
       return !logBox.hidden;
@@ -806,6 +874,7 @@ export function createDialogueUi(
       return layer;
     },
     dispose() {
+      leaving?.();
       unhold();
       doc.removeEventListener('keydown', onKey);
       layer.remove();

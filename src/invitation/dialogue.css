@@ -7,13 +7,15 @@
    stacked in the middle of the screen, under his face; the Log and the "Skip the Intro?"
    question as cards over it all. Phone first (390×844), roomier on a
    desktop and lower on a phone held sideways. The layer takes every press, so the canvas under
-   it gets none. The lines' text effects: markup.css.
+   it gets none, until the intro ends. The lines' text effects: markup.css.
    Feedback in the toolbar's style, ordered dither (the tiles dialogueUi.js draws on the layer:
    --talk-ink-N, the ink at N/16; --talk-mask-N, a mask at N/16): every button's hover a light ink
-   dither and its press a heavier one (a finger's too, .is-pressed), its words on a plate over it; the layer dithers in as it opens (its mask through the
-   fade's steps) and the replies one after another; a line dithers out over the next (the ghost,
-   from script) and a press that goes on dips the box with a flash of dither (the flash, from
-   script); the ▼ bobs in pixel steps. Reduced motion: quick plain fades, no bob, no dip. */
+   dither and its press a heavier one (a finger's too, .is-pressed), its words on a plate over
+   it; the layer dithers in as it opens (its mask through the fade's steps) and out as the intro
+   ends (from script, out of reach from its first step), and the replies one after another; a
+   line dithers out before the next shows (the ghost, from script) and a press that goes on dips
+   the box with a flash of dither (the flash, from script); the ▼ bobs in pixel steps. Reduced
+   motion: quick plain fades, no bob, no dip, no sinking. */
 
 @import './markup.css';
 
@@ -34,6 +36,12 @@
 /* (Opening: the whole screen dithers in, the box, its tab and the buttons together.) */
 .inv-talk:not([hidden]) {
   animation: inv-talk-dither-in 0.24s steps(1, end) both;
+}
+/* (Closing as the intro ends: the whole screen dithers out, from script (dialogueUi.js
+   ditherAway), and from its first step a press goes to the stage under it.) */
+.inv-talk.is-leaving {
+  pointer-events: none;
+  cursor: auto;
 }
 
 .inv-talk-top {

@@ -1172,7 +1172,7 @@ function start(s) {
       introHeld = false;
       shot = null;
       framed = null;
-      talkUi.close();
+      talkUi.close({ cut: true });
     }
     previewBegin = true;
   }
@@ -1192,7 +1192,7 @@ function start(s) {
       introHeld = false;
       shot = null;
       framed = null;
-      talkUi.close();
+      talkUi.close({ cut: true });
       ui.setTalking(false);
     }
     backFromIntro = false;
@@ -1256,8 +1256,8 @@ function start(s) {
   }
 
   /**
-   * The intro's over: the layer goes, the camera eases back (cuts, with reduced motion), the
-   * toolbar and free play return.
+   * The intro's over: the layer dithers out (out of reach at once), the camera eases back (cuts,
+   * with reduced motion), the toolbar and free play return.
    */
   function endIntro() {
     intro = null;

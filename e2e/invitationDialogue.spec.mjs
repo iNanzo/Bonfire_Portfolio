@@ -14,8 +14,9 @@
 // ever runs more than a pixel into the next, every step of its moves measured); Space and Enter go on (after a click on Auto, Next or
 // Log too); under the Log or the
 // question the buttons over the stage are out of reach; reduced motion shows each line at once
-// and cuts the camera (round to the front, to each shot, back at the end); and after the end the
-// toolbar, the camera and his free play come back. The script is read from the page (?test's
+// and cuts the camera (round to the front, to each shot, back at the end); and at the end the
+// whole screen dithers out (a plain fade with reduced motion), out of reach from its first step,
+// and the toolbar, the camera and his free play come back. The script is read from the page (?test's
 // intro()). Tests requiring a specific script shape install a fixture; the admin integration
 // tests exercise the current content. Every wait is on a state (the script as
 // content.js reads it). Down every reply each box shows its face (the four dialogue faces from
@@ -1463,6 +1464,67 @@ test.describe('on a desktop', () => {
     // (Ended with a click: no ring, and its label stays hidden.)
     expect(await replayIntro(page).evaluate((el) => el.matches(':focus-visible'))).toBe(false);
     await expect(replayIntro(page).locator('.inv-btn-label')).toHaveCSS('opacity', '0');
+    expect(errors).toEqual([]);
+  });
+
+  test('the end dithers the whole chat screen out, out of reach from its first step; reduced motion fades it', async ({
+    page,
+  }) => {
+    const errors = watch(page);
+    await calm(page);
+    await useBehaviorIntro(page);
+    /** Notes each change to the layer as it goes: shown, out of reach, its fade's frames. */
+    const watchLeave = () =>
+      page.evaluate(() => {
+        const layer = document.querySelector('.inv-talk');
+        window.leave = [];
+        window.leaveWatch?.disconnect();
+        window.leaveWatch = new MutationObserver(() =>
+          window.leave.push({
+            hidden: layer.hidden,
+            leaving: layer.classList.contains('is-leaving'),
+            inert: layer.inert,
+            through: getComputedStyle(layer).pointerEvents === 'none',
+            frames: layer
+              .getAnimations()
+              .filter((a) => !(a instanceof CSSAnimation))
+              .flatMap((a) =>
+                a.effect.getKeyframes().map((k) => (k.opacity !== undefined ? `opacity ${k.opacity}` : k.maskImage)),
+              ),
+          }),
+        );
+        window.leaveWatch.observe(layer, { attributes: true, attributeFilter: ['hidden', 'class', 'inert'] });
+      });
+    const leave = () => page.evaluate(() => window.leave);
+    for (const motion of ['no-preference', 'reduce']) {
+      await page.emulateMedia({ reducedMotion: motion });
+      await open(page);
+      await watchLeave();
+      await page.locator('.inv-talk [data-intro-skip]').click();
+      await expect(box(page)).toBeHidden();
+      const steps = await leave();
+      const first = steps.findIndex((s) => s.leaving);
+      expect(first, 'it went through a leave').toBeGreaterThanOrEqual(0);
+      const going = steps[first];
+      expect(going.hidden, 'still on screen as it starts').toBe(false);
+      expect(going.inert && going.through, 'out of reach from its first step').toBe(true);
+      if (motion === 'reduce') expect(going.frames).toEqual(['opacity 1', 'opacity 0']);
+      else
+        expect(
+          going.frames.filter((m) => /^url\(/.test(m)).length,
+          'its mask through the fade’s steps',
+        ).toBeGreaterThanOrEqual(6);
+      const hid = steps.findIndex((s) => s.hidden);
+      expect(hid, 'hidden once it’s gone').toBeGreaterThan(first);
+      expect(steps[hid].leaving || steps[hid].inert, 'nothing of the leave left').toBe(false);
+      // Free play as before: the toolbar back, Replay Intro focused, and the next open whole.
+      await until(page, (s) => !s.dialogue && !s.toolbarTalking && s.buttonsEnabled, 'free play');
+      await expect(replayIntro(page)).toBeFocused();
+    }
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await open(page);
+    await expect(page.locator('.inv-talk')).toHaveCSS('mask-image', 'none');
+    await expect(page.locator('.inv-talk')).toHaveCSS('opacity', '1');
     expect(errors).toEqual([]);
   });
 
