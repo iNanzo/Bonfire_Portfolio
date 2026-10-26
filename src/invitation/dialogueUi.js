@@ -24,9 +24,14 @@
 // round the layer's buttons. A screen reader hears each line whole once, as plain text, from a
 // live region (the typed text is hidden from it), and the Log lists it plain too; the replies are buttons, and focus goes to the first reply
 // when they show, into the Log and the question when they open and back when they close.
+// Feedback in the toolbar's style, its ordered dither (TALK_DITHER's tiles on the layer, CSS in
+// dialogue.css): the buttons' hover and press, the screen and the replies dithering in; from
+// here, the line before dithering out over the next (ditherOut) and a press that goes on
+// dipping the box with a flash of dither (pressFlash); reduced motion, quick plain fades.
 
 /** @typedef {import('./dialogue.js').DialogueView} DialogueView */
 /** @typedef {import('./dialogue.js').LogEntry} LogEntry */
+import { ditherMask } from './icons.js';
 import { DEFAULT_TEXT_COLORS, paletteOf, parseMarkup, plainText, renderMarkup, revealLetters } from './markup.js';
 /**
  * @typedef {{type: 'advance'} | {type: 'choose', index: number} | {type: 'auto', on: boolean} |
@@ -46,6 +51,61 @@ export const REPLY_ROOM = 120;
  * picks one the visitor didn't choose.
  */
 export const REPLY_SETTLE = 450;
+
+/**
+ * The screen's dither, the toolbar's (icons.js ditherMask, a Bayer 4×4 at n/16): ink, the
+ * coverages of the ink tiles (--talk-ink-N: the buttons' hover and press, the press flash, the
+ * dark from the bottom); fade, the steps of a dithered fade (--talk-mask-N, mask tiles: the
+ * layer and the replies dithering in, a line dithering out as the next comes); fadeMs, how long
+ * a line takes to dither out; pressMs, the press flash on the box.
+ */
+export const TALK_DITHER = {
+  ink: [1, 2, 3, 4, 6, 8],
+  fade: [0, 2, 4, 6, 8, 10, 12, 14],
+  fadeMs: 180,
+  pressMs: 150,
+};
+
+/**
+ * A dither tile of 8×8 CSS px, each of the Bayer 4×4's cells two px square (the toolbar's
+ * tiles are drawn at that size), row by row: the cells on at a coverage of `n`/16.
+ * @param {number} n  0 to 16
+ * @returns {boolean[]}
+ */
+export function talkTile(n) {
+  const cells = ditherMask(n);
+  return Array.from({ length: 64 }, (_, i) => cells[((i >> 4) & 3) * 4 + ((i & 7) >> 1)]);
+}
+
+/**
+ * The screen's dither tiles as custom properties on `layer` (drawn once, as tiny PNGs):
+ * --talk-ink-N in `ink` for TALK_DITHER.ink, --talk-mask-N (opaque cells) for TALK_DITHER.fade.
+ * Their URLs by coverage, for the fades run from script (none without a canvas).
+ * @param {HTMLElement} layer
+ * @param {string} ink  a CSS colour
+ */
+function installTalkDither(layer, ink) {
+  /** @type {{ink: Map<number, string>, mask: Map<number, string>}} */
+  const urls = { ink: new Map(), mask: new Map() };
+  const c = layer.ownerDocument.createElement('canvas');
+  c.width = c.height = 8;
+  const g = c.getContext?.('2d');
+  if (!g) return urls;
+  for (const [kind, steps, color] of /** @type {const} */ ([
+    ['ink', TALK_DITHER.ink, ink],
+    ['mask', TALK_DITHER.fade, '#000'],
+  ])) {
+    for (const n of steps) {
+      g.clearRect(0, 0, 8, 8);
+      g.fillStyle = color;
+      talkTile(n).forEach((on, i) => on && g.fillRect(i % 8, i >> 3, 1, 1));
+      const url = `url("${c.toDataURL('image/png')}")`;
+      urls[kind].set(n, url);
+      layer.style.setProperty(`--talk-${kind}-${n}`, url);
+    }
+  }
+  return urls;
+}
 
 /** The words on the screen: labels in Title Case, the rest sentences. */
 export const TALK_TEXT = {
@@ -107,8 +167,12 @@ export function talkHtml() {
   <button type="button" class="inv-btn inv-talk-btn inv-talk-skip-intro" data-intro-skip>${t.skipIntro}</button>
   <div class="inv-talk-choices" role="group" aria-label="${t.replies}" hidden></div>
   <section class="inv-talk-box">
+    <span class="inv-talk-flash" aria-hidden="true"></span>
     <p class="inv-talk-name" aria-hidden="true"></p>
-    <p class="inv-talk-text" aria-hidden="true"><span class="inv-talk-typed"></span></p>
+    <div class="inv-talk-view">
+      <p class="inv-talk-text" aria-hidden="true"><span class="inv-talk-typed"></span></p>
+      <p class="inv-talk-ghost" aria-hidden="true"></p>
+    </div>
     <p class="inv-talk-live" role="status" aria-live="polite" aria-atomic="true"></p>
     <p class="inv-talk-hint">${t.goOn}</p>
     <span class="inv-talk-next" aria-hidden="true" hidden>▼</span>
@@ -161,9 +225,17 @@ export function createDialogueUi(
   layer.hidden = true;
   layer.innerHTML = talkHtml();
   stage.append(layer);
+  const view = doc.defaultView;
+  /** The toy's ink, the dither's colour (the layer's own --talk-ink). */
+  const ink = (view && getComputedStyle(layer).getPropertyValue('--talk-ink').trim()) || '#3a332d';
+  const tiles = installTalkDither(layer, ink);
   const $ = (sel) => /** @type {HTMLElement} */ (layer.querySelector(sel));
   const name = $('.inv-talk-name');
   const typed = $('.inv-talk-typed');
+  const text = $('.inv-talk-text');
+  const ghost = $('.inv-talk-ghost');
+  const flash = $('.inv-talk-flash');
+  const boxEl = $('.inv-talk-box');
   const live = $('.inv-talk-live');
   const next = $('.inv-talk-next');
   const choices = $('.inv-talk-choices');
@@ -204,6 +276,71 @@ export function createDialogueUi(
   const settle = () => {
     if (shown.up) shown.settle = Math.max(shown.settle, now() + replySettle);
   };
+
+  const reduced = () => Boolean(view?.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+  /**
+   * Run keyframes on `el` (none where the page can't animate: the tests' stand-in document).
+   * @param {Element} el
+   * @param {Keyframe[]} frames
+   * @param {KeyframeAnimationOptions} o
+   */
+  const play = (el, frames, o) => (typeof el.animate === 'function' ? el.animate(frames, o) : null);
+  /** Each value held until the next (a dither steps, it never blends). @param {Keyframe[]} frames */
+  const held = (frames) => frames.map((f) => ({ ...f, easing: 'steps(1, end)' }));
+
+  /**
+   * The line that was up dithers out over the new one (a copy of it, where it was, its scroll
+   * kept), through the fade's steps the other way; with reduced motion, a quick plain fade.
+   */
+  function ditherOut() {
+    ghost.replaceChildren(...[...typed.childNodes].map((n) => n.cloneNode(true)));
+    ghost.scrollTop = text.scrollTop;
+    const masks = [...TALK_DITHER.fade].reverse().map((n) => tiles.mask.get(n));
+    const fade =
+      reduced() || masks.some((m) => !m)
+        ? play(ghost, [{ opacity: 1 }, { opacity: 0 }], { duration: 120, easing: 'linear', fill: 'forwards' })
+        : play(ghost, held([{ maskImage: 'none' }, ...masks.map((m) => ({ maskImage: m }))]), {
+            duration: TALK_DITHER.fadeMs,
+            fill: 'forwards',
+          });
+    if (fade) fade.onfinish = () => ghost.replaceChildren();
+    else ghost.replaceChildren();
+  }
+
+  /** A press that goes on: the box dips a step and flashes the ink's dither (reduced motion: a quick fade of it). */
+  function pressFlash() {
+    const [heavy, light] = [tiles.ink.get(4), tiles.ink.get(2)];
+    if (reduced() || !heavy || !light) {
+      const bg = light ?? 'none';
+      play(
+        flash,
+        [
+          { backgroundImage: bg, opacity: 1 },
+          { backgroundImage: bg, opacity: 0 },
+        ],
+        { duration: 100 },
+      );
+      return;
+    }
+    const ms = TALK_DITHER.pressMs;
+    play(
+      flash,
+      held([
+        { backgroundImage: heavy },
+        { backgroundImage: light, offset: 0.4 },
+        { backgroundImage: 'none', offset: 0.8 },
+      ]),
+      { duration: ms },
+    );
+    play(
+      boxEl,
+      held([
+        { translate: '0 2px', boxShadow: `0 2px 0 ${ink}` },
+        { translate: '0 0', boxShadow: `0 4px 0 ${ink}`, offset: 0.6 },
+      ]),
+      { duration: ms },
+    );
+  }
 
   /** The Log was opened with a pointer (a click or a tap), not from the keyboard. */
   let logByPointer = false;
@@ -280,7 +417,9 @@ export function createDialogueUi(
     e.preventDefault();
     if (modal()) return;
     settle();
-    if (!e.repeat) onAction({ type: 'advance' });
+    if (e.repeat) return;
+    pressFlash();
+    onAction({ type: 'advance' });
   }
 
   layer.addEventListener('click', (e) => {
@@ -290,6 +429,7 @@ export function createDialogueUi(
       // (Off the buttons: go on, unless the Log or the question is up.)
       if (!modal() && !el.closest('.inv-talk-log, .inv-talk-ask')) {
         settle();
+        pressFlash();
         onAction({ type: 'advance' });
       }
       return;
@@ -343,6 +483,7 @@ export function createDialogueUi(
       ask.hidden = true;
       logBtn.setAttribute('aria-expanded', 'false');
       shown.seq = -1;
+      ghost.replaceChildren();
       reach();
       doc.addEventListener('keydown', onKey);
       layer.focus({ preventScroll: true });
@@ -360,6 +501,8 @@ export function createDialogueUi(
     render(v) {
       if (layer.hidden || !v.box) return;
       if (v.seq !== shown.seq) {
+        // (The line before dithers out as this one comes; the first comes with the layer.)
+        if (shown.seq >= 0) ditherOut();
         shown.seq = v.seq;
         const line = parseMarkup(v.box.text, palette);
         shown.spans = renderMarkup(typed, line);

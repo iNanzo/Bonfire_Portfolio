@@ -323,10 +323,16 @@ envelope back over a fresh scene to open again (above). It's laid out like Uma M
 toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
 
 - **The screen:** a wide box along the bottom with his name on a tab at its top left and his
-  line typed out in it, a small bouncing ▼ at its bottom right once the line is all there, Auto,
-  Next and Log at the top right, **Skip Intro** at the top left, and a gentle dim along the bottom
-  behind the box. A line's own line breaks (as the admin types them) show. The toolbar goes while
-  the intro runs and comes back after it.
+  line typed out in it, a small ▼ bobbing in pixel steps at its bottom right once the line is all
+  there, Auto, Next and Log at the top right, **Skip Intro** at the top left, and a gentle dim along
+  the bottom behind the box. A line's own line breaks (as the admin types them) show. The toolbar
+  goes while the intro runs and comes back after it.
+- **Feedback,** in the toolbar's style (its ordered Bayer dither, in the ink): every button on the
+  screen (Auto, Next, Log, Skip Intro, the replies, the Log's and the question's) fills with a
+  light dither on hover and a heavier one pressed. The screen dithers in as it opens, the replies
+  dither in one after another, the line that was up dithers out over the next as it comes, and a
+  tap or a key that goes on dips the box a step with a flash of dither. With reduced motion these
+  are quick plain fades, with no dip and no bob.
 - **Going on:** a tap or click anywhere first finishes the line, then goes on to the next box;
   Space and Enter do the same (after a click or tap on Auto, Next or Log too; from the keyboard,
   a focused button presses itself). Some boxes ask a question: two or three replies show as buttons
@@ -946,7 +952,12 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   counting the letters that show (markup.js); `lookSway`; main.js runs
   `content.js` `introScript()` through `normalizeScript` as a safety net, `playScript`),
   `dialogueUi.js` and `dialogue.css` (the screen: a modal layer over the stage that takes every
-  press; the line in a live region once, whole; `REPLY_SETTLE`, `REPLY_ROOM`), brain.js's `talk` state (`BrainIn.dialogue`: the
+  press; the line in a live region once, whole; `REPLY_SETTLE`, `REPLY_ROOM`; its feedback from
+  `TALK_DITHER`'s tiles, `talkTile` (icons.js `ditherMask` drawn at 2 px a cell) installed on the
+  layer as `--talk-ink-N` and `--talk-mask-N`: the buttons' hover and press backgrounds, the
+  `inv-talk-dither-in` keyframes stepping the layer's and the replies' `mask-image`, and from
+  script the ghost (`ditherOut`, a copy of the line before, masked out step by step) and the press
+  flash (`pressFlash`)), brain.js's `talk` state (`BrainIn.dialogue`: the
   box's seq, animation, face and whether it's typing; any clip, clips.js `DIALOGUE_CLIPS`:
   `DIALOGUE_WAYS` says which step in place (main.js moves the step phase on by brain.js
   `talkPhase`) and which dangle him (`dangleLift`: his lowest point `DANGLE.gap` over the

@@ -11,6 +11,7 @@
 // introScript() (content.json's intro, or one mended), which the runner plays as it is.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { DIALOGUE_CLIPS, FACE_NAMES } from '../src/invitation/clips.js';
 import {
   DIALOGUE,
@@ -337,7 +338,6 @@ test('Play Intro’s script is content.js introScript(): the runner plays it as 
 /** content.js, reading content.json's `invitation` as `virtual:invitation-content` (vite.config.js). */
 async function loadContent() {
   const { register } = await import('node:module');
-  const { readFileSync } = await import('node:fs');
   const inv = JSON.parse(readFileSync(new URL('../src/content.json', import.meta.url), 'utf8')).invitation ?? {};
   const sub = `export default ${JSON.stringify(inv)}`;
   const hooks = `export async function resolve(spec, ctx, next) {
@@ -466,4 +466,66 @@ test('text effects: typing, Auto’s wait and the cap count the letters that sho
     [plain],
     'the Log lists it plain',
   );
+});
+
+test('the chat screen’s feedback, in the toolbar’s style: dither tiles, a dithered fade, stepped moves', async () => {
+  const { TALK_DITHER, talkTile, talkHtml } = await import('../src/invitation/dialogueUi.js');
+  // (A tile is the toolbar's Bayer 4×4 drawn at two CSS px a cell: 8×8, its cells inside the next coverage's.)
+  for (const n of [...TALK_DITHER.ink, ...TALK_DITHER.fade]) {
+    const t = talkTile(n);
+    assert.equal(t.length, 64, `${n}: 8×8`);
+    assert.equal(t.filter(Boolean).length, n * 4, `${n}/16 of it`);
+    for (let y = 0; y < 8; y += 2)
+      for (let x = 0; x < 8; x += 2) {
+        const c = t[y * 8 + x];
+        assert.ok(
+          [t[y * 8 + x + 1], t[(y + 1) * 8 + x], t[(y + 1) * 8 + x + 1]].every((v) => v === c),
+          'a 2 px cell',
+        );
+      }
+  }
+  const more = talkTile(8);
+  assert.ok(
+    talkTile(4).every((on, i) => !on || more[i]),
+    'a lighter tile’s cells are in the heavier one',
+  );
+  // (The fade goes up from nothing, in even steps, short of whole: the last step is no mask at all.)
+  assert.equal(TALK_DITHER.fade[0], 0);
+  assert.ok(TALK_DITHER.fade.every((n, i) => i === 0 || n > TALK_DITHER.fade[i - 1]) && TALK_DITHER.fade.at(-1) < 16);
+  assert.ok(TALK_DITHER.fadeMs >= 120 && TALK_DITHER.fadeMs <= 260, 'a short fade');
+  const markup = talkHtml();
+  assert.match(markup, /class="inv-talk-flash" aria-hidden="true"/);
+  assert.match(markup, /class="inv-talk-ghost" aria-hidden="true"/);
+
+  const css = readFileSync(new URL('../src/invitation/dialogue.css', import.meta.url), 'utf8');
+  const rule = (sel) => {
+    const at = css.indexOf(`${sel} {`);
+    assert.ok(at >= 0, `a rule for ${sel}`);
+    return css.slice(at, css.indexOf('}', at));
+  };
+  // (Hover a light ink dither, press a heavier one, on every button in the layer, as on the toolbar.)
+  assert.match(rule('.inv-talk .inv-btn:hover:not(:disabled)'), /background-image: var\(--talk-ink-2\)/);
+  assert.match(rule('.inv-talk .inv-btn:active:not(:disabled)'), /background-image: var\(--talk-ink-6\)/);
+  assert.match(rule('.inv-talk .inv-btn'), /background-size: 8px 8px/);
+  // (The layer dithers in: its mask through the fade's steps, a step at a time.)
+  const fade = /@keyframes inv-talk-dither-in \{([\s\S]*?)\n\}/.exec(css)?.[1] ?? '';
+  const steps = [...fade.matchAll(/mask-image: var\(--talk-mask-(\d+)\)/g)].map((m) => Number(m[1]));
+  assert.deepEqual(steps, TALK_DITHER.fade);
+  assert.match(fade, /100% \{\s*mask-image: none;/);
+  assert.match(rule('.inv-talk:not([hidden])'), /animation: inv-talk-dither-in/);
+  // (The replies dither in one after another.)
+  assert.match(rule('.inv-talk-choices:not(.is-waiting) .inv-talk-choice'), /animation: inv-talk-dither-in/);
+  const delays = [2, 3].map((n) =>
+    Number(
+      /animation-delay: ([\d.]+)s/.exec(
+        rule(`.inv-talk-choices:not(.is-waiting) .inv-talk-choice:nth-child(${n})`),
+      )?.[1],
+    ),
+  );
+  assert.ok(delays[0] > 0 && delays[1] > delays[0], `staggered: ${delays}`);
+  // (The ▼ steps, a pixel sprite's bob.)
+  assert.match(rule('.inv-talk-next'), /animation: inv-talk-bob [\d.]+s steps\(/);
+  // (Reduced motion: quick plain fades instead.)
+  const reduced = css.slice(css.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
+  assert.match(reduced, /animation: inv-talk-fade 0\.1\d?s/);
 });

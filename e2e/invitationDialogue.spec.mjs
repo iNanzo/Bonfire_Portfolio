@@ -19,7 +19,10 @@
 // intro()). Tests requiring a specific script shape install a fixture; the admin integration
 // tests exercise the current content. Every wait is on a state (the script as
 // content.js reads it). Down every reply each box shows its face (the four dialogue faces from
-// their own sheets) and plays its animation.
+// their own sheets) and plays its animation. The screen answers in the toolbar's style: its
+// buttons dither on hover and press, it dithers in as it opens and the replies one after another,
+// a line dithers out over the next, a press that goes on flashes the box, the ▼ bobs in steps,
+// and reduced motion fades plainly.
 import { readFileSync } from 'node:fs';
 import { test, expect } from '@playwright/test';
 import { routeToEnd } from './helpers/dialogue-route.mjs';
@@ -888,6 +891,113 @@ test.describe('on a phone', () => {
 });
 
 test.describe('on a desktop', () => {
+  test('the buttons dither on hover and press; the box dithers in, a line dithers out over the next, a press flashes it', async ({
+    page,
+  }) => {
+    const errors = watch(page);
+    await calm(page);
+    await useBehaviorIntro(page);
+    /** A dither tile, as the computed style gives one. */
+    const TILE = /^url\("data:image\/png;base64,[^"]+"\)$/;
+    // Opening: the layer dithers in, its mask a dither tile part way through (each step held).
+    await replayIntro(page).click();
+    const opening = await page.evaluate(() => {
+      const layer = document.querySelector('.inv-talk');
+      const a = layer.getAnimations().find((x) => x.animationName === 'inv-talk-dither-in');
+      if (!a) return null;
+      a.pause();
+      a.currentTime = 0.4 * a.effect.getTiming().duration;
+      const mid = getComputedStyle(layer).maskImage;
+      a.finish();
+      return { mid, after: getComputedStyle(layer).maskImage };
+    });
+    expect(opening, 'the layer’s dither-in').not.toBeNull();
+    expect(opening.mid).toMatch(TILE);
+    expect(opening.after).toBe('none');
+    await until(page, (s) => s.dialogue && s.state === 'talk' && !s.dialogue.waiting, 'the intro under way');
+    // The ▼ bobs in steps.
+    await expect(page.locator('.inv-talk-next')).toHaveCSS('animation-timing-function', /steps/);
+    // Hover: a light dither of the ink; pressed: a heavier one; neither on a button at rest.
+    const auto = page.getByRole('button', { name: 'Auto', exact: true });
+    const bg = () => auto.evaluate((e) => getComputedStyle(e).backgroundImage);
+    expect(await bg()).toBe('none');
+    await auto.hover();
+    const hover = await bg();
+    expect(hover).toMatch(TILE);
+    await page.mouse.down();
+    const pressed = await bg();
+    expect(pressed).toMatch(TILE);
+    expect(pressed).not.toBe(hover);
+    await page.mouse.move(5, 5);
+    await page.mouse.up();
+    // A press that goes on: the box flashes the ink's dither; the line before dithers out over the next.
+    await page.evaluate(() => {
+      window.seen = { flash: [], ghost: [] };
+      const ghost = document.querySelector('.inv-talk-ghost');
+      new MutationObserver(() => {
+        if (!ghost.childElementCount) return;
+        window.seen.ghost.push({
+          text: ghost.textContent,
+          masks: ghost.getAnimations().flatMap((a) => a.effect.getKeyframes().map((k) => k.maskImage ?? '')),
+        });
+      }).observe(ghost, { childList: true });
+      document.addEventListener(
+        'click',
+        () =>
+          requestAnimationFrame(() =>
+            window.seen.flash.push(
+              document
+                .querySelector('.inv-talk-flash')
+                .getAnimations()
+                .flatMap((a) => a.effect.getKeyframes().map((k) => k.backgroundImage ?? '')),
+            ),
+          ),
+        true,
+      );
+    });
+    const before = await snapshot(page);
+    if (!before.dialogue.typed) {
+      await goOn(page);
+      await until(page, (s) => s.dialogue.typed, 'the line up');
+    }
+    const line = await shownLine(page);
+    await goOn(page);
+    await until(page, (s) => s.dialogue?.seq > before.dialogue.seq, 'the next line');
+    const seen = await page.evaluate(() => window.seen);
+    expect(
+      seen.flash.at(-1)?.some((v) => TILE.test(v) || /^url\(/.test(v)),
+      'the press flash',
+    ).toBe(true);
+    expect(seen.ghost.length, 'the line before, dithering out').toBeGreaterThan(0);
+    expect(seen.ghost[0].text.replace(/\s+/g, ' ').trim()).toBe(line.replace(/\s+/g, ' ').trim());
+    expect(seen.ghost[0].masks.filter((m) => /^url\(/.test(m)).length).toBeGreaterThanOrEqual(6);
+    await expect(page.locator('.inv-talk-ghost')).toBeEmpty();
+    expect(errors).toEqual([]);
+  });
+
+  test('the replies dither in one after another; with reduced motion the screen fades plainly', async ({ page }) => {
+    await calm(page);
+    await useBehaviorIntro(page);
+    const { ask } = askAndBefore(await script(page));
+    test.skip(!ask, 'this script has no replies');
+    await open(page);
+    await page.getByRole('button', { name: 'Next', exact: true }).click();
+    await until(page, (s) => s.dialogue.id === ask.id && Boolean(s.dialogue.choices), 'at the replies');
+    const looks = await page.locator('.inv-talk-choice').evaluateAll((els) =>
+      els.map((e) => ({
+        name: getComputedStyle(e).animationName,
+        delay: parseFloat(getComputedStyle(e).animationDelay),
+      })),
+    );
+    expect(looks.length).toBeGreaterThan(1);
+    for (const l of looks) expect(l.name).toBe('inv-talk-dither-in');
+    for (let i = 1; i < looks.length; i++) expect(looks[i].delay).toBeGreaterThan(looks[i - 1].delay);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await expect(page.locator('.inv-talk')).toHaveCSS('animation-name', 'inv-talk-fade');
+    await expect(page.locator('.inv-talk-choice').first()).toHaveCSS('animation-name', 'inv-talk-fade');
+    await expect(page.locator('.inv-talk-next')).toHaveCSS('animation-name', 'none');
+  });
+
   test('tags in a reply and a name show styled, read plain; an italic word slants in place', async ({ page }) => {
     await tagsShowStyled(page, false);
   });

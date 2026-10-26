@@ -5,8 +5,14 @@
    a small bouncing ▼ at its bottom right once it's up; Auto, Next and Log at the top right; the
    replies stacked in the middle of the screen, under his face; a gentle dim along the bottom behind the box; the
    Log and the "Skip the Intro?" question as cards over it all. Phone first (390×844), roomier on a
-   desktop and lower on a phone held sideways. Reduced motion: no bounce, no pop. The layer takes
-   every press, so the canvas under it gets none. The lines' text effects: markup.css. */
+   desktop and lower on a phone held sideways. The layer takes every press, so the canvas under
+   it gets none. The lines' text effects: markup.css.
+   Feedback in the toolbar's style, ordered dither (the tiles dialogueUi.js draws on the layer:
+   --talk-ink-N, the ink at N/16; --talk-mask-N, a mask at N/16): every button's hover a light ink
+   dither and its press a heavier one; the layer dithers in as it opens (its mask through the
+   fade's steps) and the replies one after another; a line dithers out over the next (the ghost,
+   from script) and a press that goes on dips the box with a flash of dither (the flash, from
+   script); the ▼ bobs in pixel steps. Reduced motion: quick plain fades, no bob, no dip. */
 
 @import './markup.css';
 
@@ -23,6 +29,10 @@
   touch-action: none;
   cursor: pointer;
   outline: none;
+}
+/* (Opening: the whole screen dithers in, the box, its tab and the buttons together.) */
+.inv-talk:not([hidden]) {
+  animation: inv-talk-dither-in 0.24s steps(1, end) both;
 }
 
 /* (The dim: darker at the very bottom, gone by the middle; it never takes a press itself.) */
@@ -60,6 +70,21 @@
   font-size: 14px;
   box-shadow: 0 3px 0 var(--talk-ink);
 }
+/* (Every button in the layer: the toolbar's ordered dither of the ink, light on hover, heavier
+   pressed, its 2 px cells crisp.) */
+.inv-talk .inv-btn {
+  background-repeat: repeat;
+  background-size: 8px 8px;
+  image-rendering: pixelated;
+}
+@media (hover: hover) and (pointer: fine) {
+  .inv-talk .inv-btn:hover:not(:disabled) {
+    background-image: var(--talk-ink-2);
+  }
+}
+.inv-talk .inv-btn:active:not(:disabled) {
+  background-image: var(--talk-ink-6);
+}
 
 /* --- The box and its name tab. */
 .inv-talk-box {
@@ -76,7 +101,18 @@
   border-radius: 22px;
   background: var(--talk-fill);
   box-shadow: 0 4px 0 var(--talk-ink);
-  animation: inv-talk-rise 0.28s ease-out;
+  animation: inv-talk-rise 0.24s steps(3, end);
+}
+/* (A press that goes on: the ink's dither over the box for a moment, dialogueUi.js pressFlash.) */
+.inv-talk-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  background-repeat: repeat;
+  background-size: 8px 8px;
+  image-rendering: pixelated;
+  pointer-events: none;
 }
 .inv-talk-name {
   position: absolute;
@@ -94,6 +130,9 @@
   letter-spacing: 0.03em;
   transform: translateY(-62%);
 }
+.inv-talk-view {
+  position: relative;
+}
 .inv-talk-text {
   margin: 0;
   /* (Three lines' room, so a longer line never grows the box as it types.) */
@@ -105,13 +144,30 @@
   /* (The admin's own line breaks show.) */
   white-space: pre-line;
 }
+/* (The line before, dithering out over the next as it comes: dialogueUi.js ditherOut.) */
+.inv-talk-ghost {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: 18px;
+  line-height: 1.42;
+  letter-spacing: 0.01em;
+  overflow-wrap: break-word;
+  white-space: pre-line;
+  background: var(--talk-fill);
+  pointer-events: none;
+}
+.inv-talk-ghost:empty {
+  display: none;
+}
 .inv-talk-next {
   position: absolute;
   right: 16px;
   bottom: 8px;
   font-size: 14px;
   line-height: 1;
-  animation: inv-talk-bob 0.9s ease-in-out infinite;
+  animation: inv-talk-bob 0.8s steps(1, end) infinite;
 }
 
 /* (For a screen reader only: the whole line once, how to go on, and a styled name's or reply's
@@ -154,13 +210,13 @@
   line-height: 1.2;
 }
 .inv-talk-choices:not(.is-waiting) .inv-talk-choice {
-  animation: inv-talk-pop 0.22s ease-out both;
+  animation: inv-talk-dither-in 0.2s steps(1, end) both;
 }
-.inv-talk-choice:nth-child(2) {
-  animation-delay: 0.05s;
+.inv-talk-choices:not(.is-waiting) .inv-talk-choice:nth-child(2) {
+  animation-delay: 0.08s;
 }
-.inv-talk-choice:nth-child(3) {
-  animation-delay: 0.1s;
+.inv-talk-choices:not(.is-waiting) .inv-talk-choice:nth-child(3) {
+  animation-delay: 0.16s;
 }
 
 /* --- The Log and the question: cards over everything, the Log's list scrolling. */
@@ -246,25 +302,54 @@
   visibility: hidden;
 }
 
+/* (A pixel bob: down two px, four, two, back, a step at a time.) */
 @keyframes inv-talk-bob {
-  0%,
-  100% {
-    transform: translateY(0);
+  0% {
+    translate: 0 0;
+  }
+  25% {
+    translate: 0 2px;
   }
   50% {
-    transform: translateY(4px);
+    translate: 0 4px;
+  }
+  75% {
+    translate: 0 2px;
   }
 }
 @keyframes inv-talk-rise {
   from {
-    opacity: 0;
-    transform: translateY(12px);
+    translate: 0 12px;
   }
 }
-@keyframes inv-talk-pop {
-  from {
-    opacity: 0;
-    transform: scale(0.92);
+/* (In through the fade's steps, each held: a mask of more and more of the pixels, then none.) */
+@keyframes inv-talk-dither-in {
+  0% {
+    mask-image: var(--talk-mask-0);
+  }
+  12.5% {
+    mask-image: var(--talk-mask-2);
+  }
+  25% {
+    mask-image: var(--talk-mask-4);
+  }
+  37.5% {
+    mask-image: var(--talk-mask-6);
+  }
+  50% {
+    mask-image: var(--talk-mask-8);
+  }
+  62.5% {
+    mask-image: var(--talk-mask-10);
+  }
+  75% {
+    mask-image: var(--talk-mask-12);
+  }
+  87.5% {
+    mask-image: var(--talk-mask-14);
+  }
+  100% {
+    mask-image: none;
   }
 }
 @keyframes inv-talk-fade {
@@ -284,7 +369,8 @@
     left: 22px;
     font-size: 18px;
   }
-  .inv-talk-text {
+  .inv-talk-text,
+  .inv-talk-ghost {
     font-size: 21px;
   }
   .inv-talk-top {
@@ -316,6 +402,9 @@
   }
   .inv-talk-text {
     min-height: calc(2 * 1.42em);
+  }
+  .inv-talk-text,
+  .inv-talk-ghost {
     font-size: 16px;
   }
   .inv-talk-choices {
@@ -330,8 +419,11 @@
 @media (prefers-reduced-motion: reduce) {
   .inv-talk-next,
   .inv-talk-box,
-  .inv-talk-dim,
-  .inv-talk-choices:not(.is-waiting) .inv-talk-choice {
+  .inv-talk-dim {
     animation: none;
+  }
+  .inv-talk:not([hidden]),
+  .inv-talk-choices:not(.is-waiting) .inv-talk-choice {
+    animation: inv-talk-fade 0.12s linear both;
   }
 }
