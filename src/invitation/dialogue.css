@@ -4,22 +4,23 @@
    the intro runs) with the speaker's name on a tab at its top left, the line typed out in it and
    a small bouncing ▼ at its bottom right once it's up; Auto, Next and Log at the top right; the
    replies stacked in the middle of the screen, under his face; a gentle dim along the bottom
-   behind the box; the Log and the "Skip the Intro?" question as cards over it all. Phone first (390×844), roomier on a
-   desktop and lower on a phone held sideways. The layer takes every press, so the canvas under
-   it gets none, until the intro ends. The lines' text effects: markup.css.
+   behind the box; the Log and the "Skip the Intro?" question as cards over it all. Phone first
+   (390×844), roomier on a desktop and lower on a phone held sideways. The layer takes every
+   press, so the canvas under it gets none, until the intro ends. The lines' text effects:
+   markup.css. The box holds three rows (two on a short screen) and a long line grows it by a
+   row at most before it scrolls.
    Plain, as before round 18: no dither on the buttons or the box, no outline round the words;
    a light hover where there's a mouse (a step warmer, a button lifted a pixel) and a plain press
    (a step darker and down: :active, or .is-pressed for a finger held on one, where :active isn't
    reliable: dialogueUi.js holdPressed), the box too while a press on it goes on; the replies pop
-   in together; the ▼ bobs; the box rises
-   in with a plain quick fade over the dim, and the screen fades out plainly as the intro ends
-   (from script, out of reach from its first step). Its one dither: a press that goes on, or a
-   reply picked, dithers the old line out with its name tab (and the replies) and then the next
-   one in, from script (dialogueUi.js clickFade): the old line's copy (.inv-talk-ghost) over the
-   new one's place, the replies' copy (.inv-talk-choices.is-ghost), both out of reach. Reduced
-   motion: no rise, no bob, no pop, quick plain fades. */
+   in together; the ▼ bobs; the box rises in with a plain quick fade over the dim, and the screen
+   fades out plainly as the intro ends (from script, out of reach from its first step). Its one
+   dither: a press that goes on, or a reply picked, dithers the old line out with its name tab
+   (and the replies) and then the next one in, from script (dialogueUi.js clickFade): the old
+   line's copy (.inv-talk-ghost) over the new one's place, the replies' copy
+   (.inv-talk-choices.is-ghost), both out of reach. Reduced motion: no rise, no bob, no pop,
+   quick plain fades. */
 
-@import './markup.css';
 @import './markup.css';
 
 .inv-talk {

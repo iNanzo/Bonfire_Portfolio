@@ -573,6 +573,7 @@ test('the chat screen is plain, as before round 18: no dither on its buttons or 
     'steps(',
   ])
     assert.ok(!css.includes(gone), `no ${gone}`);
+  assert.equal(css.match(/@import /g)?.length, 1, 'the text effects imported once');
   // (The box rises into place with its plain quick fade, as it did.)
   assert.match(rule('.inv-talk-box'), /animation: inv-talk-rise 0\.28s ease-out;/);
   const frames = (name) => new RegExp(`@keyframes ${name} \\{([\\s\\S]*?)\\n\\}`).exec(css)?.[1] ?? '';
