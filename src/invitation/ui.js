@@ -24,7 +24,8 @@
 // ones resting at Pixel Size Off, the lines' while Outlines is off, the dither's while
 // Dithering is), Ground Cues (the ring and the dashed drop line under him while he's held: Off,
 // In the Mix or Always, In the Mix until it's picked: cues.js CUE_DEFAULT), Rose Petals (petals
-// trailing the cursor or finger and bursting at a click: petalLayer.js; on until switched off), and Wander, whether
+// trailing the cursor or finger and bursting at a click: petalLayer.js; on until switched off), Screen
+// Shake (the picture shaken when he lands from high: camera.js shakeKick; on until switched off), and Wander, whether
 // he walks about by himself, kept for the next visit (loadWander, in localStorage, every read and
 // write in try/catch)). The slider's steps are the screen's (pixels.js pixelSteps: two resolutions that come
 // to the same block there are one step, and one that comes to 1 px is Native), set by main.js
@@ -43,7 +44,7 @@
 //                        (an old address's ?drag= is ignored: the bead hold is the only carry)
 
 import { PIXEL_SIZES, resolutionOf, shownPixel, stepFor } from './pixels.js';
-import { LOOKS, MOTIONS, STYLES, isCustom, petalsOn, shaderOf, validLook } from './look.js';
+import { LOOKS, MOTIONS, STYLES, isCustom, petalsOn, shakeOn, shaderOf, validLook } from './look.js';
 import { SHADER_CONTROLS, controlFor, shaderText } from './shader.js';
 import { CUE_DEFAULT, CUE_LABELS, CUE_MODES } from './cues.js';
 import { LABEL_ICONS, iconSvg, installDither } from './icons.js';
@@ -400,6 +401,7 @@ export function sheetHtml(look, steps = ALL_STEPS, { wander = true } = {}) {
   ${shaderHtml(l)}
   <fieldset class="inv-field"><legend>Ground Cues</legend><div class="inv-segs">${cues}</div><p class="inv-hint">The ring and the dashed line under NEWT while he’s held, showing where he is over the floor.</p></fieldset>
   <div class="inv-field inv-play">${toggle('petals', 'Rose Petals', petalsOn(l))}<p class="inv-hint">Rose petals trail your cursor or finger and burst where you click or tap.</p></div>
+  <div class="inv-field inv-play">${toggle('shake', 'Screen Shake', shakeOn(l))}<p class="inv-hint">The picture shakes when NEWT lands from high. Never with reduced motion.</p></div>
   <div class="inv-field inv-play">${toggle('wander', 'Wander', wander, 'data-setting')}<p class="inv-hint">Left be, he walks about by himself now and then.</p></div>
 </section>`;
 }

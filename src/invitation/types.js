@@ -24,7 +24,9 @@
 //      the look left it; Screen Time's tablet at his palms); bubble.update (while a line is up): his head on screen
 //      (character.screenShape; null while the open Look sheet covers it, bubble.js
 //      speakerPoint), clear of the toolbar and the open sheet
-//   9. stage.render: the shadow map once, the colour pass, the retro pass
+//   9. the landing's dust and screen shake (main.js dropFx: dust.js, camera.js shakeOffset, from
+//      a landing step 3 reported), then stage.render: the shadow map once, the colour pass, the
+//      retro pass
 
 /** @typedef {{x: number, z: number}} XZ */
 /** @typedef {{x: number, y: number, z: number}} XYZ */

@@ -112,7 +112,12 @@ loading screen too: NEWT loads behind it.
   his arms and legs hanging limp and swinging with the motion; at the edge of his patch he stops
   instead of sliding along it. Held, he hangs his head, and every few seconds (sooner if you
   shake him) he thrashes about, kicking and flailing; let go and he falls, lands and gets back
-  up. Shaking him means shaking him back and forth (one fast flick isn't a shake): shake him
+  up. He lands in a puff of dust: a ring of small dithered puffs in the floor's warm grey bursts
+  out from his feet along the floor, rising a little, and is gone in about half a second to 0.8 s;
+  the harder he lands the bigger and fuller the ring (set down gently, from just over the floor,
+  there's none). Dropped from high (lifted well over his own height), the screen shakes for about
+  a third of a second, a few pixels, more the harder he lands (**Screen Shake** in Settings; never
+  with reduced motion). Shaking him means shaking him back and forth (one fast flick isn't a shake): shake him
   hard, fling him about or drop him from high and he gets stressed, and once he lands he runs
   off if it was too much; carrying him about gently, however long, never bothers him. Flick him
   and he flies, a flick up the screen lobbing him away from you; let go while
@@ -229,6 +234,7 @@ the sheet and leaves the slider as it was.
 | Motion | Smooth, Choppy | Smooth (the default) moves NEWT every frame. Choppy moves his arms, legs and head 15 times a second, like stop motion, while the camera and his walking about stay smooth. |
 | Ground Cues | Off, In the Mix, Always | The ring on the floor under NEWT while he's held and the dashed line from his collar down to it, so you can see where he is over the floor. In the Mix shows them while he's high or moving fast; Always all the time he's held. In the Mix until you pick one. |
 | Rose Petals | On, Off | On (the default): rose petals trail the cursor or a finger and burst in a ring at every click or tap, over the envelope and through the toy; Off, none at all (the envelope's too). |
+| Screen Shake | On, Off | On (the default): when NEWT lands from high the picture shakes for about a third of a second, a few pixels, more the harder he lands; Off, it never shakes (his landing's dust still shows). Never with reduced motion. |
 | Wander | On, Off | On (the default): left be, he strolls about by himself now and then. Kept for your next visit, like the rest. |
 
 **Shader** lays out the pixel look's own values, which the Style sets; any change shows at once
@@ -928,6 +934,32 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   and `setBurst(x, y, r, k)` (client px; stage.js forwards them), `hoverEase` (in over 0.08 s,
   out over 0.2 s: `HOVER`) and `burstAt` (to 20 texels in 0.38 s: `BURST`), which main.js
   `effects` drives each frame.
+- **Landings:** carry.js `fallStep` returns the `impact` velocity he hit the floor with, and
+  play.js `bodyStep` keeps each landing as `BodyState.landing` (`t`, `x`, `z` and `speed`:
+  dust.js `landingSpeed`, how fast he came down plus `DUST.slide` of how fast he slid). main.js
+  `landed` takes a new one: the dust (`dust.js`, pure and seeded on a stream of its own,
+  `createRng(seed + 11)`: `dustLand` sets off `DUST.count` puffs, 2 at `DUST.min` 1.5 u/s to 14
+  at `DUST.full` 8 u/s, evenly round his feet with a little jitter, each slowed by exponential
+  drag in closed form, rising, swelling and fading as `(1 − u)^DUST.fade` over 0.5–0.8 s, at most
+  `DUST.max` kept; `dustPuffs(d, t)` the live ones, `dustBounds` their box) and the shake
+  (camera.js `shakeKick(speed, {on, reduced})`: none under `SHAKE.min` 5.6 u/s, up to
+  `SHAKE.px` 7 CSS px for `SHAKE.time` 0.25–0.4 s at `SHAKE.full` 8.2; `shakeOffset(kick,
+  since)`, trauma² over three sines an axis, the up and down one starting at its peak). The maths
+  is the Bonfire's: `src/bonfire/impact.js`'s impact puff (headings round the impact, drag, the
+  power fade) and `src/bonfire/view.js`'s camera shake (trauma², odd-frequency sines), copied,
+  since the invitation imports only its own modules. As measured at 1280×800: a finger's grab let
+  go lands at about 3.8 u/s, the mouse's at 4.9, lifted his own height 5.9, as high as the hold
+  goes 8.2, and set down from his hang height 1.2. `dropFx`, each frame before the render, hands
+  the puffs to `stage.setDust` (`dustLayer.js`: one instanced, camera-facing quad a puff on the
+  decal layer, no depth written, the target's surface id kept, so the pass draws it as floor and
+  it takes no lines; in the colour target each texel is in where the puff's cover beats its 4×4
+  Bayer threshold, drawn in the look's marker colour at `DUST_INK.opacity` 0.85, a smooth alpha at
+  Off; the stage grows the pass's area by `dustBounds`) and the shake to `stage.setShake` (the
+  projection's offset, `setViewOffset`, moved by it and snapped to whole texels as `view.js`
+  snaps the Bonfire's; the camera's place, the orbit and the canvas never move: a CSS transform on
+  the canvas held back the frames Chrome showed for the first 100 ms of the shake); a
+  grab, Screen Shake switched off (look.js `shake`, `shakeOn`: left out until it's picked, on) or
+  reduced motion ends it at once.
 - **The intro:** `dialogue.js` (pure, on an injected clock: `normalizeScript` makes any
   `DialogueScript` safe, types.js; `createDialogue(script, {reduced})` with `start`, `step`,
   `advance`, `choose`, `setAuto`, `skip` (the Next button), `pause`, `end`, `view` and `log`
@@ -957,10 +989,14 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   `invitationEnvelope` (its states, swipes, keys and timeline), `invitationPetals` (the petals'
   shapes, variety, the stepped simulation and every flow, the trail's spacing and rate),
   `invitationPetalSetting` (Rose Petals stored with the look), `invitationPetalLayer` (no WebGL
-  context till petals may come),
+  context till petals may come), `invitationDust` (the landing's speed, the dust's count, spread,
+  rise and fade by it, bounded) and `invitationShake` (the shake's threshold, size, decay, none
+  when off, and Screen Shake stored with the look),
   `e2e/invitation.spec.mjs`, `e2e/invitationDialogue.spec.mjs`,
-  `e2e/invitationEnvelope.spec.mjs` and `e2e/invitationPetals.spec.mjs` (the page's petal layer:
-  the mouse, a finger, Rose Petals off, reduced motion) (`npm run e2e -- invitation`).
+  `e2e/invitationEnvelope.spec.mjs`, `e2e/invitationPetals.spec.mjs` (the page's petal layer:
+  the mouse, a finger, Rose Petals off, reduced motion) and `e2e/invitationDrop.spec.mjs` (the
+  landings' dust and shake: from high, from the hold's height, set down, Screen Shake off,
+  reduced motion, a finger and a second finger's lift) (`npm run e2e -- invitation`).
 - **Test hooks:** `[data-stage].is-ready` once the first frame is drawn, `data-webgl="off"`
   without WebGL. `?test` adds `window.__invitation`: `snapshot()` (his state, clip, face,
   position, head turn, the camera's yaw, elevation and distance, the states he went through,
@@ -987,7 +1023,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   the `spot` the cues share (cues.js `cueSpot`, null on his feet), the floor ring as drawn
   (`marker`: shown, centre, radius in world units and `texels`, `alpha`, the view's
   `elevation` over it), the blob's and the ring's centres as drawn (`floorPx`, client px),
-  `groundCues` as it plays and `pushed`); `view({yaw, elevation, zoom})` eases the camera there
+  `groundCues` as it plays and `pushed`), `drop` the last `landing` (`t`, `x`, `z`, `speed`), the
+  `dust` as drawn (`count`, its `box`), the `shake` offset on the picture (CSS px) and its `kick`
+  (null when there's none); `view({yaw, elevation, zoom})` eases the camera there
   (radians; zoom the home distance over the distance); the limp layer (`limp.weight`, `limp.most`: the most a limb
   has swung, radians) and Screen Time (`device.state` and `label`, the tablet `shown` and its
   `screen` point, his `turn` off the camera). The snapshot's `camera` has
@@ -1039,7 +1077,10 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   him up high (the report says how far the grabbed point strayed from the cursor) and sweep the
   cursor, or a finger, over the whole screen to show where he looks, and its `reach` and
   `reach-turned` acts tap near the top of the screen and follow him there, as far up as keeps
-  his head on the screen (turned 90° first); its `envelope` and `envelope-skip` acts open or skip the envelope
+  his head on the screen (turned 90° first); its `drop-small` and `drop-big` acts let him go from
+  the hold's height and from as high as it goes (the mouse into the top band and the wheel, a
+  second finger on a phone), for the dust and the shake (the console says how fast he landed);
+  its `envelope` and `envelope-skip` acts open or skip the envelope
   (`?test&envelope`, whole frames). The record and the frames are
   `tools/capture-invitation-record.mjs`. One GPU capture at a time.
   `node tools/capture-invitation-drag.mjs` records the same carry from each of the camera's views
