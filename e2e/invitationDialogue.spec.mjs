@@ -588,6 +588,12 @@ async function darkInsideBox(page, tap) {
   await calm(page);
   await useBehaviorIntro(page);
   await open(page, tap);
+  // (The mouse is still where Replay Intro was, under the box: off it, the dither rests.)
+  if (!tap) await page.mouse.move(5, 5);
+  await expect.poll(async () => (await shadeInBox(page)).receding, { message: 'at rest' }).toBe(false);
+  await expect
+    .poll(async () => (await shadeInBox(page)).bands.every((b) => b.sunk === 0), { message: 'all the way up' })
+    .toBe(true);
   const d = await shadeInBox(page);
   expect(d.inBox && !d.fromScreen, 'in the box, nothing from the screen’s bottom').toBe(true);
   expect(d.under, 'under the flash, the name tab, the line and the ▼').toBe(true);
