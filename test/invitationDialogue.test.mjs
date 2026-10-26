@@ -740,6 +740,8 @@ function stand(tag, parent) {
     },
     hasPointerCapture: () => el.captured,
     releasePointerCapture: () => (el.captured = false),
+    // (Every element's box: 0 to 100 px across, 0 to 40 down.)
+    getBoundingClientRect: () => ({ left: 0, top: 0, right: 100, bottom: 40 }),
   };
   el.classList = {
     add: (c) => el.classes.add(c),
@@ -773,11 +775,20 @@ test('a press held on a button shows pressed until it lifts, is cancelled or sli
   assert.ok(pressed(t.reply));
   fire(t.reply, 'pointercancel', { pointerId: 4 });
   assert.ok(!pressed(t.reply), 'cancelled: not pressed');
-  // (Slid off it: not pressed, even before the finger lifts somewhere else.)
+  // (Slid off it: not pressed, even before the finger lifts somewhere else; a finger still held
+  // by its button gets no pointerleave there, so its moves say when it's off the button's box.)
   fire(t.next, 'pointerdown', { pointerId: 5 });
   fire(t.next, 'pointerleave', { pointerId: 5 });
   assert.ok(!pressed(t.next), 'left: not pressed');
   fire(t.off, 'pointerup', { pointerId: 5 });
+  fire(t.next, 'pointerdown', { pointerId: 11, clientX: 50, clientY: 20 });
+  fire(t.next, 'pointermove', { pointerId: 11, clientX: 90, clientY: 35 });
+  assert.ok(pressed(t.next), 'moved about on it: still pressed');
+  fire(t.next, 'pointermove', { pointerId: 12, clientX: 300, clientY: 300 });
+  assert.ok(pressed(t.next), 'another pointer moving leaves it');
+  fire(t.next, 'pointermove', { pointerId: 11, clientX: 140, clientY: 20 });
+  assert.ok(!pressed(t.next), 'moved off its box: not pressed');
+  fire(t.next, 'pointerup', { pointerId: 11 });
   // (Lifted over the window, outside the layer: still let go.)
   fire(t.reply, 'pointerdown', { pointerId: 6 });
   for (const f of t.win.on.pointerup ?? []) f({ type: 'pointerup', target: t.win, pointerId: 6 });

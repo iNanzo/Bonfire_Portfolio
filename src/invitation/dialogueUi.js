@@ -147,7 +147,8 @@ export const SHADE_BANDS = [1, 2, 3, 4];
  * A press held on a button in `root` shows as pressed (`cls` on it, dialogue.css) from its
  * pointerdown until that pointer lifts, is cancelled or slides off the button: CSS :active isn't
  * reliable on touch, where a finger held on Next or a reply showed nothing. A finger's press is
- * captured by its button till it lifts, so it's let go of at once, for sliding off to count.
+ * captured by its button till it lifts (no pointerleave meanwhile, where the browser keeps it),
+ * so it's let go of, and its moves off the button's box count as sliding off too.
  * Returns a function that stops it.
  * @param {HTMLElement} root
  * @param {string} [cls]
@@ -167,6 +168,12 @@ export function holdPressed(root, cls = 'is-pressed') {
     if (e.pointerId === id) release();
   };
   /** @param {PointerEvent} e */
+  const move = (e) => {
+    if (e.pointerId !== id || !held) return;
+    const r = held.getBoundingClientRect();
+    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) release();
+  };
+  /** @param {PointerEvent} e */
   const down = (e) => {
     const at = /** @type {Element|null} */ (e.target);
     const button = /** @type {HTMLButtonElement|null} */ (at?.closest?.('button') ?? null);
@@ -182,11 +189,13 @@ export function holdPressed(root, cls = 'is-pressed') {
   root.addEventListener('pointerdown', down);
   win?.addEventListener('pointerup', leave);
   win?.addEventListener('pointercancel', leave);
+  win?.addEventListener('pointermove', move);
   return () => {
     release();
     root.removeEventListener('pointerdown', down);
     win?.removeEventListener('pointerup', leave);
     win?.removeEventListener('pointercancel', leave);
+    win?.removeEventListener('pointermove', move);
   };
 }
 
