@@ -29,12 +29,9 @@
 // size from the line's start, so it never grows as it types), and a longer one scrolls inside
 // that: the view follows the typing a row at a time (followRow); once it's all typed the wheel, a
 // finger and the arrow and Page keys scroll it, with pixel cues over and under it where there's more.
-// Feedback in the toolbar's style, its ordered dither (TALK_DITHER's tiles on the layer, CSS in
-// dialogue.css): the buttons' hover and press (a press held with a finger too, holdPressed: CSS
-// :active isn't reliable on touch; the dither shows right up to the button's words, which a 2 px
-// outline of its fill keeps clear of it), the replies dithering in, and from here a press that
-// goes on dipping the box with a flash of dither (pressFlash); reduced motion, quick plain fades.
-// The box rises in with a plain fade (CSS) and the screen fades out plainly at the end. A press
+// It's plain, as before round 18 (dialogue.css): a button presses down (a press held with a
+// finger too, holdPressed: CSS :active isn't reliable on touch), the replies pop in, the box
+// rises in with a plain fade and the screen fades out plainly at the end. Its one dither: a press
 // that goes on, or a reply picked, brings the next box on with the click fade (clickFade,
 // TALK_FADE): the old line (a copy of it, where it was) dithers out with its name tab and the
 // replies picked, then the new name tab and line dither in, and only then does it type (the
@@ -64,18 +61,6 @@ export const REPLY_ROOM = 120;
  */
 export const REPLY_SETTLE = 450;
 
-/**
- * The screen's dither, the toolbar's (icons.js ditherMask, a Bayer 4×4 at n/16): ink, the
- * coverages of the ink tiles (--talk-ink-N: the buttons' hover and press, the press flash);
- * fade, the steps of a dithered fade (--talk-mask-N, mask tiles: the replies dithering in);
- * pressMs, the press flash on the box.
- */
-export const TALK_DITHER = {
-  ink: [2, 4, 6],
-  fade: [0, 2, 4, 6, 8, 10, 12, 14],
-  pressMs: 150,
-};
-
 /** How long the chat screen takes to fade out as the intro ends, ms (fadeAway). */
 export const LEAVE_MS = 150;
 
@@ -103,34 +88,24 @@ export function talkTile(n) {
 }
 
 /**
- * The screen's dither tiles as custom properties on `layer` (drawn once, as tiny PNGs):
- * --talk-ink-N in `ink` for TALK_DITHER.ink, --talk-mask-N (opaque cells) for TALK_DITHER.fade.
- * Their URLs by coverage, for the press flash and the click fade run from script (none without
- * a canvas).
- * @param {HTMLElement} layer
- * @param {string} ink  a CSS colour
+ * The click fade's mask tiles (talkTile's cells opaque), drawn once as tiny PNGs: their URLs by
+ * coverage, 0 and TALK_FADE.steps (none without a canvas: then the fade goes plainly).
+ * @param {Document} doc
  */
-function installTalkDither(layer, ink) {
-  /** @type {{ink: Map<number, string>, mask: Map<number, string>}} */
-  const urls = { ink: new Map(), mask: new Map() };
-  const c = layer.ownerDocument.createElement('canvas');
+function talkMasks(doc) {
+  /** @type {Map<number, string>} */
+  const masks = new Map();
+  const c = doc.createElement('canvas');
   c.width = c.height = 8;
   const g = c.getContext?.('2d');
-  if (!g) return urls;
-  for (const [kind, steps, color] of /** @type {const} */ ([
-    ['ink', TALK_DITHER.ink, ink],
-    ['mask', TALK_DITHER.fade, '#000'],
-  ])) {
-    for (const n of steps) {
-      g.clearRect(0, 0, 8, 8);
-      g.fillStyle = color;
-      talkTile(n).forEach((on, i) => on && g.fillRect(i % 8, i >> 3, 1, 1));
-      const url = `url("${c.toDataURL('image/png')}")`;
-      urls[kind].set(n, url);
-      layer.style.setProperty(`--talk-${kind}-${n}`, url);
-    }
+  if (!g) return masks;
+  g.fillStyle = '#000';
+  for (const n of [0, ...TALK_FADE.steps]) {
+    g.clearRect(0, 0, 8, 8);
+    talkTile(n).forEach((on, i) => on && g.fillRect(i % 8, i >> 3, 1, 1));
+    masks.set(n, `url("${c.toDataURL('image/png')}")`);
   }
-  return urls;
+  return masks;
 }
 
 /**
@@ -328,7 +303,6 @@ export function talkHtml() {
   <button type="button" class="inv-btn inv-talk-btn inv-talk-skip-intro" data-intro-skip>${t.skipIntro}</button>
   <div class="inv-talk-choices" role="group" aria-label="${t.replies}" hidden></div>
   <section class="inv-talk-box">
-    <span class="inv-talk-flash" aria-hidden="true"></span>
     <p class="inv-talk-name" aria-hidden="true"></p>
     <div class="inv-talk-view">
       <p class="inv-talk-text" aria-hidden="true"><span class="inv-talk-typed"></span></p>
@@ -388,9 +362,7 @@ export function createDialogueUi(
   layer.innerHTML = talkHtml();
   stage.append(layer);
   const view = doc.defaultView;
-  /** The toy's ink, the dither's colour (the layer's own --talk-ink). */
-  const ink = (view && getComputedStyle(layer).getPropertyValue('--talk-ink').trim()) || '#3a332d';
-  const tiles = installTalkDither(layer, ink);
+  const masks = talkMasks(doc);
   // (A finger held on a button shows it pressed, as the mouse's :active does.)
   const unhold = holdPressed(layer);
   const $ = (sel) => /** @type {HTMLElement} */ (layer.querySelector(sel));
@@ -398,7 +370,6 @@ export function createDialogueUi(
   const typed = $('.inv-talk-typed');
   const text = $('.inv-talk-text');
   const lineView = $('.inv-talk-view');
-  const flash = $('.inv-talk-flash');
   const boxEl = $('.inv-talk-box');
   const moreUp = $('.inv-talk-more-up');
   const moreDown = $('.inv-talk-more-down');
@@ -512,7 +483,6 @@ export function createDialogueUi(
    * @param {boolean} out
    */
   function fadeAll(els, out) {
-    const masks = tiles.mask;
     const plain = reduced() || [0, ...TALK_FADE.steps].some((n) => !masks.has(n));
     const fill = out ? 'forwards' : 'none';
     for (const el of els) {
@@ -624,41 +594,6 @@ export function createDialogueUi(
       scrollState();
     }
     return typedNow;
-  }
-
-  /** A press that goes on: the box dips a step and flashes the ink's dither (reduced motion: a quick fade of it). */
-  function pressFlash() {
-    const [heavy, light] = [tiles.ink.get(4), tiles.ink.get(2)];
-    if (reduced() || !heavy || !light) {
-      const bg = light ?? 'none';
-      play(
-        flash,
-        [
-          { backgroundImage: bg, opacity: 1 },
-          { backgroundImage: bg, opacity: 0 },
-        ],
-        { duration: 100 },
-      );
-      return;
-    }
-    const ms = TALK_DITHER.pressMs;
-    play(
-      flash,
-      held([
-        { backgroundImage: heavy },
-        { backgroundImage: light, offset: 0.4 },
-        { backgroundImage: 'none', offset: 0.8 },
-      ]),
-      { duration: ms },
-    );
-    play(
-      boxEl,
-      held([
-        { translate: '0 2px', boxShadow: `0 2px 0 ${ink}` },
-        { translate: '0 0', boxShadow: `0 4px 0 ${ink}`, offset: 0.6 },
-      ]),
-      { duration: ms },
-    );
   }
 
   /**
@@ -790,7 +725,6 @@ export function createDialogueUi(
     settle();
     if (e.repeat) return;
     press({ type: 'advance' });
-    pressFlash();
   }
 
   layer.addEventListener('click', (e) => {
@@ -801,7 +735,6 @@ export function createDialogueUi(
       if (!modal() && !el.closest('.inv-talk-log, .inv-talk-ask')) {
         settle();
         press({ type: 'advance' });
-        pressFlash();
       }
       return;
     }

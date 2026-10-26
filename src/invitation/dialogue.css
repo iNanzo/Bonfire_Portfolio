@@ -7,19 +7,17 @@
    behind the box; the Log and the "Skip the Intro?" question as cards over it all. Phone first (390×844), roomier on a
    desktop and lower on a phone held sideways. The layer takes every press, so the canvas under
    it gets none, until the intro ends. The lines' text effects: markup.css.
-   Feedback in the toolbar's style, ordered dither (the tiles dialogueUi.js draws on the layer:
-   --talk-ink-N, the ink at N/16; --talk-mask-N, a mask at N/16): every button's hover a light ink
-   dither and its press a heavier one (a finger's too, .is-pressed), right up to its words, which
-   a crisp 2 px outline of the button's own fill keeps clear of it; the replies dither in one
-   after another (their mask through the fade's steps); a press that goes on dips the box with a
-   flash of dither (the flash, from script); the ▼ bobs in pixel steps. The box rises in with a
-   plain quick fade, and the screen fades out plainly as the intro ends (from script, out of reach
-   from its first step). A press that goes on, or a reply picked, dithers the old line out with
-   its name tab (and the replies) and then the next one in, from script (dialogueUi.js
-   clickFade): the old line's copy (.inv-talk-ghost) over the new one's place, the replies' copy
-   (.inv-talk-choices.is-ghost), both out of reach. Reduced motion: no rise, no bob, no dip,
-   quick plain fades. */
+   Plain, as before round 18: no dither on the buttons or the box, no outline round the words;
+   a button presses down (:active, or .is-pressed for a finger held on it, where :active isn't
+   reliable: dialogueUi.js holdPressed); the replies pop in together; the ▼ bobs; the box rises
+   in with a plain quick fade over the dim, and the screen fades out plainly as the intro ends
+   (from script, out of reach from its first step). Its one dither: a press that goes on, or a
+   reply picked, dithers the old line out with its name tab (and the replies) and then the next
+   one in, from script (dialogueUi.js clickFade): the old line's copy (.inv-talk-ghost) over the
+   new one's place, the replies' copy (.inv-talk-choices.is-ghost), both out of reach. Reduced
+   motion: no rise, no bob, no pop, quick plain fades. */
 
+@import './markup.css';
 @import './markup.css';
 
 .inv-talk {
@@ -78,54 +76,9 @@
   font-size: 14px;
   box-shadow: 0 3px 0 var(--talk-ink);
 }
-/* (Every button in the layer: the toolbar's ordered dither of the ink, light on hover, heavier
-   pressed, its 2 px cells crisp. Pressed is :active, or .is-pressed for a finger held on it,
-   where :active isn't reliable (dialogueUi.js holdPressed). Either dither shows right up to its
-   words: no plate under them, just a crisp outline round each letter, 2 px out from its sides
-   and 1 px at its corners (a dither cell's width clear of it; whole-pixel shadows, no blur; a
-   reply's styled letters inherit it), in the button's own fill, --talk-btn-fill, which its
-   background takes too, so the two never differ: paper, the replies' cream, the on colour of
-   Auto and Log while they're on. The outline fades with the fill.) */
-.inv-talk .inv-btn {
-  --talk-btn-fill: var(--inv-paper, #fbf9f5);
-  background-color: var(--talk-btn-fill);
-  background-repeat: repeat;
-  background-size: 8px 8px;
-  image-rendering: pixelated;
-  text-shadow:
-    1px 0 var(--talk-btn-fill),
-    -1px 0 var(--talk-btn-fill),
-    0 1px var(--talk-btn-fill),
-    0 -1px var(--talk-btn-fill),
-    1px 1px var(--talk-btn-fill),
-    -1px 1px var(--talk-btn-fill),
-    1px -1px var(--talk-btn-fill),
-    -1px -1px var(--talk-btn-fill),
-    2px 0 var(--talk-btn-fill),
-    -2px 0 var(--talk-btn-fill),
-    0 2px var(--talk-btn-fill),
-    0 -2px var(--talk-btn-fill);
-  transition:
-    transform 60ms ease-out,
-    box-shadow 60ms ease-out,
-    background-color 120ms,
-    text-shadow 120ms;
-}
-.inv-talk .inv-talk-choice {
-  --talk-btn-fill: var(--talk-fill);
-}
-.inv-talk .inv-btn[aria-pressed='true'],
-.inv-talk .inv-btn[aria-expanded='true'] {
-  --talk-btn-fill: var(--inv-on, #f4cf7a);
-}
-@media (hover: hover) and (pointer: fine) {
-  .inv-talk .inv-btn:hover:not(:disabled) {
-    background-image: var(--talk-ink-2);
-  }
-}
-.inv-talk .inv-btn:active:not(:disabled),
+/* (A finger held on a button presses it down as the mouse's :active does: dialogueUi.js
+   holdPressed, where :active isn't reliable on touch.) */
 .inv-talk .inv-btn.is-pressed:not(:disabled) {
-  background-image: var(--talk-ink-6);
   transform: translateY(3px);
   box-shadow: 0 1px 0 var(--talk-ink);
 }
@@ -146,17 +99,6 @@
   background: var(--talk-fill);
   box-shadow: 0 4px 0 var(--talk-ink);
   animation: inv-talk-rise 0.28s ease-out;
-}
-/* (A press that goes on: the ink's dither over the box's fill for a moment, under its tab and its
-   line, dialogueUi.js pressFlash.) */
-.inv-talk-flash {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background-repeat: repeat;
-  background-size: 8px 8px;
-  image-rendering: pixelated;
-  pointer-events: none;
 }
 .inv-talk-name {
   position: absolute;
@@ -256,7 +198,7 @@
   bottom: 8px;
   font-size: 14px;
   line-height: 1;
-  animation: inv-talk-bob 0.8s steps(1, end) infinite;
+  animation: inv-talk-bob 0.9s ease-in-out infinite;
 }
 
 /* (For a screen reader only: the whole line once, how to go on, and a styled name's or reply's
@@ -294,17 +236,12 @@
   min-height: 54px;
   padding: 8px 16px;
   border-radius: 16px;
+  background: var(--talk-fill);
   font-size: 17px;
   line-height: 1.2;
 }
 .inv-talk-choices:not(.is-waiting) .inv-talk-choice {
-  animation: inv-talk-dither-in 0.2s steps(1, end) both;
-}
-.inv-talk-choices:not(.is-waiting) .inv-talk-choice:nth-child(2) {
-  animation-delay: 0.08s;
-}
-.inv-talk-choices:not(.is-waiting) .inv-talk-choice:nth-child(3) {
-  animation-delay: 0.16s;
+  animation: inv-talk-pop 0.22s ease-out;
 }
 /* (The replies picked, dithering out where they were: clickFade's copy, out of reach.) */
 .inv-talk-choices.is-ghost {
@@ -397,19 +334,13 @@
   visibility: hidden;
 }
 
-/* (A pixel bob: down two px, four, two, back, a step at a time.) */
 @keyframes inv-talk-bob {
-  0% {
-    translate: 0 0;
-  }
-  25% {
-    translate: 0 2px;
+  0%,
+  100% {
+    transform: translateY(0);
   }
   50% {
-    translate: 0 4px;
-  }
-  75% {
-    translate: 0 2px;
+    transform: translateY(4px);
   }
 }
 @keyframes inv-talk-rise {
@@ -418,34 +349,10 @@
     transform: translateY(12px);
   }
 }
-/* (In through the fade's steps, each held: a mask of more and more of the pixels, then none.) */
-@keyframes inv-talk-dither-in {
-  0% {
-    mask-image: var(--talk-mask-0);
-  }
-  12.5% {
-    mask-image: var(--talk-mask-2);
-  }
-  25% {
-    mask-image: var(--talk-mask-4);
-  }
-  37.5% {
-    mask-image: var(--talk-mask-6);
-  }
-  50% {
-    mask-image: var(--talk-mask-8);
-  }
-  62.5% {
-    mask-image: var(--talk-mask-10);
-  }
-  75% {
-    mask-image: var(--talk-mask-12);
-  }
-  87.5% {
-    mask-image: var(--talk-mask-14);
-  }
-  100% {
-    mask-image: none;
+@keyframes inv-talk-pop {
+  from {
+    opacity: 0;
+    scale: 0.92;
   }
 }
 @keyframes inv-talk-fade {
@@ -515,10 +422,8 @@
 @media (prefers-reduced-motion: reduce) {
   .inv-talk-next,
   .inv-talk-box,
-  .inv-talk-dim {
-    animation: none;
-  }
+  .inv-talk-dim,
   .inv-talk-choices:not(.is-waiting) .inv-talk-choice {
-    animation: inv-talk-fade 0.12s linear both;
+    animation: none;
   }
 }
