@@ -518,8 +518,8 @@ export function createDialogueUi(
     if (modal()) return;
     settle();
     if (e.repeat) return;
-    pressFlash();
     onAction({ type: 'advance' });
+    pressFlash();
   }
 
   layer.addEventListener('click', (e) => {
@@ -529,8 +529,8 @@ export function createDialogueUi(
       // (Off the buttons: go on, unless the Log or the question is up.)
       if (!modal() && !el.closest('.inv-talk-log, .inv-talk-ask')) {
         settle();
-        pressFlash();
         onAction({ type: 'advance' });
+        pressFlash();
       }
       return;
     }
