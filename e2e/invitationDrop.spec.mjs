@@ -119,7 +119,30 @@ test.describe('landing, on a desktop', () => {
     await until(page, (s) => s.state === 'idle' && s.clip === 'Idle', 'idle again', 30_000);
     await grab(page, 'body');
     for (let i = 0; i < 12; i++) await page.mouse.wheel(0, 100);
-    await until(page, (s) => s.drag.lowestFoot < 0.1, 'lowered to the floor');
+    // Let the wheel's lowering motion finish before releasing. The held character
+    // keeps moving his limbs, so judge the hand's anchor, not an idle limb pose.
+    let stillSince = null;
+    let previous = null;
+    await expect
+      .poll(
+        async () => {
+          const s = await snapshot(page);
+          const a = s.drag.anchor;
+          const point = a ? [a.x, a.y, a.z] : null;
+          const quiet =
+            s.held &&
+            s.drag.lowestFoot < 0.1 &&
+            point &&
+            previous &&
+            point.every((v, i) => Math.abs(v - previous[i]) < 0.001);
+          previous = point;
+          if (!quiet) stillSince = null;
+          else stillSince ??= s.motion.heldFor;
+          return stillSince !== null && s.motion.heldFor - stillSince >= 0.25;
+        },
+        { message: 'the lowering motion stopped before set-down', timeout: 30_000, intervals: [100] },
+      )
+      .toBe(true);
     watching = watchLanding(page);
     await page.mouse.up();
     w = await watching;
