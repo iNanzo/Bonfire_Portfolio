@@ -377,6 +377,64 @@ test('the chat screen’s markup: Title Case labels, a live region for the line,
   assert.equal((log.match(/<li/g) ?? []).length, 2);
 });
 
+test('tags in the names and the replies: kept for the screen to draw; the log has them plain, and styled to show', () => {
+  const d = run({
+    speaker: '{red,wave|NEWT}',
+    start: 'ask',
+    boxes: [
+      {
+        id: 'ask',
+        text: 'Ready?',
+        face: 'smug',
+        animation: 'Think',
+        camera: 'wide',
+        choices: [
+          { label: '{gold,italic|Yes}!', next: 'b' },
+          { label: '{red| }', next: 'b' },
+          { label: 'No', next: 'b' },
+        ],
+      },
+      { id: 'b', speaker: '{#3a7bd5|Narrator}', text: 'Great', face: 'happy', animation: 'Cheer', camera: 'medium' },
+    ],
+  });
+  d.advance(0);
+  const v = d.view;
+  assert.equal(v.speaker, '{red,wave|NEWT}', 'the name tab draws its tags');
+  assert.deepEqual(
+    v.choices?.map((c) => c.label),
+    ['{gold,italic|Yes}!', 'No'],
+    'a reply that shows nothing is dropped; the rest keep their tags',
+  );
+  d.choose(0, 0);
+  assert.equal(d.view.speaker, '{#3a7bd5|Narrator}');
+  assert.deepEqual(d.log, [
+    { kind: 'line', speaker: 'NEWT', styled: '{red,wave|NEWT}', text: 'Ready?' },
+    { kind: 'reply', text: 'Yes!', styled: '{gold,italic|Yes}!' },
+    { kind: 'line', speaker: 'Narrator', styled: '{#3a7bd5|Narrator}', text: 'Great' },
+  ]);
+});
+
+test('the Log draws the names and replies styled (for the eye) and reads them plain (for a screen reader)', async () => {
+  const { logHtml } = await import('../src/invitation/dialogueUi.js');
+  const log = logHtml([
+    { kind: 'line', speaker: 'NEWT <3', styled: '{red|NEWT} <3', text: 'hi' },
+    { kind: 'reply', text: 'Yes & no', styled: '{gold,italic|Yes} & no' },
+    { kind: 'line', speaker: 'Plain', styled: 'Plain', text: 'as ever' },
+  ]);
+  // (A styled one: a holder the screen fills with its letters, hidden from a screen reader, beside its plain text.)
+  assert.match(
+    log,
+    /<span class="inv-talk-styled" aria-hidden="true" data-styled="\{red\|NEWT\} &lt;3"><\/span><span class="inv-talk-sr">NEWT &lt;3<\/span>/,
+  );
+  assert.match(
+    log,
+    /data-styled="\{gold,italic\|Yes\} &amp; no"><\/span><span class="inv-talk-sr">Yes &amp; no<\/span>/,
+  );
+  // (One with no tags, as ever: its text.)
+  assert.match(log, /<span class="inv-talk-log-who">Plain<\/span> as ever/);
+  assert.ok(!/data-styled="[^"]*"[^>]*>[^<]*\{/.test(log), 'no tag ever shows as text');
+});
+
 test('text effects: typing, Auto’s wait and the cap count the letters that show; the log keeps plain text', () => {
   const styled = 'I’m {red,wave|NEWT}!';
   const plain = 'I’m NEWT!';

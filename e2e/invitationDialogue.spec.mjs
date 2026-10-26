@@ -330,7 +330,118 @@ async function movesStayLegible(page, tap) {
   expect(errors).toEqual([]);
 }
 
+/** An intro whose name, line, replies and second name carry tags (the test's own words). */
+const TAGGED_INTRO = {
+  speaker: '{gold,wave|Newt}',
+  start: 'a',
+  boxes: [
+    {
+      id: 'a',
+      speaker: '',
+      text: 'So {italic|very} happy.',
+      face: 'happy',
+      animation: 'Talk',
+      camera: 'medium',
+      next: '',
+      end: false,
+      auto: 0,
+      choices: [
+        { label: '{red,italic|Yes}!', next: 'b' },
+        { label: '{bold|No}', next: 'b' },
+      ],
+    },
+    {
+      id: 'b',
+      speaker: '{#3a7bd5,italic|Narrator}',
+      text: 'Done.',
+      face: 'neutral',
+      animation: 'none',
+      camera: 'keep',
+      next: '',
+      end: true,
+      auto: 0,
+      choices: [],
+    },
+  ],
+};
+/**
+ * Tags in a reply and a name show styled (the name tab, the reply buttons, the Log's names and
+ * replies), while a screen reader gets them plain (the live region, the buttons' names, the
+ * Log's own plain text); an italic word's letters slant about -10 deg, each keeping its width.
+ */
+async function tagsShowStyled(page, tap) {
+  const errors = watch(page);
+  await calm(page);
+  await page.evaluate((i) => window.__invitation.setIntro(i), TAGGED_INTRO);
+  await open(page, tap);
+  const name = page.locator('.inv-talk-name');
+  await expect(name).toHaveText('Newt');
+  await expect(name).toHaveAttribute('aria-hidden', 'true');
+  await expect(name.locator('.inv-fx-wave').first()).toHaveCSS('color', 'rgb(201, 130, 42)');
+  await expect(page.locator('.inv-talk-live')).toHaveText('Newt: So very happy.');
+  await goOn(page, tap);
+  await until(page, (x) => x.dialogue.typed, 'the line up');
+  // Italic: each letter slanted in place (a skew about -10 deg), as wide as it is upright.
+  const slant = await page.evaluate(() => {
+    const letters = [...document.querySelectorAll('.inv-talk-typed .inv-fx-italic')];
+    return letters.map((e) => {
+      const c = getComputedStyle(e);
+      const m = new DOMMatrix(c.transform);
+      const upright = document.createElement('span');
+      upright.className = 'inv-fx';
+      upright.textContent = e.textContent;
+      e.after(upright);
+      const widths = [e.getBoundingClientRect().width, upright.getBoundingClientRect().width];
+      upright.remove();
+      // (Its layout box: offsetWidth is the box before the transform.)
+      return {
+        ch: e.textContent,
+        display: c.display,
+        skew: (Math.atan(m.c) * 180) / Math.PI,
+        box: e.offsetWidth,
+        upright: widths[1],
+      };
+    });
+  });
+  expect(slant.map((l) => l.ch).join('')).toBe('very');
+  for (const l of slant) {
+    expect(l.display).toBe('inline-block');
+    expect(l.skew).toBeGreaterThan(-12);
+    expect(l.skew).toBeLessThan(-8);
+    expect(Math.abs(l.box - l.upright), `${l.ch} keeps its width`).toBeLessThan(1);
+  }
+  // The replies: styled words, plain names.
+  await until(page, (x) => Boolean(x.dialogue?.choices), 'the replies');
+  const yes = page.getByRole('button', { name: 'Yes!', exact: true });
+  await expect(yes).toBeVisible();
+  await expect(yes.locator('.inv-fx-italic').first()).toHaveCSS('color', 'rgb(200, 50, 60)');
+  await expect(yes).toHaveText('Yes!');
+  await expect(page.getByRole('button', { name: 'No', exact: true }).locator('.inv-fx-bold')).toHaveCount(2);
+  await pick(page, 0, tap);
+  await until(page, (x) => x.dialogue?.id === 'b', 'on to b');
+  await expect(name).toHaveText('Narrator');
+  await expect(name.locator('.inv-fx-italic').first()).toHaveCSS('color', 'rgb(58, 123, 213)');
+  // The Log: the names and the reply styled, read plain, never a tag.
+  const logBtn = page.getByRole('button', { name: 'Log', exact: true });
+  if (tap) await logBtn.tap();
+  else await logBtn.click();
+  const list = page.locator('.inv-talk-log-list');
+  await expect(list.locator('.inv-talk-log-who .inv-talk-styled .inv-fx-wave').first()).toHaveCSS(
+    'color',
+    'rgb(201, 130, 42)',
+  );
+  await expect(list.locator('.inv-talk-log-reply .inv-talk-styled .inv-fx-italic')).toHaveCount(3);
+  await expect(list.locator('.inv-talk-log-reply .inv-talk-sr')).toHaveText('Yes!');
+  await expect(list).not.toContainText('{');
+  expect(await list.locator('.inv-talk-styled').first().getAttribute('aria-hidden')).toBe('true');
+  expect(errors).toEqual([]);
+}
+
 test.describe('on a phone', () => {
+  test('tags in a reply and a name show styled, read plain; an italic word slants in place', async ({ page }) => {
+    await tagsShowStyled(page, true);
+  });
+
   test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
 
   test('a shaken or waved word stays legible: no letter runs more than a pixel into the next, in the bubble or the box', async ({
@@ -777,6 +888,10 @@ test.describe('on a phone', () => {
 });
 
 test.describe('on a desktop', () => {
+  test('tags in a reply and a name show styled, read plain; an italic word slants in place', async ({ page }) => {
+    await tagsShowStyled(page, false);
+  });
+
   test('a shaken or waved word stays legible: no letter runs more than a pixel into the next, in the bubble or the box', async ({
     page,
   }) => {

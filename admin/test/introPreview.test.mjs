@@ -341,6 +341,13 @@ test('a draft with no intro plays the toy’s own, in its own colours; one with 
   assert.equal(nodes.find((n) => n.className === 'preview-state').textContent, 'No Boxes Yet');
 });
 
+test('the box picker names each box by how its line reads, its tags left out', () => {
+  const d = {
+    invitation: { intro: { speaker: 'x', start: 'a', boxes: [{ id: 'a', text: '{red,italic|Hi} {wave|there}' }] } },
+  };
+  assert.deepEqual(previewBoxes(d), [{ id: 'a', label: 'a: Hi there' }]);
+});
+
 test('the Invitation page has it, beside the page; the docs say how it works', () => {
   const schema = readFileSync(new URL('../ui/schema.js', import.meta.url), 'utf8');
   assert.ok(/id: 'invitation',[\s\S]*?introPreview: true/.test(schema), 'the page asks for it');

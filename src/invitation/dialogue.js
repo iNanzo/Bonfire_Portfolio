@@ -4,8 +4,9 @@
 // fallback): a face, clip or shot it doesn't know falls back (neutral, none, keep), a missing or
 // doubled id gets its own, a start that isn't there is the first box, text is capped at
 // DIALOGUE.maxText letters and choices at DIALOGUE.maxChoices; with no box at all it's null.
-// A line may carry text effects' tags (markup.js: {red,wave|…}): it keeps them (the screen
-// draws them), and everything here counts the letters that show (an emoji is one).
+// A line, a speaker's name and a reply may carry text effects' tags (markup.js: {red,wave|…}):
+// they're kept (the screen draws them), and everything here counts the letters that show (an
+// emoji is one; a name or a reply that shows nothing is none).
 // createDialogue runs it:
 //   - the line types out at DIALOGUE.cps letters a second, a beat after punctuation
 //     (DIALOGUE.pause); with reduced motion it shows at once;
@@ -17,7 +18,8 @@
 //     autoDelay's, from the line's length), never past a choice;
 //   - Next (the top right's button; skip here) goes to the next box with choices, typed, or to
 //     the end (a loop with no choice in it ends rather than going round);
-//   - the log keeps every line shown (its speaker and plain text) and every reply picked, in order;
+//   - the log keeps every line shown (its speaker and plain text) and every reply picked, in order,
+//     each name and reply plain and as written (styled: its tags, for the Log to draw);
 //   - pause holds its clock (the Log or the "Skip intro?" question open): no typing, no Auto.
 // lookSway is the small, slow drift his look has on top of looking at the camera while he talks.
 
@@ -52,6 +54,8 @@ export const SHOT_NAMES = /** @type {DialogueShot[]} */ (['close', 'medium', 'wi
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const str = (v) => (typeof v === 'string' ? v : '');
+/** Text with a letter that shows (its tags aside). @param {unknown} v */
+const shows = (v) => plainText(str(v)).trim() !== '';
 
 /**
  * Seconds from a line's start until each letter that shows does: the i-th (from 1) at i / cps,
@@ -133,13 +137,13 @@ export function normalizeScript(raw) {
       animation: r.animation === 'none' || DIALOGUE_CLIPS.includes(r.animation) ? r.animation : 'none',
       camera: SHOT_NAMES.includes(r.camera) ? r.camera : 'keep',
     };
-    if (str(r.speaker).trim()) box.speaker = str(r.speaker).trim();
+    if (shows(r.speaker)) box.speaker = str(r.speaker).trim();
     if (typeof r.auto === 'number' && Number.isFinite(r.auto) && r.auto >= 0)
       box.auto = Math.min(DIALOGUE.maxAuto, r.auto);
     if (str(r.next).trim()) box.next = str(r.next).trim();
     if (Array.isArray(r.choices)) {
       const choices = r.choices
-        .filter((c) => isObj(c) && str(c.label).trim())
+        .filter((c) => isObj(c) && shows(c.label))
         .slice(0, DIALOGUE.maxChoices)
         .map((c) => ({ label: str(c.label).trim(), next: str(c.next).trim() }));
       if (choices.length) box.choices = choices;
@@ -150,7 +154,7 @@ export function normalizeScript(raw) {
   if (!boxes.length) return null;
   const start = str(o.start).trim();
   return {
-    speaker: str(o.speaker).trim() || DIALOGUE.speaker,
+    speaker: shows(o.speaker) ? str(o.speaker).trim() : DIALOGUE.speaker,
     start: boxes.some((b) => b.id === start) ? start : boxes[0].id,
     boxes,
   };
@@ -169,7 +173,11 @@ export function normalizeScript(raw) {
  * @property {boolean} auto
  * @property {boolean} paused
  */
-/** @typedef {{kind: 'line', speaker: string, text: string} | {kind: 'reply', text: string, speaker?: undefined}} LogEntry */
+/**
+ * @typedef {{kind: 'line', speaker: string, styled: string, text: string} |
+ *   {kind: 'reply', text: string, styled: string, speaker?: undefined}} LogEntry  speaker and
+ *   text plain (a line's text always is); styled: the name or the reply as written, its tags kept
+ */
 
 /**
  * The runner for a script (normalizeScript's; null or nothing to show ends at the start).
@@ -234,7 +242,8 @@ export function createDialogue(script, { reduced = false } = {}) {
     m.start = m.pausedAt ?? m.t;
     m.forced = whole;
     m.typedAt = null;
-    m.log.push({ kind: 'line', speaker: b.speaker ?? script?.speaker ?? DIALOGUE.speaker, text: plainText(b.text) });
+    const who = b.speaker ?? script?.speaker ?? DIALOGUE.speaker;
+    m.log.push({ kind: 'line', speaker: plainText(who), styled: who, text: plainText(b.text) });
     markTyped();
   }
 
@@ -325,7 +334,7 @@ export function createDialogue(script, { reduced = false } = {}) {
       tick(t);
       const c = view().choices?.[i];
       if (!c) return false;
-      m.log.push({ kind: 'reply', text: c.label });
+      m.log.push({ kind: 'reply', text: plainText(c.label), styled: c.label });
       enter(byId.get(c.next) ?? null);
       return true;
     },

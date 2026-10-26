@@ -114,9 +114,11 @@
   animation: inv-talk-bob 0.9s ease-in-out infinite;
 }
 
-/* (For a screen reader only: the whole line once, and how to go on.) */
+/* (For a screen reader only: the whole line once, how to go on, and a styled name's or reply's
+   plain text in the Log.) */
 .inv-talk-live,
-.inv-talk-hint {
+.inv-talk-hint,
+.inv-talk-sr {
   position: absolute;
   width: 1px;
   height: 1px;

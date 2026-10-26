@@ -290,7 +290,8 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
 
 ## Text Effects
 
-His bubble lines and the intro's lines can style words with tags, `{styles|text}`:
+His bubble lines and the intro's lines, the speakers' names on the intro's tab and its replies
+can style words with tags, `{styles|text}`:
 
 - **Colors:** a name from the admin's Text Effects colors (`{red|NEWT}`; as shipped red, gold,
   rose and ink), or a hex color of its own (`{#e44544|NEWT}`, `#rgb` or `#rrggbb`).
@@ -310,7 +311,10 @@ moving letter keeps its own width and only ever steps a pixel sideways, to the r
 runs into the next letter by more than a pixel and the space before a shaken word never closes. A
 styled word never breaks across two rows. The typing, Auto's wait, how long a bubble stays up and
 the length limits count only the letters that show; a screen reader and the Log get the line as
-plain text. The admin checks every tag as you type and previews each line under its box.
+plain text. A styled name shows styled on the tab and in the Log, and a styled reply on its button
+and in the Log, while a screen reader hears them plain (the live region, the button's name, the
+Log's own plain copy). The admin checks every tag as you type and previews each line, name and
+reply under its field.
 
 ## The Intro
 

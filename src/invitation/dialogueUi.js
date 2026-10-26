@@ -27,7 +27,7 @@
 
 /** @typedef {import('./dialogue.js').DialogueView} DialogueView */
 /** @typedef {import('./dialogue.js').LogEntry} LogEntry */
-import { DEFAULT_TEXT_COLORS, paletteOf, parseMarkup, renderMarkup, revealLetters } from './markup.js';
+import { DEFAULT_TEXT_COLORS, paletteOf, parseMarkup, plainText, renderMarkup, revealLetters } from './markup.js';
 /**
  * @typedef {{type: 'advance'} | {type: 'choose', index: number} | {type: 'auto', on: boolean} |
  *   {type: 'skip'} | {type: 'pause', on: boolean} | {type: 'end'}} TalkAction  what the visitor
@@ -70,6 +70,30 @@ export const TALK_TEXT = {
  * @param {string} s
  */
 const html = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+/** Text as an attribute's value (in double quotes). @param {string} s */
+const attr = (s) => html(s).replace(/"/g, '&quot;');
+
+/**
+ * A name or a reply as written (`styled`, its tags kept) for the Log: as it is when it has no
+ * tags; else a holder the screen fills with its styled letters (styleHolders), hidden from a
+ * screen reader, beside its plain text for one (`plain`).
+ * @param {string} plain
+ * @param {string|undefined} styled
+ */
+function styledHtml(plain, styled) {
+  if (!styled || styled === plain) return html(plain);
+  return `<span class="inv-talk-styled" aria-hidden="true" data-styled="${attr(styled)}"></span><span class="inv-talk-sr">${html(plain)}</span>`;
+}
+
+/**
+ * Fill each holder in `root` (styledHtml's) with its letters, styled (markup.js).
+ * @param {HTMLElement} root
+ * @param {Map<string, string>} palette
+ */
+function styleHolders(root, palette) {
+  for (const el of /** @type {NodeListOf<HTMLElement>} */ (root.querySelectorAll('[data-styled]')))
+    renderMarkup(el, parseMarkup(el.dataset.styled ?? '', palette));
+}
 
 /** The layer's markup (hidden until open). */
 export function talkHtml() {
@@ -83,7 +107,7 @@ export function talkHtml() {
   <button type="button" class="inv-btn inv-talk-btn inv-talk-skip-intro" data-intro-skip>${t.skipIntro}</button>
   <div class="inv-talk-choices" role="group" aria-label="${t.replies}" hidden></div>
   <section class="inv-talk-box">
-    <p class="inv-talk-name"></p>
+    <p class="inv-talk-name" aria-hidden="true"></p>
     <p class="inv-talk-text" aria-hidden="true"><span class="inv-talk-typed"></span></p>
     <p class="inv-talk-live" role="status" aria-live="polite" aria-atomic="true"></p>
     <p class="inv-talk-hint">${t.goOn}</p>
@@ -101,15 +125,16 @@ export function talkHtml() {
 }
 
 /**
- * The Log's entries as list items: each line with its speaker, each reply as the visitor's.
+ * The Log's entries as list items: each line with its speaker, each reply as the visitor's; a
+ * name or a reply with tags drawn styled (styledHtml: the screen fills it in), a line's text plain.
  * @param {LogEntry[]} entries
  */
 export function logHtml(entries) {
   return entries
     .map((e) =>
       e.kind === 'reply'
-        ? `<li class="inv-talk-log-reply"><span class="inv-talk-log-who">${TALK_TEXT.you}</span> ${html(e.text)}</li>`
-        : `<li><span class="inv-talk-log-who">${html(e.speaker)}</span> ${html(e.text)}</li>`,
+        ? `<li class="inv-talk-log-reply"><span class="inv-talk-log-who">${TALK_TEXT.you}</span> ${styledHtml(e.text, e.styled)}</li>`
+        : `<li><span class="inv-talk-log-who">${styledHtml(e.speaker, e.styled)}</span> ${html(e.text)}</li>`,
     )
     .join('');
 }
@@ -195,6 +220,7 @@ export function createDialogueUi(
     if (open) {
       logByPointer = byPointer;
       logList.innerHTML = logHtml(log());
+      styleHolders(logList, palette);
       // (The latest at the bottom, in view.)
       logList.scrollTop = logList.scrollHeight;
       $('[data-talk="log-close"]').focus();
@@ -338,9 +364,11 @@ export function createDialogueUi(
         const line = parseMarkup(v.box.text, palette);
         shown.spans = renderMarkup(typed, line);
         shown.n = -1;
-        name.textContent = v.speaker;
+        // (The name with its tags, for the eye; a screen reader hears it plain, with the line.)
+        renderMarkup(name, parseMarkup(v.speaker, palette));
         name.hidden = !v.speaker;
-        live.textContent = v.speaker ? `${v.speaker}: ${line.plain}` : line.plain;
+        const who = plainText(v.speaker);
+        live.textContent = who ? `${who}: ${line.plain}` : line.plain;
       }
       if (v.shown !== shown.n) {
         revealLetters(shown.spans, v.shown, shown.n);
@@ -354,12 +382,14 @@ export function createDialogueUi(
       const key = own ? `${v.seq}:${own.map((c) => c.label).join('\n')}` : '';
       if (key !== shown.choices) {
         shown.choices = key;
+        // (Each reply's words styled, for the eye; its name plain, for a screen reader.)
         choices.innerHTML = (own ?? [])
           .map(
             (c, i) =>
-              `<button type="button" class="inv-btn inv-talk-choice" data-choice="${i}">${html(c.label)}</button>`,
+              `<button type="button" class="inv-btn inv-talk-choice" data-choice="${i}" aria-label="${attr(plainText(c.label))}"><span class="inv-talk-choice-text" aria-hidden="true" data-styled="${attr(c.label)}"></span></button>`,
           )
           .join('');
+        styleHolders(choices, palette);
         choices.hidden = !own;
         // (Their state set afresh below.)
         shown.up = !(own && v.choices);

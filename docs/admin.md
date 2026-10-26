@@ -182,11 +182,12 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     `markup.js` and `markup.css`) follow the text as it's typed and these colors as they
     change.
   - **Intro:** the chat **Play Intro** opens (`invitation.intro`, `types.js`
-    `DialogueScript`): the **Speaker** on every box's name tab, the **Start Box** (every Play
+    `DialogueScript`): the **Speaker** on every box's name tab (tags style it, up to 24
+    letters, with a **Preview**), the **Start Box** (every Play
     Intro starts there) and the **Chat Boxes**, in order, dragged or moved with ↑/↓. Each
     box's card is titled by its line, with its id, face, move, shot and where it goes under
     it. A box has its **ID** (how Next and the choices point to it), a **Speaker Override**
-    (such as ??? before he's said his name; empty: the intro's Speaker), its **Text** (typed
+    (such as ??? before he's said his name; empty: the intro's Speaker; tags style it too), its **Text** (typed
     out letter by letter, up to 240 letters; past 100 it outgrows the box's three lines on
     a phone; its tags style it, with a **Preview** under it), a **Face** (every face he has; he still blinks on Neutral), an **Animation** (any
     of his: Once plays and then he talks, Loops keeps going, In Place walks or runs on the spot,
@@ -194,7 +195,8 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     (Close: head and shoulders, too tight for a Cheer's fists on a phone; Medium: his whole
     body; Wide: the default view; Keep: as it was), its **Next Box** (empty: the box after
     it), **Ends the Intro**, an **Auto Wait** (seconds Auto waits once the line is typed; 0:
-    by its length) and 2 or 3 **Choices**, each a **Label** and the box it **Leads To**.
+    by its length) and 2 or 3 **Choices**, each a **Label** (up to 60 letters; tags style it,
+    with a **Preview**) and the box it **Leads To**.
     Choices come first, then End, then Next; the last box ends the intro. The start, a
     Next and a choice's box are picked from the boxes there are, each by its id and how its
     line starts; the lists follow a box renamed as it's typed, and one that's gone still
