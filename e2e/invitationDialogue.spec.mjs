@@ -20,7 +20,8 @@
 // tests exercise the current content. Every wait is on a state (the script as
 // content.js reads it). Down every reply each box shows its face (the four dialogue faces from
 // their own sheets) and plays its animation. The screen answers in the toolbar's style: its
-// buttons dither on hover and press, it dithers in as it opens and the replies one after another,
+// buttons dither on hover and press (a finger held on one too, its label kept clear of the
+// dither), it dithers in as it opens and the replies one after another,
 // a line dithers out over the next, a press that goes on flashes the box, the ▼ bobs in steps,
 // and reduced motion fades plainly. A line longer than the box scrolls inside it (the box keeps
 // its size): it follows the typing, then a finger, the wheel or the arrow keys scroll it, with
@@ -1132,6 +1133,67 @@ test.describe('on a phone', () => {
     const head = await page.evaluate(() => window.__invitation.screen('head'));
     await page.touchscreen.tap(head.x, head.y);
     await until(page, (s) => s.state === 'react', 'a tap makes him react');
+  });
+
+  test('a finger held on Next or a reply shows it pressed, its label clear of the dither', async ({ page }) => {
+    const errors = watch(page);
+    await calm(page);
+    await useBehaviorIntro(page);
+    const { ask } = askAndBefore(await script(page));
+    test.skip(!ask, 'this script has no replies');
+    await open(page, true);
+    const cdp = await page.context().newCDPSession(page);
+    const finger = (type, p) =>
+      cdp.send('Input.dispatchTouchEvent', {
+        type,
+        touchPoints: p ? [{ x: p.x, y: p.y, id: 1, radiusX: 2, radiusY: 2, force: 1 }] : [],
+      });
+    /** A button as it's held: pressed or not, its dither, and its words' plate against its fill. */
+    const look = (loc) =>
+      loc.evaluate((b) => {
+        const label = b.querySelector('.inv-talk-label');
+        const lr = label.getBoundingClientRect();
+        const br = b.getBoundingClientRect();
+        return {
+          pressed: b.classList.contains('is-pressed'),
+          dither: getComputedStyle(b).backgroundImage,
+          fill: getComputedStyle(b).backgroundColor,
+          plate: getComputedStyle(label).backgroundColor,
+          inside: lr.left >= br.left && lr.right <= br.right && lr.top >= br.top && lr.bottom <= br.bottom,
+        };
+      });
+    const centre = async (loc) => {
+      const r = await loc.boundingBox();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    };
+    /** Held: pressed, with the press's dither, its words on a plate of the button's own fill. */
+    const heldLooksPressed = (h) => {
+      expect(h.dither).toMatch(/^url\("data:image\/png/);
+      expect(h.plate, 'the label’s plate, the button’s own fill').toBe(h.fill);
+      expect(h.plate).not.toBe('rgba(0, 0, 0, 0)');
+      expect(h.inside).toBe(true);
+    };
+    const next = page.getByRole('button', { name: 'Next', exact: true });
+    expect((await look(next)).pressed).toBe(false);
+    const at = await centre(next);
+    await finger('touchStart', at);
+    await expect.poll(async () => (await look(next)).pressed, { message: 'Next pressed' }).toBe(true);
+    heldLooksPressed(await look(next));
+    // Slid off it, not pressed any more.
+    await finger('touchMove', { x: at.x - 160, y: at.y + 160 });
+    await expect.poll(async () => (await look(next)).pressed, { message: 'slid off' }).toBe(false);
+    await finger('touchEnd');
+    // A reply held: pressed the same; the touch cancelled, not.
+    await next.tap();
+    await until(page, (s) => s.dialogue.id === ask.id && Boolean(s.dialogue.repliesLive), 'at the replies');
+    const reply = page.locator('.inv-talk-choice').first();
+    await finger('touchStart', await centre(reply));
+    await expect.poll(async () => (await look(reply)).pressed, { message: 'the reply pressed' }).toBe(true);
+    heldLooksPressed(await look(reply));
+    await finger('touchCancel');
+    await expect.poll(async () => (await look(reply)).pressed, { message: 'cancelled' }).toBe(false);
+    expect((await snapshot(page)).dialogue.id, 'a cancelled press picks nothing').toBe(ask.id);
+    expect(errors).toEqual([]);
   });
 
   test('Replay Intro rests while he’s held', async ({ page }) => {

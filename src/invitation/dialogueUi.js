@@ -31,7 +31,9 @@
 // the typing a row at a time (followRow); once it's all typed the wheel, a finger and the arrow
 // and Page keys scroll it, with pixel cues over and under it where there's more.
 // Feedback in the toolbar's style, its ordered dither (TALK_DITHER's tiles on the layer, CSS in
-// dialogue.css): the buttons' hover and press, the screen and the replies dithering in; from
+// dialogue.css): the buttons' hover and press (a press held with a finger too, holdPressed: CSS
+// :active isn't reliable on touch; the button's words on a plate of its fill, so the dither never
+// runs through them), the screen and the replies dithering in; from
 // here, the line before dithering out as the next comes (ditherOut: the next one's letters wait
 // unseen till it's gone, so the two never show at once) and a press that goes on dipping the box
 // with a flash of dither (pressFlash); reduced motion, quick plain fades.
@@ -138,6 +140,53 @@ export function followRow({ mid, rowH, clientHeight, scrollTop }) {
  */
 export const SHADE_BANDS = [1, 2, 3, 4];
 
+/**
+ * A press held on a button in `root` shows as pressed (`cls` on it, dialogue.css) from its
+ * pointerdown until that pointer lifts, is cancelled or slides off the button: CSS :active isn't
+ * reliable on touch, where a finger held on Next or a reply showed nothing. A finger's press is
+ * captured by its button till it lifts, so it's let go of at once, for sliding off to count.
+ * Returns a function that stops it.
+ * @param {HTMLElement} root
+ * @param {string} [cls]
+ */
+export function holdPressed(root, cls = 'is-pressed') {
+  /** @type {HTMLElement|null} */
+  let held = null;
+  let id = -1;
+  const release = () => {
+    if (!held) return;
+    held.classList.remove(cls);
+    held.removeEventListener('pointerleave', leave);
+    held = null;
+  };
+  /** @param {PointerEvent} e */
+  const leave = (e) => {
+    if (e.pointerId === id) release();
+  };
+  /** @param {PointerEvent} e */
+  const down = (e) => {
+    const at = /** @type {Element|null} */ (e.target);
+    const button = /** @type {HTMLButtonElement|null} */ (at?.closest?.('button') ?? null);
+    if (!button || button.disabled || e.button !== 0) return;
+    release();
+    held = button;
+    id = e.pointerId;
+    button.classList.add(cls);
+    if (button.hasPointerCapture?.(e.pointerId)) button.releasePointerCapture(e.pointerId);
+    button.addEventListener('pointerleave', leave);
+  };
+  const win = root.ownerDocument.defaultView;
+  root.addEventListener('pointerdown', down);
+  win?.addEventListener('pointerup', leave);
+  win?.addEventListener('pointercancel', leave);
+  return () => {
+    release();
+    root.removeEventListener('pointerdown', down);
+    win?.removeEventListener('pointerup', leave);
+    win?.removeEventListener('pointercancel', leave);
+  };
+}
+
 /** The words on the screen: labels in Title Case, the rest sentences. */
 export const TALK_TEXT = {
   layer: 'Intro',
@@ -186,15 +235,21 @@ function styleHolders(root, palette) {
     renderMarkup(el, parseMarkup(el.dataset.styled ?? '', palette));
 }
 
+/**
+ * A button's words on a plate of its own fill (dialogue.css), over its hover's and press's dither.
+ * @param {string} s
+ */
+const label = (s) => `<span class="inv-talk-label">${s}</span>`;
+
 /** The layer's markup (hidden until open). */
 export function talkHtml() {
   const t = TALK_TEXT;
   return `<div class="inv-talk-top" role="toolbar" aria-label="${t.layer}">
-    <button type="button" class="inv-btn inv-talk-btn" data-talk="auto" aria-pressed="false">${t.auto}</button>
-    <button type="button" class="inv-btn inv-talk-btn" data-talk="skip">${t.next}</button>
-    <button type="button" class="inv-btn inv-talk-btn" data-talk="log" aria-haspopup="dialog" aria-expanded="false">${t.log}</button>
+    <button type="button" class="inv-btn inv-talk-btn" data-talk="auto" aria-pressed="false">${label(t.auto)}</button>
+    <button type="button" class="inv-btn inv-talk-btn" data-talk="skip">${label(t.next)}</button>
+    <button type="button" class="inv-btn inv-talk-btn" data-talk="log" aria-haspopup="dialog" aria-expanded="false">${label(t.log)}</button>
   </div>
-  <button type="button" class="inv-btn inv-talk-btn inv-talk-skip-intro" data-intro-skip>${t.skipIntro}</button>
+  <button type="button" class="inv-btn inv-talk-btn inv-talk-skip-intro" data-intro-skip>${label(t.skipIntro)}</button>
   <div class="inv-talk-choices" role="group" aria-label="${t.replies}" hidden></div>
   <section class="inv-talk-box">
     <span class="inv-talk-shade" aria-hidden="true">${SHADE_BANDS.map((n) => `<span class="inv-talk-shade-${n}"></span>`).join('')}</span>
@@ -211,13 +266,13 @@ export function talkHtml() {
     <span class="inv-talk-next" aria-hidden="true" hidden>▼</span>
   </section>
   <section class="inv-talk-log" role="dialog" aria-modal="true" aria-labelledby="inv-talk-log-title" hidden>
-    <header class="inv-talk-log-head"><h2 id="inv-talk-log-title">${t.logTitle}</h2><button type="button" class="inv-btn inv-btn-small" data-talk="log-close">${t.close}</button></header>
+    <header class="inv-talk-log-head"><h2 id="inv-talk-log-title">${t.logTitle}</h2><button type="button" class="inv-btn inv-btn-small" data-talk="log-close">${label(t.close)}</button></header>
     <ol class="inv-talk-log-list"></ol>
   </section>
   <section class="inv-talk-ask" role="alertdialog" aria-modal="true" aria-labelledby="inv-talk-ask-title" aria-describedby="inv-talk-ask-hint" hidden>
     <h2 id="inv-talk-ask-title">${t.ask}</h2>
     <p class="inv-hint" id="inv-talk-ask-hint">${t.askHint}</p>
-    <div class="inv-talk-ask-row"><button type="button" class="inv-btn" data-talk="no">${t.no}</button><button type="button" class="inv-btn" data-talk="yes">${t.yes}</button></div>
+    <div class="inv-talk-ask-row"><button type="button" class="inv-btn" data-talk="no">${label(t.no)}</button><button type="button" class="inv-btn" data-talk="yes">${label(t.yes)}</button></div>
   </section>`;
 }
 
@@ -262,6 +317,8 @@ export function createDialogueUi(
   /** The toy's ink, the dither's colour (the layer's own --talk-ink). */
   const ink = (view && getComputedStyle(layer).getPropertyValue('--talk-ink').trim()) || '#3a332d';
   const tiles = installTalkDither(layer, ink);
+  // (A finger held on a button shows it pressed, as the mouse's :active does.)
+  const unhold = holdPressed(layer);
   const $ = (sel) => /** @type {HTMLElement} */ (layer.querySelector(sel));
   const name = $('.inv-talk-name');
   const typed = $('.inv-talk-typed');
@@ -689,7 +746,7 @@ export function createDialogueUi(
         choices.innerHTML = (own ?? [])
           .map(
             (c, i) =>
-              `<button type="button" class="inv-btn inv-talk-choice" data-choice="${i}" aria-label="${attr(plainText(c.label))}"><span class="inv-talk-choice-text" aria-hidden="true" data-styled="${attr(c.label)}"></span></button>`,
+              `<button type="button" class="inv-btn inv-talk-choice" data-choice="${i}" aria-label="${attr(plainText(c.label))}"><span class="inv-talk-choice-text inv-talk-label" aria-hidden="true" data-styled="${attr(c.label)}"></span></button>`,
           )
           .join('');
         styleHolders(choices, palette);
@@ -749,6 +806,7 @@ export function createDialogueUi(
       return layer;
     },
     dispose() {
+      unhold();
       doc.removeEventListener('keydown', onKey);
       layer.remove();
     },

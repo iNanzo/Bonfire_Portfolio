@@ -421,9 +421,9 @@ test('the chat screen’s markup: Title Case labels, a live region for the line,
   assert.match(markup, /data-talk="auto" aria-pressed="false"/);
   // (The top right's Next jumps to the next question or the end; Skip Intro, top left, ends it.)
   assert.equal(TALK_TEXT.next, 'Next');
-  assert.match(markup, />Next<\/button>/);
-  assert.ok(!/>Skip<\/button>/.test(markup), 'no Skip button any more');
-  assert.match(markup, /data-intro-skip>Skip Intro<\/button>/);
+  assert.match(markup, />Next<\/span><\/button>/);
+  assert.ok(!/>Skip<\/(span|button)>/.test(markup), 'no Skip button any more');
+  assert.match(markup, /data-intro-skip><span class="inv-talk-label">Skip Intro<\/span><\/button>/);
   const log = logHtml([
     { kind: 'line', speaker: 'NEWT', text: 'a <b> & c' },
     { kind: 'reply', text: 'Yes' },
@@ -561,7 +561,8 @@ test('the chat screen’s feedback, in the toolbar’s style: dither tiles, a di
   };
   // (Hover a light ink dither, press a heavier one, on every button in the layer, as on the toolbar.)
   assert.match(rule('.inv-talk .inv-btn:hover:not(:disabled)'), /background-image: var\(--talk-ink-2\)/);
-  assert.match(rule('.inv-talk .inv-btn:active:not(:disabled)'), /background-image: var\(--talk-ink-6\)/);
+  // (Pressed: :active, or the class a held finger sets, holdPressed.)
+  assert.match(rule('.inv-talk .inv-btn.is-pressed:not(:disabled)'), /background-image: var\(--talk-ink-6\)/);
   assert.match(rule('.inv-talk .inv-btn'), /background-size: 8px 8px/);
   // (The layer dithers in: its mask through the fade's steps, a step at a time.)
   const fade = /@keyframes inv-talk-dither-in \{([\s\S]*?)\n\}/.exec(css)?.[1] ?? '';
@@ -700,4 +701,120 @@ test('a dark dither inside the box: the ink’s bands up from its bottom edge, l
       `band ${n} a step lighter`,
     );
   });
+});
+
+// ---- the screen's presses on stand-in elements ---------------------------------------------
+
+/**
+ * Just enough of a tree for holdPressed: elements with classes, a parent, listeners, closest()
+ * by tag and a pointer capture; events bubble up to the document and the window, but
+ * pointerleave stays on its element (as in a browser).
+ */
+function pressTree() {
+  const win = stand('window', null);
+  const doc = stand('document', win);
+  doc.defaultView = win;
+  const root = stand('div', doc);
+  const next = stand('button', root);
+  const label = stand('span', next);
+  const reply = stand('button', root);
+  const off = stand('p', root);
+  for (const el of [root, next, label, reply, off]) el.ownerDocument = doc;
+  return { win, doc, root, next, label, reply, off };
+}
+/** @param {string} tag @param {any} parent */
+function stand(tag, parent) {
+  /** @type {any} */
+  const el = {
+    tagName: tag.toUpperCase(),
+    parent,
+    disabled: false,
+    captured: false,
+    classes: new Set(),
+    on: /** @type {Record<string, Function[]>} */ ({}),
+    addEventListener: (type, f) => (el.on[type] ??= []).push(f),
+    removeEventListener: (type, f) => (el.on[type] = (el.on[type] ?? []).filter((g) => g !== f)),
+    closest: (sel) => {
+      for (let n = el; n; n = n.parent) if (n.tagName === sel.toUpperCase()) return n;
+      return null;
+    },
+    hasPointerCapture: () => el.captured,
+    releasePointerCapture: () => (el.captured = false),
+  };
+  el.classList = {
+    add: (c) => el.classes.add(c),
+    remove: (c) => el.classes.delete(c),
+    contains: (c) => el.classes.has(c),
+  };
+  return el;
+}
+/** A pointer event on `target`, bubbling (but pointerleave). */
+function fire(target, type, o = {}) {
+  const e = { type, target, pointerId: 1, button: 0, ...o };
+  for (let n = target; n; n = type === 'pointerleave' ? null : n.parent) for (const f of n.on[type] ?? []) f(e);
+}
+
+test('a press held on a button shows pressed until it lifts, is cancelled or slides off (CSS :active isn’t reliable on touch)', async () => {
+  const { holdPressed } = await import('../src/invitation/dialogueUi.js');
+  const t = pressTree();
+  holdPressed(t.root);
+  const pressed = (el) => el.classList.contains('is-pressed');
+  // (A finger on Next's label: Next shows pressed, its implicit capture let go so sliding off counts.)
+  t.next.captured = true;
+  fire(t.label, 'pointerdown', { pointerId: 3 });
+  assert.ok(pressed(t.next), 'pressed from pointerdown');
+  assert.equal(t.next.captured, false, 'the finger’s capture let go');
+  fire(t.off, 'pointerup', { pointerId: 9 });
+  assert.ok(pressed(t.next), 'another pointer lifting leaves it');
+  fire(t.label, 'pointerup', { pointerId: 3 });
+  assert.ok(!pressed(t.next), 'lifted: not pressed');
+  // (Cancelled, as when the browser takes the touch.)
+  fire(t.reply, 'pointerdown', { pointerId: 4 });
+  assert.ok(pressed(t.reply));
+  fire(t.reply, 'pointercancel', { pointerId: 4 });
+  assert.ok(!pressed(t.reply), 'cancelled: not pressed');
+  // (Slid off it: not pressed, even before the finger lifts somewhere else.)
+  fire(t.next, 'pointerdown', { pointerId: 5 });
+  fire(t.next, 'pointerleave', { pointerId: 5 });
+  assert.ok(!pressed(t.next), 'left: not pressed');
+  fire(t.off, 'pointerup', { pointerId: 5 });
+  // (Lifted over the window, outside the layer: still let go.)
+  fire(t.reply, 'pointerdown', { pointerId: 6 });
+  for (const f of t.win.on.pointerup ?? []) f({ type: 'pointerup', target: t.win, pointerId: 6 });
+  assert.ok(!pressed(t.reply), 'lifted anywhere');
+  // (Off the buttons, on a disabled one, or the mouse's other buttons: nothing shows pressed.)
+  fire(t.off, 'pointerdown', { pointerId: 7 });
+  t.reply.disabled = true;
+  fire(t.reply, 'pointerdown', { pointerId: 8 });
+  t.reply.disabled = false;
+  fire(t.next, 'pointerdown', { pointerId: 10, button: 2 });
+  assert.ok(!pressed(t.next) && !pressed(t.reply), 'none pressed');
+  // (Disposed: presses show nothing.)
+  const t2 = pressTree();
+  holdPressed(t2.root)();
+  fire(t2.next, 'pointerdown', { pointerId: 1 });
+  assert.ok(!pressed(t2.next), 'disposed');
+});
+
+test('a held press keeps its label above the dither; the pressed class looks as :active does', async () => {
+  const { talkHtml } = await import('../src/invitation/dialogueUi.js');
+  const markup = talkHtml();
+  // (Every button's words on a plate of the button's own fill.)
+  for (const b of ['auto', 'skip', 'log', 'log-close', 'no', 'yes'])
+    assert.match(markup, new RegExp(`data-talk="${b}"[^>]*><span class="inv-talk-label">[^<]+</span></button>`), b);
+  assert.match(markup, /data-intro-skip><span class="inv-talk-label">Skip Intro<\/span><\/button>/);
+  const css = readFileSync(new URL('../src/invitation/dialogue.css', import.meta.url), 'utf8');
+  const at = css.indexOf('.inv-talk-label {');
+  assert.ok(at >= 0, 'a rule for the label');
+  const label = css.slice(at, css.indexOf('}', at));
+  assert.match(label, /background-color: inherit/);
+  assert.match(label, /box-decoration-break: clone/);
+  // (Pressed with a finger: the press's heavier dither and the press-down, as :active has them.)
+  const pressed =
+    /\.inv-talk \.inv-btn:active:not\(:disabled\),\n\.inv-talk \.inv-btn\.is-pressed:not\(:disabled\) \{([^}]*)\}/.exec(
+      css,
+    )?.[1];
+  assert.ok(pressed, 'the pressed class beside :active');
+  assert.match(pressed, /background-image: var\(--talk-ink-6\)/);
+  assert.match(pressed, /transform: translateY\(3px\)/);
 });

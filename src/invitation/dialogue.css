@@ -10,7 +10,7 @@
    it gets none. The lines' text effects: markup.css.
    Feedback in the toolbar's style, ordered dither (the tiles dialogueUi.js draws on the layer:
    --talk-ink-N, the ink at N/16; --talk-mask-N, a mask at N/16): every button's hover a light ink
-   dither and its press a heavier one; the layer dithers in as it opens (its mask through the
+   dither and its press a heavier one (a finger's too, .is-pressed), its words on a plate over it; the layer dithers in as it opens (its mask through the
    fade's steps) and the replies one after another; a line dithers out over the next (the ghost,
    from script) and a press that goes on dips the box with a flash of dither (the flash, from
    script); the ▼ bobs in pixel steps. Reduced motion: quick plain fades, no bob, no dip. */
@@ -57,7 +57,9 @@
   box-shadow: 0 3px 0 var(--talk-ink);
 }
 /* (Every button in the layer: the toolbar's ordered dither of the ink, light on hover, heavier
-   pressed, its 2 px cells crisp.) */
+   pressed, its 2 px cells crisp. Pressed is :active, or .is-pressed for a finger held on it,
+   where :active isn't reliable (dialogueUi.js holdPressed); its words stay on a plate of the
+   button's own fill over either dither, .inv-talk-label, a line at a time on a reply of two.) */
 .inv-talk .inv-btn {
   background-repeat: repeat;
   background-size: 8px 8px;
@@ -68,8 +70,18 @@
     background-image: var(--talk-ink-2);
   }
 }
-.inv-talk .inv-btn:active:not(:disabled) {
+.inv-talk .inv-btn:active:not(:disabled),
+.inv-talk .inv-btn.is-pressed:not(:disabled) {
   background-image: var(--talk-ink-6);
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--talk-ink);
+}
+.inv-talk-label {
+  margin: 0 -4px;
+  padding: 1px 4px;
+  background-color: inherit;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 
 /* --- The box and its name tab. */
