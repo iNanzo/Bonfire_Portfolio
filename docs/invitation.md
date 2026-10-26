@@ -1034,7 +1034,10 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   (he walks in again); anything else is dropped (`readPreview`). On its next step `main.js`
   drops any intro under way (the camera stays on him) and starts the dialogue from that box
   the way Replay Intro does, with Auto off, so it holds once the line is typed; a tap or a
-  reply goes on as in the intro. It answers its framer, at that origin only, with
+  reply goes on as in the intro. It never takes the focus from the admin's page
+  (`keepFocusOut`: every `focus()` in the frame does nothing while the frame doesn't have the
+  focus, since Chrome lets a framed page's `focus()` pull it out of the field being typed in);
+  once the frame is clicked or tapped into, focus moves in it as ever. It answers its framer, at that origin only, with
   `{type: 'invitation-intro-preview-state', state}`: `ready` once he's drawn, `playing` with
   the `box` up, its `next` (`nextBox`: where the admin's Next goes, null at replies or the end)
   and whether it has `choices`, and `done` as it ends. With `?test` too, the snapshot's

@@ -1,4 +1,4 @@
-// The admin's intro preview, as the invitation toy takes it (pure: no DOM): /invitation/?preview
+// The admin's intro preview, as the invitation toy takes it (pure but keepFocusOut, which takes the window): /invitation/?preview
 // inside a frame (admin/ui/introPreview.js, beside the Invitation page) plays one chat box of the
 // admin's draft. main.js runs it; this says who may drive it and what it takes:
 //   - previewOrigin: the one origin it listens to, the framing page's own as the browser reports
@@ -17,6 +17,11 @@
 //   - nextBox: where Next goes from a box (its next, as introFrom spells each box's flow; none at
 //     a box with choices or one that ends it).
 //   - previewState: what the toy says back (ready, playing a box, done).
+//   - keepFocusOut: in the frame the toy never takes the focus from the admin's page (the field
+//     being typed in): any focus() in it does nothing while the frame doesn't have the focus, so
+//     a box played again, its replies showing or the toolbar coming back leave the typing where
+//     it is; once the frame is clicked or tapped into, focus moves in it as ever. (Chrome lets a
+//     framed page's focus() pull the focus out of the page around it.)
 import { introFrom } from './content.js';
 import { normalizeScript } from './dialogue.js';
 import { DEFAULT_TEXT_COLORS, paletteOf } from './markup.js';
@@ -129,3 +134,23 @@ export function nextBox(script, id) {
  * @param {{box?: string, next?: string|null, choices?: boolean}} [o]  playing: the box up, where Next goes, whether it asks
  */
 export const previewState = (state, o = {}) => ({ type: PREVIEW_STATE, state, ...o });
+
+/** The windows keepFocusOut has already done. */
+const keptOut = new WeakSet();
+/**
+ * The toy's focus() calls kept inside its own frame (see the header): on every element of `win`
+ * (HTML and SVG), focus() does as ever only while its document has the focus.
+ * @param {{document: {hasFocus(): boolean}, HTMLElement?: {prototype: object}, SVGElement?: {prototype: object}}} win
+ */
+export function keepFocusOut(win) {
+  if (keptOut.has(win)) return;
+  keptOut.add(win);
+  for (const kind of [win.HTMLElement, win.SVGElement]) {
+    const proto = /** @type {{focus?: (...a: unknown[]) => void}|undefined} */ (kind?.prototype);
+    const focus = proto?.focus;
+    if (!proto || typeof focus !== 'function') continue;
+    proto.focus = function (/** @type {unknown[]} */ ...a) {
+      if (win.document.hasFocus()) focus.apply(this, a);
+    };
+  }
+}

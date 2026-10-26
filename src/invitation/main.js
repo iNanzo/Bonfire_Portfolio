@@ -99,7 +99,8 @@
 // with restart the scene first as it began (replay without the envelope: he walks in again). It
 // holds there; a tap or a reply goes on as in the intro. It answers with preview.js previewState:
 // ready once he's drawn, playing as each box comes up (with where Next goes from it), done as it
-// ends. ?test's snapshot().preview says what it listens to and plays.
+// ends. It never takes the focus from the admin's page (preview.js keepFocusOut). ?test's
+// snapshot().preview says what it listens to and plays.
 import { Vector3 } from 'three';
 import '@fontsource/pixelify-sans/400.css';
 import '@fontsource/pixelify-sans/600.css';
@@ -159,7 +160,7 @@ import { createDialogue, lookSway, normalizeScript } from './dialogue.js';
 import { REPLY_SETTLE, createDialogueUi } from './dialogueUi.js';
 import { createEnvelopeScene } from './envelopeScene.js';
 import { createPetalLayer } from './petalLayer.js';
-import { nextBox, previewOrigin, previewState, readPreview } from './preview.js';
+import { keepFocusOut, nextBox, previewOrigin, previewState, readPreview } from './preview.js';
 import { createFaceState, faceStep } from './faces.js';
 import { fitShadow, shadowTop } from './floor.js';
 import { createGesture, pickScreen, rayPlaneY } from './gesture.js';
@@ -260,6 +261,8 @@ const previewFrom = options.preview
       ancestors: location.ancestorOrigins ?? null,
     })
   : null;
+// (In the admin's frame the toy never pulls the focus out of the field being typed in.)
+if (previewFrom) keepFocusOut(window);
 /** @type {import('./preview.js').PreviewRequest|null} */
 let previewWant = null;
 /** @type {import('./preview.js').PreviewRequest|null} */

@@ -243,7 +243,8 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     to fit. A tap in the frame goes on and a reply picked goes to its box, as in the intro,
     and the picker follows. Once a box has played, an edit to the intro or the colors plays
     it again with the change (after a third of a second's pause in the typing); edits
-    elsewhere on the page don't. The state beside its title says Loading…, Ready, Playing
+    elsewhere on the page don't; the field you're typing in keeps the focus all the while (the
+    toy never takes it while its frame doesn't have it). The state beside its title says Loading…, Ready, Playing
     and the box, or Done. Without an intro in the draft it plays the toy's own. It loads
     `/invitation/?preview` on the site the live preview frames (`SITE_URL`; locally
     `ADMIN_SITE_URL`), so it shows this draft in that version of the toy: a new box field
