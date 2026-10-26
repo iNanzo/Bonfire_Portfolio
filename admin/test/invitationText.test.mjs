@@ -177,7 +177,7 @@ test('Text Effects is on the Invitation page, named and helped, its help showing
   }
   assert.equal(titleCase(LABELS['invitation.text']), 'Text Effects');
   const help = `${HELP['invitation.text']} ${HELP['invitation.text.colors']} ${moreFor('invitation.text')}`;
-  for (const shown of ['{red|', '{wave|', 'shake', 'bold', 'big', '{red,wave|', '#e44544', '\\{'])
+  for (const shown of ['{red|', '{wave|', 'shake', 'bold', 'big', '{italic|', '{red,wave|', '#e44544', '\\{'])
     assert.ok(help.includes(shown), `the help shows ${shown}`);
   // (The lines' and the boxes' help say they take tags.)
   assert.match(HELP['invitation.intro.boxes[].text'], /\{red,wave\|/);

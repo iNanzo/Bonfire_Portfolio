@@ -176,7 +176,7 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     and a **Color**; as shipped red, gold, rose and ink; each card shows its swatch and hex,
     and can't be hidden: delete one instead). Tags go in the lines and the chat
     boxes' text: `{red|word}` colors it, `{#e44544|word}` takes a hex color, `{wave|…}`,
-    `{shake|…}`, `{bold|…}` and `{big|…}` add an effect, `{red,wave|…}` combines them, a tag may
+    `{shake|…}`, `{bold|…}`, `{big|…}` and `{italic|…}` add an effect, `{red,wave|…}` combines them, a tag may
     hold one more, and `\{` `\}` are braces ([invitation.md](invitation.md#text-effects)). The
     previews (`INVITATION_PREVIEWS`, schema.js `PREVIEWS`; form.js draws them with the toy's
     `markup.js` and `markup.css`) follow the text as it's typed and these colors as they

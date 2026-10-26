@@ -208,7 +208,7 @@ export const INVITATION_HELP = {
   [`${CHOICE}.label`]: 'The reply on its button, in the visitor’s words. Keep it short.',
   [`${CHOICE}.next`]: 'The box this reply goes to. Boxes after different replies can lead back to the same one.',
   'invitation.text':
-    'Style words in his lines and the intro with tags: {red|word} colors it; {wave|…}, {shake|…}, {bold|…} and {big|…} add an effect.',
+    'Style words in his lines and the intro with tags: {red|word} colors it; {wave|…}, {shake|…}, {bold|…}, {big|…} and {italic|…} add an effect.',
   'invitation.text.colors':
     'The color names a tag can use, like {gold|this}. A tag also takes a hex color itself: {#e44544|this}.',
   [`${COLOR}.name`]: 'What a tag calls it: lowercase letters, numbers and dashes, like {red|word}.',
@@ -260,7 +260,7 @@ export const INVITATION_KEYWORDS = {
   'invitation.speech': ['newt', 'speech bubble', 'talk', 'chatty'],
   'invitation.lines': ['newt', 'speech bubble', 'talk', 'say', 'words'],
   'invitation.intro': ['newt', 'dialogue', 'chat', 'play intro', 'story', 'cutscene', 'uma musume'],
-  'invitation.text': ['newt', 'color', 'colour', 'wave', 'shake', 'bold', 'big', 'tags', 'markup', 'style'],
+  'invitation.text': ['newt', 'color', 'colour', 'wave', 'shake', 'bold', 'big', 'italic', 'tags', 'markup', 'style'],
 };
 
 /** Its triggers by the plan's kinds (the quiet spell with Passive). */

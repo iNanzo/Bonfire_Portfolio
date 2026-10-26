@@ -7,7 +7,11 @@
    narrows (spaces never move): a shake is a pixel's jitter across and up and down, a wave rises
    and dips straight up and down. A letter with both does both at once (the wave on its translate,
    the shake on its transform). Bold is the 600 weight the page loads; big is a fifth bigger, its
-   line height kept so the box doesn't grow. A word with a styled letter never breaks mid-word.
+   line height kept so the box doesn't grow. Italic (Pixelify Sans has none of its own) slants each
+   letter about -10 deg in place, an inline-block skewed round its middle: its box keeps its width
+   and place, so the line never reflows and its neighbours stay where they were; a shake keeps the
+   slant through its steps (--inv-fx-skew after its translate). A word with a styled letter never
+   breaks mid-word.
    Letters not typed yet keep their place, unseen. Reduced motion stills the moves (the moves'
    own rules weigh one class, so the stilling ones always win). */
 
@@ -23,6 +27,13 @@
 .inv-fx-big {
   font-size: 1.2em;
   line-height: 1;
+}
+.inv-fx-italic {
+  --inv-fx-skew: -10deg;
+  display: inline-block;
+  line-height: 1;
+  transform: skewX(var(--inv-fx-skew));
+  transform-origin: 50% 55%;
 }
 .inv-fx-moves {
   display: inline-block;
@@ -71,22 +82,22 @@
 }
 @keyframes inv-fx-shake {
   0% {
-    transform: translate(1px, 0);
+    transform: translate(1px, 0) skewX(var(--inv-fx-skew, 0deg));
   }
   16.667% {
-    transform: translate(0, -1px);
+    transform: translate(0, -1px) skewX(var(--inv-fx-skew, 0deg));
   }
   33.333% {
-    transform: translate(1px, 1px);
+    transform: translate(1px, 1px) skewX(var(--inv-fx-skew, 0deg));
   }
   50% {
-    transform: translate(0, 1px);
+    transform: translate(0, 1px) skewX(var(--inv-fx-skew, 0deg));
   }
   66.667% {
-    transform: translate(1px, -1px);
+    transform: translate(1px, -1px) skewX(var(--inv-fx-skew, 0deg));
   }
   83.333% {
-    transform: translate(0, 0);
+    transform: translate(0, 0) skewX(var(--inv-fx-skew, 0deg));
   }
 }
 

@@ -296,8 +296,10 @@ His bubble lines and the intro's lines can style words with tags, `{styles|text}
   rose and ink), or a hex color of its own (`{#e44544|NEWT}`, `#rgb` or `#rrggbb`).
 - **Effects:** `wave` (each letter bobs up and down, a little later down the line), `shake`
   (each letter jitters a pixel across and up and down, out of step with its neighbours, so the
-  word trembles but stays legible), `bold` and `big` (a fifth bigger). They combine with commas:
-  `{red,wave|Hey!}`, and both moves together wave with the jitter on top.
+  word trembles but stays legible), `bold`, `big` (a fifth bigger) and `italic` (Pixelify Sans
+  has no italic of its own, so each letter is slanted about 10 degrees where it stands, keeping
+  its width: the line never reflows). They combine with commas: `{red,wave|Hey!}`,
+  `{italic,gold|really}`, and both moves together wave with the jitter on top.
 - **Nesting:** a tag can hold one more, which adds to it (its color wins):
   `{gold|a {wave|big} deal}`. Deeper isn't allowed.
 - **Braces:** write `\{` and `\}` for a brace; a backslash anywhere else is itself, and `*`,
@@ -689,6 +691,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   over 1 s, the shake on `transform`, a pixel's jitter over 0.42 s, so a letter with both runs
   both; sideways only ever 0 to 1px, so no letter runs more than a pixel into its neighbour
   whatever their phases; `.inv-fx-bold` the 600 weight, `.inv-fx-big` 1.2em at line height 1,
+  `.inv-fx-italic` an inline-block (not on a space) skewed `--inv-fx-skew` (-10deg) round its
+  middle, its layout box unchanged, the shake's steps keeping the skew after their translate,
   stilled by `prefers-reduced-motion` and the bubble's `is-still`). A broken tag
   still shows: a stray brace as itself, an unknown style as plain letters. `dialogue.js`,
   `speech.js`, `bubble.js` and `dialogueUi.js` count, time and type by its letters; the Log, the

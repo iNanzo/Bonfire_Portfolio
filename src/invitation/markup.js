@@ -2,7 +2,7 @@
 // content.json `invitation.intro` and `invitation.lines`), read the same way by the toy, the
 // content rules (src/contentRules.js) and the admin's preview. A tag is {styles|text}: styles,
 // split by commas, are a colour (a name from the palette, `invitation.text.colors`, or #rgb or
-// #rrggbb) and the effects wave, shake, bold and big, as in {red|NEWT} or {red,wave|hey}. A tag
+// #rrggbb) and the effects wave, shake, bold, big and italic, as in {red|NEWT} or {red,wave|hey}. A tag
 // may hold one more (one level of nesting: the inner one adds to the outer, its colour wins);
 // \{ and \} are braces, a backslash anywhere else is itself, and *, ** and ~ are only text.
 // parseMarkup gives the styled runs, the letters that show (graphemes: an emoji is one) and the
@@ -13,7 +13,7 @@
 // shows the first n (the rest keep their place, unseen). markup.css draws the effects.
 
 /** The effects a tag can ask for. */
-export const TEXT_EFFECTS = /** @type {const} */ (['wave', 'shake', 'bold', 'big']);
+export const TEXT_EFFECTS = /** @type {const} */ (['wave', 'shake', 'bold', 'big', 'italic']);
 /** The palette a content.json without `invitation.text` gets (the admin's Start From the Toy’s Own too). */
 export const DEFAULT_TEXT_COLORS = [
   { name: 'red', color: '#c8323c' },
@@ -35,6 +35,7 @@ const TAG_HEX_RE = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
  * @property {true} [shake]
  * @property {true} [bold]
  * @property {true} [big]
+ * @property {true} [italic]
  */
 /** @typedef {{text: string, letters: string[], style: TextStyle|null, tokens: string[]}} TextRun */
 /** @typedef {{at: number, message: string}} MarkupError  at: where in the source, UTF-16 units */
@@ -102,7 +103,7 @@ const MESSAGES = {
   hex: (t) => `${quoted(t)} isn’t a hex color: use #rgb or #rrggbb.`,
   /** @param {string} t */
   unknown: (t) =>
-    `Unknown style ${quoted(t)}: use a color from Text Effects, a hex color like #e44544, or wave, shake, bold or big.`,
+    `Unknown style ${quoted(t)}: use a color from Text Effects, a hex color like #e44544, or wave, shake, bold, big or italic.`,
 };
 
 const isEffect = (t) => TEXT_EFFECTS.includes(/** @type {any} */ (t));
@@ -315,14 +316,16 @@ export function letterPlan(parsed) {
 
 /**
  * A letter's classes: inv-fx, and inv-fx-<effect> for each it has (a moving one, wave or shake,
- * not on a space: inline-block, so it can move).
+ * not on a space: inline-block, so it can move; italic not on a space either, which has nothing
+ * to slant).
  * @param {PlannedLetter} l
  */
 function letterClass(l) {
   const s = l.style;
   if (!s) return 'inv-fx';
-  const fx = TEXT_EFFECTS.filter((f) => s[f]);
-  const moves = (s.wave || s.shake) && !SPACE_RE.test(l.ch);
+  const space = SPACE_RE.test(l.ch);
+  const fx = TEXT_EFFECTS.filter((f) => s[f] && !(f === 'italic' && space));
+  const moves = (s.wave || s.shake) && !space;
   return ['inv-fx', ...fx.map((f) => `inv-fx-${f}`), ...(moves ? ['inv-fx-moves'] : [])].join(' ');
 }
 
