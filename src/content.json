@@ -2074,7 +2074,7 @@
         {
           "id": "congrats",
           "speaker": "",
-          "text": "Congratulations! You're invited!!",
+          "text": "{gold,wave|Congratulations!} You're invited!!",
           "face": "happy",
           "animation": "Cheer",
           "camera": "close",
@@ -2099,7 +2099,7 @@
         {
           "id": "friends",
           "speaker": "",
-          "text": "Though the December date and venue are undecided, I would love for you to come to my birthday party :D!\n(More information and updates will be available in the partiful)",
+          "text": "Though the {blue|December} date and venue are undecided, I would love for you to come to my birthday party :D!\n(More information and updates will be available in the partiful)",
           "face": "happy",
           "animation": "Point",
           "camera": "close",
@@ -2123,8 +2123,8 @@
         {
           "id": "pay",
           "speaker": "",
-          "text": "It doesn't pay that much because I'm only on a contract",
-          "face": "neutral",
+          "text": "It doesn't pay that much because I'm only on a contract. The work is fine, but I don't get much face-to-face social interaction. ",
+          "face": "blink",
           "animation": "Shrug",
           "camera": "medium",
           "next": "",
@@ -2135,7 +2135,7 @@
         {
           "id": "sad",
           "speaker": "",
-          "text": "And all I've been doing for a while now is working from home and staying inside unless I have commitments or if my friends invite me out ;-;",
+          "text": "And all I've been doing for a while now is working from home and staying inside unless I have commitments or if my friends invite me out {wave|;-;}",
           "face": "sad",
           "animation": "Sit",
           "camera": "medium",
@@ -2159,7 +2159,7 @@
         {
           "id": "whimsy",
           "speaker": "",
-          "text": "I could feel my whimsy slowly draining away, not spending time with or being surrounded by the people I love every day (at least physically, shoutout to my fellow gamers).",
+          "text": "I could feel my whimsy {shake,bold,blue|slowly draining away,} not interacting with or being surrounded by the people I love every day (at least in person).",
           "face": "sad",
           "animation": "Sit",
           "camera": "close",
@@ -2171,7 +2171,7 @@
         {
           "id": "but",
           "speaker": "",
-          "text": "But!",
+          "text": "{big,bold,shake|But!}",
           "face": "surprised",
           "animation": "Spook",
           "camera": "wide",
@@ -2196,7 +2196,7 @@
         {
           "id": "epiphany",
           "speaker": "",
-          "text": "I had an epiphany!",
+          "text": "{big,bold|I had an {blue,wave,shake|epiphany!}}",
           "face": "smug",
           "animation": "Nod",
           "camera": "keep",
@@ -2208,7 +2208,7 @@
         {
           "id": "realize1",
           "speaker": "",
-          "text": "I realized, I don't really feel emotion for myself; at the core of my ethos, I try to be kind, try to make others happy, and deeply value human connection (although I may not show it). I take life as it comes.",
+          "text": "While dissociating into NPC mode; I realized, I don't really feel emotion for {bold|myself}.",
           "face": "neutral",
           "animation": "Think",
           "camera": "wide",
@@ -2220,7 +2220,7 @@
         {
           "id": "realize2",
           "speaker": "",
-          "text": "But I experience emotion through others, especially through you guys! I find joy in your happiness, am so proud of all your achievements, and grieve with you in your times of distress.",
+          "text": "But I experience emotion through others, especially through you guys! {gold|I find joy in your happiness}, {green|am so proud of all your achievements}, {blue|and grieve with you in your times of distress}.",
           "face": "happy",
           "animation": "Point",
           "camera": "close",
@@ -2232,7 +2232,7 @@
         {
           "id": "storylike",
           "speaker": "",
-          "text": "I am an amalgamation of everyone I love. I am an avid story liker because I am so invested in the people I love!!",
+          "text": "{big,red|I am an amalgamation of everyone I love.}\nI am an avid insta story liker because I am so invested in the people I love!!",
           "face": "shy",
           "animation": "Cheer",
           "camera": "wide",
@@ -2244,8 +2244,8 @@
         {
           "id": "bigbrain",
           "speaker": "",
-          "text": "And! I want to show you all what I'm capable of! Some people think I'm dumb, but I always do everything for the bit! To be cringe is to be free! In a way I guess I am technically a performative male.",
-          "face": "angry",
+          "text": "{big,shake,bold|And!} I want to show you all what I'm capable of! \n\nSome people think I'm dumb, but I always do everything for the bit! To be cringe is to be free! In a way I guess I am technically a performative male...",
+          "face": "smug",
           "animation": "Point",
           "camera": "close",
           "next": "",
@@ -2254,9 +2254,21 @@
           "choices": []
         },
         {
+          "id": "bigbrain2",
+          "speaker": "",
+          "text": "Although I've been lacking for a long time; at the core of my ethos I try to be kind, try to entertain & uplift others, and value genuine human connection. Even if I don't show it.",
+          "face": "neutral",
+          "animation": "Talk",
+          "camera": "keep",
+          "next": "",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
           "id": "wrap1",
           "speaker": "",
-          "text": "I'll try to wrap it up soon, the theme is \"a love letter to my friends\", my gift to you all! As a show of appreciation and thanks. An accumulation of my hobbies (I'm jack of all trades and master of none so don't expect smth good ;;)",
+          "text": "I'll try to wrap it up soon, the theme is {red,wave|\"a love letter to my friends\"}, my gift to you all! As a show of appreciation and thanks. An accumulation of my hobbies \n(I'm a jack of all trades and master of none so don't expect smth good ;-;)",
           "face": "smug",
           "animation": "Nod",
           "camera": "medium",
@@ -2268,7 +2280,7 @@
         {
           "id": "wrap2",
           "speaker": "",
-          "text": "The 1st gift is this invitation! My A.A. is in Digital Media (2D/3D Graphic & Gamedev) (shoutout to Thomas for doing gamejams with me many many years ago) This is actually a toy kind of like a tamagotchi, where you just mess around with me.",
+          "text": "The 1st gift is this invitation! My A.A. is in Digital Media (2D/3D Graphic & Gamedev) (shoutout to Thomas for doing gamejams with me eons ago) This is actually a toy kind of like a tamagotchi, where you just mess around with me.",
           "face": "happy",
           "animation": "Cheer",
           "camera": "keep",
@@ -2292,7 +2304,7 @@
         {
           "id": "wrap4",
           "speaker": "",
-          "text": "The 2nd gift will be some DJ sets! Featuring my godson John AKA \"Soberist\", who inspired me to DJ. You'll see names like Winja and Nanzo. Let me give you the rundown on the lore, as you will see, there are two wolves inside me (maybe more).",
+          "text": "The 2nd gift will be some DJ sets! Featuring my godson John AKA {big,blue,bold,wave|\"Soberist\"}, who inspired me to DJ You'll see names like {big,purple,bold|Winja} and {big,red,bold|Nanzo}. Let me give you the rundown on the lore, as you will see, there are two wolves inside me (maybe more).",
           "face": "happy",
           "animation": "Talk",
           "camera": "medium",
@@ -2317,7 +2329,7 @@
         {
           "id": "nanzo1",
           "speaker": "Nanzo",
-          "text": "Nanzo is like the feral wolf, it's a name I came up with after my brother told me to come up with one for RP. I picked up a Naruto manga and just took Danzo's name and swapped the first letter with my name's.",
+          "text": "{red,bold,big|Nanzo} is like the {red,shake,wave|unhinged feral wolf}, it's a name I came up with after my brother told me to come up with one for RP. I picked up a {gold|Naruto} manga and just took Danzo's name and swapped the first letter with my name's.",
           "face": "happy",
           "animation": "Thrash",
           "camera": "close",
@@ -2329,7 +2341,7 @@
         {
           "id": "nanzo2",
           "speaker": "",
-          "text": "It's the username I've been using online since I was like 12, including the Chiikawa TikTok. But I consider the mask a separate persona.",
+          "text": "It's the username I've been using online since I was like 12, including the {pink,bold,big|Chiikawa©} {bold|TikTok©}. But I consider the mask a separate persona.",
           "face": "neutral",
           "animation": "Talk",
           "camera": "medium",
@@ -2341,7 +2353,7 @@
         {
           "id": "tomy",
           "speaker": "",
-          "text": "To my birthday party!! :D",
+          "text": "{wave|To my birthday party!! :D}",
           "face": "happy",
           "animation": "Cheer",
           "camera": "medium",
@@ -2353,7 +2365,7 @@
         {
           "id": "hate",
           "speaker": "",
-          "text": "You hate me... I just wanted to invite you to my birthday party...",
+          "text": "{shake|You hate me... I just wanted to invite you to my birthday party...}",
           "face": "sad",
           "animation": "Sit",
           "camera": "keep",
@@ -2365,7 +2377,7 @@
         {
           "id": "come",
           "speaker": "",
-          "text": "Yippee!! I knew you'd come to my birthday party!",
+          "text": "{big,bold|Yippee!!} {wave|I knew you'd come to my birthday party!}",
           "face": "happy",
           "animation": "Cheer",
           "camera": "medium",
@@ -2377,11 +2389,23 @@
         {
           "id": "winja1",
           "speaker": "",
-          "text": "Winja, short for the \"Winning Ninja\", is the first username I really started using online. Mostly on Roblox (c. 2008), but both of my accounts got hacked. He's like the wise, evil, eldritch cryptid wolf.",
+          "text": "{purple,bold,big|Winja}, short for the {wave,purple|\"Winning Ninja\"}, is the first username I really started using online.\n\nMostly on {bold,red,big|Roblox©} (c. 2008), where I got my first taste of gamedev alongside {gold,bold,big|Scratch©}.",
           "face": "neutral",
           "animation": "Think",
           "camera": "close",
-          "next": "wrap4",
+          "next": "winja2",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "winja2",
+          "speaker": "",
+          "text": "{purple|He} was banished long ago (both of my accounts got hacked). {bold|But somehow, {purple|He} returned.} {purple|He's} like the {purple,shake|wise, evil, eldritch cryptid wolf.}",
+          "face": "neutral",
+          "animation": "Talk",
+          "camera": "keep",
+          "next": "",
           "end": false,
           "auto": 0,
           "choices": []
@@ -2389,7 +2413,7 @@
         {
           "id": "bye",
           "speaker": "",
-          "text": "Thanks for listening! I hope you can make it :3",
+          "text": "{bold,big|Thanks for listening!} I hope you can make it :3\n{wave|.・。.・゜✭・.・✫・゜・。.}",
           "face": "happy",
           "animation": "Wave",
           "camera": "wide",
@@ -2401,10 +2425,10 @@
         {
           "id": "box",
           "speaker": "",
-          "text": "Alright time for some doomscrolling...",
+          "text": "{wave|Alright time for some doomscrolling...}",
           "face": "smug",
           "animation": "DeviceSit",
-          "camera": "close",
+          "camera": "medium",
           "next": "",
           "end": true,
           "auto": 0,
@@ -2429,6 +2453,22 @@
         {
           "name": "ink",
           "color": "#2b2a33"
+        },
+        {
+          "name": "blue",
+          "color": "#3a7bd5"
+        },
+        {
+          "name": "green",
+          "color": "#34ad3c"
+        },
+        {
+          "name": "purple",
+          "color": "#732291"
+        },
+        {
+          "name": "pink",
+          "color": "#c468b1"
         }
       ]
     }
