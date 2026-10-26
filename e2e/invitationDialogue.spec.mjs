@@ -781,7 +781,11 @@ test.describe('on a phone', () => {
     const log = (await snapshot(page)).dialogue.log;
     await page.touchscreen.tap(spot.x, spot.y);
     await until(page, (s) => Boolean(s.dialogue.choices), 'its replies');
-    const hit = await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.className ?? '', spot);
+    // (Its words are letters in it: the reply is what's under them.)
+    const hit = await page.evaluate(
+      ({ x, y }) => document.elementFromPoint(x, y)?.closest('.inv-talk-choice')?.className ?? '',
+      spot,
+    );
     expect(hit, 'the spot is a reply now').toContain('inv-talk-choice');
     await page.clock.runFor(150);
     await page.touchscreen.tap(spot.x, spot.y);
