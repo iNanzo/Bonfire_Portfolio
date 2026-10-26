@@ -22,7 +22,7 @@
 //
 // Text Effects (`invitation.text`): the colours a line's tags name ({red,wave|…}: markup.js), a
 // list of name and colour started from the toy's own (DEFAULT_TEXT_COLORS); its help shows the
-// tags. Each chat box's text and each line has a live preview under it (INVITATION_PREVIEWS:
+// tags. Each chat box's text, the names, the replies and each line have a live preview under them (INVITATION_PREVIEWS:
 // form.js draws it with markup.js and the draft's colours, previewPalette).
 import {
   INTRO_ANIMATIONS,
@@ -39,7 +39,7 @@ import { DEFAULT_LOOK, MOTIONS } from '../../src/invitation/look.js';
 import { PRESETS } from '../../src/invitation/looks/index.js';
 import { PIXEL_SIZES } from '../../src/invitation/pixels.js';
 import { SHADER_CONTROLS, styleShader } from '../../src/invitation/shader.js';
-import { DEFAULT_TEXT_COLORS, paletteOf } from '../../src/invitation/markup.js';
+import { DEFAULT_TEXT_COLORS, paletteOf, plainText } from '../../src/invitation/markup.js';
 import { LINE_MAX, LINES_MAX, SPEECH_DEFAULTS, SPEECH_RANGES, TRIGGERS } from '../../src/invitation/speech.js';
 import { getAt } from './paths.js';
 import { titleCase } from './text.js';
@@ -90,7 +90,6 @@ const SHADER_HELP = {
   ring: 'Draws his line just outside his silhouette, like a sprite’s, instead of on his edge.',
   bands: 'Smooth light, or that many flat bands of it (toon shading).',
   highlight: 'White where the light falls straight on him.',
-  pixelShirt: 'His shirt’s bold pixel plaid at the coarser sizes. Off: his real plaid at every size.',
   pixelFace: 'His face redrawn in pixels to fit his size. Off: his smooth face at every size.',
   edge: 'A crisp shadow, or one with a dithered, two-tone edge.',
   shadow: 'How dark his shadow on the floor is. Off: none.',
@@ -185,7 +184,7 @@ export const INVITATION_HELP = {
   'invitation.intro':
     'The chat the envelope and Replay Intro open: NEWT talks to the visitor box by box, with a face, a move and a shot for each line.',
   'invitation.intro.speaker':
-    'The name on the tab at the top left of every chat box (a box’s Speaker Override changes it for that box).',
+    'The name on the tab at the top left of every chat box (a box’s Speaker Override changes it). Tags style it (Text Effects).',
   'invitation.intro.start':
     'The box the intro opens on, from the envelope or Replay Intro. It starts here every time: nothing is kept from the last.',
   'invitation.intro.boxes':
@@ -193,8 +192,8 @@ export const INVITATION_HELP = {
   [`${BOX}.id`]:
     'How Next and the choices point to this box. Lowercase letters, numbers and dashes, and no other box’s.',
   [`${BOX}.speaker`]:
-    'Another name on the tab for this box alone, such as ??? before he’s said his. Empty: the intro’s Speaker.',
-  [`${BOX}.text`]: `What he says, typed out; {red,wave|tags} style it (Text Effects). Up to ${INTRO_TEXT_MAX} letters; past ${INTRO_TEXT_LONG} it outgrows a phone’s box.`,
+    'Another name on the tab for this box alone, such as ??? before he’s said his; tags style it. Empty: the intro’s Speaker.',
+  [`${BOX}.text`]: `What he says, typed out; {red,wave|tags} style it (Text Effects). Up to ${INTRO_TEXT_MAX} letters; past ${INTRO_TEXT_LONG} it scrolls in a phone’s box.`,
   [`${BOX}.face`]: 'His face while he says it. He still blinks on Neutral.',
   [`${BOX}.animation`]:
     'As the line starts: Once plays, then he talks; Loops keeps on. In Place walks on the spot; Dangling holds him up. Down, he gets up first. None: as he was.',
@@ -205,10 +204,10 @@ export const INVITATION_HELP = {
   [`${BOX}.auto`]:
     'With Auto on, the seconds to wait once the line is typed before going on. 0: as long as it takes to read.',
   [`${BOX}.choices`]: `${INTRO_CHOICES_MIN} or ${INTRO_CHOICES_MAX} replies the visitor picks from instead of a tap, each leading to a box of its own.`,
-  [`${CHOICE}.label`]: 'The reply on its button, in the visitor’s words. Keep it short.',
+  [`${CHOICE}.label`]: 'The reply on its button, in the visitor’s words; {red,wave|tags} style it. Keep it short.',
   [`${CHOICE}.next`]: 'The box this reply goes to. Boxes after different replies can lead back to the same one.',
   'invitation.text':
-    'Style words in his lines and the intro with tags: {red|word} colors it; {wave|…}, {shake|…}, {bold|…} and {big|…} add an effect.',
+    'Style words in his lines and the intro with tags: {red|word} colors it; {wave|…}, {shake|…}, {bold|…}, {big|…} and {italic|…} add an effect.',
   'invitation.text.colors':
     'The color names a tag can use, like {gold|this}. A tag also takes a hex color itself: {#e44544|this}.',
   [`${COLOR}.name`]: 'What a tag calls it: lowercase letters, numbers and dashes, like {red|word}.',
@@ -260,7 +259,7 @@ export const INVITATION_KEYWORDS = {
   'invitation.speech': ['newt', 'speech bubble', 'talk', 'chatty'],
   'invitation.lines': ['newt', 'speech bubble', 'talk', 'say', 'words'],
   'invitation.intro': ['newt', 'dialogue', 'chat', 'play intro', 'story', 'cutscene', 'uma musume'],
-  'invitation.text': ['newt', 'color', 'colour', 'wave', 'shake', 'bold', 'big', 'tags', 'markup', 'style'],
+  'invitation.text': ['newt', 'color', 'colour', 'wave', 'shake', 'bold', 'big', 'italic', 'tags', 'markup', 'style'],
 };
 
 /** Its triggers by the plan's kinds (the quiet spell with Passive). */
@@ -300,7 +299,8 @@ const animationLabel = (v) => {
 };
 /** The start of a line, for a list: up to 28 characters. */
 const snippet = (text) => {
-  const s = Array.from(String(text ?? '').trim());
+  // (Its letters as they show, the tags left out.)
+  const s = Array.from(plainText(String(text ?? '')).trim());
   return s.length > 28 ? `${s.slice(0, 27).join('')}…` : s.join('');
 };
 /** The draft's chat boxes (none when it has no intro). */
@@ -488,8 +488,17 @@ export const INVITATION_STARTERS = {
   'invitation.text': () => ({ colors: DEFAULT_TEXT_COLORS.map((c) => ({ ...c })) }),
 };
 
-/** The fields with a live preview under them (form.js): each chat box's text and each line. */
-export const INVITATION_PREVIEWS = new Set([`${BOX}.text`, ...TRIGGERS.map((k) => `invitation.lines.${k}[]`)]);
+/**
+ * The fields with a live preview under them (form.js): each chat box's text, the speakers'
+ * names, each reply and each line.
+ */
+export const INVITATION_PREVIEWS = new Set([
+  `${BOX}.text`,
+  'invitation.intro.speaker',
+  `${BOX}.speaker`,
+  `${CHOICE}.label`,
+  ...TRIGGERS.map((k) => `invitation.lines.${k}[]`),
+]);
 /**
  * The text effects' colours the preview draws with: the draft's (as the toy reads them,
  * content.js), else the toy's own.

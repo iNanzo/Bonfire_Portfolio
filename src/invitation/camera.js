@@ -1186,3 +1186,61 @@ export function lightDir(dir, yaw) {
   const s = Math.sin(yaw);
   return { x: x * c + z * s, y, z: z * c - x * s };
 }
+
+/**
+ * Screen shake on a big drop: a landing at `min` world units a second or faster shakes the
+ * picture by up to `px` CSS px (at min, at `full` and over) for `time` seconds (the same), `side`
+ * of it across, the rest up and down (a thump). main.js hands it to the stage, which moves the
+ * picture by it through the projection's offset (stage.js setShake), so the orbit's own state
+ * never moves.
+ */
+export const SHAKE = Object.freeze({
+  min: 5.6,
+  full: 8.2,
+  px: Object.freeze([1.5, 7]),
+  time: Object.freeze([0.25, 0.4]),
+  side: 0.6,
+});
+
+/**
+ * @typedef {{px: number, time: number}} ShakeKick  a shake: its size, CSS px, and how long, seconds
+ */
+
+/**
+ * A landing's shake (null for none): under SHAKE.min of a landing speed (dust.js landingSpeed),
+ * with Screen Shake off (`on` false) or reduced motion, none; over it, bigger and a little longer
+ * for faster, up to SHAKE.full.
+ * @param {number} speed
+ * @param {{on?: boolean, reduced?: boolean}} [o]
+ * @returns {ShakeKick|null}
+ */
+export function shakeKick(speed, { on = true, reduced = false } = {}) {
+  if (!on || reduced || !(speed >= SHAKE.min)) return null;
+  const k = Math.min(1, (speed - SHAKE.min) / (SHAKE.full - SHAKE.min));
+  return {
+    px: SHAKE.px[0] + (SHAKE.px[1] - SHAKE.px[0]) * k,
+    time: SHAKE.time[0] + (SHAKE.time[1] - SHAKE.time[0]) * k,
+  };
+}
+
+/**
+ * The shake's offset `since` seconds after it began, CSS px (+y down): none before it or once its
+ * time is up. The Bonfire's camera shake (src/bonfire/view.js, copied: the invitation imports
+ * only its own modules): "trauma" going from 1 to 0 over its time, the offset by trauma², over
+ * smooth noise, three sines an axis at odd frequencies, not jumps frame to frame; here the up and
+ * down noise starts at its peak (a cosine first), so the thump shows at once. Never past `px`.
+ * @param {ShakeKick|null} kick
+ * @param {number} since
+ * @returns {{x: number, y: number}}
+ */
+export function shakeOffset(kick, since) {
+  if (!kick || !(since >= 0) || since >= kick.time) return { x: 0, y: 0 };
+  const trauma = 1 - since / kick.time;
+  const k = trauma * trauma * kick.px;
+  const x =
+    ((Math.sin(since * 37) + Math.sin(since * 59 + 1.3) * 0.6 + Math.sin(since * 83 + 2.1) * 0.3) / 1.9) * SHAKE.side;
+  const y = (Math.cos(since * 43) + Math.sin(since * 67 + 1.3) * 0.6 + Math.sin(since * 97 + 2.1) * 0.3) / 1.9;
+  const n = Math.hypot(x, y);
+  const most = n > 1 ? 1 / n : 1;
+  return { x: x * k * most, y: y * k * most };
+}

@@ -38,7 +38,9 @@
 // under his hips), the marker (or, while he's held, the ring under him and the dashed drop
 // line, Ground Cues), the toolbar → the speech bubble (bubble.js: over his head as
 // posed, clear of the toolbar, the open Camera pad and Settings sheet, out of sight while the sheet covers his
-// head; near the top, beside his head, narrowed to fit there, or under his feet) → render. With Motion Choppy (look.js) his pose (the update and applyLook) only moves
+// head; near the top, beside his head, narrowed to fit there, or under his feet) → a landing's
+// dust and screen shake (dropFx: dust.js through stage.setDust, camera.js shakeOffset through
+// stage.setShake) → render. With Motion Choppy (look.js) his pose (the update and applyLook) only moves
 // on the clock's steps, 15 a second; his root, the camera and the rest move every frame. The
 // lowest his collar is carried comes from the Held clip at load (his collar over his lowest
 // sole, plus a gap).
@@ -99,7 +101,8 @@
 // with restart the scene first as it began (replay without the envelope: he walks in again). It
 // holds there; a tap or a reply goes on as in the intro. It answers with preview.js previewState:
 // ready once he's drawn, playing as each box comes up (with where Next goes from it), done as it
-// ends. ?test's snapshot().preview says what it listens to and plays.
+// ends. It never takes the focus from the admin's page (preview.js keepFocusOut). ?test's
+// snapshot().preview says what it listens to and plays.
 import { Vector3 } from 'three';
 import '@fontsource/pixelify-sans/400.css';
 import '@fontsource/pixelify-sans/600.css';
@@ -150,16 +153,19 @@ import {
   orbitTurning,
   orbitWheel,
   orbitZoom,
+  shakeKick,
+  shakeOffset,
   shotView,
 } from './camera.js';
 import { cursorKind, installCursors } from './cursor.js';
 import { loadCharacter } from './character.js';
 import { ANKLE_HEIGHT, BONES, COLLAR, DIALOGUE_WAYS, FACE_NAMES, FACE_TRACK, SCALE, fadeFor } from './clips.js';
 import { createDialogue, lookSway, normalizeScript } from './dialogue.js';
-import { REPLY_SETTLE, createDialogueUi } from './dialogueUi.js';
+import { REPLY_SETTLE, TALK_DITHER, createDialogueUi } from './dialogueUi.js';
+import { createDust, dustLand, dustPuffs } from './dust.js';
 import { createEnvelopeScene } from './envelopeScene.js';
 import { createPetalLayer } from './petalLayer.js';
-import { nextBox, previewOrigin, previewState, readPreview } from './preview.js';
+import { keepFocusOut, nextBox, previewOrigin, previewState, readPreview } from './preview.js';
 import { createFaceState, faceStep } from './faces.js';
 import { fitShadow, shadowTop } from './floor.js';
 import { createGesture, pickScreen, rayPlaneY } from './gesture.js';
@@ -174,6 +180,7 @@ import {
   petalsOn,
   saveLook,
   shaderOf,
+  shakeOn,
 } from './look.js';
 import { createGlance, createLook, glanceLook, glanceStep, lookStep, torsoStep } from './lookAt.js';
 import {
@@ -260,6 +267,8 @@ const previewFrom = options.preview
       ancestors: location.ancestorOrigins ?? null,
     })
   : null;
+// (In the admin's frame the toy never pulls the focus out of the field being typed in.)
+if (previewFrom) keepFocusOut(window);
 /** @type {import('./preview.js').PreviewRequest|null} */
 let previewWant = null;
 /** @type {import('./preview.js').PreviewRequest|null} */
@@ -412,8 +421,6 @@ let stage = null;
 let character = null;
 /** @type {import('./camera.js').OrbitState|null} */
 let orbit = null;
-/** His height in texels at the Pixel Size's own grid in the default view (his shirt goes by it). */
-let homeTexels = 0;
 if (webgl2()) {
   try {
     stage = createStage(stageEl, {
@@ -421,13 +428,9 @@ if (webgl2()) {
       look,
       insets,
       focus: focusInsets,
-      onResize: ({ view, home }) => {
+      onResize: ({ view }) => {
         // (Pixel Size's steps are this screen's: two resolutions that draw alike here are one.)
         ui.setPixelSteps(screenSteps());
-        // (His shirt's plaid by how many texels tall the Pixel Size makes him in the default
-        // view, once he's in: never the zoom's bigger blocks or the governor's coarser ones.)
-        homeTexels = newtTexels(view, home);
-        character?.setResolution(homeTexels);
         if (!orbit || !stage) return;
         orbitHome(orbit, view.distance);
         orbitSpan(orbit, stageSpan(stage));
@@ -637,6 +640,18 @@ function start(s) {
   let squashing = false;
   /** The hold's own random numbers (a stream of their own: the rest stay as seeded). */
   const holdRng = createRng(seed + 7);
+  /** The dust he raises landing (dust.js), on random numbers of its own. */
+  const dust = createDust();
+  const dustRng = createRng(seed + 11);
+  /**
+   * The last landing seen (play.js BodyState.landing), and its screen shake (camera.js
+   * shakeKick: null for none, or once it's over) and when it began.
+   */
+  const drop = {
+    seen: /** @type {import('./play.js').Landing|null} */ (null),
+    kick: /** @type {import('./camera.js').ShakeKick|null} */ (null),
+    at: 0,
+  };
   /**
    * The ground cues (cues.js): the blob's held look eased in, the ring's and the drop line's
    * strengths, when the ring last pulsed, whether he was pushed at the edge last frame, where the
@@ -738,7 +753,6 @@ function start(s) {
   })
     .then((c) => {
       character = c;
-      c.setResolution(homeTexels);
       c.root.rotation.order = 'XZY'; // (the swing tilts him about the world's axes, after his yaw)
       s.scene.add(c.root);
       s.setSubject(c.root); // (the retro pass's boxes go round him: stage.js)
@@ -1108,7 +1122,8 @@ function start(s) {
     if (intro || !out?.buttonsEnabled || ui.sheetOpen) return;
     const fromEnvelope = introWanted;
     introWanted = false;
-    intro = createDialogue(playScript(), { reduced: reducedMotion() });
+    // (Each line after the first starts typing once the one before has dithered out.)
+    intro = createDialogue(playScript(), { reduced: reducedMotion(), lead: TALK_DITHER.fadeMs / 1000 });
     intro.start(t);
     intro.pause(true, t);
     introHeld = true;
@@ -1157,7 +1172,7 @@ function start(s) {
       introHeld = false;
       shot = null;
       framed = null;
-      talkUi.close();
+      talkUi.close({ cut: true });
     }
     previewBegin = true;
   }
@@ -1177,7 +1192,7 @@ function start(s) {
       introHeld = false;
       shot = null;
       framed = null;
-      talkUi.close();
+      talkUi.close({ cut: true });
       ui.setTalking(false);
     }
     backFromIntro = false;
@@ -1241,8 +1256,8 @@ function start(s) {
   }
 
   /**
-   * The intro's over: the layer goes, the camera eases back (cuts, with reduced motion), the
-   * toolbar and free play return.
+   * The intro's over: the layer dithers out (out of reach at once), the camera eases back (cuts,
+   * with reduced motion), the toolbar and free play return.
    */
   function endIntro() {
     intro = null;
@@ -1616,6 +1631,8 @@ function start(s) {
       footOffset: soleY() - root.position.y,
       released,
     });
+    // (Just landed: the dust, and a big drop's shake.)
+    if (body.landing && body.landing !== drop.seen) landed(body.landing);
     // (The hold's side clamp: its push, kept for the toss.)
     if (holdNow && holdNow.push !== undefined && body.carry) body.carry.push = holdNow.push;
     // (The hold's own body: its tilt in place of the swing. Never his heading: held, falling and
@@ -1628,6 +1645,32 @@ function start(s) {
       : null;
     // (On his model's own scale, clips.js SCALE.)
     root.scale.set(SCALE * (sq?.xz ?? 1), SCALE * (sq?.y ?? 1), SCALE * (sq?.xz ?? 1));
+  }
+
+  /**
+   * A landing (play.js BodyState.landing): the dust round his feet (dust.js dustLand, sized by
+   * how fast he came down) and, from high enough, the screen shake (camera.js shakeKick: none
+   * with Screen Shake off or reduced motion).
+   * @param {import('./play.js').Landing} at
+   */
+  function landed(at) {
+    drop.seen = at;
+    dustLand(dust, at, at.speed, t, dustRng);
+    drop.kick = shakeKick(at.speed, { on: shakeOn(look), reduced: reducedMotion() });
+    drop.at = t;
+  }
+
+  /**
+   * The dust and the shake this frame: the puffs to the stage (dust.js dustPuffs), and the
+   * shake's offset on its picture (camera.js shakeOffset), cut short by a grab, Screen Shake
+   * switched off or reduced motion (the orbit never moves).
+   */
+  function dropFx() {
+    s.setDust(dustPuffs(dust, t));
+    const k = drop.kick;
+    if (k && (t - drop.at >= k.time || body.mode === 'held' || !shakeOn(look) || reducedMotion())) drop.kick = null;
+    const o = shakeOffset(drop.kick, t - drop.at);
+    s.setShake(o.x, o.y);
   }
 
   /**
@@ -1808,6 +1851,7 @@ function start(s) {
     last = ms;
     try {
       step(dt, ms / 1000);
+      dropFx();
       s.render();
     } catch {
       lost = true;
@@ -1960,6 +2004,14 @@ function start(s) {
     };
   }
 
+  /** The last landing, the dust as drawn and the screen shake (its offset, CSS px, and its kick), for ?test (snapshot().drop). */
+  const dropSnapshot = () => ({
+    landing: body.landing ? { ...body.landing } : null,
+    dust: s.dustState,
+    shake: s.shakeState,
+    kick: drop.kick ? { ...drop.kick } : null,
+  });
+
   /** The admin's intro preview for ?test: the origin it listens to, the box asked for, its viewport, and whether it waits to start. */
   const previewSnapshot = () => ({
     origin: previewFrom,
@@ -1983,7 +2035,6 @@ function start(s) {
         // Off; his half face in texels.)
         faceSheet: character?.faceSheet ?? null,
         faceTexels: character?.faceTexels ?? 0,
-        atlas: character?.atlas ?? null,
         pos: { x: character?.root.position.x ?? 0, z: character?.root.position.z ?? 0 },
         lift: character?.root.position.y ?? 0,
         heading: body.body.yaw,
@@ -2047,6 +2098,7 @@ function start(s) {
         options,
         motion: motionSnapshot(),
         drag: dragSnapshot(),
+        drop: dropSnapshot(),
       }),
       /**
        * Ease the camera to `yaw` and `elevation` (radians, as snapshot().camera has them) and a

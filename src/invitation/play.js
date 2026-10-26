@@ -7,6 +7,7 @@
 //                           once the bones are posed), the fall once he's let go (tossed with
 //                           the hold's last ~80 ms) until his lowest foot meets the floor, when
 //                           his root is snapped to the floor and steer takes him from there
+//                           (`landing` says when, where and how fast: the dust and the shake)
 //   createMix / mixStep     the clip weights: each one moves toward what the brain plays at
 //                           clips.js's fade for the change (fadeFor of the leading clips), the
 //                           gait's step phase advancing by speed over the stride Walk and Run
@@ -31,6 +32,7 @@
 import { blendStep, blendTarget, gaitPhase, mainClip, movingShare, runShare } from './blend.js';
 import { CARRY, fallStep, grab, holdStep, toss } from './carry.js';
 import { fadeFor } from './clips.js';
+import { landingSpeed } from './dust.js';
 import { LOOK, aimAngles, aimAt, screenAim, viewerAim } from './lookAt.js';
 import { steer } from './steer.js';
 
@@ -54,6 +56,15 @@ export const TWIN = '~';
  * @property {XYZ} vel  while he's falling
  * @property {{x: number, z: number}} tilt  the root's swing: root.rotation.x and .z
  * @property {number|null} landedAt  when he last landed
+ * @property {Landing|null} landing  his last landing, for the dust and the shake
+ */
+/**
+ * @typedef {object} Landing  a landing: when, where his feet came down and how fast (dust.js
+ *   landingSpeed of carry.js fallStep's impact)
+ * @property {number} t
+ * @property {number} x
+ * @property {number} z
+ * @property {number} speed
  */
 
 /**
@@ -70,6 +81,7 @@ export function createBody({ x = 0, z = 0, yaw = 0 } = {}) {
     vel: { x: 0, y: 0, z: 0 },
     tilt: { x: 0, z: 0 },
     landedAt: null,
+    landing: null,
   };
 }
 
@@ -127,6 +139,7 @@ export function bodyStep(s, { state, move, pointer, bounds, dt, t, collar, targe
       s.mode = 'ground';
       s.grounded = true;
       s.landedAt = t;
+      s.landing = { t, x: s.root.x, z: s.root.z, speed: landingSpeed(f.impact) };
     }
     return s;
   }

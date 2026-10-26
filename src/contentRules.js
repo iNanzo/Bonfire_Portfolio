@@ -20,7 +20,7 @@ import { contrast, HEX_RE, ID_RE, isObj, WEAPON_KEYS } from './ruleBasics.js';
 import { PIXEL_SIZES } from './pixelSizes.js';
 import { validateScenes } from './scenes.js';
 import { DIALOGUE_CLIPS, FACE_NAMES } from './invitation/clips.js';
-import { LEGACY_SHADER, MOTIONS, STYLES } from './invitation/look.js';
+import { LEGACY_SHADER, MOTIONS, RETIRED_SHADER, STYLES } from './invitation/look.js';
 import { PIXEL_SIZES as INVITATION_PIXEL_SIZES } from './invitation/pixels.js';
 import { SHADER_CONTROLS } from './invitation/shader.js';
 import { LINE_MAX, LINE_RAW_MAX, LINES_MAX, SPEECH_RANGES, TRIGGERS } from './invitation/speech.js';
@@ -250,14 +250,16 @@ export const INTRO_CAMERAS = ['close', 'medium', 'wide', 'keep'];
 export const INTRO_ANIMATIONS = ['none', ...DIALOGUE_CLIPS];
 /** The longest line a chat box types out, in letters (the ones that show: its tags aside)… */
 export const INTRO_TEXT_MAX = 240;
+/** Tagged text (a line, a name, a reply) may be this many times its letters' limit as written. */
+const RAW_PER_LETTER = 3;
 /** …and in characters as written, tags and all. */
-export const INTRO_TEXT_RAW_MAX = 3 * INTRO_TEXT_MAX;
+export const INTRO_TEXT_RAW_MAX = RAW_PER_LETTER * INTRO_TEXT_MAX;
 /** The most colours the text effects' palette (`invitation.text.colors`) holds. */
 export const TEXT_COLORS_MAX = 24;
 /** The longest colour name, in characters. */
 export const COLOR_NAME_MAX = 20;
 /**
- * A line longer than this (characters) outgrows the chat box's three lines on a phone (measured at
+ * A line longer than this (characters) scrolls past the chat box's three lines on a phone (measured at
  * 390×844: 100 fit, 110 take four), growing it up over NEWT: a warning.
  */
 export const INTRO_TEXT_LONG = 100;
@@ -470,7 +472,8 @@ function invitationDefaults(d, check) {
 /**
  * One Shader value: within its control's range or steps, one of its choices, or a switch; an old
  * switch that's been split (look.js LEGACY_SHADER: the toy still reads it) a switch too, with a
- * warning naming the ones to set instead.
+ * warning naming the ones to set instead; one taken away (look.js RETIRED_SHADER: the toy
+ * ignores it) a switch too, with a warning that it does nothing.
  */
 function shaderValue(key, value, p, check) {
   const c = SHADER_CONTROLS.find((x) => x.key === key);
@@ -478,7 +481,10 @@ function shaderValue(key, value, p, check) {
   if (!c && split.length) {
     check.bool(value, p);
     const names = split.map((k) => SHADER_CONTROLS.find((x) => x.key === k)?.label ?? k);
-    check.warn(check.at(p), `Split into ${names.join(' and ')}: set those instead.`);
+    check.warn(check.at(p), `Split into ${names.join(' and ')}: set ${split.length > 1 ? 'those' : 'it'} instead.`);
+  } else if (!c && RETIRED_SHADER.includes(key)) {
+    check.bool(value, p);
+    check.warn(check.at(p), 'No longer an option: the toy ignores it.');
   } else if (!c) check.err(check.at(p), 'Unknown setting.');
   else if (c.kind === 'switch') check.bool(value, p);
   else if (c.kind === 'choice')
@@ -545,7 +551,7 @@ function invitationIntro(it, check) {
   const { at, err } = check;
   for (const k of Object.keys(it))
     if (!['speaker', 'start', 'boxes'].includes(k)) err(at(`intro.${k}`), 'Unknown setting.');
-  introText(it.speaker, 'intro.speaker', INTRO_SPEAKER_MAX, check);
+  introText(it.speaker, 'intro.speaker', INTRO_SPEAKER_MAX, check, true, true);
   if (!Array.isArray(it.boxes)) {
     err(at('intro.boxes'), 'Must be a list of chat boxes.');
     if (typeof it.start !== 'string') err(at('intro.start'), 'Must be the id of a box.');
@@ -576,12 +582,12 @@ const BOX_CHECKS = {
     introText(v, p, INTRO_TEXT_MAX, check, true, true);
     const n = typeof v === 'string' ? letterCount(v.trim()) : 0;
     if (n > INTRO_TEXT_LONG && n <= INTRO_TEXT_MAX)
-      check.warn(check.at(p), `Over ${INTRO_TEXT_LONG} characters: on a phone it outgrows the box’s three lines.`);
+      check.warn(check.at(p), `Over ${INTRO_TEXT_LONG} characters: on a phone it scrolls past the box’s three lines.`);
   },
   face: (v, p, check) => check.oneOf(v, FACE_NAMES, p),
   animation: (v, p, check) => check.oneOf(v, INTRO_ANIMATIONS, p),
   camera: (v, p, check) => check.oneOf(v, INTRO_CAMERAS, p),
-  speaker: (v, p, check) => introText(v, p, INTRO_SPEAKER_MAX, check, false),
+  speaker: (v, p, check) => introText(v, p, INTRO_SPEAKER_MAX, check, false, true),
   auto: (v, p, check) => check.num(v, INTRO_AUTO, p),
   end: (v, p, check) => check.bool(v, p),
 };
@@ -629,22 +635,23 @@ function introChoice(c, p, target, check) {
   if (!isObj(c)) return err(at(p), 'Must be a group of fields.');
   for (const k of Object.keys(c)) if (k !== 'label' && k !== 'next') err(at(`${p}.${k}`), 'Unknown setting.');
   if (c.label === undefined) err(at(`${p}.label`), 'Missing.');
-  else introText(c.label, `${p}.label`, INTRO_LABEL_MAX, check);
+  else introText(c.label, `${p}.label`, INTRO_LABEL_MAX, check, true, true);
   target(c.next, `${p}.next`, 'Pick the box it leads to.');
 }
 
 /**
  * Text up to `max` characters (not UTF-16 units), not empty unless it may be. With `markup` (a
- * chat box's line): its text effects' tags well formed, `max` counting the letters that show,
- * and at most INTRO_TEXT_RAW_MAX characters as written.
+ * chat box's line, the speakers' names, the replies): its text effects' tags well formed, `max`
+ * counting the letters that show, and at most three times `max` characters as written
+ * (INTRO_TEXT_RAW_MAX for a line).
  */
 function introText(v, p, max, check, required = true, markup = false) {
   if (typeof v !== 'string') return check.err(check.at(p), 'Must be text.');
   const n = markup ? letterCount(v.trim()) : Array.from(v.trim()).length;
+  const raw = RAW_PER_LETTER * max;
   if (markup ? blankMarkup(v, check) : !v.trim()) {
     if (required) check.err(check.at(p), 'Can’t be empty.');
-  } else if (markup && v.trim().length > INTRO_TEXT_RAW_MAX)
-    check.err(check.at(p), `At most ${INTRO_TEXT_RAW_MAX} characters with its tags.`);
+  } else if (markup && v.trim().length > raw) check.err(check.at(p), `At most ${raw} characters with its tags.`);
   else if (n > max) check.err(check.at(p), `At most ${max} characters.`);
   if (markup) markupErrors(v, check.at(p), check);
 }

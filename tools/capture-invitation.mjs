@@ -49,6 +49,10 @@
 //   lift      a press on his body held into a grab and carried up near the top of the screen,
 //             across and back, held a moment and let go (the point grabbed stays under the
 //             cursor: the report's `grip` says how far from it, CSS px, frame by frame)
+//   drop-small  a press on his body held into a grab and let go from the hold's own height: he
+//             lands with a puff of dust; drop-big, lifted high first (the mouse up into the top
+//             band and the wheel, a second finger pushed up on a phone): a full ring of dust and
+//             the screen shake (the console says how fast he landed)
 //   sweep     where he looks over the whole screen: the cursor in rows across it, top to bottom
 //             (desktop sizes), or a finger held still at a grid of spots (phone sizes: a moving
 //             finger would turn the camera); whole frames
@@ -354,6 +358,69 @@ async function catchHim(page, size) {
   await sleep(200);
   await press.up();
   await press.done();
+}
+/**
+ * A drop: a press on his body held into a grab and let go, from the hold's own height
+ * (drop-small), or (drop-big) lifted high first, the mouse up into the stage's top band and the
+ * wheel, or a second finger pushed up the screen, so he lands hard: the dust, and the screen
+ * shake (the console says how fast he landed and how big the shake was).
+ * @param {any} page
+ * @param {{w: number, h: number, phone: boolean}} size
+ * @param {boolean} big
+ */
+async function dropHim(page, size, big) {
+  const from = await point(page, 'body');
+  if (!size.phone) {
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await sleep(320); // (held past the 280 ms that makes it a grab)
+    if (big) {
+      const top = { x: from.x, y: Math.max(60, size.h * 0.1) };
+      await along(
+        (p) => page.mouse.move(p.x, p.y),
+        (k) => ({ x: from.x, y: from.y + (top.y - from.y) * k }),
+        700,
+      );
+      for (let i = 0; i < 12; i++) {
+        await page.mouse.wheel(0, -100);
+        await sleep(30);
+      }
+    }
+    await sleep(700);
+    await page.mouse.up();
+  } else {
+    const cdp = await page.context().newCDPSession(page);
+    const send = (type, points) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points });
+    const one = { x: from.x, y: from.y, id: 1 };
+    await send('touchStart', [one]);
+    await sleep(320);
+    if (big) {
+      // (A second finger beside him, pushed up the screen: it lifts his hold, gesture.js holdLift.)
+      const two = { x: Math.min(size.w - 24, from.x + 80), y: Math.min(size.h - 120, from.y + 80), id: 2 };
+      await send('touchStart', [one, two]);
+      await along(
+        (dy) => send('touchMove', [one, { ...two, y: two.y - dy }]),
+        (k) => size.h * 0.4 * k,
+        800,
+      );
+      await send('touchEnd', [one]);
+    }
+    await sleep(700);
+    await send('touchEnd', []);
+    await cdp.detach();
+  }
+  await sleep(900);
+  const drop = await page.evaluate(() => window.__invitation.snapshot().drop);
+  console.log(`  ${big ? 'drop-big' : 'drop-small'}: landed at ${drop.landing?.speed?.toFixed(2) ?? '?'} u/s`);
+}
+/**
+ * The drop acts asked for (--acts drop-small, drop-big), through `act`.
+ * @param {(name: string, run: (page: any) => Promise<unknown>, tail: number, more?: object) => void} act
+ * @param {{w: number, h: number, phone: boolean}} size
+ */
+function addDrops(act, size) {
+  if (ACTS.includes('drop-small')) act('drop-small', (page) => dropHim(page, size, false), 600, { from: 1100 });
+  if (ACTS.includes('drop-big')) act('drop-big', (page) => dropHim(page, size, true), 600, { from: 2200 });
 }
 /**
  * Drags across empty space under him, one after another, until the camera has turned a whole
@@ -697,6 +764,7 @@ function actsFor(size) {
   const more = cameraActs({ point, presser, sweep, pinch, along, sleep });
   if (ACTS.includes('pan')) act('pan', (page) => more.panTurnZoom(page, size), 1400, { full: true });
   if (ACTS.includes('lift')) act('lift', (page) => more.liftHigh(page, size), 2400);
+  addDrops(act, size);
   if (ACTS.includes('sweep')) act('sweep', (page) => more.lookSweep(page, size), 600, { full: true });
   more.addReach(act, ACTS, size);
   if (ACTS.includes('intro'))

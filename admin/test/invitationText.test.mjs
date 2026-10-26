@@ -127,10 +127,42 @@ test('tags in the lines and the intro: mistakes are errors at the line, checked 
   const own = { text: { colors: [{ name: 'moss', color: '#4a7a3b' }] } };
   assert.deepEqual(errorsAt({ ...own, lines: { wave: ['{moss|x}'] } }), []);
   assert.deepEqual(errorsAt({ ...own, lines: { wave: ['{red|x}'] } }), ['invitation.lines.wave[0]']);
-  // (Choice labels and names aren't styled: braces there are only text.)
-  const labelled = intro('Pick');
-  labelled.boxes[0].speaker = '{red|x';
-  assert.deepEqual(errorsAt({ intro: labelled }), []);
+});
+
+test('tags in the speaker, a box’s speaker and the replies: checked as a line’s are, limits by the letters that show', () => {
+  /** An intro with this speaker, box speaker and reply label (two replies, so no warning). */
+  const named = ({ speaker = 'NEWT', own, label = 'Yes' } = {}) => {
+    const it = intro('Pick');
+    it.speaker = speaker;
+    it.boxes.push(box('Done'));
+    it.boxes[1].id = 'b';
+    if (own !== undefined) it.boxes[0].speaker = own;
+    it.boxes[0].choices = [
+      { label, next: 'b' },
+      { label: 'No', next: 'b' },
+    ];
+    return { intro: it };
+  };
+  for (const ok of ['{red,wave|NEWT}', '{gold|N{italic|E}WT}', '\\{N\\}', 'Plain'])
+    for (const o of [{ speaker: ok }, { own: ok }, { label: ok }]) assert.deepEqual(errorsAt(named(o)), [], ok);
+  for (const bad of ['{red|x', 'a } b', '{blue|x}', '{red|}'])
+    for (const [o, at] of [
+      [{ speaker: bad }, 'invitation.intro.speaker'],
+      [{ own: bad }, 'invitation.intro.boxes[0].speaker'],
+      [{ label: bad }, 'invitation.intro.boxes[0].choices[0].label'],
+    ])
+      assert.deepEqual(errorsAt(named(o)), [at], `${bad} at ${at}`);
+  // (Only the letters that show count: the name's 24, the reply's 60; the raw text is capped at three times that.)
+  const tagged = (n) => `{red,italic|${'a'.repeat(n)}}`;
+  assert.deepEqual(errorsAt(named({ speaker: tagged(24), label: tagged(60) })), []);
+  assert.deepEqual(errorsAt(named({ speaker: tagged(25) })), ['invitation.intro.speaker']);
+  assert.deepEqual(errorsAt(named({ label: tagged(61) })), ['invitation.intro.boxes[0].choices[0].label']);
+  const piled = (n) => '{red|a}'.repeat(n);
+  assert.deepEqual(errorsAt(named({ own: piled(11) })), ['invitation.intro.boxes[0].speaker']);
+  assert.match(problems(named({ own: piled(11) })).errors[0].message, /with its tags/);
+  // (A styled blank is empty: an error for a reply and the intro's speaker; a box's own speaker may be empty.)
+  assert.deepEqual(errorsAt(named({ label: '{red| }' })), ['invitation.intro.boxes[0].choices[0].label']);
+  assert.deepEqual(errorsAt(named({ own: '' })), []);
 });
 
 test('a line or a box that is only a styled blank is empty: an error', () => {
@@ -177,7 +209,7 @@ test('Text Effects is on the Invitation page, named and helped, its help showing
   }
   assert.equal(titleCase(LABELS['invitation.text']), 'Text Effects');
   const help = `${HELP['invitation.text']} ${HELP['invitation.text.colors']} ${moreFor('invitation.text')}`;
-  for (const shown of ['{red|', '{wave|', 'shake', 'bold', 'big', '{red,wave|', '#e44544', '\\{'])
+  for (const shown of ['{red|', '{wave|', 'shake', 'bold', 'big', '{italic|', '{red,wave|', '#e44544', '\\{'])
     assert.ok(help.includes(shown), `the help shows ${shown}`);
   // (The lines' and the boxes' help say they take tags.)
   assert.match(HELP['invitation.intro.boxes[].text'], /\{red,wave\|/);
@@ -201,12 +233,22 @@ test('it starts from the toy’s own colours, and a colour is added with a name 
 test('a live preview under each intro box’s text and each line, with the draft’s colours', () => {
   assert.ok(hint(PREVIEWS, 'invitation.intro.boxes[].text'));
   for (const k of TRIGGERS) assert.ok(hint(PREVIEWS, patternOf(['invitation', 'lines', k, 0])), k);
-  for (const no of [
-    'invitation.intro.boxes[].id',
-    'invitation.intro.boxes[].choices[].label',
+  // (The names and the replies take tags too: previewed.)
+  for (const yes of [
     'invitation.intro.speaker',
+    'invitation.intro.boxes[].speaker',
+    'invitation.intro.boxes[].choices[].label',
   ])
+    assert.ok(hint(PREVIEWS, yes), `${yes}: previewed`);
+  for (const no of ['invitation.intro.boxes[].id', 'invitation.intro.boxes[].next'])
     assert.ok(!hint(PREVIEWS, no), `${no}: none`);
+  // (Their help says they take tags.)
+  for (const k of [
+    'invitation.intro.speaker',
+    'invitation.intro.boxes[].speaker',
+    'invitation.intro.boxes[].choices[].label',
+  ])
+    assert.match(HELP[k], /tags|Text Effects/, k);
   assert.deepEqual(previewPalette({}), paletteOf(DEFAULT_TEXT_COLORS), 'none yet: the toy’s own');
   assert.deepEqual(
     [...previewPalette({ invitation: { text: { colors: [{ name: 'moss', color: '#4a7a3b' }] } } })],

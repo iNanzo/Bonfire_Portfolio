@@ -6,11 +6,15 @@
 // Next (to the next question, or the end) and Log at the top right of the screen, Skip Intro at its top
 // left (on screen all through the intro: it ends it at once, no question), the replies as buttons
 // stacked in the middle of it when a box has them (laid out out of sight from the box's start, so
-// main.js frames him over them: clearSpace), a gentle dim along the bottom behind the box,
+// main.js frames him over them: clearSpace), a dark dither inside the box (the ink's Bayer bands,
+// SHADE_BANDS, up from its bottom edge under the line and the name tab, the denser ones under the
+// line and only the lightest over its lowest row; it recedes a little while the box is hovered,
+// has focus in it or is pressed: .is-receding),
 // the Log (a scrollable list of the lines shown and the replies picked, a dialog of its own) and
-// a "Skip the Intro?" question for Escape. Rendering only: dialogue.js runs the script, and
-// main.js hands each frame's view here (render) and turns what's pressed (`onAction`) into the
-// runner's calls.
+// a "Skip the Intro?" question for Escape. As the intro ends the whole screen dithers out
+// (ditherAway), out of reach from its first step, so free play comes back at once. Rendering
+// only: dialogue.js runs the script, and main.js hands each frame's view here (render) and turns
+// what's pressed (`onAction`) into the runner's calls.
 //
 // The whole layer is a modal dialog over the stage: a tap or click anywhere off its buttons goes
 // on (finishes the line, then the next box), so nothing reaches the canvas (no drags, no orbit).
@@ -24,10 +28,22 @@
 // round the layer's buttons. A screen reader hears each line whole once, as plain text, from a
 // live region (the typed text is hidden from it), and the Log lists it plain too; the replies are buttons, and focus goes to the first reply
 // when they show, into the Log and the question when they open and back when they close.
+// A line longer than the box shows scrolls inside it (the box keeps its size): the view follows
+// the typing a row at a time (followRow); once it's all typed the wheel, a finger and the arrow
+// and Page keys scroll it, with pixel cues over and under it where there's more.
+// Feedback in the toolbar's style, its ordered dither (TALK_DITHER's tiles on the layer, CSS in
+// dialogue.css): the buttons' hover and press (a press held with a finger too, holdPressed: CSS
+// :active isn't reliable on touch; the button's words on a plate of its fill, so the dither never
+// runs through them), the screen and the replies dithering in; from here, the line before
+// dithering out as the next comes (ditherOut: the next one's letters wait unseen till it's gone,
+// so the two never show at once), a press that goes on dipping the box with a flash of dither
+// (pressFlash) and the screen dithering out at the end (ditherAway); reduced motion, quick plain
+// fades.
 
 /** @typedef {import('./dialogue.js').DialogueView} DialogueView */
 /** @typedef {import('./dialogue.js').LogEntry} LogEntry */
-import { DEFAULT_TEXT_COLORS, paletteOf, parseMarkup, renderMarkup, revealLetters } from './markup.js';
+import { ditherMask } from './icons.js';
+import { DEFAULT_TEXT_COLORS, paletteOf, parseMarkup, plainText, renderMarkup, revealLetters } from './markup.js';
 /**
  * @typedef {{type: 'advance'} | {type: 'choose', index: number} | {type: 'auto', on: boolean} |
  *   {type: 'skip'} | {type: 'pause', on: boolean} | {type: 'end'}} TalkAction  what the visitor
@@ -46,6 +62,198 @@ export const REPLY_ROOM = 120;
  * picks one the visitor didn't choose.
  */
 export const REPLY_SETTLE = 450;
+
+/**
+ * The screen's dither, the toolbar's (icons.js ditherMask, a Bayer 4×4 at n/16): ink, the
+ * coverages of the ink tiles (--talk-ink-N: the buttons' hover and press, the press flash, the
+ * dark dither in the box); fade, the steps of a dithered fade (--talk-mask-N, mask tiles: the
+ * layer and the replies dithering in, a line dithering out as the next comes); fadeMs, how long
+ * a line takes to dither out (main.js has the runner hold the next line's typing that long:
+ * dialogue.js lead); pressMs, the press flash on the box; leaveMs, the whole screen dithering
+ * out as the intro ends (ditherAway).
+ */
+export const TALK_DITHER = {
+  ink: [1, 2, 3, 4, 6, 8],
+  fade: [0, 2, 4, 6, 8, 10, 12, 14],
+  fadeMs: 180,
+  pressMs: 150,
+  leaveMs: 200,
+};
+
+/**
+ * A dither tile of 8×8 CSS px, each of the Bayer 4×4's cells two px square (the toolbar's
+ * tiles are drawn at that size), row by row: the cells on at a coverage of `n`/16.
+ * @param {number} n  0 to 16
+ * @returns {boolean[]}
+ */
+export function talkTile(n) {
+  const cells = ditherMask(n);
+  return Array.from({ length: 64 }, (_, i) => cells[((i >> 4) & 3) * 4 + ((i & 7) >> 1)]);
+}
+
+/**
+ * The screen's dither tiles as custom properties on `layer` (drawn once, as tiny PNGs):
+ * --talk-ink-N in `ink` for TALK_DITHER.ink, --talk-mask-N (opaque cells) for TALK_DITHER.fade.
+ * Their URLs by coverage, for the fades run from script (none without a canvas).
+ * @param {HTMLElement} layer
+ * @param {string} ink  a CSS colour
+ */
+function installTalkDither(layer, ink) {
+  /** @type {{ink: Map<number, string>, mask: Map<number, string>}} */
+  const urls = { ink: new Map(), mask: new Map() };
+  const c = layer.ownerDocument.createElement('canvas');
+  c.width = c.height = 8;
+  const g = c.getContext?.('2d');
+  if (!g) return urls;
+  for (const [kind, steps, color] of /** @type {const} */ ([
+    ['ink', TALK_DITHER.ink, ink],
+    ['mask', TALK_DITHER.fade, '#000'],
+  ])) {
+    for (const n of steps) {
+      g.clearRect(0, 0, 8, 8);
+      g.fillStyle = color;
+      talkTile(n).forEach((on, i) => on && g.fillRect(i % 8, i >> 3, 1, 1));
+      const url = `url("${c.toDataURL('image/png')}")`;
+      urls[kind].set(n, url);
+      layer.style.setProperty(`--talk-${kind}-${n}`, url);
+    }
+  }
+  return urls;
+}
+
+/**
+ * A line that shows more letters than this in one frame was finished at once (a tap, reduced
+ * motion): the view stays where it is rather than following it down (the cue says there's more).
+ */
+export const FOLLOW_JUMP = 12;
+
+/**
+ * Where a long line's view scrolls to as it types, px: the newest letter's row (its middle at
+ * `mid` px down the text) in view at the bottom, rows `rowH` px tall, the view `clientHeight`
+ * tall; only ever down, so a row already in view leaves it as it is.
+ * @param {{mid: number, rowH: number, clientHeight: number, scrollTop: number}} o
+ */
+export function followRow({ mid, rowH, clientHeight, scrollTop }) {
+  const want = Math.max(0, Math.round((Math.floor(mid / rowH) + 1) * rowH - clientHeight));
+  return want > scrollTop ? want : scrollTop;
+}
+
+/**
+ * The dark dither in the box, its bands top to bottom: the ink's coverage in each, out of 16
+ * (lightest at the top, densest along the box's bottom edge; dialogue.css sizes them).
+ */
+export const SHADE_BANDS = [1, 2, 3, 4];
+
+/**
+ * A press held on a button in `root` shows as pressed (`cls` on it, dialogue.css) from its
+ * pointerdown until that pointer lifts, is cancelled or slides off the button: CSS :active isn't
+ * reliable on touch, where a finger held on Next or a reply showed nothing. A finger's press is
+ * captured by its button till it lifts (no pointerleave meanwhile, where the browser keeps it),
+ * so it's let go of, and its moves off the button's box count as sliding off too.
+ * Returns a function that stops it.
+ * @param {HTMLElement} root
+ * @param {string} [cls]
+ */
+export function holdPressed(root, cls = 'is-pressed') {
+  /** @type {HTMLElement|null} */
+  let held = null;
+  let id = -1;
+  const release = () => {
+    if (!held) return;
+    held.classList.remove(cls);
+    held.removeEventListener('pointerleave', leave);
+    held = null;
+  };
+  /** @param {PointerEvent} e */
+  const leave = (e) => {
+    if (e.pointerId === id) release();
+  };
+  /** @param {PointerEvent} e */
+  const move = (e) => {
+    if (e.pointerId !== id || !held) return;
+    const r = held.getBoundingClientRect();
+    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) release();
+  };
+  /** @param {PointerEvent} e */
+  const down = (e) => {
+    const at = /** @type {Element|null} */ (e.target);
+    const button = /** @type {HTMLButtonElement|null} */ (at?.closest?.('button') ?? null);
+    if (!button || button.disabled || e.button !== 0) return;
+    release();
+    held = button;
+    id = e.pointerId;
+    button.classList.add(cls);
+    if (button.hasPointerCapture?.(e.pointerId)) button.releasePointerCapture(e.pointerId);
+    button.addEventListener('pointerleave', leave);
+  };
+  const win = root.ownerDocument.defaultView;
+  root.addEventListener('pointerdown', down);
+  win?.addEventListener('pointerup', leave);
+  win?.addEventListener('pointercancel', leave);
+  win?.addEventListener('pointermove', move);
+  return () => {
+    release();
+    root.removeEventListener('pointerdown', down);
+    win?.removeEventListener('pointerup', leave);
+    win?.removeEventListener('pointercancel', leave);
+    win?.removeEventListener('pointermove', move);
+  };
+}
+
+/**
+ * Run keyframes on `el` (none where the page can't animate: the tests' stand-in document).
+ * @param {Element} el
+ * @param {Keyframe[]} frames
+ * @param {KeyframeAnimationOptions} o
+ */
+const play = (el, frames, o) => (typeof el.animate === 'function' ? el.animate(frames, o) : null);
+/** Each value held until the next (a dither steps, it never blends). @param {Keyframe[]} frames */
+const held = (frames) => frames.map((f) => ({ ...f, easing: 'steps(1, end)' }));
+
+/**
+ * The chat screen going at the intro's end, in this order: from the start it takes no press, tap
+ * or key (`is-leaving` and inert: free play has them at once), it dithers out through the fade's
+ * steps the other way over TALK_DITHER.leaveMs (reduced motion, or no tiles: a quick plain
+ * fade), then it hides, its fade let go so it opens whole next time, and `done` runs. Returns a
+ * stop: the screen back as it was, never hidden after (opened again before it had gone).
+ * @param {HTMLElement} el
+ * @param {{masks: (string|undefined)[], reduced: boolean}} o  masks: the fade's tiles from the
+ *   most covered to none (--talk-mask-N, TALK_DITHER.fade the other way)
+ * @param {() => void} [done]
+ * @returns {() => void}
+ */
+export function ditherAway(el, { masks, reduced }, done) {
+  el.classList.add('is-leaving');
+  el.toggleAttribute('inert', true);
+  const plain = reduced || !masks.length || masks.some((m) => !m);
+  const fade = plain
+    ? play(el, [{ opacity: 1 }, { opacity: 0 }], { duration: 120, easing: 'linear', fill: 'forwards' })
+    : play(el, held([{ maskImage: 'none' }, ...masks.map((m) => ({ maskImage: String(m) }))]), {
+        duration: TALK_DITHER.leaveMs,
+        fill: 'forwards',
+      });
+  let over = false;
+  const reachable = () => {
+    el.classList.remove('is-leaving');
+    el.toggleAttribute('inert', false);
+  };
+  const gone = () => {
+    if (over) return;
+    over = true;
+    el.hidden = true;
+    reachable();
+    fade?.cancel();
+    done?.();
+  };
+  if (fade) fade.onfinish = gone;
+  else gone();
+  return () => {
+    if (over) return;
+    over = true;
+    fade?.cancel();
+    reachable();
+  };
+}
 
 /** The words on the screen: labels in Title Case, the rest sentences. */
 export const TALK_TEXT = {
@@ -70,46 +278,83 @@ export const TALK_TEXT = {
  * @param {string} s
  */
 const html = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+/** Text as an attribute's value (in double quotes). @param {string} s */
+const attr = (s) => html(s).replace(/"/g, '&quot;');
+
+/**
+ * A name or a reply as written (`styled`, its tags kept) for the Log: as it is when it has no
+ * tags; else a holder the screen fills with its styled letters (styleHolders), hidden from a
+ * screen reader, beside its plain text for one (`plain`).
+ * @param {string} plain
+ * @param {string|undefined} styled
+ */
+function styledHtml(plain, styled) {
+  if (!styled || styled === plain) return html(plain);
+  return `<span class="inv-talk-styled" aria-hidden="true" data-styled="${attr(styled)}"></span><span class="inv-talk-sr">${html(plain)}</span>`;
+}
+
+/**
+ * Fill each holder in `root` (styledHtml's) with its letters, styled (markup.js).
+ * @param {HTMLElement} root
+ * @param {Map<string, string>} palette
+ */
+function styleHolders(root, palette) {
+  for (const el of /** @type {NodeListOf<HTMLElement>} */ (root.querySelectorAll('[data-styled]')))
+    renderMarkup(el, parseMarkup(el.dataset.styled ?? '', palette));
+}
+
+/**
+ * A button's words on a plate of its own fill (dialogue.css), over its hover's and press's dither.
+ * @param {string} s
+ */
+const label = (s) => `<span class="inv-talk-label">${s}</span>`;
 
 /** The layer's markup (hidden until open). */
 export function talkHtml() {
   const t = TALK_TEXT;
-  return `<div class="inv-talk-dim" aria-hidden="true"></div>
-  <div class="inv-talk-top" role="toolbar" aria-label="${t.layer}">
-    <button type="button" class="inv-btn inv-talk-btn" data-talk="auto" aria-pressed="false">${t.auto}</button>
-    <button type="button" class="inv-btn inv-talk-btn" data-talk="skip">${t.next}</button>
-    <button type="button" class="inv-btn inv-talk-btn" data-talk="log" aria-haspopup="dialog" aria-expanded="false">${t.log}</button>
+  return `<div class="inv-talk-top" role="toolbar" aria-label="${t.layer}">
+    <button type="button" class="inv-btn inv-talk-btn" data-talk="auto" aria-pressed="false">${label(t.auto)}</button>
+    <button type="button" class="inv-btn inv-talk-btn" data-talk="skip">${label(t.next)}</button>
+    <button type="button" class="inv-btn inv-talk-btn" data-talk="log" aria-haspopup="dialog" aria-expanded="false">${label(t.log)}</button>
   </div>
-  <button type="button" class="inv-btn inv-talk-btn inv-talk-skip-intro" data-intro-skip>${t.skipIntro}</button>
+  <button type="button" class="inv-btn inv-talk-btn inv-talk-skip-intro" data-intro-skip>${label(t.skipIntro)}</button>
   <div class="inv-talk-choices" role="group" aria-label="${t.replies}" hidden></div>
   <section class="inv-talk-box">
-    <p class="inv-talk-name"></p>
-    <p class="inv-talk-text" aria-hidden="true"><span class="inv-talk-typed"></span></p>
+    <span class="inv-talk-shade" aria-hidden="true">${SHADE_BANDS.map((n) => `<span class="inv-talk-shade-${n}"></span>`).join('')}</span>
+    <span class="inv-talk-flash" aria-hidden="true"></span>
+    <p class="inv-talk-name" aria-hidden="true"></p>
+    <div class="inv-talk-view">
+      <p class="inv-talk-text" aria-hidden="true"><span class="inv-talk-typed"></span></p>
+      <p class="inv-talk-ghost" aria-hidden="true"></p>
+      <span class="inv-talk-more inv-talk-more-up" aria-hidden="true" hidden></span>
+      <span class="inv-talk-more inv-talk-more-down" aria-hidden="true" hidden></span>
+    </div>
     <p class="inv-talk-live" role="status" aria-live="polite" aria-atomic="true"></p>
     <p class="inv-talk-hint">${t.goOn}</p>
     <span class="inv-talk-next" aria-hidden="true" hidden>▼</span>
   </section>
   <section class="inv-talk-log" role="dialog" aria-modal="true" aria-labelledby="inv-talk-log-title" hidden>
-    <header class="inv-talk-log-head"><h2 id="inv-talk-log-title">${t.logTitle}</h2><button type="button" class="inv-btn inv-btn-small" data-talk="log-close">${t.close}</button></header>
+    <header class="inv-talk-log-head"><h2 id="inv-talk-log-title">${t.logTitle}</h2><button type="button" class="inv-btn inv-btn-small" data-talk="log-close">${label(t.close)}</button></header>
     <ol class="inv-talk-log-list"></ol>
   </section>
   <section class="inv-talk-ask" role="alertdialog" aria-modal="true" aria-labelledby="inv-talk-ask-title" aria-describedby="inv-talk-ask-hint" hidden>
     <h2 id="inv-talk-ask-title">${t.ask}</h2>
     <p class="inv-hint" id="inv-talk-ask-hint">${t.askHint}</p>
-    <div class="inv-talk-ask-row"><button type="button" class="inv-btn" data-talk="no">${t.no}</button><button type="button" class="inv-btn" data-talk="yes">${t.yes}</button></div>
+    <div class="inv-talk-ask-row"><button type="button" class="inv-btn" data-talk="no">${label(t.no)}</button><button type="button" class="inv-btn" data-talk="yes">${label(t.yes)}</button></div>
   </section>`;
 }
 
 /**
- * The Log's entries as list items: each line with its speaker, each reply as the visitor's.
+ * The Log's entries as list items: each line with its speaker, each reply as the visitor's; a
+ * name or a reply with tags drawn styled (styledHtml: the screen fills it in), a line's text plain.
  * @param {LogEntry[]} entries
  */
 export function logHtml(entries) {
   return entries
     .map((e) =>
       e.kind === 'reply'
-        ? `<li class="inv-talk-log-reply"><span class="inv-talk-log-who">${TALK_TEXT.you}</span> ${html(e.text)}</li>`
-        : `<li><span class="inv-talk-log-who">${html(e.speaker)}</span> ${html(e.text)}</li>`,
+        ? `<li class="inv-talk-log-reply"><span class="inv-talk-log-who">${TALK_TEXT.you}</span> ${styledHtml(e.text, e.styled)}</li>`
+        : `<li><span class="inv-talk-log-who">${styledHtml(e.speaker, e.styled)}</span> ${html(e.text)}</li>`,
     )
     .join('');
 }
@@ -136,9 +381,21 @@ export function createDialogueUi(
   layer.hidden = true;
   layer.innerHTML = talkHtml();
   stage.append(layer);
+  const view = doc.defaultView;
+  /** The toy's ink, the dither's colour (the layer's own --talk-ink). */
+  const ink = (view && getComputedStyle(layer).getPropertyValue('--talk-ink').trim()) || '#3a332d';
+  const tiles = installTalkDither(layer, ink);
+  // (A finger held on a button shows it pressed, as the mouse's :active does.)
+  const unhold = holdPressed(layer);
   const $ = (sel) => /** @type {HTMLElement} */ (layer.querySelector(sel));
   const name = $('.inv-talk-name');
   const typed = $('.inv-talk-typed');
+  const text = $('.inv-talk-text');
+  const ghost = $('.inv-talk-ghost');
+  const flash = $('.inv-talk-flash');
+  const boxEl = $('.inv-talk-box');
+  const moreUp = $('.inv-talk-more-up');
+  const moreDown = $('.inv-talk-more-down');
   const live = $('.inv-talk-live');
   const next = $('.inv-talk-next');
   const choices = $('.inv-talk-choices');
@@ -162,6 +419,10 @@ export function createDialogueUi(
     settle: 0,
     next: false,
     auto: false,
+    /** the line is all typed (the visitor may scroll it) */
+    typed: false,
+    /** its rows' height, px (read once a line) */
+    rowH: 0,
   };
 
   const modal = () => !logBox.hidden || !ask.hidden;
@@ -180,6 +441,182 @@ export function createDialogueUi(
     if (shown.up) shown.settle = Math.max(shown.settle, now() + replySettle);
   };
 
+  const reduced = () => Boolean(view?.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+  /** The screen going at the intro's end (ditherAway's stop), or null. */
+  let leaving = /** @type {(() => void)|null} */ (null);
+
+  /**
+   * The line before, dithering out (ditherOut), or null: the new line's letters, its ▼ and its
+   * scrolling wait unseen until it's gone, so the two never show at once (the runner's lead,
+   * main.js, has the new one start typing about then).
+   */
+  let fading = /** @type {Animation|null} */ (null);
+  /**
+   * The line that was up dithers out over the new one (a copy of it, where it was, its scroll
+   * kept), through the fade's steps the other way; with reduced motion, a quick plain fade. A
+   * line that showed nothing yet leaves the one before it going (or nothing to dither).
+   */
+  function ditherOut() {
+    if (shown.n <= 0) return;
+    fading?.cancel();
+    ghost.replaceChildren(...[...typed.childNodes].map((n) => n.cloneNode(true)));
+    ghost.scrollTop = text.scrollTop;
+    const masks = [...TALK_DITHER.fade].reverse().map((n) => tiles.mask.get(n));
+    const fade =
+      reduced() || masks.some((m) => !m)
+        ? play(ghost, [{ opacity: 1 }, { opacity: 0 }], { duration: 120, easing: 'linear', fill: 'forwards' })
+        : play(ghost, held([{ maskImage: 'none' }, ...masks.map((m) => ({ maskImage: m }))]), {
+            duration: TALK_DITHER.fadeMs,
+            fill: 'forwards',
+          });
+    fading = fade;
+    if (!fade) {
+      ghost.replaceChildren();
+      return;
+    }
+    fade.onfinish = () => {
+      if (fading !== fade) return;
+      fading = null;
+      ghost.replaceChildren();
+    };
+  }
+
+  /**
+   * The view's letters typed (none while the line before dithers out: then it types from
+   * there), the newest row in view, and the line scrollable once it's all up. Whether it is.
+   * @param {DialogueView} v
+   */
+  function typeTo(v) {
+    const want = fading ? 0 : v.shown;
+    const typedNow = v.typed && !fading;
+    if (want !== shown.n) {
+      const was = shown.n;
+      revealLetters(shown.spans, want, shown.n);
+      shown.n = want;
+      // (Typing: the newest row in view. Finished at once: the view stays, the cue says there's more.)
+      if (was >= 0 && want - was <= FOLLOW_JUMP) follow();
+    }
+    if (typedNow !== shown.typed) {
+      shown.typed = typedNow;
+      scrollState();
+    }
+    return typedNow;
+  }
+
+  /** A press that goes on: the box dips a step and flashes the ink's dither (reduced motion: a quick fade of it). */
+  function pressFlash() {
+    const [heavy, light] = [tiles.ink.get(4), tiles.ink.get(2)];
+    if (reduced() || !heavy || !light) {
+      const bg = light ?? 'none';
+      play(
+        flash,
+        [
+          { backgroundImage: bg, opacity: 1 },
+          { backgroundImage: bg, opacity: 0 },
+        ],
+        { duration: 100 },
+      );
+      return;
+    }
+    const ms = TALK_DITHER.pressMs;
+    play(
+      flash,
+      held([
+        { backgroundImage: heavy },
+        { backgroundImage: light, offset: 0.4 },
+        { backgroundImage: 'none', offset: 0.8 },
+      ]),
+      { duration: ms },
+    );
+    play(
+      boxEl,
+      held([
+        { translate: '0 2px', boxShadow: `0 2px 0 ${ink}` },
+        { translate: '0 0', boxShadow: `0 4px 0 ${ink}`, offset: 0.6 },
+      ]),
+      { duration: ms },
+    );
+  }
+
+  /**
+   * A long line's view: scrollable once it's all typed and it outgrows the box (the wheel, a
+   * finger, the keys), and the cues over and under it where there's more.
+   */
+  function scrollState() {
+    const over = text.scrollHeight > text.clientHeight + 1;
+    text.classList.toggle('can-scroll', shown.typed && over);
+    cues();
+  }
+  /** The pixel cues: more above (scrolled down), more below (only once it's all typed). */
+  function cues() {
+    const top = text.scrollTop;
+    moreUp.hidden = top <= 1;
+    moreDown.hidden = !shown.typed || top + text.clientHeight >= text.scrollHeight - 1;
+  }
+  /** The newest letter's row kept in view as the line types (followRow). */
+  function follow() {
+    const span = shown.spans[shown.n - 1];
+    if (!span) return;
+    if (!shown.rowH) shown.rowH = parseFloat(getComputedStyle(text).lineHeight) || 25;
+    const to = followRow({
+      mid: span.offsetTop + span.offsetHeight / 2,
+      rowH: shown.rowH,
+      clientHeight: text.clientHeight,
+      scrollTop: text.scrollTop,
+    });
+    if (to !== text.scrollTop) text.scrollTop = to;
+    cues();
+  }
+  /**
+   * The keys that scroll a long line once it's all typed: the arrows a row, Page Up and Down a
+   * view less a row. Whether it took the key.
+   * @param {string} key
+   */
+  function scrollKey(key) {
+    if (!text.classList.contains('can-scroll')) return false;
+    const row = shown.rowH || 25;
+    const page = Math.max(row, text.clientHeight - row);
+    const by = { ArrowDown: row, ArrowUp: -row, PageDown: page, PageUp: -page }[key];
+    if (!by) return false;
+    text.scrollTop += by;
+    cues();
+    return true;
+  }
+  text.addEventListener('scroll', cues, { passive: true });
+  if (typeof view?.ResizeObserver === 'function') new view.ResizeObserver(() => scrollState()).observe(text);
+
+  /**
+   * The pointers on the box (a mouse's or a pen's while it hovers; a finger's from its press till
+   * it lifts) and whether focus is in it: while any is, its dark dither recedes (dialogue.css).
+   */
+  const onBox = /** @type {Set<number>} */ (new Set());
+  let focusInBox = false;
+  const recede = () => boxEl.classList.toggle('is-receding', onBox.size > 0 || focusInBox);
+  /** Nothing on the box (the layer opened or closed): the dither as it rests. */
+  const restShade = () => {
+    onBox.clear();
+    focusInBox = false;
+    recede();
+  };
+  boxEl.addEventListener('pointerenter', (e) => {
+    onBox.add(e.pointerId);
+    recede();
+  });
+  for (const type of ['pointerleave', 'pointercancel'])
+    boxEl.addEventListener(type, (e) => {
+      onBox.delete(/** @type {PointerEvent} */ (e).pointerId);
+      recede();
+    });
+  boxEl.addEventListener('focusin', () => {
+    focusInBox = true;
+    recede();
+  });
+  boxEl.addEventListener('focusout', (e) => {
+    const to = e.relatedTarget;
+    focusInBox = to instanceof Node && boxEl.contains(to);
+    recede();
+  });
+
   /** The Log was opened with a pointer (a click or a tap), not from the keyboard. */
   let logByPointer = false;
 
@@ -195,6 +632,7 @@ export function createDialogueUi(
     if (open) {
       logByPointer = byPointer;
       logList.innerHTML = logHtml(log());
+      styleHolders(logList, palette);
       // (The latest at the bottom, in view.)
       logList.scrollTop = logList.scrollHeight;
       $('[data-talk="log-close"]').focus();
@@ -247,6 +685,11 @@ export function createDialogueUi(
       stops[to].focus();
       return;
     }
+    // (A long line, all typed: the arrows and Page Up and Down scroll it.)
+    if (!modal() && scrollKey(e.key)) {
+      e.preventDefault();
+      return;
+    }
     if (e.key !== ' ' && e.key !== 'Enter') return;
     const target = /** @type {HTMLElement|null} */ (e.target instanceof HTMLElement ? e.target : null);
     // (A focused button presses itself: a reply's press waits for them to settle, in the click.)
@@ -254,7 +697,9 @@ export function createDialogueUi(
     e.preventDefault();
     if (modal()) return;
     settle();
-    if (!e.repeat) onAction({ type: 'advance' });
+    if (e.repeat) return;
+    onAction({ type: 'advance' });
+    pressFlash();
   }
 
   layer.addEventListener('click', (e) => {
@@ -265,6 +710,7 @@ export function createDialogueUi(
       if (!modal() && !el.closest('.inv-talk-log, .inv-talk-ask')) {
         settle();
         onAction({ type: 'advance' });
+        pressFlash();
       }
       return;
     }
@@ -298,55 +744,83 @@ export function createDialogueUi(
     if (modal() && !on) e.preventDefault();
   });
   // (Nothing under the layer takes a wheel or a context menu while it's up; the Log's own list
-  // still scrolls with a wheel or trackpad.)
+  // still scrolls with a wheel or trackpad, and so does a long line once it's all typed.)
   layer.addEventListener(
     'wheel',
     (e) => {
       const t = /** @type {Element|null} */ (e.target instanceof Element ? e.target : null);
-      if (!t?.closest('.inv-talk-log-list')) e.preventDefault();
+      if (!t?.closest('.inv-talk-log-list, .inv-talk-text.can-scroll')) e.preventDefault();
     },
     { passive: false },
   );
   layer.addEventListener('contextmenu', (e) => e.preventDefault());
 
   return {
-    /** Show the layer, its Log and question closed, focus in it. */
+    /** Show the layer, its Log and question closed, focus in it (whole, if it was still going). */
     open() {
+      leaving?.();
+      leaving = null;
       layer.hidden = false;
       logBox.hidden = true;
       ask.hidden = true;
       logBtn.setAttribute('aria-expanded', 'false');
       shown.seq = -1;
+      fading?.cancel();
+      fading = null;
+      ghost.replaceChildren();
+      restShade();
       reach();
       doc.addEventListener('keydown', onKey);
       layer.focus({ preventScroll: true });
     },
-    /** Hide it. */
-    close() {
-      layer.hidden = true;
+    /**
+     * Hide it: dithered out (ditherAway: out of reach at once, so free play has every press
+     * meanwhile), or with `cut` at once (the intro dropped for a replay or the admin's preview).
+     * @param {{cut?: boolean}} [o]
+     */
+    close({ cut = false } = {}) {
+      leaving?.();
+      leaving = null;
       live.textContent = '';
       doc.removeEventListener('keydown', onKey);
+      if (cut || layer.hidden) {
+        layer.hidden = true;
+        restShade();
+        return;
+      }
+      const masks = [...TALK_DITHER.fade].reverse().map((n) => tiles.mask.get(n));
+      leaving = ditherAway(layer, { masks, reduced: reduced() }, () => {
+        leaving = null;
+        restShade();
+      });
     },
     /**
      * Show a view: the name, the line typed so far, the ▼, the replies, Auto; only what changed.
      * @param {DialogueView} v
      */
     render(v) {
-      if (layer.hidden || !v.box) return;
+      if (layer.hidden || leaving || !v.box) return;
       if (v.seq !== shown.seq) {
+        // (The line before dithers out as this one comes; the first comes with the layer.)
+        if (shown.seq >= 0) ditherOut();
         shown.seq = v.seq;
         const line = parseMarkup(v.box.text, palette);
         shown.spans = renderMarkup(typed, line);
         shown.n = -1;
-        name.textContent = v.speaker;
+        // (A new line from its top, not scrollable till it's typed.)
+        shown.typed = false;
+        shown.rowH = 0;
+        text.scrollTop = 0;
+        text.classList.remove('can-scroll');
+        moreUp.hidden = moreDown.hidden = true;
+        // (The name with its tags, for the eye; a screen reader hears it plain, with the line.)
+        renderMarkup(name, parseMarkup(v.speaker, palette));
         name.hidden = !v.speaker;
-        live.textContent = v.speaker ? `${v.speaker}: ${line.plain}` : line.plain;
+        const who = plainText(v.speaker);
+        live.textContent = who ? `${who}: ${line.plain}` : line.plain;
       }
-      if (v.shown !== shown.n) {
-        revealLetters(shown.spans, v.shown, shown.n);
-        shown.n = v.shown;
-      }
-      const showNext = v.typed && !v.choices;
+      const typedNow = typeTo(v);
+      const showNext = typedNow && !v.choices;
       if (showNext !== shown.next) next.hidden = !(shown.next = showNext);
       // (A box's replies are laid out from its start, out of sight and out of reach, so its shot
       // frames him over them; they show once its line is typed.)
@@ -354,12 +828,14 @@ export function createDialogueUi(
       const key = own ? `${v.seq}:${own.map((c) => c.label).join('\n')}` : '';
       if (key !== shown.choices) {
         shown.choices = key;
+        // (Each reply's words styled, for the eye; its name plain, for a screen reader.)
         choices.innerHTML = (own ?? [])
           .map(
             (c, i) =>
-              `<button type="button" class="inv-btn inv-talk-choice" data-choice="${i}">${html(c.label)}</button>`,
+              `<button type="button" class="inv-btn inv-talk-choice" data-choice="${i}" aria-label="${attr(plainText(c.label))}"><span class="inv-talk-choice-text inv-talk-label" aria-hidden="true" data-styled="${attr(c.label)}"></span></button>`,
           )
           .join('');
+        styleHolders(choices, palette);
         choices.hidden = !own;
         // (Their state set afresh below.)
         shown.up = !(own && v.choices);
@@ -382,8 +858,9 @@ export function createDialogueUi(
     setPalette(colours) {
       palette = colours;
     },
+    /** Open (not hidden, nor going). */
     get showing() {
-      return !layer.hidden;
+      return !layer.hidden && !leaving;
     },
     get logOpen() {
       return !logBox.hidden;
@@ -416,6 +893,8 @@ export function createDialogueUi(
       return layer;
     },
     dispose() {
+      leaving?.();
+      unhold();
       doc.removeEventListener('keydown', onKey);
       layer.remove();
     },

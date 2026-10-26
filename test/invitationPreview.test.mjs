@@ -4,7 +4,8 @@
 // gives; never when it isn't framed), what it takes (every field of the message checked: its
 // type, the script as content.js introScript() mends it, the box one of the script's, the text
 // colours, the viewport, restart), the script it plays starting from that box, where Next goes
-// from a box, and what it says back. The words are the test's own.
+// from a box, and what it says back; and that it never takes the focus from the admin's page (a
+// focus() in the frame does nothing until the frame has the focus). The words are the test's own.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { register } from 'node:module';
@@ -16,7 +17,7 @@ const hooks = `export async function resolve(spec, ctx, next) {
   return next(spec, ctx);
 }`;
 register(`data:text/javascript,${encodeURIComponent(hooks)}`);
-const { PREVIEW_MESSAGE, PREVIEW_STATE, nextBox, previewOrigin, previewState, readPreview } =
+const { PREVIEW_MESSAGE, PREVIEW_STATE, keepFocusOut, nextBox, previewOrigin, previewState, readPreview } =
   await import('../src/invitation/preview.js');
 const { createDialogue } = await import('../src/invitation/dialogue.js');
 const { parseQuery } = await import('../src/invitation/ui.js');
@@ -199,4 +200,50 @@ test('what it says back: its own type, its state, and the box with where Next go
   });
   assert.deepEqual(previewState('done'), { type: PREVIEW_STATE, state: 'done' });
   assert.notEqual(PREVIEW_STATE, PREVIEW_MESSAGE);
+});
+
+test('in the admin’s frame it never takes the focus from the page: focus() waits until the frame has it', () => {
+  const calls = [];
+  class El {
+    focus(o) {
+      calls.push([this.name, o]);
+    }
+  }
+  class Svg {
+    focus() {
+      calls.push(['svg']);
+    }
+  }
+  const win = {
+    document: {
+      focused: false,
+      hasFocus() {
+        return this.focused;
+      },
+    },
+    HTMLElement: El,
+    SVGElement: Svg,
+  };
+  keepFocusOut(win);
+  const button = Object.assign(new El(), { name: 'reply' });
+  // (The admin's field has the focus: the toy's calls do nothing.)
+  button.focus({ preventScroll: true });
+  new Svg().focus();
+  assert.deepEqual(calls, []);
+  // (Clicked into, the frame has the focus: its own focus moves as ever, options and all.)
+  win.document.focused = true;
+  button.focus({ preventScroll: true });
+  new Svg().focus();
+  assert.deepEqual(calls, [['reply', { preventScroll: true }], ['svg']]);
+  // (Twice is once.)
+  keepFocusOut(win);
+  win.document.focused = false;
+  button.focus();
+  assert.equal(calls.length, 2);
+});
+
+test('main.js keeps the focus out in the admin’s frame only', async () => {
+  const { readFileSync } = await import('node:fs');
+  const main = readFileSync(new URL('../src/invitation/main.js', import.meta.url), 'utf8');
+  assert.match(main, /if \(previewFrom\) keepFocusOut\(window\)/);
 });

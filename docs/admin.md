@@ -164,7 +164,8 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     menu: Pixel Size (16×16 to 256×256, Native or Off), Dithering, Outlines, the style it's
     **Built On** (DS or Soft: its own colors carry over), Motion, and every Shader option
     the Look menu shows, by the same names, with the same ranges and choices. Visitors'
-    own picks stay in their browser, over these.
+    own picks stay in their browser, over these. One saved with a Shader option since taken
+    away (Pixel Shirt) still passes, with a warning that the toy ignores it.
   - **Speech:** the shortest and longest quiet spell before an idle line (seconds), and each
     moment's **Chance** (0 never, 1 every time) and **Cooldown** (seconds), under the
     plan's kinds: Reactions, Running, Carried, Moving, Sitting, Passive and Camera.
@@ -176,25 +177,27 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     and a **Color**; as shipped red, gold, rose and ink; each card shows its swatch and hex,
     and can't be hidden: delete one instead). Tags go in the lines and the chat
     boxes' text: `{red|word}` colors it, `{#e44544|word}` takes a hex color, `{wave|…}`,
-    `{shake|…}`, `{bold|…}` and `{big|…}` add an effect, `{red,wave|…}` combines them, a tag may
+    `{shake|…}`, `{bold|…}`, `{big|…}` and `{italic|…}` add an effect, `{red,wave|…}` combines them, a tag may
     hold one more, and `\{` `\}` are braces ([invitation.md](invitation.md#text-effects)). The
     previews (`INVITATION_PREVIEWS`, schema.js `PREVIEWS`; form.js draws them with the toy's
     `markup.js` and `markup.css`) follow the text as it's typed and these colors as they
     change.
   - **Intro:** the chat **Play Intro** opens (`invitation.intro`, `types.js`
-    `DialogueScript`): the **Speaker** on every box's name tab, the **Start Box** (every Play
+    `DialogueScript`): the **Speaker** on every box's name tab (tags style it, up to 24
+    letters, with a **Preview**), the **Start Box** (every Play
     Intro starts there) and the **Chat Boxes**, in order, dragged or moved with ↑/↓. Each
     box's card is titled by its line, with its id, face, move, shot and where it goes under
     it. A box has its **ID** (how Next and the choices point to it), a **Speaker Override**
-    (such as ??? before he's said his name; empty: the intro's Speaker), its **Text** (typed
-    out letter by letter, up to 240 letters; past 100 it outgrows the box's three lines on
+    (such as ??? before he's said his name; empty: the intro's Speaker; tags style it too), its **Text** (typed
+    out letter by letter, up to 240 letters; past 100 it scrolls past the box's three lines on
     a phone; its tags style it, with a **Preview** under it), a **Face** (every face he has; he still blinks on Neutral), an **Animation** (any
     of his: Once plays and then he talks, Loops keeps going, In Place walks or runs on the spot,
     Dangling holds him up off the floor, sitting or lying down gets him down first; None: as he was), a **Camera**
     (Close: head and shoulders, too tight for a Cheer's fists on a phone; Medium: his whole
     body; Wide: the default view; Keep: as it was), its **Next Box** (empty: the box after
     it), **Ends the Intro**, an **Auto Wait** (seconds Auto waits once the line is typed; 0:
-    by its length) and 2 or 3 **Choices**, each a **Label** and the box it **Leads To**.
+    by its length) and 2 or 3 **Choices**, each a **Label** (up to 60 letters; tags style it,
+    with a **Preview**) and the box it **Leads To**.
     Choices come first, then End, then Next; the last box ends the intro. The start, a
     Next and a choice's box are picked from the boxes there are, each by its id and how its
     line starts; the lists follow a box renamed as it's typed, and one that's gone still
@@ -241,7 +244,8 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     to fit. A tap in the frame goes on and a reply picked goes to its box, as in the intro,
     and the picker follows. Once a box has played, an edit to the intro or the colors plays
     it again with the change (after a third of a second's pause in the typing); edits
-    elsewhere on the page don't. The state beside its title says Loading…, Ready, Playing
+    elsewhere on the page don't; the field you're typing in keeps the focus all the while (the
+    toy never takes it while its frame doesn't have it). The state beside its title says Loading…, Ready, Playing
     and the box, or Done. Without an intro in the draft it plays the toy's own. It loads
     `/invitation/?preview` on the site the live preview frames (`SITE_URL`; locally
     `ADMIN_SITE_URL`), so it shows this draft in that version of the toy: a new box field

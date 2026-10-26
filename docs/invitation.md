@@ -112,7 +112,12 @@ loading screen too: NEWT loads behind it.
   his arms and legs hanging limp and swinging with the motion; at the edge of his patch he stops
   instead of sliding along it. Held, he hangs his head, and every few seconds (sooner if you
   shake him) he thrashes about, kicking and flailing; let go and he falls, lands and gets back
-  up. Shaking him means shaking him back and forth (one fast flick isn't a shake): shake him
+  up. He lands in a puff of dust: a ring of small dithered puffs in the floor's warm grey bursts
+  out from his feet along the floor, rising a little, and is gone in about half a second to 0.8 s;
+  the harder he lands the bigger and fuller the ring (set down gently, from just over the floor,
+  there's none). Dropped from high (lifted well over his own height), the screen shakes for about
+  a third of a second, a few pixels, more the harder he lands (**Screen Shake** in Settings; never
+  with reduced motion). Shaking him means shaking him back and forth (one fast flick isn't a shake): shake him
   hard, fling him about or drop him from high and he gets stressed, and once he lands he runs
   off if it was too much; carrying him about gently, however long, never bothers him. Flick him
   and he flies, a flick up the screen lobbing him away from you; let go while
@@ -222,13 +227,14 @@ the sheet and leaves the slider as it was.
 
 | Setting | Choices | What it does |
 | --- | --- | --- |
-| Pixel Size | 16×16 to 256×256, Native, Off | NEWT's sprite resolution: at 64×64 he's drawn roughly 64 pixels tall, more or fewer as each pixel rounds to a whole number of the screen's own (at the default 128×128, 105 to 191 across common screens). A slider, coarse to fine, then Native and Off at its fine end, with a button at each end; the line under it says how many pixels tall he really is on this screen. 128×128 is the default (on a 1280×800 desktop it draws as Native, the same pixels there). Each pixel is a whole number of the screen's own pixels, and two steps that would draw the same picture on a screen show as one there, reading as the one picked (128×128 on a 1429×1115 desktop, where it draws as 96×96 does). **Native** gives every one of the screen's own pixels a pixel, even a phone's three to a CSS pixel, with the pixel look still on (outlines, dithering, toon shading); a resolution that already reaches the screen's pixels shows as Native (256×256 on a phone, 128×128 and up on a 1280×800 desktop), so a 390-wide phone lists 7 resolutions and a 1280×800 desktop 5, then Native and Off. NEWT stays the same size on screen, so a coarser resolution only makes him chunkier, and zooming the camera in or out takes his pixels with him (bigger blocks zoomed in), so he keeps the resolution you chose at any zoom; Native and Off don't change with the zoom. His shirt shows its real plaid at every resolution unless Pixel Shirt (under Shader) is on, and his face is redrawn in pixels to fit his size unless Pixel Face is off. **Off** is the smooth picture without the pixel look, at the screen's resolution (at most two pixels to a CSS pixel). |
+| Pixel Size | 16×16 to 256×256, Native, Off | NEWT's sprite resolution: at 64×64 he's drawn roughly 64 pixels tall, more or fewer as each pixel rounds to a whole number of the screen's own (at the default 128×128, 105 to 191 across common screens). A slider, coarse to fine, then Native and Off at its fine end, with a button at each end; the line under it says how many pixels tall he really is on this screen. 128×128 is the default (on a 1280×800 desktop it draws as Native, the same pixels there). Each pixel is a whole number of the screen's own pixels, and two steps that would draw the same picture on a screen show as one there, reading as the one picked (128×128 on a 1429×1115 desktop, where it draws as 96×96 does). **Native** gives every one of the screen's own pixels a pixel, even a phone's three to a CSS pixel, with the pixel look still on (outlines, dithering, toon shading); a resolution that already reaches the screen's pixels shows as Native (256×256 on a phone, 128×128 and up on a 1280×800 desktop), so a 390-wide phone lists 7 resolutions and a 1280×800 desktop 5, then Native and Off. NEWT stays the same size on screen, so a coarser resolution only makes him chunkier, and zooming the camera in or out takes his pixels with him (bigger blocks zoomed in), so he keeps the resolution you chose at any zoom; Native and Off don't change with the zoom. His shirt shows its real plaid at every resolution, and his face is redrawn in pixels to fit his size unless Pixel Face (under Shader) is off. **Off** is the smooth picture without the pixel look, at the screen's resolution (at most two pixels to a CSS pixel). |
 | Dithering | On, Off | The checkered blend between colours (how strong: Dither Strength, under Shader). |
 | Outlines | On, Off | A one-pixel line around NEWT (none in his shadow; how dark, its colour and where: under Shader). |
 | Style | Default, DS, Soft, Custom | Default (what a first visit shows, set in the admin's Invitation page; as shipped, Soft with 6 colours, a full-strength dither, full-strength tinted lines on the outer ring, two toon bands and the highlight). DS: like the old handheld, 15-bit colour with a fine dither, dark 1-pixel lines, a hard shadow. Soft: fewer colours, pastel, a warm ring outside him and a softer, dithered shadow. Each sets every Shader option; Custom shows once one of them is yours (it can't be picked: choose a style, or Reset To Style, to go back). |
 | Motion | Smooth, Choppy | Smooth (the default) moves NEWT every frame. Choppy moves his arms, legs and head 15 times a second, like stop motion, while the camera and his walking about stay smooth. |
 | Ground Cues | Off, In the Mix, Always | The ring on the floor under NEWT while he's held and the dashed line from his collar down to it, so you can see where he is over the floor. In the Mix shows them while he's high or moving fast; Always all the time he's held. In the Mix until you pick one. |
 | Rose Petals | On, Off | On (the default): rose petals trail the cursor or a finger and burst in a ring at every click or tap, over the envelope and through the toy; Off, none at all (the envelope's too). |
+| Screen Shake | On, Off | On (the default): when NEWT lands from high the picture shakes for about a third of a second, a few pixels, more the harder he lands; Off, it never shakes (his landing's dust still shows). Never with reduced motion. |
 | Wander | On, Off | On (the default): left be, he strolls about by himself now and then. Kept for your next visit, like the rest. |
 
 **Shader** lays out the pixel look's own values, which the Style sets; any change shows at once
@@ -243,7 +249,6 @@ and turns the Style to Custom, and **Reset To Style** puts the style's values ba
 | Outer Ring | On, Off | Lines just outside his outline, like a sprite's, instead of on his edge. |
 | Toon Shading | Smooth, 2, 3, 4 | Smooth light, or that many flat bands of it. |
 | Highlight | On, Off | White where the light falls straight on him. |
-| Pixel Shirt | On, Off | Off in every style: his real plaid at every resolution (under about 100 pixels tall its checks are smaller than a pixel, so it shows as a mottled mix of its colours). On: below 128 pixels tall his shirt shows bold pixel checks. |
 | Pixel Face | On, Off | On in every style: his face redrawn in pixels to fit his size, drawn after his smooth face (the same eyes, brows, mouth and blush, scaled down; the smooth face again at the finest steps zoomed in). Off: the smooth face at every resolution (drawn sharper with the pixel look on, the more the fewer pixels he has, down to the sheet's own pixels at 32×32 and coarser, so his eyes and mouth stay). |
 | Shadow | Hard, Soft | A crisp shadow, or one with a dithered, two-tone edge. |
 | Shadow Strength | Off to 100% | How dark his shadow is. |
@@ -290,14 +295,17 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
 
 ## Text Effects
 
-His bubble lines and the intro's lines can style words with tags, `{styles|text}`:
+His bubble lines and the intro's lines, the speakers' names on the intro's tab and its replies
+can style words with tags, `{styles|text}`:
 
 - **Colors:** a name from the admin's Text Effects colors (`{red|NEWT}`; as shipped red, gold,
   rose and ink), or a hex color of its own (`{#e44544|NEWT}`, `#rgb` or `#rrggbb`).
 - **Effects:** `wave` (each letter bobs up and down, a little later down the line), `shake`
   (each letter jitters a pixel across and up and down, out of step with its neighbours, so the
-  word trembles but stays legible), `bold` and `big` (a fifth bigger). They combine with commas:
-  `{red,wave|Hey!}`, and both moves together wave with the jitter on top.
+  word trembles but stays legible), `bold`, `big` (a fifth bigger) and `italic` (Pixelify Sans
+  has no italic of its own, so each letter is slanted about 10 degrees where it stands, keeping
+  its width: the line never reflows). They combine with commas: `{red,wave|Hey!}`,
+  `{italic,gold|really}`, and both moves together wave with the jitter on top.
 - **Nesting:** a tag can hold one more, which adds to it (its color wins):
   `{gold|a {wave|big} deal}`. Deeper isn't allowed.
 - **Braces:** write `\{` and `\}` for a brace; a backslash anywhere else is itself, and `*`,
@@ -308,7 +316,10 @@ moving letter keeps its own width and only ever steps a pixel sideways, to the r
 runs into the next letter by more than a pixel and the space before a shaken word never closes. A
 styled word never breaks across two rows. The typing, Auto's wait, how long a bubble stays up and
 the length limits count only the letters that show; a screen reader and the Log get the line as
-plain text. The admin checks every tag as you type and previews each line under its box.
+plain text. A styled name shows styled on the tab and in the Log, and a styled reply on its button
+and in the Log, while a screen reader hears them plain (the live region, the button's name, the
+Log's own plain copy). The admin checks every tag as you type and previews each line, name and
+reply under its field.
 
 ## The Intro
 
@@ -317,10 +328,30 @@ envelope back over a fresh scene to open again (above). It's laid out like Uma M
 toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
 
 - **The screen:** a wide box along the bottom with his name on a tab at its top left and his
-  line typed out in it, a small bouncing ▼ at its bottom right once the line is all there, Auto,
-  Next and Log at the top right, **Skip Intro** at the top left, and a gentle dim along the bottom
-  behind the box. A line's own line breaks (as the admin types them) show. The toolbar goes while
-  the intro runs and comes back after it.
+  line typed out in it, a small ▼ bobbing in pixel steps at its bottom right once the line is all
+  there, Auto, Next and Log at the top right, **Skip Intro** at the top left, and a dark dither
+  inside the box (the ink's ordered dither in bands up from its bottom edge, densest there and
+  fading out upward, under the line and the name tab: the denser bands fill the space under the
+  line and only the lightest reach its lowest row, so the text always reads; sized to the box on
+  a phone, a desktop or a phone held sideways, and a long line scrolls over it where it is).
+  Hovering the box, focus in it or a finger on it makes the dither recede a little: it sinks a
+  band in 2 px steps over a quarter of a second, leaving every row a step lighter, and comes back
+  up after (with reduced motion it just goes a step lighter where it is). A line's own line
+  breaks (as the admin types them) show. A line
+  longer than the box's three rows (two on a phone held sideways) scrolls inside it, and the box
+  keeps its size: as it types the newest row stays in view, and once it's all there the wheel, a
+  finger dragged over it, or the arrow and Page keys scroll it, with small pixel triangles at its
+  right where there's more above or below (a line finished at once by a tap stays where it was,
+  the cue showing the rest). The toolbar goes while the intro runs and comes back after it.
+- **Feedback,** in the toolbar's style (its ordered Bayer dither, in the ink): every button on the
+  screen (Auto, Next, Log, Skip Intro, the replies, the Log's and the question's) fills with a
+  light dither on hover and a heavier one pressed (a finger held on one too, where a phone's own
+  pressed state can't be relied on), its words on a plate of the button's own colour so the
+  press never hides them. The screen dithers in as it opens and all of it dithers out as the
+  intro ends (out of reach from the first step, so play comes back at once), the replies dither
+  in one after another, the line that was up dithers out before the next one types (the two
+  never overlap), and a tap or a key that goes on dips the box a step with a flash of dither.
+  With reduced motion these are quick plain fades, with no dip and no bob.
 - **Going on:** a tap or click anywhere first finishes the line, then goes on to the next box;
   Space and Enter do the same (after a click or tap on Auto, Next or Log too; from the keyboard,
   a focused button presses itself). Some boxes ask a question: two or three replies show as buttons
@@ -689,6 +720,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   over 1 s, the shake on `transform`, a pixel's jitter over 0.42 s, so a letter with both runs
   both; sideways only ever 0 to 1px, so no letter runs more than a pixel into its neighbour
   whatever their phases; `.inv-fx-bold` the 600 weight, `.inv-fx-big` 1.2em at line height 1,
+  `.inv-fx-italic` an inline-block (not on a space) skewed `--inv-fx-skew` (-10deg) round its
+  middle, its layout box unchanged, the shake's steps keeping the skew after their translate,
   stilled by `prefers-reduced-motion` and the bubble's `is-still`). A broken tag
   still shows: a stray brace as itself, an unknown style as plain letters. `dialogue.js`,
   `speech.js`, `bubble.js` and `dialogueUi.js` count, time and type by its letters; the Log, the
@@ -709,11 +742,10 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
 - **The model:** `npm run model -- newt` rebuilds `public/models/newt.glb` from `tools/newt.py`
   with headless Blender (`$NEWT_BLEND` names the .blend; it defaults to the user's
   `NEWT_optimized.blend`, which is never overwritten).
-- **The pixel face and shirt** (the face only with Pixel Face on, the preset's
-  `texture.pixelFace`, on in every style; the shirt only with Pixel Shirt on, `texture.pixelShirt`,
-  off in every style; off, the glb's smooth face and own atlas show at every resolution; a look
-  stored with the one switch they split from, `pixelArt`, sets both, `LEGACY_SHADER`, and the
-  admin's content rules read it with a warning): at the coarser
+- **The pixel face** (only with Pixel Face on, the preset's `texture.pixelFace`, on in every
+  style; off, the glb's smooth face shows at every resolution; a look stored with the one switch
+  it split from, `pixelArt`, sets it, `LEGACY_SHADER`, and the admin's content rules read it with
+  a warning): at the coarser
   resolutions his head is only a dozen or two texels wide, so
   `node tools/newt-face.mjs` redraws the glb's face sheet as `public/models/newt-face.png`,
   his smooth face scaled down faithfully to each cell size: its design measured from the glb's
@@ -734,14 +766,14 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   half face in texels (3 px at 16×16 up to 62, his half face at Native on a phone); past 1.25
   times the largest (`SMOOTH_FACE_OVER`: zoomed in at Native or the finest resolutions) it
   shows the glb's smooth face again, as at Off. A copy of the image cached from before the
-  ladder grew shows the sheets it has, and the smooth face past them (`layoutFor`). His shirt shows the bold pixel plaid (`newt-atlas-pixel.png`, `tools/newt-atlas.mjs`)
-  until he's `ORIGINAL_ATLAS_TEXELS` (128) texels tall in the default view at the Pixel Size's
-  own grid (stage.js hands main.js that grid as `home`: neither the zoom's bigger blocks nor the
-  governor's coarser ones change his shirt), then the glb's own plaid, sampled at the preset's
-  `texture.fineMipBias`. The face sheet and the pixel atlas are asked for at the same time as
-  the glb, and the first frame waits (up to 3 s more) for each one whose switch is on, so NEWT
-  never shows a blank face or the blurred atlas first; one whose switch is off never holds it
-  up.
+  ladder grew shows the sheets it has, and the smooth face past them (`layoutFor`). His shirt
+  shows the glb's own plaid at every resolution, sampled at the preset's `texture.fineMipBias`
+  (under about 100 texels tall its checks are smaller than a texel, so it shows as a mottled mix
+  of its colours). Pixel Shirt, a bold black-and-white pixel plaid at the coarser resolutions, is
+  gone: a look stored with it loads with the key ignored (`RETIRED_SHADER`), and the admin's
+  content rules read it in the Default look with a warning. The face sheet is asked for at the
+  same time as the glb, and while Pixel Face is on the first frame waits for it (up to 3 s more),
+  so NEWT never shows a blank face first; with it off it never holds him up.
 - **The dialogue faces** (sad, angry, shy and smug, for the intro's boxes: `clips.js`
   `EXTRA_FACES`) have sheets of their own beside the glb, laid out like his: `node
   tools/newt-face-smooth.mjs` draws the smooth one (`newt-face-smooth-extra.png`, 1024) from his
@@ -930,15 +962,57 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   and `setBurst(x, y, r, k)` (client px; stage.js forwards them), `hoverEase` (in over 0.08 s,
   out over 0.2 s: `HOVER`) and `burstAt` (to 20 texels in 0.38 s: `BURST`), which main.js
   `effects` drives each frame.
+- **Landings:** carry.js `fallStep` returns the `impact` velocity he hit the floor with, and
+  play.js `bodyStep` keeps each landing as `BodyState.landing` (`t`, `x`, `z` and `speed`:
+  dust.js `landingSpeed`, how fast he came down plus `DUST.slide` of how fast he slid). main.js
+  `landed` takes a new one: the dust (`dust.js`, pure and seeded on a stream of its own,
+  `createRng(seed + 11)`: `dustLand` sets off `DUST.count` puffs, 2 at `DUST.min` 1.5 u/s to 14
+  at `DUST.full` 8 u/s, evenly round his feet with a little jitter, each slowed by exponential
+  drag in closed form, rising, swelling and fading as `(1 − u)^DUST.fade` over 0.5–0.8 s, at most
+  `DUST.max` kept; `dustPuffs(d, t)` the live ones, `dustBounds` their box) and the shake
+  (camera.js `shakeKick(speed, {on, reduced})`: none under `SHAKE.min` 5.6 u/s, up to
+  `SHAKE.px` 7 CSS px for `SHAKE.time` 0.25–0.4 s at `SHAKE.full` 8.2; `shakeOffset(kick,
+  since)`, trauma² over three sines an axis, the up and down one starting at its peak). The maths
+  is the Bonfire's: `src/bonfire/impact.js`'s impact puff (headings round the impact, drag, the
+  power fade) and `src/bonfire/view.js`'s camera shake (trauma², odd-frequency sines), copied,
+  since the invitation imports only its own modules. As measured at 1280×800: a finger's grab let
+  go lands at about 3.8 u/s, the mouse's at 4.9, lifted his own height 5.9, as high as the hold
+  goes 8.2, and set down from his hang height 1.2. `dropFx`, each frame before the render, hands
+  the puffs to `stage.setDust` (`dustLayer.js`: one instanced, camera-facing quad a puff on the
+  decal layer, no depth written, the target's surface id kept, so the pass draws it as floor and
+  it takes no lines; in the colour target each texel is in where the puff's cover beats its 4×4
+  Bayer threshold, drawn in the look's marker colour at `DUST_INK.opacity` 0.85, a smooth alpha at
+  Off; the stage grows the pass's area by `dustBounds`) and the shake to `stage.setShake` (the
+  projection's offset, `setViewOffset`, moved by it and snapped to whole texels as `view.js`
+  snaps the Bonfire's; the camera's place, the orbit and the canvas never move: a CSS transform on
+  the canvas held back the frames Chrome showed for the first 100 ms of the shake); a
+  grab, Screen Shake switched off (look.js `shake`, `shakeOn`: left out until it's picked, on) or
+  reduced motion ends it at once.
 - **The intro:** `dialogue.js` (pure, on an injected clock: `normalizeScript` makes any
-  `DialogueScript` safe, types.js; `createDialogue(script, {reduced})` with `start`, `step`,
-  `advance`, `choose`, `setAuto`, `skip` (the Next button), `pause`, `end`, `view` and `log`
+  `DialogueScript` safe, types.js; `createDialogue(script, {reduced, lead})` (lead: the seconds
+  a line after another waits before it types) with `start`, `step`, `advance`, `choose`,
+  `setAuto`, `skip` (the Next button), `pause`, `end`, `view` and `log`
   (plain text); `DIALOGUE`: 32 letters a second with a beat after punctuation, Auto's wait
   1.1 s plus 0.035 s a letter between 1.4 and 6 s, 240 letters and 3 replies at most, all
   counting the letters that show (markup.js); `lookSway`; main.js runs
   `content.js` `introScript()` through `normalizeScript` as a safety net, `playScript`),
   `dialogueUi.js` and `dialogue.css` (the screen: a modal layer over the stage that takes every
-  press; the line in a live region once, whole; `REPLY_SETTLE`, `REPLY_ROOM`), brain.js's `talk` state (`BrainIn.dialogue`: the
+  press; the line in a live region once, whole; `REPLY_SETTLE`, `REPLY_ROOM`; a long line's
+  view `followRow` (the newest row in view, never back up; a jump over `FOLLOW_JUMP` letters
+  stays put), `.can-scroll` once it's typed and outgrows the box, the `.inv-talk-more` cues; its feedback from
+  `TALK_DITHER`'s tiles, `talkTile` (icons.js `ditherMask` drawn at 2 px a cell) installed on the
+  layer as `--talk-ink-N` and `--talk-mask-N`: the buttons' hover and press backgrounds, the
+  `inv-talk-dither-in` keyframes stepping the layer's and the replies' `mask-image`, and from
+  script the ghost (`ditherOut`, a copy of the line before, masked out step by step; the next
+  line's letters and ▼ wait unseen while it goes, and main.js passes `TALK_DITHER.fadeMs` as the
+  runner's `lead` so it starts typing then), the press flash (`pressFlash`) and the end
+  (`ditherAway`: `.is-leaving` and inert at once, the layer's mask through the fade's steps over
+  `TALK_DITHER.leaveMs`, then hidden; `close({cut})` drops it at once for a replay or the
+  preview); `holdPressed` (`.is-pressed` from a pointerdown until it lifts, is cancelled or
+  leaves the button) and `.inv-talk-label` (a button's words on a plate of its inherited fill);
+  the dark dither in the box, `.inv-talk-shade` (`SHADE_BANDS` on `--talk-ink-N`, four bands of
+  `--talk-band` each per layout, sinking one in `--talk-sink-steps` steps under `.is-receding`:
+  a pointer on the box or focus in it)), brain.js's `talk` state (`BrainIn.dialogue`: the
   box's seq, animation, face and whether it's typing; any clip, clips.js `DIALOGUE_CLIPS`:
   `DIALOGUE_WAYS` says which step in place (main.js moves the step phase on by brain.js
   `talkPhase`) and which dangle him (`dangleLift`: his lowest point `DANGLE.gap` over the
@@ -951,7 +1025,7 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   sheet is in, above), and main.js plays a clip the glb lacks (an older copy cached from before
   the gestures) as Idle.
 - **Tests:** `test/invitationCharacter.test.mjs`, `invitationLook`, `invitationLooks`,
-  `invitationShader`, `invitationRetro`, `invitationGovernor`, `invitationAtlas`,
+  `invitationShader`, `invitationRetro`, `invitationGovernor`,
   `invitationFace`, `invitationFaceExtra`, `invitationFaceBlink`, `invitationCharacterFaces`,
   `invitationArea`, `invitationCamera` and `invitationPlay` (with `invitationBrain`,
   `invitationMotion`, `invitationGesture` and `invitationModel`), `invitationDialogue` (the
@@ -959,10 +1033,14 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   `invitationEnvelope` (its states, swipes, keys and timeline), `invitationPetals` (the petals'
   shapes, variety, the stepped simulation and every flow, the trail's spacing and rate),
   `invitationPetalSetting` (Rose Petals stored with the look), `invitationPetalLayer` (no WebGL
-  context till petals may come),
+  context till petals may come), `invitationDust` (the landing's speed, the dust's count, spread,
+  rise and fade by it, bounded) and `invitationShake` (the shake's threshold, size, decay, none
+  when off, and Screen Shake stored with the look),
   `e2e/invitation.spec.mjs`, `e2e/invitationDialogue.spec.mjs`,
-  `e2e/invitationEnvelope.spec.mjs` and `e2e/invitationPetals.spec.mjs` (the page's petal layer:
-  the mouse, a finger, Rose Petals off, reduced motion) (`npm run e2e -- invitation`).
+  `e2e/invitationEnvelope.spec.mjs`, `e2e/invitationPetals.spec.mjs` (the page's petal layer:
+  the mouse, a finger, Rose Petals off, reduced motion) and `e2e/invitationDrop.spec.mjs` (the
+  landings' dust and shake: from high, from the hold's height, set down, Screen Shake off,
+  reduced motion, a finger and a second finger's lift) (`npm run e2e -- invitation`).
 - **Test hooks:** `[data-stage].is-ready` once the first frame is drawn, `data-webgl="off"`
   without WebGL. `?test` adds `window.__invitation`: `snapshot()` (his state, clip, face,
   position, head turn, the camera's yaw, elevation and distance, the states he went through,
@@ -970,8 +1048,7 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   shows Native, a resolution at 1 px a texel included; null at Off), `newtTexels`: his height in
   texels and `newtTall` in CSS px in the default view, `faceSheet`: the face sheet showing (a
   cell width, or `'smooth'`, as at Off), `faceShown`: the face really showing (a dialogue face's
-  stand-in until its sheet is in), `faceTexels`, `atlas`: `'pixel'` or `'original'`,
-  `shader`: every Shader option's value, `custom`: whether one is the user's, `pass`: what
+  stand-in until its sheet is in), `faceTexels`, `shader`: every Shader option's value, `custom`: whether one is the user's, `pass`: what
   reached the renderer (the post shader's values, the light's strength and angle, the shadow's
   strength, `zoom`: the zoom the texels follow, `pd`: device px a texel as drawn, `governor`:
   whether it's on, its level and the last second's p90), and `warmed`: the pass's other path compiled),
@@ -990,7 +1067,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   the `spot` the cues share (cues.js `cueSpot`, null on his feet), the floor ring as drawn
   (`marker`: shown, centre, radius in world units and `texels`, `alpha`, the view's
   `elevation` over it), the blob's and the ring's centres as drawn (`floorPx`, client px),
-  `groundCues` as it plays and `pushed`); `view({yaw, elevation, zoom})` eases the camera there
+  `groundCues` as it plays and `pushed`), `drop` the last `landing` (`t`, `x`, `z`, `speed`), the
+  `dust` as drawn (`count`, its `box`), the `shake` offset on the picture (CSS px) and its `kick`
+  (null when there's none); `view({yaw, elevation, zoom})` eases the camera there
   (radians; zoom the home distance over the distance); the limp layer (`limp.weight`, `limp.most`: the most a limb
   has swung, radians) and Screen Time (`device.state` and `label`, the tablet `shown` and its
   `screen` point, his `turn` off the camera). The snapshot's `camera` has
@@ -1026,7 +1105,10 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   (he walks in again); anything else is dropped (`readPreview`). On its next step `main.js`
   drops any intro under way (the camera stays on him) and starts the dialogue from that box
   the way Replay Intro does, with Auto off, so it holds once the line is typed; a tap or a
-  reply goes on as in the intro. It answers its framer, at that origin only, with
+  reply goes on as in the intro. It never takes the focus from the admin's page
+  (`keepFocusOut`: every `focus()` in the frame does nothing while the frame doesn't have the
+  focus, since Chrome lets a framed page's `focus()` pull it out of the field being typed in);
+  once the frame is clicked or tapped into, focus moves in it as ever. It answers its framer, at that origin only, with
   `{type: 'invitation-intro-preview-state', state}`: `ready` once he's drawn, `playing` with
   the `box` up, its `next` (`nextBox`: where the admin's Next goes, null at replies or the end)
   and whether it has `choices`, and `done` as it ends. With `?test` too, the snapshot's
@@ -1042,7 +1124,10 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   him up high (the report says how far the grabbed point strayed from the cursor) and sweep the
   cursor, or a finger, over the whole screen to show where he looks, and its `reach` and
   `reach-turned` acts tap near the top of the screen and follow him there, as far up as keeps
-  his head on the screen (turned 90° first); its `envelope` and `envelope-skip` acts open or skip the envelope
+  his head on the screen (turned 90° first); its `drop-small` and `drop-big` acts let him go from
+  the hold's height and from as high as it goes (the mouse into the top band and the wheel, a
+  second finger on a phone), for the dust and the shake (the console says how fast he landed);
+  its `envelope` and `envelope-skip` acts open or skip the envelope
   (`?test&envelope`, whole frames). The record and the frames are
   `tools/capture-invitation-record.mjs`. One GPU capture at a time.
   `node tools/capture-invitation-drag.mjs` records the same carry from each of the camera's views

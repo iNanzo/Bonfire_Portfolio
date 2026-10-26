@@ -16,7 +16,7 @@
 // through the style object, as el() does. No imports outside the admin's own and the toy's
 // pure lists, so the tests run it on a stand-in document.
 import { el } from './el.js';
-import { DEFAULT_TEXT_COLORS } from '../../src/invitation/markup.js';
+import { DEFAULT_TEXT_COLORS, plainText } from '../../src/invitation/markup.js';
 import { INVITATION_STARTERS } from './invitationSchema.js';
 import { titleCase } from './text.js';
 
@@ -39,7 +39,7 @@ export const draftIntro = (draft) =>
 
 /**
  * The boxes the toy can play (each with an id, the first of a doubled one: content.js
- * introFrom's), by id and how its line starts.
+ * introFrom's), by id and how its line starts (its tags left out).
  * @param {any} draft
  * @returns {{id: string, label: string}[]}
  */
@@ -49,7 +49,7 @@ export function previewBoxes(draft) {
   const out = [];
   for (const b of Array.isArray(boxes) ? boxes : []) {
     if (!isObj(b) || typeof b.id !== 'string' || !b.id || out.some((o) => o.id === b.id)) continue;
-    const words = Array.from(String(b.text ?? '').trim());
+    const words = Array.from(plainText(String(b.text ?? '')).trim());
     const start = words.length > 28 ? `${words.slice(0, 27).join('')}…` : words.join('');
     out.push({ id: b.id, label: start ? `${b.id}: ${start}` : b.id });
   }

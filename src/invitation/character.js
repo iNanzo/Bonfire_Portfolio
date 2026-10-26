@@ -1,10 +1,10 @@
 // NEWT, the invitation toy's character: his glb dressed for the retro look, his clips on one
 // mixer, his face and his look-at, in the Character shape types.js gives main.js.
 //
-//   loadCharacter(url, opts)       GLTFLoader and the two pixel images at once (the images never
-//                                  wait for the glb), then createCharacter once the glb is in and
-//                                  the images too (or TEXTURE_GRACE s more), so the first frame
-//                                  already wears them; the dialogue faces' two sheets as well,
+//   loadCharacter(url, opts)       GLTFLoader and the pixel face at once (the image never waits
+//                                  for the glb), then createCharacter once the glb is in and the
+//                                  image too (or TEXTURE_GRACE s more), so the first frame
+//                                  already wears it; the dialogue faces' two sheets as well,
 //                                  never waited for
 //   createCharacter(gltf, opts)    any {scene, animations} (the tests pass a stand-in skeleton
 //                                  and synthetic clips): scaled by SCALE; toon materials (the
@@ -46,15 +46,13 @@
 // spring about straight down, pushed by the stud's acceleration; and Screen Time's tablet
 // (device.js) at his palms while he holds it (device.js deviceShown), its game moving on.
 //
-// Two Shader options say which of his own textures show under the pixel filter. Pixel Face (the
-// preset's `texture.pixelFace`, on in every style): on, the pixel face sheets below; off, the
-// glb's smooth sheet at every resolution, sampled sharper than three picks, the more the fewer
-// texels it has, down to its own pixels at 32×32 and coarser (faceSharpen), so his eyes and mouth
-// stay. Pixel Shirt (`texture.pixelShirt`, off in every style): on, the pixel atlas below at the
-// coarser resolutions; off, the glb's own plaid at every resolution, at the preset's
-// `texture.fineMipBias`, so its checks don't blur grey (under about 100 texels tall they're
-// smaller than a texel, and any sample of them dithers to a mottled mix at a few colour levels,
-// coarser mips no less).
+// Pixel Face (the preset's `texture.pixelFace`, a Shader option on in every style) says which
+// face shows under the pixel filter: on, the pixel face sheets below; off, the glb's smooth
+// sheet at every resolution, sampled sharper than three picks, the more the fewer texels it has,
+// down to its own pixels at 32×32 and coarser (faceSharpen), so his eyes and mouth stay. His
+// shirt is the glb's own plaid at every resolution (Pixel Shirt, a bold black-and-white plaid
+// from a pixel atlas at the coarser ones, is gone): under about 100 texels tall its checks are
+// smaller than a texel, and any sample of them dithers to a mottled mix of its colours.
 //
 // Faces: NEWT_Face's 2×2 sheet split into one clamped texture per cell (clips.js FACES), so
 // swapping material.map never bleeds into the next cell as an offset would (the face's UVs reach
@@ -87,15 +85,10 @@
 // steps it back and forth); the rest of him moves the same way by his feet, which stay put
 // while he stands (snapped by his head, they bobbed a texel with each breath on a desktop).
 //
-// The pixel atlas (pixel filter on): models/newt-atlas-pixel.png beside the glb
-// (tools/newt-atlas.mjs: his atlas in flat colours, the plaid redrawn in big black-and-white
-// checks), nearest and no mipmaps, on his atlas material while he's under ORIGINAL_ATLAS_TEXELS
-// tall in the default view (setResolution: main.js passes his texels at the Pixel Size's own
-// grid, so neither the zoom nor the frame-time governor changes his shirt); from
-// there, and at Off, the glb's own atlas, whose real plaid has enough texels to resolve. Under
-// the pixel filter his atlas materials sample it the preset's `texture.mipBias` mip levels
-// coarser (atlasBias: a fallback glb atlas at a low resolution would alias into a patchwork),
-// `texture.fineMipBias` from ORIGINAL_ATLAS_TEXELS (less, or the checks blur into grey); none at Off.
+// His atlas (pixel filter on): his atlas materials sample it the preset's `texture.fineMipBias`
+// mip levels coarser (atlasBias; its `texture.mipBias` for a preset without one): a little, so
+// the toon bands shade him rather than the texture's noise, and no more, or the plaid's checks
+// blur into grey; none at Off.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { BONES, CLIPS, DEVICE, EXTRA_FACES, FACES, SCALE } from './clips.js';
@@ -123,14 +116,11 @@ const MIN_R = 11;
 /**
  * @typedef {import('./types.js').Character & {
  *   setStyle(preset: import('./look.js').LookPreset, pixel: boolean): void,
- *   setResolution(texelsTall: number): void,
- *   atlas: 'pixel'|'original',
  *   weightOf(clip: string): number,
  *   timeOf(clip: string): number,
  *   face: import('./clips.js').FaceName,
  *   faceShown: import('./clips.js').FaceName,
  *   faceReady: Promise<void>,
- *   atlasReady: Promise<void>,
  *   faceSize: number|'smooth'|null,
  *   faceSheet: number|'smooth'|null,
  *   faceTexels: number,
@@ -146,12 +136,6 @@ const MIN_R = 11;
  */
 
 /**
- * The pixel atlas's address: models/newt-atlas-pixel.png beside the glb at `url`.
- * @param {string} url
- */
-export const pixelAtlasUrl = (url) => url.replace(/[^/?#]*([?#].*)?$/, 'newt-atlas-pixel.png');
-
-/**
  * The dialogue faces' sheets' addresses, beside the glb at `url`: the smooth 1024 sheet and the
  * pixel sheets.
  * @param {string} url
@@ -160,13 +144,6 @@ export const extraFaceUrls = (url) => ({
   smooth: url.replace(/[^/?#]*([?#].*)?$/, 'newt-face-smooth-extra.png'),
   pixel: url.replace(/[^/?#]*([?#].*)?$/, 'newt-face-extra.png'),
 });
-
-/**
- * NEWT's height in texels in the default view from which his shirt shows the glb's own plaid
- * rather than the pixel atlas's bold checks (which read at low resolutions but look crude once
- * there are texels enough for the real plaid's checks to resolve).
- */
-export const ORIGINAL_ATLAS_TEXELS = 128;
 
 /**
  * Pixel Face off, under the pixel filter: the smooth face sheet is sampled this many mip
@@ -201,18 +178,14 @@ export function faceSharpen(texels, cell = FACE_CELL) {
   return Math.min(FACE_SHARPEN, (picked + FACE_SHARPEN) * (1 - k) - picked);
 }
 
-/** Seconds the first frame waits for the pixel images once the glb is in (then they come in late). */
+/** Seconds the first frame waits for the pixel face once the glb is in (then it comes in late). */
 export const TEXTURE_GRACE = 3;
 
 /**
- * Whether a preset shows his pixel face (Pixel Face: on unless it says false) and his shirt's
- * bold pixel plaid (Pixel Shirt: off unless it says true), the pixel filter on.
+ * Whether a preset shows his pixel face (Pixel Face: on unless it says false), the pixel filter on.
  * @param {any} preset  a LookPreset
  */
-export const pixelParts = (preset) => ({
-  face: preset?.texture?.pixelFace !== false,
-  shirt: Boolean(preset?.texture?.pixelShirt),
-});
+export const pixelFaceIn = (preset) => preset?.texture?.pixelFace !== false;
 
 /**
  * A texture from `url`, or null when it fails (or there's no url).
@@ -222,44 +195,35 @@ export const pixelParts = (preset) => ({
 const loadTexture = (url) => (url ? new THREE.TextureLoader().loadAsync(url).catch(() => null) : Promise.resolve(null));
 
 /**
- * Load the glb at `url` and dress it: the pixel atlas (from beside it, unless opts name one) and
- * the pixel face are asked for at the same time as the glb, not after it (on a slow phone the
- * first frames showed the glb's blurred atlas and a blank face, then swapped), and, while the
- * look shows one (the pixel filter on, and Pixel Face for the face, Pixel Shirt for the atlas),
- * it's dressed once that one's in too, or TEXTURE_GRACE s after the glb (a slower one goes on
- * when it comes); one the look doesn't show never holds him up, and goes on him whenever it
- * comes, ready for its switch. The dialogue faces' sheets (from beside the glb, unless opts name
- * them) are asked for too and never waited for: until they come their faces show the nearest of
- * the first four.
+ * Load the glb at `url` and dress it: the pixel face is asked for at the same time as the glb,
+ * not after it (on a slow phone the first frames showed a blank face, then swapped), and, while
+ * the look shows it (the pixel filter and Pixel Face on), he's dressed once it's in too, or
+ * TEXTURE_GRACE s after the glb (a slower one goes on when it comes); with the look not showing
+ * it, it never holds him up, and goes on him whenever it comes, ready for its switch. The
+ * dialogue faces' sheets (from beside the glb, unless opts name them) are asked for too and never
+ * waited for: until they come their faces show the nearest of the first four.
  * @param {string} url
- * @param {{preset?: import('./look.js').LookPreset, pixel?: boolean, pixelFaceUrl?: string, pixelAtlasUrl?: string, extraFaceUrl?: string, pixelExtraFaceUrl?: string}} [opts]
+ * @param {{preset?: import('./look.js').LookPreset, pixel?: boolean, pixelFaceUrl?: string, extraFaceUrl?: string, pixelExtraFaceUrl?: string}} [opts]
  */
 export async function loadCharacter(
   url,
   {
-    pixelAtlasUrl: atlasUrl = pixelAtlasUrl(url),
     pixelFaceUrl,
     extraFaceUrl = extraFaceUrls(url).smooth,
     pixelExtraFaceUrl = extraFaceUrls(url).pixel,
     ...rest
   } = {},
 ) {
-  const atlas = loadTexture(atlasUrl);
   const face = loadTexture(pixelFaceUrl);
   const opts = { ...rest, extraFace: loadTexture(extraFaceUrl), pixelExtraFace: loadTexture(pixelExtraFaceUrl) };
   const gltf = await new GLTFLoader().loadAsync(url);
-  const parts = pixelParts(opts.preset ?? LOOKS[DEFAULT_LOOK.style]);
-  if (opts.pixel === false || !(parts.face || parts.shirt))
-    return createCharacter(gltf, { ...opts, pixelAtlas: atlas, pixelFace: face });
-  /** @type {Promise<null>} */
-  const grace = new Promise((done) => setTimeout(() => done(null), TEXTURE_GRACE * 1000));
-  // (A texture in time goes on before the first frame; a late one, as its promise settles, and so
-  // does one the look doesn't show, never waited for.)
+  if (opts.pixel === false || !pixelFaceIn(opts.preset ?? LOOKS[DEFAULT_LOOK.style]))
+    return createCharacter(gltf, { ...opts, pixelFace: face });
+  // (In time, it goes on before the first frame; late, as its promise settles.)
   const late = Symbol('late');
-  /** @param {Promise<any>} p @param {boolean} shown */
-  const wait = (p, shown) => (shown ? Promise.race([p, grace.then(() => late)]) : Promise.resolve(late));
-  const [a, f] = await Promise.all([wait(atlas, parts.shirt), wait(face, parts.face)]);
-  return createCharacter(gltf, { ...opts, pixelAtlas: a === late ? atlas : a, pixelFace: f === late ? face : f });
+  const grace = new Promise((done) => setTimeout(() => done(late), TEXTURE_GRACE * 1000));
+  const f = await Promise.race([face, grace]);
+  return createCharacter(gltf, { ...opts, pixelFace: f === late ? face : f });
 }
 
 const DEG = Math.PI / 180;
@@ -293,10 +257,10 @@ const EAR_SWING = {
 
 /**
  * @param {{scene: any, animations?: any[]}} gltf
- * @param {{preset?: import('./look.js').LookPreset, pixel?: boolean, pixelAtlas?: any, pixelFace?: any, extraFace?: any, pixelExtraFace?: any}} [opts]
- *   pixelAtlas: the pixel atlas and pixelFace: the pixel face sheet (models/newt-face.png),
- *   extraFace and pixelExtraFace: the dialogue faces' smooth and pixel sheets, each a texture (on
- *   him at once), a promise of one (on him when it settles; null: none) or nothing
+ * @param {{preset?: import('./look.js').LookPreset, pixel?: boolean, pixelFace?: any, extraFace?: any, pixelExtraFace?: any}} [opts]
+ *   pixelFace: the pixel face sheet (models/newt-face.png), extraFace and pixelExtraFace: the
+ *   dialogue faces' smooth and pixel sheets, each a texture (on him at once), a promise of one
+ *   (on him when it settles; null: none) or nothing
  * @returns {PageCharacter}
  */
 export function createCharacter(gltf, opts = {}) {
@@ -321,12 +285,6 @@ export function createCharacter(gltf, opts = {}) {
    */
   const snaps = { head: { value: new THREE.Vector2() }, body: { value: new THREE.Vector2() } };
   const holds = { head: { x: Number.NaN, y: Number.NaN }, body: { x: Number.NaN, y: Number.NaN } };
-  /** @type {Array<{material: any, map: any}>} his atlas materials and the glb's map on each */
-  const atlased = [];
-  /** @type {any} */
-  let pixelAtlas = null;
-  /** His height in texels in the default view (0: not measured yet). */
-  let tall = 0;
   /** The mip bias his materials other than the face sample their maps at (markId's `bias`). */
   const atlasBias = { value: 0 };
   /**
@@ -339,16 +297,13 @@ export function createCharacter(gltf, opts = {}) {
   /** A cell of the smooth face sheet, pixels (the glb's: FACE_CELL). */
   let faceCell = FACE_CELL;
   /**
-   * atlasBias and faceBias for the preset, the pixel filter and his height in texels (with Pixel
-   * Shirt off, the glb's plaid at fineMipBias at every height: at mipBias it blurred grey; with
-   * Pixel Face off, the smooth face sharper: faceSharpen).
+   * atlasBias and faceBias for the preset and the pixel filter (the glb's plaid at fineMipBias: at
+   * mipBias it blurred grey; with Pixel Face off, the smooth face sharper: faceSharpen).
    */
   const setBias = () => {
     const t = /** @type {import('./look.js').LookPreset & import('./retro.js').RetroExtras} */ (preset).texture ?? {};
-    const parts = pixelParts(preset);
-    const fine = !parts.shirt || tall >= ORIGINAL_ATLAS_TEXELS ? (t.fineMipBias ?? t.mipBias) : t.mipBias;
-    atlasBias.value = pixel ? Math.max(0, fine ?? 0) : 0;
-    faceBias.value = pixel && !parts.face ? faceSharpen(faceTexels, faceCell) : 0;
+    atlasBias.value = pixel ? Math.max(0, t.fineMipBias ?? t.mipBias ?? 0) : 0;
+    faceBias.value = pixel && !pixelFaceIn(preset) ? faceSharpen(faceTexels, faceCell) : 0;
   };
   setBias();
   /** @type {any[]} every mesh of his */
@@ -394,7 +349,6 @@ export function createCharacter(gltf, opts = {}) {
     );
     if (src?.map) textures.add(src.map);
     if (src?.name === 'NEWT_Face') faceMaterial = m;
-    else if (src?.map) atlased.push({ material: m, map: src.map });
     parts[part] = m;
     made.set(src, parts);
     toons.push(m);
@@ -521,9 +475,7 @@ export function createCharacter(gltf, opts = {}) {
     return pixelSets.get(sheet.w);
   };
   /** Pixel Face (a Shader option, on in every style) under the pixel filter: the pixel sheets at all. */
-  const pixelFaceOn = () => pixel && pixelParts(preset).face;
-  /** Pixel Shirt (a Shader option, off in every style) under the pixel filter: the bold plaid at all. */
-  const pixelShirtOn = () => pixel && pixelParts(preset).shirt;
+  const pixelFaceOn = () => pixel && pixelFaceIn(preset);
   /**
    * The dialogue faces' cells for the pixel sheet `sheet` (null: none that size in the image
    * there is, or no image yet), split the first time they show.
@@ -544,39 +496,8 @@ export function createCharacter(gltf, opts = {}) {
     faceMaterial.map = (extra ?? base)[faceShown];
     faceSheet = sheet ? sheet.w : 'smooth';
   };
-  /**
-   * Whether his shirt shows the pixel atlas's bold plaid (the pixel filter and Pixel Shirt on, him
-   * under ORIGINAL_ATLAS_TEXELS tall).
-   */
-  const pixelPlaid = () => pixelShirtOn() && Boolean(pixelAtlas) && !(tall >= ORIGINAL_ATLAS_TEXELS);
-  const showAtlas = () => {
-    setBias();
-    const bold = pixelPlaid();
-    for (const { material, map } of atlased) material.map = bold ? pixelAtlas : map;
-  };
-  /** @param {any} t  the pixel atlas */
-  const usePixelAtlas = (t) => {
-    t.flipY = false;
-    t.colorSpace = THREE.SRGBColorSpace;
-    t.magFilter = THREE.NearestFilter;
-    t.minFilter = THREE.NearestFilter;
-    t.generateMipmaps = false;
-    if (atlased[0]) {
-      t.wrapS = atlased[0].map.wrapS;
-      t.wrapT = atlased[0].map.wrapT;
-    }
-    t.needsUpdate = true;
-    pixelAtlas = t;
-    textures.add(t);
-    showAtlas();
-  };
   /** A texture now, or a promise of one later (null: none). */
   const isPromise = (t) => typeof t?.then === 'function';
-  if (opts.pixelAtlas && !isPromise(opts.pixelAtlas)) usePixelAtlas(opts.pixelAtlas);
-  // (Without it the glb's atlas stays, its mip a little coarser.)
-  const atlasReady = isPromise(opts.pixelAtlas)
-    ? opts.pixelAtlas.then((t) => t && atlased.length && usePixelAtlas(t)).catch(() => {})
-    : Promise.resolve();
   if (faceMaterial?.map?.image && typeof document !== 'undefined') {
     sheetFaces = splitSheet(faceMaterial.map.image, false);
     faceCell = Math.floor(faceMaterial.map.image.width / 2) || FACE_CELL;
@@ -938,7 +859,6 @@ export function createCharacter(gltf, opts = {}) {
       return faceShown;
     },
     faceReady,
-    atlasReady,
     /** The face sheet size picked for his half face in texels (whether or not it shows). */
     get faceSize() {
       return faceSize;
@@ -949,14 +869,6 @@ export function createCharacter(gltf, opts = {}) {
     },
     get faceTexels() {
       return faceTexels;
-    },
-    /** The atlas on his shirt: the bold pixel plaid, or the glb's own. */
-    get atlas() {
-      return pixelPlaid() ? 'pixel' : 'original';
-    },
-    setResolution(texelsTall) {
-      tall = texelsTall > 0 ? texelsTall : 0;
-      showAtlas();
     },
     get texelSnap() {
       return { head: snaps.head.value, body: snaps.body.value };
@@ -971,7 +883,7 @@ export function createCharacter(gltf, opts = {}) {
         holds[part].y = Number.NaN;
       }
       showFace();
-      showAtlas();
+      setBias();
     },
     bonePos(name, out) {
       const b = bone(name);
