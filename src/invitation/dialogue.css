@@ -170,7 +170,11 @@
   line-height: 1.42;
   letter-spacing: 0.01em;
   overflow-wrap: break-word;
-  /* (The admin's own line breaks show.) */
+}
+/* (The admin's own line breaks show, in the line and its copy: never on the view, where the
+   breaks between its parts in the markup would each take a row.) */
+.inv-talk-text,
+.inv-talk-ghost {
   white-space: pre-line;
 }
 .inv-talk-text {

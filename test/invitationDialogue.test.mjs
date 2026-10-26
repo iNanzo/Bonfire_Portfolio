@@ -730,15 +730,21 @@ test('a press that goes on, or a reply picked: the old line dithers out, then th
     assert.ok(at >= 0, `a rule for ${sel}`);
     return css.slice(at, css.indexOf('}', at));
   };
-  const ghost = rule('.inv-talk-ghost');
+  // (Its own rule: the last of its name, after the one it shares with the line.)
+  const ghostAt = css.lastIndexOf('\n.inv-talk-ghost {');
+  assert.ok(ghostAt >= 0, 'a rule for .inv-talk-ghost');
+  const ghost = css.slice(ghostAt, css.indexOf('}', ghostAt));
   for (const d of [/position: absolute/, /inset: 0/, /overflow: hidden/, /pointer-events: none/])
     assert.match(ghost, d);
   assert.match(rule('.inv-talk-choices.is-ghost'), /pointer-events: none/);
-  // (The line's type is its view's, so the copy is set just as the line was.)
+  // (The line's type is its view's, so the copy is set just as the line was; the admin's own line
+  // breaks show in the line and in its copy, never in the view, where the markup's breaks
+  // between its parts would each take a row.)
   const view = rule('.inv-talk-view');
-  for (const d of [/font-size: 18px/, /line-height: 1\.42/, /white-space: pre-line/, /overflow-wrap: break-word/])
-    assert.match(view, d);
+  for (const d of [/font-size: 18px/, /line-height: 1\.42/, /overflow-wrap: break-word/]) assert.match(view, d);
+  assert.ok(!/white-space/.test(view), 'no breaks kept in the view');
   assert.ok(!/font-size/.test(rule('.inv-talk-text')), 'the line takes its view’s type');
+  assert.match(css, /\.inv-talk-text,\n\.inv-talk-ghost \{\s*white-space: pre-line;/);
 });
 
 test('a long line grows the box a row at most (four rows, three on a short screen), then scrolls in it, following the typing a row at a time', async () => {
