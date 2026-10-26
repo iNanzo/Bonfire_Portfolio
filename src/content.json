@@ -2405,7 +2405,7 @@
           "face": "neutral",
           "animation": "Talk",
           "camera": "keep",
-          "next": "",
+          "next": "wrap4",
           "end": false,
           "auto": 0,
           "choices": []
