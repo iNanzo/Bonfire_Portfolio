@@ -24,7 +24,8 @@
 // a line dithers out over the next, a press that goes on flashes the box, the ▼ bobs in steps,
 // and reduced motion fades plainly. A line longer than the box scrolls inside it (the box keeps
 // its size): it follows the typing, then a finger, the wheel or the arrow keys scroll it, with
-// cues where there's more.
+// cues where there's more. A dark dither rises from the bottom behind the box, up to its top
+// and fading out over it, and grows with it.
 import { readFileSync } from 'node:fs';
 import { test, expect } from '@playwright/test';
 import { routeToEnd } from './helpers/dialogue-route.mjs';
@@ -533,7 +534,64 @@ async function longLineScrolls(page, tap) {
   expect(errors).toEqual([]);
 }
 
+/** The dark dither behind the box, against the box: client px. */
+const dimAgainstBox = (page) =>
+  page.evaluate(() => {
+    const r = (sel) => document.querySelector(sel).getBoundingClientRect();
+    const bands = [...document.querySelectorAll('.inv-talk-dim > span')];
+    const text = r('.inv-talk-text');
+    const hit = document.elementFromPoint(text.left + text.width / 2, text.top + text.height / 2);
+    return {
+      boxTop: r('.inv-talk-box').top,
+      baseTop: bands.at(-1).getBoundingClientRect().top,
+      dimTop: r('.inv-talk-dim').top,
+      dimBottom: r('.inv-talk-dim').bottom,
+      layerBottom: r('.inv-talk').bottom,
+      tiles: bands.map((b) => getComputedStyle(b).backgroundImage),
+      textOnTop: Boolean(hit?.closest('.inv-talk-box')),
+    };
+  });
+/**
+ * A dark dither rises from the screen's bottom behind the chat box: densest behind it up to its
+ * top, fading out in bands above it, under the box (its text on top), and it follows the box
+ * when the box grows.
+ */
+async function darkBehindBox(page, tap) {
+  const errors = watch(page);
+  await calm(page);
+  await useBehaviorIntro(page);
+  await open(page, tap);
+  const behind = (d) =>
+    d.baseTop <= d.boxTop + 0.5 && d.baseTop >= d.boxTop - 8.5 && d.dimTop < d.boxTop - 40 && d.dimTop > d.boxTop - 80;
+  await expect.poll(async () => behind(await dimAgainstBox(page)), { message: 'up to the box’s top' }).toBe(true);
+  const d = await dimAgainstBox(page);
+  expect(Math.abs(d.dimBottom - d.layerBottom)).toBeLessThan(1);
+  for (const t of d.tiles) expect(t).toMatch(/^url\("data:image\/png/);
+  expect(new Set(d.tiles).size, 'each band its own coverage').toBe(d.tiles.length);
+  expect(d.textOnTop, 'the line over it').toBe(true);
+  // A taller box: the dither rises with it.
+  const grow = await page.addStyleTag({ content: '.inv-talk-box { padding-top: 120px !important; }' });
+  await expect
+    .poll(
+      async () => {
+        const g = await dimAgainstBox(page);
+        return g.boxTop < d.boxTop - 60 && behind(g);
+      },
+      { message: 'up to the taller box’s top' },
+    )
+    .toBe(true);
+  await grow.evaluate((el) => el.remove());
+  await expect.poll(async () => behind(await dimAgainstBox(page))).toBe(true);
+  expect(errors).toEqual([]);
+}
+
 test.describe('on a phone', () => {
+  test('a dark dither rises from the bottom behind the box, to its top and fading out over it, and grows with it', async ({
+    page,
+  }) => {
+    await darkBehindBox(page, true);
+  });
+
   test('a long line scrolls in the box: it follows the typing, then a finger or the wheel and keys scroll it', async ({
     page,
   }) => {
@@ -990,6 +1048,12 @@ test.describe('on a phone', () => {
 });
 
 test.describe('on a desktop', () => {
+  test('a dark dither rises from the bottom behind the box, to its top and fading out over it, and grows with it', async ({
+    page,
+  }) => {
+    await darkBehindBox(page, false);
+  });
+
   test('a long line scrolls in the box: it follows the typing, then a finger or the wheel and keys scroll it', async ({
     page,
   }) => {

@@ -6,7 +6,8 @@
 // Next (to the next question, or the end) and Log at the top right of the screen, Skip Intro at its top
 // left (on screen all through the intro: it ends it at once, no question), the replies as buttons
 // stacked in the middle of it when a box has them (laid out out of sight from the box's start, so
-// main.js frames him over them: clearSpace), a gentle dim along the bottom behind the box,
+// main.js frames him over them: clearSpace), a dark dither rising from the bottom behind the box
+// (the ink's Bayer bands, up to the box's top and fading out over it: talkRise),
 // the Log (a scrollable list of the lines shown and the replies picked, a dialog of its own) and
 // a "Skip the Intro?" question for Escape. Rendering only: dialogue.js runs the script, and
 // main.js hands each frame's view here (render) and turns what's pressed (`onAction`) into the
@@ -127,6 +128,18 @@ export function followRow({ mid, rowH, clientHeight, scrollTop }) {
   return want > scrollTop ? want : scrollTop;
 }
 
+/**
+ * How high the dark dither behind the box rises from the screen's bottom, CSS px: to the box's
+ * top as it's laid out (`boxTop`, from the layer's top; the layer `layerH` tall), in whole 8 px
+ * tiles, never short of it (its fade goes on over the box from there: dialogue.css).
+ * @param {number} layerH
+ * @param {number} boxTop
+ */
+export const talkRise = (layerH, boxTop) => Math.max(0, Math.ceil((layerH - boxTop - 0.01) / 8) * 8);
+
+/** The dark dither's bands, top to bottom: the ink's coverage in each (the last, behind the box). */
+const DIM_BANDS = [1, 2, 3, 4, 6];
+
 /** The words on the screen: labels in Title Case, the rest sentences. */
 export const TALK_TEXT = {
   layer: 'Intro',
@@ -178,7 +191,7 @@ function styleHolders(root, palette) {
 /** The layer's markup (hidden until open). */
 export function talkHtml() {
   const t = TALK_TEXT;
-  return `<div class="inv-talk-dim" aria-hidden="true"></div>
+  return `<div class="inv-talk-dim" aria-hidden="true">${DIM_BANDS.map((n) => `<span class="inv-talk-dim-${n}"></span>`).join('')}</div>
   <div class="inv-talk-top" role="toolbar" aria-label="${t.layer}">
     <button type="button" class="inv-btn inv-talk-btn" data-talk="auto" aria-pressed="false">${t.auto}</button>
     <button type="button" class="inv-btn inv-talk-btn" data-talk="skip">${t.next}</button>
@@ -415,6 +428,13 @@ export function createDialogueUi(
     return true;
   }
   text.addEventListener('scroll', cues, { passive: true });
+  /** The dark dither rises to the box's top, whatever its size (a phone's, a desktop's, a longer line's). */
+  const rise = () => layer.style.setProperty('--talk-rise', `${talkRise(layer.clientHeight, boxEl.offsetTop)}px`);
+  if (typeof view?.ResizeObserver === 'function') {
+    const sizes = new view.ResizeObserver(rise);
+    sizes.observe(layer);
+    sizes.observe(boxEl, { box: 'border-box' });
+  }
   if (typeof view?.ResizeObserver === 'function') new view.ResizeObserver(() => scrollState()).observe(text);
 
   /** The Log was opened with a pointer (a click or a tap), not from the keyboard. */

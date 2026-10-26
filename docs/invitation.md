@@ -324,8 +324,11 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
 
 - **The screen:** a wide box along the bottom with his name on a tab at its top left and his
   line typed out in it, a small ▼ bobbing in pixel steps at its bottom right once the line is all
-  there, Auto, Next and Log at the top right, **Skip Intro** at the top left, and a gentle dim along
-  the bottom behind the box. A line's own line breaks (as the admin types them) show. A line
+  there, Auto, Next and Log at the top right, **Skip Intro** at the top left, and a dark dither
+  rising from the bottom of the screen behind the box (the ink's ordered dither, densest behind the
+  box up to its top and fading out in lighter bands just over it, under the box and its name tab
+  so never over the text; sized to the box on a phone or a desktop, and rising with it when it's
+  taller). A line's own line breaks (as the admin types them) show. A line
   longer than the box's three rows (two on a phone held sideways) scrolls inside it, and the box
   keeps its size: as it types the newest row stays in view, and once it's all there the wheel, a
   finger dragged over it, or the arrow and Page keys scroll it, with small pixel triangles at its
@@ -963,7 +966,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   layer as `--talk-ink-N` and `--talk-mask-N`: the buttons' hover and press backgrounds, the
   `inv-talk-dither-in` keyframes stepping the layer's and the replies' `mask-image`, and from
   script the ghost (`ditherOut`, a copy of the line before, masked out step by step) and the press
-  flash (`pressFlash`)), brain.js's `talk` state (`BrainIn.dialogue`: the
+  flash (`pressFlash`); the dark dither's bands `.inv-talk-dim-N` on `--talk-ink-N`, the dim
+  `--talk-rise` (`talkRise`: the box's top as laid out, in whole 8 px tiles, kept by a
+  ResizeObserver on the layer and the box's border box) plus `--talk-fade` tall), brain.js's `talk` state (`BrainIn.dialogue`: the
   box's seq, animation, face and whether it's typing; any clip, clips.js `DIALOGUE_CLIPS`:
   `DIALOGUE_WAYS` says which step in place (main.js moves the step phase on by brain.js
   `talkPhase`) and which dangle him (`dangleLift`: his lowest point `DANGLE.gap` over the

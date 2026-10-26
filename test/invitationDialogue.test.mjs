@@ -567,3 +567,34 @@ test('a long line scrolls in the box: it follows the typing a row at a time, and
   assert.match(free, /overscroll-behavior: contain/);
   assert.match(text, /scrollbar-width: none/);
 });
+
+test('a dark dither rises from the bottom behind the box: sized to it, fading out over it, never a gradient', async () => {
+  const { talkRise, talkHtml, TALK_DITHER } = await import('../src/invitation/dialogueUi.js');
+  // (From the screen's bottom to the box's top, in whole 8 px tiles, never short of it.)
+  assert.equal(talkRise(844, 844 - 160), 160);
+  assert.equal(talkRise(844, 844 - 161), 168);
+  assert.equal(talkRise(800, 800 - 199.5), 200);
+  assert.equal(talkRise(500, 600), 0, 'a box off the bottom: none');
+  const markup = talkHtml();
+  const dim = /<div class="inv-talk-dim" aria-hidden="true">([\s\S]*?)<\/div>/.exec(markup)?.[1] ?? '';
+  const bands = [...dim.matchAll(/class="inv-talk-dim-(\d+)"/g)].map((m) => Number(m[1]));
+  // (Lightest at the top, densest behind the box; every coverage one of the ink's tiles.)
+  assert.ok(bands.length >= 4, `bands: ${bands}`);
+  assert.ok(
+    bands.every((n, i) => i === 0 || n > bands[i - 1]),
+    'denser further down',
+  );
+  for (const n of bands) assert.ok(TALK_DITHER.ink.includes(n), `${n}: an ink tile`);
+
+  const css = readFileSync(new URL('../src/invitation/dialogue.css', import.meta.url), 'utf8');
+  const at = css.indexOf('.inv-talk-dim {');
+  const rule = css.slice(at, css.indexOf('}', at));
+  assert.match(rule, /height: calc\(var\(--talk-rise, \d+px\) \+ var\(--talk-fade\)\)/);
+  assert.ok(!/gradient/.test(rule), 'dithered, not a smooth gradient');
+  for (const n of bands)
+    assert.match(
+      css,
+      new RegExp(String.raw`\.inv-talk-dim-${n} \{[^}]*background-image: var\(--talk-ink-${n}\)`),
+      `band ${n}`,
+    );
+});
