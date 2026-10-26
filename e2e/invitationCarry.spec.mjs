@@ -165,13 +165,13 @@ test.describe('on a desktop', () => {
   test('his limbs swing against a quick drag, then settle while he hangs still', async ({ page }) => {
     await calm(page);
     const cursor = await pickUp(page);
-    await until(page, (s) => s.motion.limp.weight === 1 && s.motion.limp.most < 0.03, 'hanging still');
+    await onFrame(page, (s) => s.motion.limp.weight === 1 && s.motion.limp.most < 0.03, 'hanging still');
     await glide(page, cursor, { x: cursor.x + 220, y: cursor.y }, 3);
-    await until(page, (s) => s.motion.limp.most > 0.15, 'his limbs swung');
-    await until(page, (s) => s.motion.limp.most < 0.05, 'and settled', 30_000);
+    await onFrame(page, (s) => s.motion.limp.most > 0.15, 'his limbs swung');
+    await onFrame(page, (s) => s.motion.limp.most < 0.05, 'and settled', 30_000);
     await page.mouse.up();
     await until(page, (s) => s.state === 'idle' || s.state === 'flee', 'down again', 30_000);
-    await until(page, (s) => s.motion.limp.weight === 0, 'the limp layer off once he’s down');
+    await onFrame(page, (s) => s.motion.limp.weight === 0, 'the limp layer off once he’s down');
   });
 
   test('held, he keeps the way he faced when grabbed, glances up at you now and then (only ever lifting his head as he does), and lands facing the same way', async ({
