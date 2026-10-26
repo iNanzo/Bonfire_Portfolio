@@ -7,7 +7,8 @@
 // (FLOWS): a soft flurry as the letter appears; a slow helix swirl round it while it floats (a
 // few strands on an ellipse round the letter, climbing, every fourth spiralling in from further
 // out, each petal pulled to its slot, the back half behind the letter), flung outward as it
-// opens; a pour rising out of its pocket's mouth once the flap is half open; the seal blooming
+// opens; a pour rising out of its pocket's mouth once the flap is half open (each petal drawn in
+// front of the paper once it has risen past the mouth: front, FRONT_BIAS); the seal blooming
 // into a ring of petals that unfurl and drift up and aside, clear of the mouth; a burst ring at a click; a cursor trail (createTrail spaces it, caps its
 // rate and keeps a held finger going); petals off the letter's trailing edge as it moves (the
 // wake); a spill down on a skip. Never more than POOL at once (the oldest go first, the swirl
@@ -38,6 +39,25 @@ export const LETTER_DEPTHS = { inside: 0.0095, pocket: 0.0325 };
  * SHAPE.mouth): its V's foot, in the middle; the pour starts just under it.
  */
 export const LETTER_MOUTH = 0.25;
+/**
+ * How high up the letter (`h` tall, letter widths) its pocket's mouth is `across` its middle: its
+ * V, lowest in the middle, at the top edge by its sides.
+ * @param {number} h
+ * @param {number} across
+ */
+export const mouthAt = (h, across) => h / 2 - LETTER_MOUTH * h * (1 - Math.min(1, Math.abs(across) / 0.5));
+/**
+ * A poured petal that has risen past the mouth draws in front of all the paper (its `front`):
+ * its depth, in normalised device coordinates, pulled toward the near plane to this share of the
+ * way (frontDepth), so the pocket's lip and the open flap never cut it, and front petals still
+ * overlap each other in their order.
+ */
+export const FRONT_BIAS = 0.02;
+/**
+ * A front petal's depth as drawn (NDC, −1 near … 1 far): petalScene.js's shader runs the same sum.
+ * @param {number} z
+ */
+export const frontDepth = (z) => -1 + (z + 1) * FRONT_BIAS;
 
 /**
  * How many each flow launches (a ring rolls its count; a trail step comes in 1–3). The pour starts
@@ -245,6 +265,8 @@ export function valueNoise(x) {
  * @property {number} ends  its size as it left the swirl (the swirl's ends draw it small)
  * @property {number} cut  when it was told to go (Infinity: it lives its life), seconds
  * @property {number} cutFor  how long it takes to go once it's cut, seconds
+ * @property {boolean} front  a poured one that has risen past the mouth: drawn in front of the
+ *   paper from then on (FRONT_BIAS)
  */
 
 /**
@@ -333,10 +355,11 @@ export function swirlSlot(L, slot, spin) {
  * @property {[number, number, number, number]} q  its rotation (a unit quaternion)
  * @property {number} scale  its length, letter widths (0 when it isn't there)
  * @property {number} unfurl  its tilt toward the camera now, radians
+ * @property {boolean} front  drawn in front of the letter's paper (Petal front)
  */
 
 /** @type {PetalPose} */
-const NOWHERE = { visible: false, x: 0, y: 0, z: 0, q: [0, 0, 0, 1], scale: 0, unfurl: 0 };
+const NOWHERE = { visible: false, x: 0, y: 0, z: 0, q: [0, 0, 0, 1], scale: 0, unfurl: 0, front: false };
 
 /**
  * A petal as drawn at `t`: where it is, with its flutter across on top; its tumble and rock;
@@ -361,7 +384,16 @@ export function petalAt(p, t) {
   const left = p.life - a;
   const shrink = (1 - smooth((p.fade - left) / p.fade)) * (1 - smooth((t - p.cut) / p.cutFor));
   const ends = p.slot ? clamp01(Math.min(p.slot.s * 6, (1 - p.slot.s) * 5)) : p.ends;
-  return { visible: true, x, y: p.y, z: p.z, q, scale: PETAL_LEN * p.size * grow * shrink * ends, unfurl };
+  return {
+    visible: true,
+    x,
+    y: p.y,
+    z: p.z,
+    q,
+    scale: PETAL_LEN * p.size * grow * shrink * ends,
+    unfurl,
+    front: p.front,
+  };
 }
 
 /**
@@ -461,6 +493,7 @@ export function createPetalFlow({ seed = 7, reduced = false } = {}) {
       ends: 1,
       cut: Infinity,
       cutFor: 1,
+      front: false,
       ...o,
     };
     p.start = { x: p.x, y: p.y, z: p.z };
@@ -698,7 +731,7 @@ export function createPetalFlow({ seed = 7, reduced = false } = {}) {
   function pourOne(F) {
     const a = r(-0.42, 0.42);
     // (Just under the mouth's V at its x, so the pocket hides only its first moment.)
-    const mouth = F.h / 2 - LETTER_MOUTH * F.h * (1 - Math.abs(a) / 0.5);
+    const mouth = mouthAt(F.h, a);
     const inside = F.inside ?? LETTER_DEPTHS.inside;
     const pocket = F.pocket ?? LETTER_DEPTHS.pocket;
     const at = local(F, a, mouth - r(0.015, 0.05), inside + (pocket - inside) * r(0.05, 0.15));
@@ -824,6 +857,14 @@ export function createPetalFlow({ seed = 7, reduced = false } = {}) {
       p.x += p.vx * h;
       p.y += p.vy * h;
       p.z += p.vz * h;
+      // (Out of the pocket's mouth: in front of the paper from now on.)
+      if (p.kind === 'pour' && !p.front && L) {
+        const dx = p.x - L.c.x;
+        const dy = p.y - L.c.y;
+        const dz = p.z - L.c.z;
+        const up = dx * L.up.x + dy * L.up.y + dz * L.up.z;
+        p.front = up > mouthAt(L.h, dx * L.right.x + dy * L.right.y + dz * L.right.z);
+      }
     }
     t += h;
     petals = petals.filter((p) => t - p.born < p.life && t < p.cut + p.cutFor);

@@ -16,9 +16,10 @@
 // lit side: right of every stroke
 // and under the crossbar and the stems' feet (stampCell). It's one piece: opened, it blooms
 // (envelope.js sealBloom), shrinking away while plain rose petals (petals.js) unfurl out of it, so
-// the monogram never rides on a petal.
+// the monogram never rides on a petal. With the hover's pulse, and once at a click, a white glint
+// (WAX_GLOSS, a fourth tone) sweeps across it (SEAL_GLSL, envelope.js sealGloss).
 import * as THREE from 'three';
-import { IDS, LIGHT, WAX, bandOf, rgb, toon } from './envelopeLook.js';
+import { IDS, LIGHT, WAX, WAX_GLOSS, bandOf, rgb, toon } from './envelopeLook.js';
 
 export { SEAL_SIZE } from './envelopeLook.js';
 
@@ -351,16 +352,43 @@ export function sealOnScreen(group, camera, r, tw, th) {
   return { x, y, axes: [...axis(1, 0), ...axis(0, 1)] };
 }
 
-/** The seal's face from its texture (toon's SEAL): texel for texel round its middle on the screen. */
+/** The vec3 literal of an sRGB hex. */
+const vec3Of = (/** @type {number} */ hex) => {
+  const c = rgb(hex);
+  return `vec3(${c.x.toFixed(4)}, ${c.y.toFixed(4)}, ${c.z.toFixed(4)})`;
+};
+
+/**
+ * The seal's face from its texture (toon's SEAL): texel for texel round its middle on the screen.
+ * Its glint (uGloss: where along its sweep, radii from its middle, and how wide; envelope.js
+ * sealGloss) turns the light and mid wax in a narrow band across it white (WAX_GLOSS), and in a
+ * shoulder either side the light wax white and the mid wax light, measured in the face's own cells from its snapped middle (uFaceR its radius in
+ * them), so it rides with the seal and steps a whole cell at a time: the stamp's dark floors and
+ * the ring stay as they are, so the NH stays crisp.
+ */
 const SEAL_GLSL = /* glsl */ `
   uniform sampler2D uFace;
   uniform float uFaceSize;
   uniform float uFaceC;
+  uniform float uFaceR;
   uniform vec2 uCenter;
+  uniform vec2 uGloss;
   vec4 sealFace() {
     vec2 cell = floor(gl_FragCoord.xy - uCenter) + uFaceC;
     if (cell.x < 0.0 || cell.y < 0.0 || cell.x >= uFaceSize || cell.y >= uFaceSize) return vec4(0.0);
-    return texture2D(uFace, (cell + 0.5) / uFaceSize);
+    vec4 f = texture2D(uFace, (cell + 0.5) / uFaceSize);
+    if (uGloss.y > 0.0 && f.a > 0.5) {
+      // (Radii from its middle, along the sweep: the upper left to the lower right.)
+      vec2 q = (cell - uFaceC + 0.5) / uFaceR;
+      float d = abs(dot(q, vec2(0.7071, -0.7071)) - uGloss.x);
+      bool light = distance(f.rgb, ${vec3Of(WAX[0])}) < 0.02;
+      bool mid = distance(f.rgb, ${vec3Of(WAX[1])}) < 0.02;
+      // (A white core, and a shoulder either side: its light wax white, its mid wax light.)
+      if (d < uGloss.y && (light || mid)) f.rgb = ${vec3Of(WAX_GLOSS)};
+      else if (d < uGloss.y * 2.4 && light) f.rgb = ${vec3Of(WAX_GLOSS)};
+      else if (d < uGloss.y * 2.4 && mid) f.rgb = ${vec3Of(WAX[0])};
+    }
+    return f;
   }
 `;
 
@@ -387,7 +415,9 @@ export function buildSeal(u, r) {
     uFace: { value: /** @type {THREE.DataTexture|null} */ (null) },
     uFaceSize: { value: 1 },
     uFaceC: { value: 0 },
+    uFaceR: { value: 1 },
     uCenter: { value: new THREE.Vector2() },
+    uGloss: { value: new THREE.Vector2(0, 0) },
   };
   const material = toon(WAX, u, IDS.seal, { uniforms, defines: { SEAL: '' }, glsl: SEAL_GLSL });
   const group = new THREE.Group();
@@ -438,8 +468,17 @@ export function buildSeal(u, r) {
       uniforms.uFace.value = face.tex;
       uniforms.uFaceSize.value = face.size;
       uniforms.uFaceC.value = face.c;
+      uniforms.uFaceR.value = Math.sqrt(Math.abs(ax * by - bx * ay));
       uniforms.uCenter.value.set(Math.round(x), Math.round(y));
       return true;
+    },
+    /**
+     * Its glint (envelope.js sealGloss): `at` radii along its sweep, `width` radii either side (0 none).
+     * @param {number} at
+     * @param {number} width
+     */
+    gloss(at, width) {
+      uniforms.uGloss.value.set(at, width);
     },
     dispose() {
       for (const f of faces.values()) f.tex.dispose();

@@ -36,18 +36,25 @@ loading screen too: NEWT loads behind it.
   moving trails petals (one every 14–30 px, at most about 20 a second, thrown a little the way
   it moves, every shape and size, each about 10–16 px long whatever the screen, a little
   smaller on a phone, so they read as petals beside NEWT), and every click or tap bursts a ring
-  of 10–14 of them. On a
+  of 10–14 of them as it's let go: not as the button or finger goes down, and not when the press
+  turns into a drag (the camera, the letter, NEWT) or wanders more than about 8 px. On a
   phone a finger dragging trails them, and a finger held still keeps a few coming. None come
   over the UI (a button, the toolbar, the camera pad, Settings, or the intro's boxes), and none
-  trail while you carry NEWT (a ring where you grab him, then nothing till he's down). They're
+  come while you carry NEWT (no ring for picking him up or letting him go). They're
   drawn on a layer of their own over the toy and under its toolbar, Settings and the intro (over
   the envelope while that's up) that every press goes through. **Rose Petals**
   in Settings turns them all off (the envelope's too); it's on by default and kept with the
   look.
 - **Hover it:** with the mouse over the letter (or keyboard focus on it, or on a touch screen
-  after a moment without a touch), a gold rim pulses slowly round it, seal and all, about every
-  three seconds, fading right out between pulses so you can see it clearly. With reduced motion
-  the rim holds steady.
+  after a moment without a touch), a glow pulses slowly round it, seal and all, about every
+  three seconds: a wide dithered gold glow past its outline and a warm rim inside it, the letter
+  lifting a little toward you (about 3% bigger) and its paper a step brighter at the peak, all of
+  it fading right out between pulses so you can see it clearly. A finger (or the mouse) down on
+  the letter shows it at full strength at once, fading once it's lifted. On the same beat a white
+  glint sweeps across the wax seal, rim and face, from its upper left to its lower right as each
+  pulse rises, gone by the trough; a click or tap sweeps it once, quick and bright, from the
+  moment it's pressed, before the seal blooms. The NH stays crisp under it. With reduced motion the glow holds steady, with
+  no lift and no glint.
 - **Turn it:** it leans toward the mouse, clearly enough to see (about 6° with the mouse halfway
   to the edge of the screen, 8° at the edge; on a phone, toward your finger while it's down);
   its top tips the same way as it turns, so it reads as leaning toward you; drag it sideways or
@@ -57,7 +64,8 @@ loading screen too: NEWT loads behind it.
   The seal blooms into roses first (about half a second): it swells, then shrinks away while a
   ring of petals unfurls out of it and drifts up and off to either side, fading soon, and the
   swirl is flung outward. Only then does the flap lift; as it passes half open, a stream of
-  petals rises out of the pocket's mouth (the bloom has cleared it by then), and the letter dissolves the way a weapon does on the Bonfire site:
+  petals rises out of the pocket's mouth (the bloom has cleared it by then), each one coming out
+  over the pocket's lip and flying in front of the letter and the open flap, never cut by them, and the letter dissolves the way a weapon does on the Bonfire site:
   a ragged, burning edge sweeps up across it, shedding specks of paper, embers and wax that
   drift up and fade, while the white page behind clears onto NEWT, already turned to you, and
   the intro starts by itself (below): its first line, his face and his greeting wait until the
@@ -343,7 +351,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
 - **Reduced motion:** each line shows at once and the camera cuts: round to the front at the
   start, to each shot, and back to your view at the end.
 - Every intro starts at the start; nothing about it is saved. The lines, faces, gestures,
-  shots, waits and replies are edited in the admin's Invitation page ([admin.md](admin.md));
+  shots, waits and replies are edited in the admin's Invitation page ([admin.md](admin.md)),
+  whose Intro Preview plays any box of the draft in the toy (preview mode, below);
   with no intro there (or none it can play), the toy plays a short one of its own.
 
 ## For Developers
@@ -757,7 +766,14 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   across the letter over `TIMES.dissolve`; `since`, the specks' clock; `backdrop`, the white page
   clearing over `TIMES.clear`), a skip's drop, `BOB` and `SWAY`, `TIMES`; the hover's pulse,
   `hoverStep` and `hoverPulse(k, t)` (`HOVER_PULSE`: the eased hover times
-  0.5 − 0.5·cos(2πt / 2.8 s), steady with reduced motion); the letter's turn, `turnGoal` (toward
+  0.5 − 0.5·cos(2πt / 2.8 s), steady with reduced motion), how it shows, `hoverLook(pulse)`
+  (`HOVER_LOOK`: the letter scaled up to 3% and brought 1.5% of the camera's distance nearer, a
+  glow reaching 2 to 6 texels past its line, a rim 2 to 3 texels deep, the paper's `PAPER_LIT`
+  dithered in from 0.6 of the pulse; all of it nothing at 0), a press on the letter, `pressStep`
+  (in over 0.06 s, out over 0.35 s) and `shownPulse` (the stronger of the two); the seal's glint,
+  `sealGloss(k, t, since)` (`GLOSS`: a band `width` 0.09 radii either side sweeping from −1.7 to
+  1.7 radii across the seal, upper left to lower right, from 0.18 to 0.48 of each pulse, eased
+  in with the hover; `since` a click, one sweep from its edge over 0.25 s, fast at first, 0.14 wide, started by a press on the letter or by opening it; none with reduced motion); the letter's turn, `turnGoal` (toward
   the pointer's x, eased out to `TURN.lean` (0.14 rad at the edge, about 0.1 halfway), plus a
   sideways drag or a held arrow up to `TURN.push` (0.16), at most `TURN.max`, 0.24 rad),
   `turnRoll(turn)` (the roll that goes with it, `TURN.roll` 0.45 of it, its top tipping the way
@@ -793,7 +809,10 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   envelopeLook.js `DEPTH`, which the frame can carry as `inside` and `pocket`), launched up its
   axis at 1.25–1.6 a second and only gently forward, a little bigger than most (1–1.4 of
   `PETAL_LEN`), so the pocket hides each only for its first moment and it stands 0.3 of the
-  letter or more over the mouth, out past its top, within half a second); and
+  letter or more over the mouth, out past its top, within half a second; once its middle has
+  risen past the mouth (`mouthAt(h, across)`) it's `front` from then on, drawn in front of all
+  the paper: petalScene.js pulls its depth toward the near plane, `frontDepth(z)`, to
+  `FRONT_BIAS` (0.02) of the way, so the pocket's lip and the open flap never cut it); and
   the wake (`WAKE`: the edge moving fastest away from its outward side sheds petals at a rate
   tied to its speed, drifting its way). `cut` (a skip), `at`, `live`; at most `POOL` (120; the
   oldest free petal goes first, the swirl kept), none with reduced motion. `createTrail` is the
@@ -806,7 +825,7 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   scene's world units, `unit` world units a letter width, `size` how big each is drawn of that (1); `emit`, `letter(matrix, {h, opening,
   floating})` from the letter's world matrix, `step(dt)` writing the petals into an instanced mesh
   a shape; `petalMaterial`, the petals' own toon (the three reds, dithered band edges, each
-  petal's `aShade`, its id pass on the scene's `uIdPass`); `buildInk`, the ink pass for a
+  petal's `aShade`, its `aFront` depth pull, its id pass on the scene's `uIdPass`); `buildInk`, the ink pass for a
   petals-only drawing), `petalLayer.js` (`createPetalLayer(root, {on, before, over, carrying})`:
   the page's petals, a fixed `canvas.inv-petals` with `pointer-events: none` put in `before` the
   HUD with no z-index of its own (so over the stage's canvas, under the toolbar, its labels, the
@@ -821,8 +840,10 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   width: how far they fly), each petal drawn `petalPx(w, h)` CSS px long (`PETAL_PX`: 12.5 on a
   desktop, 11 on a phone, its shorter side under 600 px; its sizes 0.75–1.3 of that), through
   petalScene.js's `size`, never by the screen's size (`petalPx` in its snapshot); passive capture-phase `pointerdown`, `pointermove`, `pointerup` and `pointercancel` on
-  the document (never `preventDefault`) drive the trail and a ring at each press, the primary
-  pointer only; it draws only while petals are up or a finger is held, then clears and stops;
+  the document (never `preventDefault`) drive the trail and a ring at each click or tap, the primary
+  pointer only (`createClick`: on the release, let go within `CLICK.tol`, 8 px, of where it went
+  down and never further on the way, so a drag of the camera, the letter or NEWT bursts none, nor
+  does a press a second finger turns into a pinch, one NEWT is picked up by, or a cancelled one); it draws only while petals are up or a finger is held, then clears and stops;
   `on()` false (Rose Petals off, `look.js petalsOn`, or reduced motion) launches none and shrinks
   any up away), `envelopeScene.js` (its own small WebGLRenderer in a fixed
   `.inv-envelope` layer at z-index 3, drawn at `TEXELS` texels along the screen's shorter side and
@@ -830,8 +851,10 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   dissolves; drawn twice, its colours and then each part's id (`IDS`, back to front), then put
   together with a one-texel line in `INK` on each texel bordering a later part, none round the
   dissolving rim, and the hover's pulse there too (a Bayer-dithered `SHINE` on the letter's
-  outermost two texels and a `HOVER` gold halo past its line, the letter's ids only, never the
-  petals', like NEWT's in retro.js; `hover` in its snapshot); the letter's yaw is the sway plus
+  outermost `uRim` texels and a glow past its line to `uReach` texels, `GLOW` next to it and
+  NEWT's `HOVER` gold further out, thinning with distance, the letter's ids only, never the
+  petals', like NEWT's in retro.js; the shared `uBright` steps the paper to `PAPER_LIT`; `hover`
+  in its snapshot: `k`, `press`, `pulse`, `look`); the letter's yaw is the sway plus
   its turn, rolled by `turnRoll(turn)` (`turn` in its snapshot); the camera's matrices are brought up to date after it's
   placed and every frame, the shaders compiled at creation and the seal hidden until it's been
   placed once (the red box on reload was a first frame's seal placed through a camera three had
@@ -869,6 +892,11 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   takes the face drawn for them from a small cache, so the seal grows, narrows and leans in
   whole steps of its own picture and is never resampled (at 5028c51 the stamp was worked out on
   the seal's own grid, which stopped matching the screen as the letter swayed, so it shimmered).
+  Its glint (`gloss(at, width)`, from envelope.js `sealGloss`) is drawn in the same shader on the
+  face's own cells, measured from its snapped middle in its radius on the screen (`uFaceR`): the
+  light and mid wax in a narrow band across it turn `WAX_GLOSS` (white, the wax's fourth tone),
+  and in a shoulder either side the light wax white and the mid wax light, never the stamp's floors or the ring, so it rides with the seal, steps a cell at
+  a time and never shimmers.
   The NH monogram is logo.js's PATH, copied in as
   `MONOGRAM_PATH`: `stampLayout(radius)` snaps its strokes to whole texels, one texel wide
   (two before: the user found them too thick to read in the ring), the four uprights mirrored,
@@ -983,6 +1011,27 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   `key`); `petals()` the page's petal layer (`gpu`: `none` till its renderer is made, `up` or `failed`; `running`, `on`, `live`, `emitted`, `texels`). `?seed=N` makes the randomness repeatable; `?calm` stops him wandering and sitting by himself; `?perf` shows the frame times
   (p50 and p90), the GPU's time a frame where the browser can measure it, the grid, the
   governor's level and the zoom in a corner; `?govern` turns the governor on under `?test`.
+- **Preview mode** (`?preview`, `src/invitation/preview.js`; the admin's Intro Preview,
+  `admin/ui/introPreview.js`, frames it): no envelope, calm (no wandering, no sitting by
+  himself), no bubble lines and no petals. It listens only when framed, only to its parent,
+  and only at one origin: the framer's own as the browser reports it
+  (`location.ancestorOrigins`), else the `&admin=<origin>` the admin adds (an http(s) origin
+  alone; one that disagrees with the browser's, or a sandboxed framer, and it takes nothing).
+  The admin posts `{type: 'invitation-intro-preview', script, palette, box, viewport,
+  restart}`: `script` the draft's `invitation.intro` as the admin writes it (mended as
+  `content.js` `introScript()` mends the saved one, `introFrom`, then `normalizeScript`, and
+  refused with no box with an id, or over 500 boxes), `box` one of its ids (the intro starts
+  there), `palette` the `invitation.text.colors` list (`paletteOf`; none: the toy's own),
+  `viewport` `desktop` or `phone`, `restart` true to put the scene back as it began first
+  (he walks in again); anything else is dropped (`readPreview`). On its next step `main.js`
+  drops any intro under way (the camera stays on him) and starts the dialogue from that box
+  the way Replay Intro does, with Auto off, so it holds once the line is typed; a tap or a
+  reply goes on as in the intro. It answers its framer, at that origin only, with
+  `{type: 'invitation-intro-preview-state', state}`: `ready` once he's drawn, `playing` with
+  the `box` up, its `next` (`nextBox`: where the admin's Next goes, null at replies or the end)
+  and whether it has `choices`, and `done` as it ends. With `?test` too, the snapshot's
+  `preview` is the origin it listens to, the box and viewport asked for and whether it waits to
+  start. `e2e/invitationPreview.spec.mjs` frames it from a stand-in admin page.
 - **Captures:** `node tools/capture-invitation.mjs` records real-speed clips of every clip and
   of taps, drags, buttons, floor taps, a chase and the camera at phone and desktop sizes
   (animated WebP plus a contact sheet; its `flick`, `shake` and `stroll` acts carry him by the

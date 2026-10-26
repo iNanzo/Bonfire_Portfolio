@@ -89,6 +89,17 @@
 // the seed to talk).
 // clock() is the toy's clock (it stands still while the envelope covers him), envelope() the
 // envelope's state and pose (null without one).
+//
+// `?preview` is the admin's intro preview (admin/ui/introPreview.js frames it): no envelope, calm
+// (no wandering), no bubble lines and no petals. It listens only to its parent window, at the
+// origin preview.js previewOrigin gives (the framing page's own), takes the messages preview.js
+// readPreview checks (the draft's intro, its text colours, a box, the viewport, restart) and
+// plays that box (playPreview, on the frame's next step): the intro started from it as Replay
+// Intro starts one (he turns to the camera, the box's shot, face, gesture and line, its replies),
+// with restart the scene first as it began (replay without the envelope: he walks in again). It
+// holds there; a tap or a reply goes on as in the intro. It answers with preview.js previewState:
+// ready once he's drawn, playing as each box comes up (with where Next goes from it), done as it
+// ends. ?test's snapshot().preview says what it listens to and plays.
 import { Vector3 } from 'three';
 import '@fontsource/pixelify-sans/400.css';
 import '@fontsource/pixelify-sans/600.css';
@@ -148,6 +159,7 @@ import { createDialogue, lookSway, normalizeScript } from './dialogue.js';
 import { REPLY_SETTLE, createDialogueUi } from './dialogueUi.js';
 import { createEnvelopeScene } from './envelopeScene.js';
 import { createPetalLayer } from './petalLayer.js';
+import { nextBox, previewOrigin, previewState, readPreview } from './preview.js';
 import { createFaceState, faceStep } from './faces.js';
 import { fitShadow, shadowTop } from './floor.js';
 import { createGesture, pickScreen, rayPlaneY } from './gesture.js';
@@ -217,7 +229,7 @@ const STATES_KEPT = 40;
  */
 /** @type {ReturnType<typeof introScript>|null} Only set through the ?test hooks. */
 let testIntro = null;
-const playScript = () => normalizeScript(testIntro ?? introScript());
+const playScript = () => normalizeScript(previewNow?.script ?? testIntro ?? introScript());
 /** The space a shot frames him in keeps this far off the Auto row and the chat box (its name tab too), CSS px. */
 const SHOT_MARGIN = { top: 10, bottom: 30 };
 /**
@@ -237,6 +249,34 @@ const area = playArea();
 const stageEl = /** @type {HTMLElement} */ (document.querySelector('[data-stage]'));
 stageEl.textContent = ''; // (the noscript fallback)
 const options = parseQuery(location.search);
+/**
+ * The admin's intro preview (?preview in its frame, preview.js): the origin it listens to and
+ * answers (null: it takes nothing), the box asked for till the loop takes it, the one playing.
+ */
+const previewFrom = options.preview
+  ? previewOrigin({
+      search: location.search,
+      framed: window.parent !== window,
+      ancestors: location.ancestorOrigins ?? null,
+    })
+  : null;
+/** @type {import('./preview.js').PreviewRequest|null} */
+let previewWant = null;
+/** @type {import('./preview.js').PreviewRequest|null} */
+let previewNow = null;
+if (previewFrom)
+  window.addEventListener('message', (e) => {
+    const p = readPreview(e, { parent: window.parent, origin: previewFrom });
+    if (p) previewWant = p;
+  });
+/**
+ * Tells the admin's preview how it's going (nothing outside it).
+ * @param {'ready'|'playing'|'done'} state
+ * @param {{box?: string, next?: string|null, choices?: boolean}} [o]
+ */
+function tellAdmin(state, o) {
+  if (previewFrom) window.parent.postMessage(previewState(state, o), previewFrom);
+}
 // (The admin's Default look over the built-in one, before anything reads a look: a first visit
 // gets it, a stored look still wins.)
 installDefaults(invitationDefaults());
@@ -291,7 +331,7 @@ let carrying = () => false;
  * envelope while it's up; no trail while he's carried.
  */
 const petalLayer = createPetalLayer(stageEl, {
-  on: () => petalsOn(look) && !prefersReduced(),
+  on: () => petalsOn(look) && !prefersReduced() && !options.preview,
   before: stageEl.querySelector('.inv-hud'),
   over: () => Boolean(envelope?.element.isConnected),
   carrying: () => carrying(),
@@ -643,6 +683,9 @@ function start(s) {
   let framed = null;
   /** The intro just ended and the camera is still easing back. */
   let backFromIntro = false;
+  /** The admin's intro preview: its box waits to start (takePreview), and the box it last heard of (seq). */
+  let previewBegin = false;
+  let toldSeq = -1;
   /**
    * The intro's line waits, its clock held, until he's in place (brain.js BrainOut.talkReady: up,
    * walked in, turned to the camera), so its line, face and gesture begin together.
@@ -962,7 +1005,8 @@ function start(s) {
     if (box) noteActed(box.seq, o.clip);
     // (Quiet too while the camera eases back after it: its close shots aren't the visitor's zoom.)
     if (backFromIntro && !cam.resetting) backFromIntro = false;
-    if (!intro && !backFromIntro) speak(o, evs, button, dt);
+    // (The admin's intro preview: no bubble lines at all.)
+    if (!intro && !backFromIntro && !options.preview) speak(o, evs, button, dt);
     // 3. His root: steer, carry or the fall.
     moveRoot(c, o, ptr, dt);
     // 4. The mix and the step phase.
@@ -1069,6 +1113,7 @@ function start(s) {
     intro.pause(true, t);
     introHeld = true;
     shotSeq = -1;
+    toldSeq = -1;
     shot = null;
     framed = null;
     acted.seq = -1;
@@ -1085,9 +1130,36 @@ function start(s) {
    * and spawns it again (replay); else, and once it's opened, the dialogue starts (beginIntro).
    */
   function introNow() {
+    if (previewWant) takePreview();
+    if (previewBegin) {
+      beginIntro();
+      if (intro) previewBegin = false;
+    }
     if (introPressed && options.envelope && !envelope?.covers) replay();
     else if (introPressed || introWanted) beginIntro();
     introPressed = false;
+  }
+
+  /**
+   * The admin's intro preview asked for a box (preview.js PreviewRequest): its colours from the
+   * next box on, any intro under way dropped where it is (the camera stays on him), or with
+   * restart the scene as it began (replay, no envelope: he walks in again); then the intro from
+   * that box, as soon as it can start (beginIntro: never while he's held or falling).
+   */
+  function takePreview() {
+    const p = /** @type {import('./preview.js').PreviewRequest} */ (previewWant);
+    previewWant = null;
+    previewNow = p;
+    talkUi.setPalette(p.palette);
+    if (p.restart) replay({ again: false });
+    else if (intro) {
+      intro = null;
+      introHeld = false;
+      shot = null;
+      framed = null;
+      talkUi.close();
+    }
+    previewBegin = true;
   }
 
   /**
@@ -1097,8 +1169,9 @@ function start(s) {
    * grab ring and the hover go; then the envelope comes (the HUD inert under it) and the toy
    * pauses behind it once this frame is drawn. Opened, the intro starts as at boot (introWanted);
    * if no envelope can be made (its renderer refused), the intro starts by itself all the same.
+   * `again` false (the admin's intro preview, restarting): the scene alone, no envelope.
    */
-  function replay() {
+  function replay({ again = true } = {}) {
     if (intro) {
       intro = null;
       introHeld = false;
@@ -1144,6 +1217,7 @@ function start(s) {
     s.setHover(0);
     burst = null;
     s.setBurst(0, 0, 0, 0);
+    if (!again) return;
     spawnEnvelope();
     envelopeVeils = Boolean(envelope);
     // (No envelope could be made, its renderer refused: the intro alone, as without one, once the
@@ -1180,6 +1254,7 @@ function start(s) {
     ui.setTalking(false);
     // (The talk wasn't stepped through the intro: its idle clock starts again from now.)
     talk.rest(t);
+    if (previewNow) tellAdmin('done');
   }
 
   /**
@@ -1246,6 +1321,12 @@ function start(s) {
     }
     talkUi.render(heldView(v));
     shotFor(v);
+    // (The admin's intro preview hears of each box as it comes up, and where Next goes from it.)
+    if (previewNow && v.seq !== toldSeq) {
+      toldSeq = v.seq;
+      const choices = Boolean(v.box.choices?.length);
+      tellAdmin('playing', { box: v.box.id, next: nextBox(previewNow.script, v.box.id), choices });
+    }
     // (Held back, the brain sees no box yet: he waits idle with his own face, and the box's
     // gesture and face start with its line.)
     if (introHeld) return { seq: -1, animation: 'none', face: v.box.face, typing: false };
@@ -1742,6 +1823,7 @@ function start(s) {
       // (Under the envelope: drawn once, then it waits there until it's uncovered.)
       toyReady = true;
       sync();
+      tellAdmin('ready');
     }
   }
 
@@ -1878,6 +1960,14 @@ function start(s) {
     };
   }
 
+  /** The admin's intro preview for ?test: the origin it listens to, the box asked for, its viewport, and whether it waits to start. */
+  const previewSnapshot = () => ({
+    origin: previewFrom,
+    box: previewNow?.box ?? null,
+    viewport: previewNow?.viewport ?? null,
+    waiting: Boolean(previewWant || previewBegin),
+  });
+
   /** The controls for ?test: Wander as the brain has it, and the stage's cursor. */
   const controlsSnapshot = () => ({ wander: out ? out.wander : null, cursor: stageEl.dataset.cursor || null });
 
@@ -1952,6 +2042,8 @@ function start(s) {
         envelope: envelopeState(),
         // (It still hides him, as of the last step: the intro's first line waits on it.)
         envelopeVeils,
+        // (The admin's intro preview: the origin it listens to, and the box it was asked for.)
+        preview: previewSnapshot(),
         options,
         motion: motionSnapshot(),
         drag: dragSnapshot(),

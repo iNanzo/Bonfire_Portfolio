@@ -122,8 +122,10 @@ export function logHtml(entries) {
  */
 export function createDialogueUi(
   stage,
-  { onAction, log, replySettle = REPLY_SETTLE, palette = paletteOf(DEFAULT_TEXT_COLORS) },
+  { onAction, log, replySettle = REPLY_SETTLE, palette: firstPalette = paletteOf(DEFAULT_TEXT_COLORS) },
 ) {
+  /** The text effects' colours (setPalette: the admin's intro preview sends its draft's). */
+  let palette = firstPalette;
   const doc = stage.ownerDocument;
   const layer = doc.createElement('div');
   layer.className = 'inv-talk';
@@ -372,6 +374,13 @@ export function createDialogueUi(
         if (!modal()) focusHome();
       }
       if (v.auto !== shown.auto) autoBtn.setAttribute('aria-pressed', String((shown.auto = v.auto)));
+    },
+    /**
+     * The text effects' colours from the next box on (the admin's intro preview: its draft's).
+     * @param {Map<string, string>} colours  markup.js paletteOf’s
+     */
+    setPalette(colours) {
+      palette = colours;
     },
     get showing() {
       return !layer.hidden;

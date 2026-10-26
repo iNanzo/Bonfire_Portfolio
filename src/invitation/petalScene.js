@@ -6,10 +6,12 @@
 // flow in the scene's world units (one letter width = `unit`) and writes the petals up into their
 // meshes each step. buildInk is the pass that puts a petals-only drawing together with a
 // one-texel line in the toy's ink round every petal and where two shapes overlap (the envelope
-// inks its petals in its own pass, with the letter).
+// inks its petals in its own pass, with the letter). A petal poured out of the letter that has
+// risen past its mouth (aFront: petals.js front) has its depth pulled toward the near plane
+// (FRONT_BIAS), so it draws in front of the paper, never cut by the pocket's lip or the open flap.
 import * as THREE from 'three';
 import { BAYER, INK, LIGHT, PETAL, SHADES, rgb } from './envelopeLook.js';
-import { PETAL_SHAPES, POOL, createPetalFlow, petalGrid } from './petals.js';
+import { FRONT_BIAS, PETAL_SHAPES, POOL, createPetalFlow, petalGrid } from './petals.js';
 
 /**
  * @typedef {object} PetalUniforms  uniforms a petal shares with the scene it's in
@@ -32,6 +34,7 @@ export function petalMaterial(id, shared = {}) {
     },
     vertexShader: /* glsl */ `
       attribute float aShade;
+      attribute float aFront;
       varying float vShade;
       varying vec3 vView;
       void main() {
@@ -43,6 +46,9 @@ export function petalMaterial(id, shared = {}) {
         vec4 mv = modelViewMatrix * p;
         vView = mv.xyz;
         gl_Position = projectionMatrix * mv;
+        // (Out of the letter: in front of its paper, its order among the others kept. petals.js
+        // frontDepth.)
+        if (aFront > 0.5) gl_Position.z = mix(-gl_Position.w, gl_Position.z, ${FRONT_BIAS.toFixed(4)});
       }
     `,
     fragmentShader: /* glsl */ `
@@ -83,10 +89,12 @@ function buildPetals(id, shared) {
     geo.setIndex(grid.index);
     const shade = new THREE.InstancedBufferAttribute(new Float32Array(POOL), 1);
     geo.setAttribute('aShade', shade);
+    const front = new THREE.InstancedBufferAttribute(new Float32Array(POOL), 1);
+    geo.setAttribute('aFront', front);
     const mesh = new THREE.InstancedMesh(geo, petalMaterial(id + i, shared), POOL);
     mesh.count = 0;
     mesh.frustumCulled = false;
-    return { mesh, shade };
+    return { mesh, shade, front };
   });
 }
 
@@ -140,11 +148,13 @@ export function createPetalScene({ scene, unit = 1, seed = 16, reduced = false, 
       tmp.updateMatrix();
       meshes[k].mesh.setMatrixAt(n, tmp.matrix);
       meshes[k].shade.setX(n, petal.shade);
+      meshes[k].front.setX(n, pose.front ? 1 : 0);
     }
     meshes.forEach((m, k) => {
       m.mesh.count = counts[k];
       m.mesh.instanceMatrix.needsUpdate = true;
       m.shade.needsUpdate = true;
+      m.front.needsUpdate = true;
     });
   }
 
