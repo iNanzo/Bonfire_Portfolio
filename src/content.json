@@ -1841,7 +1841,6 @@
         "ring": true,
         "bands": "2",
         "highlight": true,
-        "pixelShirt": false,
         "pixelFace": true,
         "edge": "soft",
         "shadow": 0.6,

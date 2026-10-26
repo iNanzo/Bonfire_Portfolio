@@ -185,8 +185,8 @@ test('the default look’s Shader values: each within its control’s range, ste
       assert.deepEqual(errorsAt(word), [`invitation.defaults.shader.${c.key}`], `${c.key}: a number`);
     }
   }
-  // Pixel Shirt & Face, the one switch Pixel Shirt and Pixel Face split from (the toy reads it
-  // as both, look.js LEGACY_SHADER): a switch still, with a warning to set the two instead.
+  // Pixel Shirt & Face, the one switch Pixel Face split from (the toy reads it as Pixel Face,
+  // look.js LEGACY_SHADER): a switch still, with a warning to set that instead.
   const legacy = valid();
   legacy.defaults.shader.pixelArt = true;
   assert.deepEqual(errorsAt(legacy), [], 'the old switch is still read');
@@ -195,6 +195,27 @@ test('the default look’s Shader values: each within its control’s range, ste
     ['invitation.defaults.shader.pixelArt'],
     'with a warning at it',
   );
+  assert.match(problems(legacy).warnings[0].message, /Pixel Face/);
+  assert.doesNotMatch(problems(legacy).warnings[0].message, /Pixel Shirt/, 'never the switch that’s gone');
+  // Pixel Shirt, taken away (look.js RETIRED_SHADER: the toy ignores it): a content.json from
+  // before still passes, the switch read as one, with a warning that it does nothing.
+  assert.equal(
+    SHADER_CONTROLS.some((c) => c.key === 'pixelShirt'),
+    false,
+    'no Pixel Shirt on the Invitation page',
+  );
+  const retired = valid();
+  retired.defaults.shader.pixelShirt = true;
+  assert.deepEqual(errorsAt(retired), [], 'a Default look saved with it still passes');
+  assert.deepEqual(
+    problems(retired).warnings.map((w) => w.path),
+    ['invitation.defaults.shader.pixelShirt'],
+    'with a warning at it',
+  );
+  assert.match(problems(retired).warnings[0].message, /ignore/i);
+  const retiredBad = valid();
+  retiredBad.defaults.shader.pixelShirt = 'on';
+  assert.deepEqual(errorsAt(retiredBad), ['invitation.defaults.shader.pixelShirt'], 'only on or off');
   const legacyBad = valid();
   legacyBad.defaults.shader.pixelArt = 'on';
   assert.deepEqual(errorsAt(legacyBad), ['invitation.defaults.shader.pixelArt'], 'only on or off');

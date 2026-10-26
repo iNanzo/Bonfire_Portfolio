@@ -185,13 +185,11 @@ export function subjectBoxes({ center, radius, light, camera, w, h, extra = [] }
  *   shadow's edge spreads over (0: hard); steps: tones it's dithered into (0: smooth);
  *   dither: how much the Bayer dither moves those steps, 0..1
  * @property {{outside?: boolean}} outline  lines on the paper just outside NEWT, not on his edge
- * @property {{mipBias?: number, fineMipBias?: number, pixelShirt?: boolean, pixelFace?: boolean}} [texture]
- *   pixelShirt: Pixel Shirt (a Shader option, off in every style), the bold pixel plaid at the
- *   coarser resolutions; pixelFace: Pixel Face (on in every style; on unless false), his face
- *   redrawn in pixels to fit his size (character.js); mipBias: how many mip levels
- *   coarser his textures are sampled with the pixel filter on (0: as three picks); fineMipBias:
- *   his atlas's once he's character.js ORIGINAL_ATLAS_TEXELS tall or more (the glb's plaid at a
- *   fine resolution; mipBias without it)
+ * @property {{mipBias?: number, fineMipBias?: number, pixelFace?: boolean}} [texture]
+ *   pixelFace: Pixel Face (a Shader option, on in every style; on unless false), his face
+ *   redrawn in pixels to fit his size (character.js); mipBias: how many mip levels coarser his
+ *   textures are sampled with the pixel filter on (0: as three picks); fineMipBias: his atlas's,
+ *   his real plaid at every resolution (less, or its checks blur into grey; mipBias without it)
  */
 
 /** The Bayer threshold of a device pixel, in 2×2 blocks (the hover's tint at Pixel Size Off). */
