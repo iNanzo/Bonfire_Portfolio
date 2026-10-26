@@ -550,20 +550,21 @@ test.describe('on a phone', () => {
       { text: '{#c8323c,wave|Hello} from {bold|NEWT}.', plain: 'Hello from NEWT.' },
       { text: 'A {shake|second} line.', plain: 'A second line.' },
       { text: 'See you there.', plain: 'See you there.' },
+      { text: 'Until next time.', plain: 'Until next time.' },
     ];
     await page.evaluate(
-      (lines) =>
+      (fixtureLines) =>
         window.__invitation.setIntro({
           speaker: 'NEWT',
           start: 'log-0',
-          boxes: lines.map(({ text }, i) => ({
+          boxes: fixtureLines.map(({ text }, i) => ({
             id: `log-${i}`,
             text,
             face: 'happy',
             animation: 'Talk',
             camera: 'close',
-            next: i + 1 < lines.length ? `log-${i + 1}` : '',
-            end: i === lines.length - 1,
+            next: i + 1 < fixtureLines.length ? `log-${i + 1}` : '',
+            end: i === fixtureLines.length - 1,
           })),
         }),
       lines,
