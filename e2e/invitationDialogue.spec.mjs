@@ -1152,6 +1152,51 @@ test.describe('on a desktop', () => {
     expect(errors).toEqual([]);
   });
 
+  test('a new line waits for the old one to dither out: their letters never show together', async ({ page }) => {
+    const errors = watch(page);
+    await calm(page);
+    await useBehaviorIntro(page);
+    await open(page);
+    // Every frame from here: the old line's ghost, the new line's letters and its ▼, together or not.
+    await page.evaluate(() => {
+      const ghost = document.querySelector('.inv-talk-ghost');
+      const s = (window.swap = { ghost: 0, both: 0, arrow: 0, gone: [], was: false });
+      const tick = () => {
+        const on = ghost.childElementCount > 0;
+        const all = document.querySelectorAll('.inv-talk-typed .inv-fx').length;
+        const letters = document.querySelectorAll('.inv-talk-typed .inv-fx:not(.is-unseen)').length;
+        if (on) s.ghost++;
+        if (on && letters) s.both++;
+        if (on && !document.querySelector('.inv-talk-next').hidden) s.arrow++;
+        // (The frame the ghost went: how much of the new line showed then.)
+        if (s.was && !on) s.gone.push({ letters, all });
+        s.was = on;
+        window.swapFrame = requestAnimationFrame(tick);
+      };
+      tick();
+    });
+    for (const press of [() => goOn(page), () => page.keyboard.press('Space')]) {
+      const s = await snapshot(page);
+      if (!s.dialogue.typed) {
+        await press();
+        await until(page, (x) => x.dialogue.typed, 'the line up');
+      }
+      await press();
+      await until(page, (x) => x.dialogue?.seq > s.dialogue.seq, 'the next line');
+      await until(page, (x) => x.dialogue.typed, 'typed out');
+    }
+    const swap = await page.evaluate(() => {
+      cancelAnimationFrame(window.swapFrame);
+      return window.swap;
+    });
+    expect(swap.ghost, 'the old lines dithered out').toBeGreaterThan(0);
+    expect(swap.both, 'never with the new line’s letters').toBe(0);
+    expect(swap.arrow, 'nor its ▼').toBe(0);
+    expect(swap.gone.length).toBe(2);
+    for (const g of swap.gone) expect(g.letters, 'the new line typing from its start, not whole').toBeLessThan(g.all);
+    expect(errors).toEqual([]);
+  });
+
   test('the replies dither in one after another; with reduced motion the screen fades plainly', async ({ page }) => {
     await calm(page);
     await useBehaviorIntro(page);

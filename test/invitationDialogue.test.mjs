@@ -2,13 +2,15 @@
 // clock: a script made safe (types.js DialogueScript: unknown faces, clips and shots fall back,
 // missing or doubled ids get their own, a start that isn't there is the first box, choices
 // capped at three, text at 240 characters, nothing to show is null), the line typed out by
-// characters a second (a beat after punctuation; reduced motion: all at once), a tap finishing
+// characters a second (a beat after punctuation; reduced motion: all at once; a line after
+// another waiting its lead while the screen dithers the old one out), a tap finishing
 // the typing and then going on (the next id, the following box, the end), choices shown once
 // the line is typed and leading where they say, Auto going on after the box's wait or one from
 // the line's length, Next to the next box with choices or the end, the log of lines shown (plain
 // text) and replies picked, text effects' tags counted by the letters that show, a pause
 // holding the clock, and a broken script ending gracefully. Play Intro's script is content.js
-// introScript() (content.json's intro, or one mended), which the runner plays as it is.
+// introScript() (content.json's intro, or one mended), which the runner plays as it is. The chat
+// screen (dialogueUi.js): its markup and CSS, and on stand-in elements a held press and its end.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -173,6 +175,60 @@ test('a tap finishes the typing first, then goes on: the following box, the next
   assert.equal(d.advance(0.8), 'end', 'an end box ends it');
   assert.ok(d.view.done);
   assert.equal(d.view.box, null);
+});
+
+test('a line after another waits its lead before it types (the old one dithers out first), then types from its first letter', () => {
+  const lead = 0.18;
+  const d = run(SCRIPT, { lead });
+  // (The first line never waits: it comes with the screen.)
+  assert.equal(d.step(1 / DIALOGUE.cps + 1e-6).shown, 1, 'the first line types at once');
+  assert.equal(d.advance(0.1), 'typed');
+  assert.equal(d.advance(0.2), 'next');
+  assert.equal(d.view.box?.id, 'me');
+  let v = stepTo(d, 0.2, 0.2 + lead - 0.01);
+  assert.equal(v.shown, 0, 'none of it while the old line goes');
+  assert.ok(!v.typed, 'not typed meanwhile');
+  v = d.step(0.2 + lead + 1 / DIALOGUE.cps + 1e-6);
+  assert.equal(v.shown, 1, 'then from its first letter');
+  v = d.step(0.2 + lead + typeDuration('I am NEWT') + 1e-6);
+  assert.ok(v.typed && v.shown === v.length, 'typed as long after it as ever');
+  // (A tap in the wait finishes the line, as one while it types does.)
+  assert.equal(d.advance(1), 'next');
+  assert.equal(d.view.box?.id, 'ask');
+  assert.equal(d.advance(1.05), 'typed');
+  assert.ok(d.view.typed && d.view.choices, 'the replies with it');
+
+  // (Paused in the wait, the wait holds too: it goes on from where it was.)
+  const p = run(SCRIPT, { lead });
+  p.advance(0);
+  p.advance(0);
+  p.pause(true, 0.1);
+  stepTo(p, 0.1, 5);
+  p.pause(false, 5);
+  assert.equal(p.step(5 + lead - 0.1 - 0.01).shown, 0, 'still waiting the rest of it');
+  assert.ok(p.step(5 + lead - 0.1 + 1 / DIALOGUE.cps + 0.01).shown >= 1, 'then typing');
+
+  // (Auto counts its wait from the line typed, the lead before it.)
+  const a = run(SCRIPT, { lead });
+  a.setAuto(true, 0);
+  const hi = typeDuration('Hi there') + autoDelay({ text: 'Hi there' });
+  let w = stepTo(a, 0, hi + 0.02);
+  assert.equal(w.box?.id, 'me');
+  const meUp = w.seq;
+  const on = hi + lead + typeDuration('I am NEWT') + autoDelay({ text: 'I am NEWT' });
+  w = stepTo(a, hi + 0.02 + 1 / 60, on - 0.05);
+  assert.equal(w.seq, meUp, 'not before the lead, the typing and its wait');
+  w = stepTo(a, on - 0.05 + 1 / 60, on + 0.1);
+  assert.equal(w.box?.id, 'ask', 'on after them');
+
+  // (A line that shows whole, reduced motion's or Next's, needs no wait from the runner: the
+  // screen holds it until the old one has gone.)
+  const r = run(SCRIPT, { lead, reduced: true });
+  r.advance(0);
+  assert.ok(r.view.typed && r.view.shown === r.view.length, 'reduced motion: whole at once');
+  const s = run(SCRIPT, { lead });
+  s.skip(0.05);
+  assert.ok(s.view.typed && s.view.choices, 'Next: whole at once');
 });
 
 test('the last box ends it, and so does a next that isn’t there', () => {

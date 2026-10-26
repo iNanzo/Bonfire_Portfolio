@@ -161,7 +161,7 @@ import { cursorKind, installCursors } from './cursor.js';
 import { loadCharacter } from './character.js';
 import { ANKLE_HEIGHT, BONES, COLLAR, DIALOGUE_WAYS, FACE_NAMES, FACE_TRACK, SCALE, fadeFor } from './clips.js';
 import { createDialogue, lookSway, normalizeScript } from './dialogue.js';
-import { REPLY_SETTLE, createDialogueUi } from './dialogueUi.js';
+import { REPLY_SETTLE, TALK_DITHER, createDialogueUi } from './dialogueUi.js';
 import { createDust, dustLand, dustPuffs } from './dust.js';
 import { createEnvelopeScene } from './envelopeScene.js';
 import { createPetalLayer } from './petalLayer.js';
@@ -1122,7 +1122,8 @@ function start(s) {
     if (intro || !out?.buttonsEnabled || ui.sheetOpen) return;
     const fromEnvelope = introWanted;
     introWanted = false;
-    intro = createDialogue(playScript(), { reduced: reducedMotion() });
+    // (Each line after the first starts typing once the one before has dithered out.)
+    intro = createDialogue(playScript(), { reduced: reducedMotion(), lead: TALK_DITHER.fadeMs / 1000 });
     intro.start(t);
     intro.pause(true, t);
     introHeld = true;

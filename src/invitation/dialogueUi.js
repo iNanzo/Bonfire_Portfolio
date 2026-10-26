@@ -30,8 +30,9 @@
 // and Page keys scroll it, with pixel cues over and under it where there's more.
 // Feedback in the toolbar's style, its ordered dither (TALK_DITHER's tiles on the layer, CSS in
 // dialogue.css): the buttons' hover and press, the screen and the replies dithering in; from
-// here, the line before dithering out over the next (ditherOut) and a press that goes on
-// dipping the box with a flash of dither (pressFlash); reduced motion, quick plain fades.
+// here, the line before dithering out as the next comes (ditherOut: the next one's letters wait
+// unseen till it's gone, so the two never show at once) and a press that goes on dipping the box
+// with a flash of dither (pressFlash); reduced motion, quick plain fades.
 
 /** @typedef {import('./dialogue.js').DialogueView} DialogueView */
 /** @typedef {import('./dialogue.js').LogEntry} LogEntry */
@@ -61,7 +62,8 @@ export const REPLY_SETTLE = 450;
  * coverages of the ink tiles (--talk-ink-N: the buttons' hover and press, the press flash, the
  * dark from the bottom); fade, the steps of a dithered fade (--talk-mask-N, mask tiles: the
  * layer and the replies dithering in, a line dithering out as the next comes); fadeMs, how long
- * a line takes to dither out; pressMs, the press flash on the box.
+ * a line takes to dither out (main.js has the runner hold the next line's typing that long:
+ * dialogue.js lead); pressMs, the press flash on the box.
  */
 export const TALK_DITHER = {
   ink: [1, 2, 3, 4, 6, 8],
@@ -330,10 +332,19 @@ export function createDialogueUi(
   const held = (frames) => frames.map((f) => ({ ...f, easing: 'steps(1, end)' }));
 
   /**
+   * The line before, dithering out (ditherOut), or null: the new line's letters, its ▼ and its
+   * scrolling wait unseen until it's gone, so the two never show at once (the runner's lead,
+   * main.js, has the new one start typing about then).
+   */
+  let fading = /** @type {Animation|null} */ (null);
+  /**
    * The line that was up dithers out over the new one (a copy of it, where it was, its scroll
-   * kept), through the fade's steps the other way; with reduced motion, a quick plain fade.
+   * kept), through the fade's steps the other way; with reduced motion, a quick plain fade. A
+   * line that showed nothing yet leaves the one before it going (or nothing to dither).
    */
   function ditherOut() {
+    if (shown.n <= 0) return;
+    fading?.cancel();
     ghost.replaceChildren(...[...typed.childNodes].map((n) => n.cloneNode(true)));
     ghost.scrollTop = text.scrollTop;
     const masks = [...TALK_DITHER.fade].reverse().map((n) => tiles.mask.get(n));
@@ -344,8 +355,16 @@ export function createDialogueUi(
             duration: TALK_DITHER.fadeMs,
             fill: 'forwards',
           });
-    if (fade) fade.onfinish = () => ghost.replaceChildren();
-    else ghost.replaceChildren();
+    fading = fade;
+    if (!fade) {
+      ghost.replaceChildren();
+      return;
+    }
+    fade.onfinish = () => {
+      if (fading !== fade) return;
+      fading = null;
+      ghost.replaceChildren();
+    };
   }
 
   /** A press that goes on: the box dips a step and flashes the ink's dither (reduced motion: a quick fade of it). */
@@ -583,6 +602,8 @@ export function createDialogueUi(
       ask.hidden = true;
       logBtn.setAttribute('aria-expanded', 'false');
       shown.seq = -1;
+      fading?.cancel();
+      fading = null;
       ghost.replaceChildren();
       reach();
       doc.addEventListener('keydown', onKey);
@@ -619,18 +640,21 @@ export function createDialogueUi(
         const who = plainText(v.speaker);
         live.textContent = who ? `${who}: ${line.plain}` : line.plain;
       }
-      if (v.shown !== shown.n) {
+      // (While the line before dithers out, none of this one shows: then it types from there.)
+      const want = fading ? 0 : v.shown;
+      const typedNow = v.typed && !fading;
+      if (want !== shown.n) {
         const was = shown.n;
-        revealLetters(shown.spans, v.shown, shown.n);
-        shown.n = v.shown;
+        revealLetters(shown.spans, want, shown.n);
+        shown.n = want;
         // (Typing: the newest row in view. Finished at once: the view stays, the cue says there's more.)
-        if (was >= 0 && v.shown - was <= FOLLOW_JUMP) follow();
+        if (was >= 0 && want - was <= FOLLOW_JUMP) follow();
       }
-      if (v.typed !== shown.typed) {
-        shown.typed = v.typed;
+      if (typedNow !== shown.typed) {
+        shown.typed = typedNow;
         scrollState();
       }
-      const showNext = v.typed && !v.choices;
+      const showNext = typedNow && !v.choices;
       if (showNext !== shown.next) next.hidden = !(shown.next = showNext);
       // (A box's replies are laid out from its start, out of sight and out of reach, so its shot
       // frames him over them; they show once its line is typed.)

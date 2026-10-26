@@ -9,7 +9,8 @@
 // emoji is one; a name or a reply that shows nothing is none).
 // createDialogue runs it:
 //   - the line types out at DIALOGUE.cps letters a second, a beat after punctuation
-//     (DIALOGUE.pause); with reduced motion it shows at once;
+//     (DIALOGUE.pause); with reduced motion it shows at once; a line after another waits `lead`
+//     seconds first (the screen dithers the old one out meanwhile: dialogueUi.js);
 //   - advance (a tap, Space, Enter) finishes the typing first, then goes on: a box's `next`, else
 //     the box after it; `end`, the last box or a `next` that isn't there ends it;
 //   - a box's choices show once its line is typed, and a tap never passes them: choose(i) goes to
@@ -182,9 +183,12 @@ export function normalizeScript(raw) {
 /**
  * The runner for a script (normalizeScript's; null or nothing to show ends at the start).
  * @param {DialogueScript|null} script
- * @param {{reduced?: boolean}} [o]  reduced: every line at once
+ * @param {{reduced?: boolean, lead?: number}} [o]  reduced: every line at once; lead: seconds a
+ *   line that follows another waits before it types (the first never does; one shown whole, by
+ *   reduced motion or Next, doesn't either: the screen holds it till the old one's gone)
  */
-export function createDialogue(script, { reduced = false } = {}) {
+export function createDialogue(script, { reduced = false, lead = 0 } = {}) {
+  const wait = Number.isFinite(lead) ? Math.max(0, lead) : 0;
   const boxes = script?.boxes ?? [];
   const byId = new Map(boxes.map((b) => [b.id, b]));
   const m = {
@@ -192,7 +196,8 @@ export function createDialogue(script, { reduced = false } = {}) {
     box: null,
     done: true,
     seq: 0,
-    /** when the box's line began, on the runner's clock (paused time taken out) */
+    /** when the box's line began typing, on the runner's clock (paused time taken out; its lead
+     * after the box came up, for a line after another) */
     start: 0,
     /** the line finished by a tap or Skip */
     forced: false,
@@ -231,15 +236,17 @@ export function createDialogue(script, { reduced = false } = {}) {
   }
 
   /**
-   * Show `b` (null: the end), typed from its start or all at once.
+   * Show `b` (null: the end), typed from its start or all at once; `first`, the script's start
+   * (no lead: it comes with the screen).
    * @param {DialogueBox|null} b
    * @param {boolean} [whole]
+   * @param {boolean} [first]
    */
-  function enter(b, whole = false) {
+  function enter(b, whole = false, first = false) {
     if (!b) return finish();
     m.box = b;
     m.seq += 1;
-    m.start = m.pausedAt ?? m.t;
+    m.start = (m.pausedAt ?? m.t) + (first ? 0 : wait);
     m.forced = whole;
     m.typedAt = null;
     const who = b.speaker ?? script?.speaker ?? DIALOGUE.speaker;
@@ -293,7 +300,7 @@ export function createDialogue(script, { reduced = false } = {}) {
       m.done = false;
       m.log = [];
       m.pausedAt = null;
-      enter(script ? (byId.get(script.start) ?? boxes[0] ?? null) : null);
+      enter(script ? (byId.get(script.start) ?? boxes[0] ?? null) : null, false, true);
     },
     /**
      * A frame: the typing moves on and Auto goes on when its wait is over.
