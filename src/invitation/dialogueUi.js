@@ -481,6 +481,28 @@ export function createDialogueUi(
     };
   }
 
+  /**
+   * The view's letters typed (none while the line before dithers out: then it types from
+   * there), the newest row in view, and the line scrollable once it's all up. Whether it is.
+   * @param {DialogueView} v
+   */
+  function typeTo(v) {
+    const want = fading ? 0 : v.shown;
+    const typedNow = v.typed && !fading;
+    if (want !== shown.n) {
+      const was = shown.n;
+      revealLetters(shown.spans, want, shown.n);
+      shown.n = want;
+      // (Typing: the newest row in view. Finished at once: the view stays, the cue says there's more.)
+      if (was >= 0 && want - was <= FOLLOW_JUMP) follow();
+    }
+    if (typedNow !== shown.typed) {
+      shown.typed = typedNow;
+      scrollState();
+    }
+    return typedNow;
+  }
+
   /** A press that goes on: the box dips a step and flashes the ink's dither (reduced motion: a quick fade of it). */
   function pressFlash() {
     const [heavy, light] = [tiles.ink.get(4), tiles.ink.get(2)];
@@ -797,20 +819,7 @@ export function createDialogueUi(
         const who = plainText(v.speaker);
         live.textContent = who ? `${who}: ${line.plain}` : line.plain;
       }
-      // (While the line before dithers out, none of this one shows: then it types from there.)
-      const want = fading ? 0 : v.shown;
-      const typedNow = v.typed && !fading;
-      if (want !== shown.n) {
-        const was = shown.n;
-        revealLetters(shown.spans, want, shown.n);
-        shown.n = want;
-        // (Typing: the newest row in view. Finished at once: the view stays, the cue says there's more.)
-        if (was >= 0 && want - was <= FOLLOW_JUMP) follow();
-      }
-      if (typedNow !== shown.typed) {
-        shown.typed = typedNow;
-        scrollState();
-      }
+      const typedNow = typeTo(v);
       const showNext = typedNow && !v.choices;
       if (showNext !== shown.next) next.hidden = !(shown.next = showNext);
       // (A box's replies are laid out from its start, out of sight and out of reach, so its shot
