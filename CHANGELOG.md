@@ -6,9 +6,9 @@ format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and ver
 
 ## [Unreleased]
 
-Round 18: NEWT's intro with italic, styled names and replies, dithered feedback, long lines
-that scroll and a dark dither inside its box; dust and screen shake when he lands; and no
-more Pixel Shirt. Round 17, below it: NEWT's envelope reworked, rose petals all through his toy, text effects for
+Round 18: NEWT's intro with italic, styled names and replies, dithered buttons and a press
+flash, and a box that grows with its line and scrolls past half the screen; dust and screen
+shake when he lands; and no more Pixel Shirt. Round 17, below it: NEWT's envelope reworked, rose petals all through his toy, text effects for
 his words, an intro preview in the admin, and a plainer cult altar, no vignette and a cleaner mirror in Bonfire Live. Round
 16: a password lock for the site, and NEWT's toy opened from an envelope, with a
 new toolbar, a new way to carry him and more to do. Round 15: an Uma Musume-style
@@ -28,18 +28,17 @@ Round 10: menus and search, the knight's fixes, hygiene and performance.
   plain. The admin previews each name and reply under its field.
 - Every button on the intro's screen (Auto, Next, Log, Skip Intro, the replies) fills with a
   light dither on hover and a heavier one pressed, in the toolbar's style, a finger held on
-  one on a phone included, and its label stays clear of the dither. The screen dithers in as
-  it opens and out as the intro ends, the replies dither in one after another, the line that
-  was up dithers out before the next one types, and going on dips the box with a flash of
-  dither. With reduced motion these are quick plain fades.
-- A line longer than the box scrolls inside it, and the box keeps its size: the newest row
-  stays in view as it types, then the wheel, a finger or the arrow and Page keys scroll it,
-  with small pixel triangles where there's more above or below.
-- A dark dither sits inside the chat box, rising from its bottom edge: densest there and
-  fading out upward, only its lightest bands reaching the text, so the line always reads. It
-  fits the box on a phone or a desktop. Hovering the box, or a finger on it, makes it sink
-  back a little in pixel steps, and it comes back up after; with reduced motion it just goes
-  a step lighter.
+  one on a phone included, and its label stays clear of the dither. The replies dither in one
+  after another, and going on dips the box with a flash of dither. The chat box itself has no
+  dither: it rises in with a quick plain fade, the next line takes the old one's place at
+  once, and the screen fades out quickly as the intro ends. With reduced motion the replies
+  fade in plainly.
+- The chat box adapts to the screen and to its line, as before: three rows at least (two on a
+  short screen, such as a phone held sideways or a half-height window), growing with a longer
+  line up to about half the screen (two fifths on a short one), with NEWT framed over it. Only
+  a line taller than that scrolls inside it: the newest row stays in view as it types, then
+  the wheel, a finger or the arrow and Page keys scroll it, with small pixel triangles where
+  there's more above or below.
 - In the admin's Invitation page, typing in an intro line while the Intro Preview plays it
   keeps the focus in the field, so there's no clicking back in after each edit.
 
