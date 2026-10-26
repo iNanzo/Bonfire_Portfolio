@@ -1,7 +1,8 @@
 // NEWT's landings in a real browser (/invitation/, the production build), through `?test`'s
 // window.__invitation (snapshot().drop) and real input: dropped from high he lands in a full ring
 // of dust (dust.js: the count its landing speed gives) and the screen shakes (camera.js
-// shakeKick: a few CSS px on the canvas, then still and the canvas put back); let go from the
+// shakeKick: the picture moved a few CSS px through the projection, then still, the canvas itself
+// never moved); let go from the
 // hold's own height, a smaller puff and a shake only over SHAKE.min; set down gently, no dust or a
 // puff, no shake; with Screen Shake off (Settings, kept in invitation.look.v1) or reduced motion
 // the dust still comes, never the shake; on a phone, a finger's drop raises dust, and lifted high
@@ -20,7 +21,7 @@ const puffsFor = (speed) =>
 /**
  * From now until the next landing's dust has gone and its shake is over, read in the page every
  * frame: the landing, the most puffs drawn, the biggest shake offset (CSS px) and how many frames
- * showed one, its kick, the canvas's transform at the biggest and once it's over.
+ * showed one, its kick, and the canvas's own transform (never set: the shake is the projection's).
  * @param {import('@playwright/test').Page} page
  */
 const watchLanding = (page) =>
@@ -30,6 +31,7 @@ const watchLanding = (page) =>
         const canvas = /** @type {HTMLCanvasElement} */ (document.querySelector('.inv-canvas'));
         const before = window.__invitation.snapshot().drop.landing?.t ?? null;
         const out = { landing: null, puffs: 0, shake: 0, shakeFrames: 0, kick: null, moved: '', after: null };
+        const own = () => canvas.style.transform || getComputedStyle(canvas).transform.replace('none', '');
         let frames = 0;
         const tick = () => {
           const d = window.__invitation.snapshot().drop;
@@ -41,11 +43,11 @@ const watchLanding = (page) =>
             if (m > 0) out.shakeFrames++;
             if (m > out.shake) {
               out.shake = m;
-              out.moved = canvas.style.transform;
+              out.moved = own();
             }
             out.kick ??= d.kick;
             if (!d.dust.count && !d.kick && m === 0) {
-              out.after = canvas.style.transform;
+              out.after = own();
               return resolve(out);
             }
           }
@@ -79,15 +81,15 @@ function checkLanding(w, { shakes = true } = {}) {
     expect(w.shakeFrames, 'it shook').toBeGreaterThan(1);
     expect(w.shake, 'a few CSS px').toBeGreaterThan(0.5);
     expect(w.shake).toBeLessThanOrEqual(due.px + 1);
-    expect(w.moved).toMatch(/^translate\(/);
+    expect(w.moved, 'the canvas itself never moves').toBe('');
   }
-  expect(w.after, 'the canvas put back').toBe('');
+  expect(w.after, 'the canvas never moved').toBe('');
 }
 
 test.describe('landing, on a desktop', () => {
   test.use({ viewport: { width: 1280, height: 800 } });
 
-  test('dropped from high, he lands in a full ring of dust and the screen shakes a few CSS px, then is still, the canvas put back', async ({
+  test('dropped from high, he lands in a full ring of dust and the picture shakes a few CSS px, then is still', async ({
     page,
   }) => {
     await calm(page);

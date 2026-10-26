@@ -1190,8 +1190,9 @@ export function lightDir(dir, yaw) {
 /**
  * Screen shake on a big drop: a landing at `min` world units a second or faster shakes the
  * picture by up to `px` CSS px (at min, at `full` and over) for `time` seconds (the same), `side`
- * of it across, the rest up and down (a thump). main.js puts it on the stage's canvas as an
- * offset (stage.js setShake), so the orbit's own state never moves.
+ * of it across, the rest up and down (a thump). main.js hands it to the stage, which moves the
+ * picture by it through the projection's offset (stage.js setShake), so the orbit's own state
+ * never moves.
  */
 export const SHAKE = Object.freeze({
   min: 5.6,

@@ -28,8 +28,8 @@
 // distance to a centre on the texel grid, a two-texel rim; setLine: the drop line from his collar to the
 // ring, two texels wide and dashed in texels, turned to face the camera). The dust he raises
 // landing is on that layer too (setDust: dustLayer.js draws dust.js's puffs, dithered, the pass's
-// area grown to take them in), and a big drop's screen shake moves the canvas by a few CSS px
-// (setShake: camera.js shakeOffset; the camera never moves). `bounds` is the default view's disc (area.js playArea), kept round the play
+// area grown to take them in), and a big drop's screen shake moves the picture a few CSS px
+// through the projection's offset (setShake: camera.js shakeOffset; the camera never moves). `bounds` is the default view's disc (area.js playArea), kept round the play
 // area's middle (setArea: the play area itself is main.js's, area.js viewArea): what a desktop's
 // default view keeps in sight (pixels.js frameView) and the size of the shadow camera's box, moved
 // to wherever NEWT is (floor.js fitShadow), so his shadow is as fine anywhere in the area.
@@ -420,6 +420,18 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
     }
   }
 
+  /**
+   * The projection's offset: the point the camera looks at shown `view.shift` from the canvas's
+   * middle, and the picture moved by the shake (setShake), CSS px. setViewOffset sets the aspect
+   * too: the canvas's.
+   */
+  function offsetView() {
+    if (!view) return;
+    const x = view.shift.x + shakeNow.x;
+    const y = view.shift.y + shakeNow.y;
+    camera.setViewOffset(grid.canvasW, grid.canvasH, -x, -y, grid.canvasW, grid.canvasH);
+  }
+
   /** The grid for the stage as measured, the zoom, the block it holds and the governor's level. */
   function gridNow() {
     return texelGrid({
@@ -462,8 +474,7 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
     camera.fov = view.fov;
     camera.near = view.near;
     camera.far = view.far;
-    // (setViewOffset sets the aspect too: the canvas's.)
-    camera.setViewOffset(grid.canvasW, grid.canvasH, -view.shift.x, -view.shift.y, grid.canvasW, grid.canvasH);
+    offsetView();
     placeCamera();
     onResize?.({ grid, view, home: homeGrid() });
   }
@@ -723,21 +734,23 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
       return { count: dust.count, box: dustBox ? { ...dustBox } : null };
     },
     /**
-     * The screen shake's offset, CSS px (camera.js shakeOffset): the canvas moved by it, rounded
-     * to device pixels so its texels stay whole (the stage behind is the paper's colour, so an
-     * edge it uncovers never shows); 0, 0 puts it back. The camera and the orbit never move.
+     * The screen shake's offset, CSS px (camera.js shakeOffset): the picture moved by it through
+     * the projection's offset (offsetView), snapped to whole texels as the Bonfire's camera shake
+     * is (src/bonfire/view.js), so the image never swims between pixels; 0, 0 puts it back. The
+     * camera's place and the orbit never move, and nor does the canvas (a CSS transform on it held
+     * back the frames shown while it moved).
      * @param {number} x
      * @param {number} y
      */
     setShake(x, y) {
-      const d = size.dpr || 1;
+      const texel = grid.canvasW / Math.max(1, grid.w);
       // (+ 0: a -0 rounded from a small negative is 0.)
-      const sx = Number.isFinite(x) ? Math.round(x * d) / d + 0 : 0;
-      const sy = Number.isFinite(y) ? Math.round(y * d) / d + 0 : 0;
+      const sx = Number.isFinite(x) ? Math.round(x / texel) * texel + 0 : 0;
+      const sy = Number.isFinite(y) ? Math.round(y / texel) * texel + 0 : 0;
       if (sx === shakeNow.x && sy === shakeNow.y) return;
       shakeNow.x = sx;
       shakeNow.y = sy;
-      canvas.style.transform = sx || sy ? `translate(${sx}px, ${sy}px)` : '';
+      offsetView();
     },
     /** The shake's offset as last set, CSS px, for ?test. */
     get shakeState() {

@@ -956,8 +956,10 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   decal layer, no depth written, the target's surface id kept, so the pass draws it as floor and
   it takes no lines; in the colour target each texel is in where the puff's cover beats its 4×4
   Bayer threshold, drawn in the look's marker colour at `DUST_INK.opacity` 0.85, a smooth alpha at
-  Off; the stage grows the pass's area by `dustBounds`) and the shake to `stage.setShake` (a CSS
-  translate on the canvas, rounded to device pixels; the camera and the orbit never move); a
+  Off; the stage grows the pass's area by `dustBounds`) and the shake to `stage.setShake` (the
+  projection's offset, `setViewOffset`, moved by it and snapped to whole texels as `view.js`
+  snaps the Bonfire's; the camera's place, the orbit and the canvas never move: a CSS transform on
+  the canvas held back the frames Chrome showed for the first 100 ms of the shake); a
   grab, Screen Shake switched off (look.js `shake`, `shakeOn`: left out until it's picked, on) or
   reduced motion ends it at once.
 - **The intro:** `dialogue.js` (pure, on an injected clock: `normalizeScript` makes any
@@ -1025,7 +1027,7 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   (`marker`: shown, centre, radius in world units and `texels`, `alpha`, the view's
   `elevation` over it), the blob's and the ring's centres as drawn (`floorPx`, client px),
   `groundCues` as it plays and `pushed`), `drop` the last `landing` (`t`, `x`, `z`, `speed`), the
-  `dust` as drawn (`count`, its `box`), the `shake` offset on the canvas (CSS px) and its `kick`
+  `dust` as drawn (`count`, its `box`), the `shake` offset on the picture (CSS px) and its `kick`
   (null when there's none); `view({yaw, elevation, zoom})` eases the camera there
   (radians; zoom the home distance over the distance); the limp layer (`limp.weight`, `limp.most`: the most a limb
   has swung, radians) and Screen Time (`device.state` and `label`, the tablet `shown` and its

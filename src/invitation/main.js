@@ -1665,7 +1665,7 @@ function start(s) {
 
   /**
    * The dust and the shake this frame: the puffs to the stage (dust.js dustPuffs), and the
-   * shake's offset on its canvas (camera.js shakeOffset), cut short by a grab, Screen Shake
+   * shake's offset on its picture (camera.js shakeOffset), cut short by a grab, Screen Shake
    * switched off or reduced motion (the orbit never moves).
    */
   function dropFx() {
