@@ -15,19 +15,19 @@
 // Log too); under the Log or the
 // question the buttons over the stage are out of reach; reduced motion shows each line at once
 // and cuts the camera (round to the front, to each shot, back at the end); and at the end the
-// whole screen dithers out (a plain fade with reduced motion), out of reach from its first step,
+// whole screen fades out plainly, out of reach from its first step,
 // and the toolbar, the camera and his free play come back. The script is read from the page (?test's
 // intro()). Tests requiring a specific script shape install a fixture; the admin integration
 // tests exercise the current content. Every wait is on a state (the script as
 // content.js reads it). Down every reply each box shows its face (the four dialogue faces from
 // their own sheets) and plays its animation. The screen answers in the toolbar's style: its
 // buttons dither on hover and press (a finger held on one too, its label kept clear of the
-// dither), it dithers in as it opens and the replies one after another,
-// a line dithers out over the next, a press that goes on flashes the box, the ▼ bobs in steps,
-// and reduced motion fades plainly. A line longer than the box scrolls inside it (the box keeps
+// dither), the replies dither in one after another, a press that goes on flashes the box, the ▼
+// bobs in steps, and reduced motion fades plainly. The box has no dither of its own: it rises in
+// with a plain fade, and a new line takes the old one's place at once, typing from its start, so
+// their letters never show together. A line longer than the box scrolls inside it (the box keeps
 // its size): it follows the typing, then a finger, the wheel or the arrow keys scroll it, with
-// cues where there's more. A new line waits for the old one to dither out, so their letters
-// never show together.
+// cues where there's more.
 import { readFileSync } from 'node:fs';
 import { test, expect } from '@playwright/test';
 import { routeToEnd } from './helpers/dialogue-route.mjs';
@@ -1064,7 +1064,7 @@ test.describe('on a desktop', () => {
     await longLineScrolls(page, false);
   });
 
-  test('the buttons dither on hover and press; the box dithers in, a line dithers out over the next, a press flashes it', async ({
+  test('the buttons dither on hover and press, and a press that goes on flashes the box; the box itself fades in plainly', async ({
     page,
   }) => {
     const errors = watch(page);
@@ -1072,30 +1072,37 @@ test.describe('on a desktop', () => {
     await useBehaviorIntro(page);
     /** A dither tile, as the computed style gives one. */
     const TILE = /^url\("data:image\/png;base64,[^"]+"\)$/;
-    // Opening: the layer dithers in, its mask a dither tile part way through (each step held),
-    // read the moment it shows (its animation held there, then finished).
+    // Opening: nothing on the screen dithers in; the box rises into place with a plain fade
+    // (read the moment the layer shows).
     await page.evaluate(() => {
       const layer = document.querySelector('.inv-talk');
       new MutationObserver((_, observer) => {
         if (layer.hidden) return;
         observer.disconnect();
-        getComputedStyle(layer).animationName; // (its animation made now)
-        const a = layer.getAnimations().find((x) => x.animationName === 'inv-talk-dither-in');
-        if (!a) return (window.opening = { none: true });
-        a.pause();
-        a.currentTime = 0.4 * a.effect.getTiming().duration;
-        const mid = getComputedStyle(layer).maskImage;
-        a.finish();
-        window.opening = { mid, after: getComputedStyle(layer).maskImage };
+        const boxEl = layer.querySelector('.inv-talk-box');
+        const css = (el) => getComputedStyle(el);
+        window.opening = {
+          layer: css(layer).animationName,
+          layerMask: css(layer).maskImage,
+          box: css(boxEl).animationName,
+          boxEasing: css(boxEl).animationTimingFunction,
+          boxMask: css(boxEl).maskImage,
+        };
       }).observe(layer, { attributes: true, attributeFilter: ['hidden'] });
     });
     await replayIntro(page).click();
     await expect.poll(() => page.evaluate(() => window.opening ?? null)).not.toBeNull();
-    const opening = await page.evaluate(() => window.opening);
-    expect(opening.none, 'the layer’s dither-in').toBeUndefined();
-    expect(opening.mid).toMatch(TILE);
-    expect(opening.after).toBe('none');
+    expect(await page.evaluate(() => window.opening)).toEqual({
+      layer: 'none',
+      layerMask: 'none',
+      box: 'inv-talk-rise',
+      boxEasing: 'ease-out',
+      boxMask: 'none',
+    });
     await until(page, (s) => s.dialogue && s.state === 'talk' && !s.dialogue.waiting, 'the intro under way');
+    // No dither of the box's own: no bands in it, no copy of a line going, its fill plain.
+    await expect(page.locator('.inv-talk-shade, .inv-talk-ghost')).toHaveCount(0);
+    await expect(box(page)).toHaveCSS('background-image', 'none');
     // The ▼ bobs in steps.
     await expect(page.locator('.inv-talk-next')).toHaveCSS('animation-timing-function', /steps/);
     // Hover: a light dither of the ink; pressed: a heavier one; neither on a button at rest.
@@ -1111,33 +1118,27 @@ test.describe('on a desktop', () => {
     expect(pressed).not.toBe(hover);
     await page.mouse.move(5, 5);
     await page.mouse.up();
-    // A press that goes on: the box flashes the ink's dither; the line before dithers out over the next.
+    // A press that goes on: the box flashes the ink's dither and dips a step.
     await page.evaluate(() => {
-      window.seen = { flash: [], ghost: [] };
-      const ghost = document.querySelector('.inv-talk-ghost');
-      new MutationObserver(() => {
-        if (!ghost.childElementCount) return;
-        window.seen.ghost.push({
-          text: ghost.textContent,
-          masks: ghost.getAnimations().flatMap((a) => a.effect.getKeyframes().map((k) => k.maskImage ?? '')),
-        });
-      }).observe(ghost, { childList: true });
+      window.seen = { flash: [], dip: [] };
+      /** The keyframes' `prop` of the animations run from script on `sel`. */
+      const frames = (sel, prop) =>
+        document
+          .querySelector(sel)
+          .getAnimations()
+          .filter((a) => !(a instanceof CSSAnimation))
+          .flatMap((a) => a.effect.getKeyframes().map((k) => k[prop] ?? ''));
       // (After the layer's own click handler: the flash it started, read at once.)
-      document.addEventListener('click', () =>
-        window.seen.flash.push(
-          document
-            .querySelector('.inv-talk-flash')
-            .getAnimations()
-            .flatMap((a) => a.effect.getKeyframes().map((k) => k.backgroundImage ?? '')),
-        ),
-      );
+      document.addEventListener('click', () => {
+        window.seen.flash.push(frames('.inv-talk-flash', 'backgroundImage'));
+        window.seen.dip.push(frames('.inv-talk-box', 'translate'));
+      });
     });
     const before = await snapshot(page);
     if (!before.dialogue.typed) {
       await goOn(page);
       await until(page, (s) => s.dialogue.typed, 'the line up');
     }
-    const line = await shownLine(page);
     await goOn(page);
     await until(page, (s) => s.dialogue?.seq > before.dialogue.seq, 'the next line');
     const seen = await page.evaluate(() => window.seen);
@@ -1145,32 +1146,37 @@ test.describe('on a desktop', () => {
       seen.flash.at(-1)?.some((v) => TILE.test(v) || /^url\(/.test(v)),
       'the press flash',
     ).toBe(true);
-    expect(seen.ghost.length, 'the line before, dithering out').toBeGreaterThan(0);
-    expect(seen.ghost[0].text.replace(/\s+/g, ' ').trim()).toBe(line.replace(/\s+/g, ' ').trim());
-    expect(seen.ghost[0].masks.filter((m) => /^url\(/.test(m)).length).toBeGreaterThanOrEqual(6);
-    await expect(page.locator('.inv-talk-ghost')).toBeEmpty();
+    expect(
+      seen.dip.at(-1)?.some((v) => /2px/.test(v)),
+      'the box dips',
+    ).toBe(true);
     expect(errors).toEqual([]);
   });
 
-  test('a new line waits for the old one to dither out: their letters never show together', async ({ page }) => {
+  test('a new line takes the old one’s place at once and types from its start: the two never show together', async ({
+    page,
+  }) => {
     const errors = watch(page);
     await calm(page);
     await useBehaviorIntro(page);
     await open(page);
-    // Every frame from here: the old line's ghost, the new line's letters and its ▼, together or not.
+    // Every frame from here: the toy's clock, which line is up (its letters' first node), how
+    // many of its letters show, and anything else in the box with words in it.
     await page.evaluate(() => {
-      const ghost = document.querySelector('.inv-talk-ghost');
-      const s = (window.swap = { ghost: 0, both: 0, arrow: 0, gone: [], was: false });
+      const typed = document.querySelector('.inv-talk-typed');
+      const view = document.querySelector('.inv-talk-view');
+      const lines = new Map();
+      const rec = (window.swap = []);
       const tick = () => {
-        const on = ghost.childElementCount > 0;
-        const all = document.querySelectorAll('.inv-talk-typed .inv-fx').length;
-        const letters = document.querySelectorAll('.inv-talk-typed .inv-fx:not(.is-unseen)').length;
-        if (on) s.ghost++;
-        if (on && letters) s.both++;
-        if (on && !document.querySelector('.inv-talk-next').hidden) s.arrow++;
-        // (The frame the ghost went: how much of the new line showed then.)
-        if (s.was && !on) s.gone.push({ letters, all });
-        s.was = on;
+        const head = typed.firstChild;
+        if (head && !lines.has(head)) lines.set(head, lines.size);
+        rec.push({
+          t: window.__invitation.clock(),
+          line: head ? lines.get(head) : -1,
+          letters: typed.querySelectorAll('.inv-fx:not(.is-unseen)').length,
+          all: typed.querySelectorAll('.inv-fx').length,
+          others: [...view.children].filter((el) => !el.matches('.inv-talk-text') && el.textContent.trim()).length,
+        });
         window.swapFrame = requestAnimationFrame(tick);
       };
       tick();
@@ -1185,19 +1191,28 @@ test.describe('on a desktop', () => {
       await until(page, (x) => x.dialogue?.seq > s.dialogue.seq, 'the next line');
       await until(page, (x) => x.dialogue.typed, 'typed out');
     }
-    const swap = await page.evaluate(() => {
+    const rec = await page.evaluate(() => {
       cancelAnimationFrame(window.swapFrame);
       return window.swap;
     });
-    expect(swap.ghost, 'the old lines dithered out').toBeGreaterThan(0);
-    expect(swap.both, 'never with the new line’s letters').toBe(0);
-    expect(swap.arrow, 'nor its ▼').toBe(0);
-    expect(swap.gone.length).toBe(2);
-    for (const g of swap.gone) expect(g.letters, 'the new line typing from its start, not whole').toBeLessThan(g.all);
+    const comes = rec.flatMap((r, i) => (i > 0 && r.line !== rec[i - 1].line ? [i] : []));
+    expect(comes.length, 'two new lines').toBe(2);
+    for (const i of comes) {
+      expect(rec[i].letters, 'from its start, not whole').toBeLessThan(rec[i].all);
+      // (Its first letter a letter's time after it came, 1/32 s, give or take a frame: no wait
+      // for the line before to go.)
+      const first = rec.findIndex((r, j) => j >= i && r.letters > 0);
+      expect(first).toBeGreaterThanOrEqual(i);
+      expect(rec[first].t - rec[i].t, 'typing at once').toBeLessThan(0.12);
+    }
+    expect(
+      rec.filter((r) => r.others > 0).length,
+      'nothing else in the box with words: the old line gone the frame the new one came',
+    ).toBe(0);
     expect(errors).toEqual([]);
   });
 
-  test('the replies dither in one after another; with reduced motion the screen fades plainly', async ({ page }) => {
+  test('the replies dither in one after another; with reduced motion they fade plainly', async ({ page }) => {
     await calm(page);
     await useBehaviorIntro(page);
     const { ask } = askAndBefore(await script(page));
@@ -1215,8 +1230,9 @@ test.describe('on a desktop', () => {
     for (const l of looks) expect(l.name).toBe('inv-talk-dither-in');
     for (let i = 1; i < looks.length; i++) expect(looks[i].delay).toBeGreaterThan(looks[i - 1].delay);
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await expect(page.locator('.inv-talk')).toHaveCSS('animation-name', 'inv-talk-fade');
     await expect(page.locator('.inv-talk-choice').first()).toHaveCSS('animation-name', 'inv-talk-fade');
+    await expect(page.locator('.inv-talk')).toHaveCSS('animation-name', 'none');
+    await expect(box(page)).toHaveCSS('animation-name', 'none');
     await expect(page.locator('.inv-talk-next')).toHaveCSS('animation-name', 'none');
   });
 
@@ -1302,9 +1318,7 @@ test.describe('on a desktop', () => {
     expect(errors).toEqual([]);
   });
 
-  test('the end dithers the whole chat screen out, out of reach from its first step; reduced motion fades it', async ({
-    page,
-  }) => {
+  test('the end fades the whole chat screen out plainly, out of reach from its first step', async ({ page }) => {
     const errors = watch(page);
     await calm(page);
     await useBehaviorIntro(page);
@@ -1343,12 +1357,7 @@ test.describe('on a desktop', () => {
       const going = steps[first];
       expect(going.hidden, 'still on screen as it starts').toBe(false);
       expect(going.inert && going.through, 'out of reach from its first step').toBe(true);
-      if (motion === 'reduce') expect(going.frames).toEqual(['opacity 1', 'opacity 0']);
-      else
-        expect(
-          going.frames.filter((m) => /^url\(/.test(m)).length,
-          'its mask through the fade’s steps',
-        ).toBeGreaterThanOrEqual(6);
+      expect(going.frames, 'a plain fade, no dither').toEqual(['opacity 1', 'opacity 0']);
       const hid = steps.findIndex((s) => s.hidden);
       expect(hid, 'hidden once it’s gone').toBeGreaterThan(first);
       expect(steps[hid].leaving || steps[hid].inert, 'nothing of the leave left').toBe(false);

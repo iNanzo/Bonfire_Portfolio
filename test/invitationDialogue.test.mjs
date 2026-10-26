@@ -3,7 +3,7 @@
 // missing or doubled ids get their own, a start that isn't there is the first box, choices
 // capped at three, text at 240 characters, nothing to show is null), the line typed out by
 // characters a second (a beat after punctuation; reduced motion: all at once; a line after
-// another waiting its lead while the screen dithers the old one out), a tap finishing
+// another typing at once, as the first does), a tap finishing
 // the typing and then going on (the next id, the following box, the end), choices shown once
 // the line is typed and leading where they say, Auto going on after the box's wait or one from
 // the line's length, Next to the next box with choices or the end, the log of lines shown (plain
@@ -177,58 +177,21 @@ test('a tap finishes the typing first, then goes on: the following box, the next
   assert.equal(d.view.box, null);
 });
 
-test('a line after another waits its lead before it types (the old one dithers out first), then types from its first letter', () => {
-  const lead = 0.18;
-  const d = run(SCRIPT, { lead });
-  // (The first line never waits: it comes with the screen.)
-  assert.equal(d.step(1 / DIALOGUE.cps + 1e-6).shown, 1, 'the first line types at once');
+test('a line after another types at once, from its first letter, as the first one does', () => {
+  const d = run(SCRIPT);
   assert.equal(d.advance(0.1), 'typed');
   assert.equal(d.advance(0.2), 'next');
   assert.equal(d.view.box?.id, 'me');
-  let v = stepTo(d, 0.2, 0.2 + lead - 0.01);
-  assert.equal(v.shown, 0, 'none of it while the old line goes');
-  assert.ok(!v.typed, 'not typed meanwhile');
-  v = d.step(0.2 + lead + 1 / DIALOGUE.cps + 1e-6);
-  assert.equal(v.shown, 1, 'then from its first letter');
-  v = d.step(0.2 + lead + typeDuration('I am NEWT') + 1e-6);
-  assert.ok(v.typed && v.shown === v.length, 'typed as long after it as ever');
-  // (A tap in the wait finishes the line, as one while it types does.)
-  assert.equal(d.advance(1), 'next');
-  assert.equal(d.view.box?.id, 'ask');
-  assert.equal(d.advance(1.05), 'typed');
-  assert.ok(d.view.typed && d.view.choices, 'the replies with it');
-
-  // (Paused in the wait, the wait holds too: it goes on from where it was.)
-  const p = run(SCRIPT, { lead });
-  p.advance(0);
-  p.advance(0);
-  p.pause(true, 0.1);
-  stepTo(p, 0.1, 5);
-  p.pause(false, 5);
-  assert.equal(p.step(5 + lead - 0.1 - 0.01).shown, 0, 'still waiting the rest of it');
-  assert.ok(p.step(5 + lead - 0.1 + 1 / DIALOGUE.cps + 0.01).shown >= 1, 'then typing');
-
-  // (Auto counts its wait from the line typed, the lead before it.)
-  const a = run(SCRIPT, { lead });
-  a.setAuto(true, 0);
-  const hi = typeDuration('Hi there') + autoDelay({ text: 'Hi there' });
-  let w = stepTo(a, 0, hi + 0.02);
-  assert.equal(w.box?.id, 'me');
-  const meUp = w.seq;
-  const on = hi + lead + typeDuration('I am NEWT') + autoDelay({ text: 'I am NEWT' });
-  w = stepTo(a, hi + 0.02 + 1 / 60, on - 0.05);
-  assert.equal(w.seq, meUp, 'not before the lead, the typing and its wait');
-  w = stepTo(a, on - 0.05 + 1 / 60, on + 0.1);
-  assert.equal(w.box?.id, 'ask', 'on after them');
-
-  // (A line that shows whole, reduced motion's or Next's, needs no wait from the runner: the
-  // screen holds it until the old one has gone.)
-  const r = run(SCRIPT, { lead, reduced: true });
-  r.advance(0);
-  assert.ok(r.view.typed && r.view.shown === r.view.length, 'reduced motion: whole at once');
-  const s = run(SCRIPT, { lead });
-  s.skip(0.05);
-  assert.ok(s.view.typed && s.view.choices, 'Next: whole at once');
+  assert.equal(d.step(0.2 + 1e-6).shown, 0, 'from its start');
+  assert.equal(d.step(0.2 + 1 / DIALOGUE.cps + 1e-6).shown, 1, 'its first letter a letter’s time after it came');
+  const v = d.step(0.2 + typeDuration('I am NEWT') + 1e-6);
+  assert.ok(v.typed && v.shown === v.length, 'typed as long after it came as the first');
+  // (After a reply too: the reply's box types straight away.)
+  const r = run(SCRIPT);
+  r.skip(0);
+  assert.ok(r.choose(0, 0.5));
+  assert.equal(r.view.box?.id, 'yes');
+  assert.equal(r.step(0.5 + 1 / DIALOGUE.cps + 1e-6).shown, 1);
 });
 
 test('the last box ends it, and so does a next that isn’t there', () => {
@@ -524,7 +487,7 @@ test('text effects: typing, Auto’s wait and the cap count the letters that sho
   );
 });
 
-test('the chat screen’s feedback, in the toolbar’s style: dither tiles, a dithered fade, stepped moves', async () => {
+test('the chat screen’s feedback: the buttons’ dither in the toolbar’s style, the box’s plain fades', async () => {
   const { TALK_DITHER, talkTile, talkHtml } = await import('../src/invitation/dialogueUi.js');
   // (A tile is the toolbar's Bayer 4×4 drawn at two CSS px a cell: 8×8, its cells inside the next coverage's.)
   for (const n of [...TALK_DITHER.ink, ...TALK_DITHER.fade]) {
@@ -548,14 +511,15 @@ test('the chat screen’s feedback, in the toolbar’s style: dither tiles, a di
   // (The fade goes up from nothing, in even steps, short of whole: the last step is no mask at all.)
   assert.equal(TALK_DITHER.fade[0], 0);
   assert.ok(TALK_DITHER.fade.every((n, i) => i === 0 || n > TALK_DITHER.fade[i - 1]) && TALK_DITHER.fade.at(-1) < 16);
-  assert.ok(TALK_DITHER.fadeMs >= 120 && TALK_DITHER.fadeMs <= 260, 'a short fade');
+  // (No dithered fade of the box or its line any more: nothing for a line to wait out.)
+  assert.deepEqual(Object.keys(TALK_DITHER).sort(), ['fade', 'ink', 'pressMs']);
   const markup = talkHtml();
   assert.match(markup, /class="inv-talk-flash" aria-hidden="true"/);
-  assert.match(markup, /class="inv-talk-ghost" aria-hidden="true"/);
+  assert.ok(!/inv-talk-ghost/.test(markup), 'no copy of the line before, dithering out');
 
   const css = readFileSync(new URL('../src/invitation/dialogue.css', import.meta.url), 'utf8');
-  const rule = (sel) => {
-    const at = css.indexOf(`${sel} {`);
+  const rule = (sel, from = 0) => {
+    const at = css.indexOf(`${sel} {`, from);
     assert.ok(at >= 0, `a rule for ${sel}`);
     return css.slice(at, css.indexOf('}', at));
   };
@@ -564,13 +528,17 @@ test('the chat screen’s feedback, in the toolbar’s style: dither tiles, a di
   // (Pressed: :active, or the class a held finger sets, holdPressed.)
   assert.match(rule('.inv-talk .inv-btn.is-pressed:not(:disabled)'), /background-image: var\(--talk-ink-6\)/);
   assert.match(rule('.inv-talk .inv-btn'), /background-size: 8px 8px/);
-  // (The layer dithers in: its mask through the fade's steps, a step at a time.)
+  // (The screen doesn't dither in: the box rises into place with a plain quick fade, as before.)
+  assert.ok(!/\.inv-talk:not\(\[hidden\]\) \{/.test(css), 'no animation on the whole layer');
+  assert.match(rule('.inv-talk-box'), /animation: inv-talk-rise 0\.2\d?s ease-out;/);
+  const rise = /@keyframes inv-talk-rise \{([\s\S]*?)\n\}/.exec(css)?.[1] ?? '';
+  assert.match(rise, /opacity: 0/);
+  assert.ok(!/mask-image|steps\(/.test(rise), 'smooth, not stepped');
+  // (The replies dither in one after another: their mask through the fade's steps.)
   const fade = /@keyframes inv-talk-dither-in \{([\s\S]*?)\n\}/.exec(css)?.[1] ?? '';
   const steps = [...fade.matchAll(/mask-image: var\(--talk-mask-(\d+)\)/g)].map((m) => Number(m[1]));
   assert.deepEqual(steps, TALK_DITHER.fade);
   assert.match(fade, /100% \{\s*mask-image: none;/);
-  assert.match(rule('.inv-talk:not([hidden])'), /animation: inv-talk-dither-in/);
-  // (The replies dither in one after another.)
   assert.match(rule('.inv-talk-choices:not(.is-waiting) .inv-talk-choice'), /animation: inv-talk-dither-in/);
   const delays = [2, 3].map((n) =>
     Number(
@@ -582,9 +550,13 @@ test('the chat screen’s feedback, in the toolbar’s style: dither tiles, a di
   assert.ok(delays[0] > 0 && delays[1] > delays[0], `staggered: ${delays}`);
   // (The ▼ steps, a pixel sprite's bob.)
   assert.match(rule('.inv-talk-next'), /animation: inv-talk-bob [\d.]+s steps\(/);
-  // (Reduced motion: quick plain fades instead.)
+  // (Reduced motion: the box comes without its rise, the replies with a quick plain fade.)
   const reduced = css.slice(css.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
-  assert.match(reduced, /animation: inv-talk-fade 0\.1\d?s/);
+  assert.match(reduced, /\.inv-talk-box \{\s*animation: none;/);
+  assert.match(
+    reduced,
+    /\.inv-talk-choices:not\(\.is-waiting\) \.inv-talk-choice \{\s*animation: inv-talk-fade 0\.1\d?s/,
+  );
 });
 
 test('a long line scrolls in the box: it follows the typing a row at a time, and the box keeps its size', async () => {
@@ -739,7 +711,7 @@ test('a press held on a button shows pressed until it lifts, is cancelled or sli
   assert.ok(!pressed(t2.next), 'disposed');
 });
 
-/** A stand-in for the layer as ditherAway uses it, its animations kept to finish by hand. */
+/** A stand-in for the layer as fadeAway uses it, its animations kept to finish by hand. */
 function leavingLayer({ animates = true } = {}) {
   /** @type {any[]} */
   const anims = [];
@@ -765,64 +737,45 @@ function leavingLayer({ animates = true } = {}) {
   return { el, anims };
 }
 
-test('the intro’s end: the screen takes no press from the start, dithers out through the fade’s steps, then hides', async () => {
-  const { ditherAway, TALK_DITHER } = await import('../src/invitation/dialogueUi.js');
-  const masks = [...TALK_DITHER.fade].reverse().map((n) => `url("mask-${n}")`);
+test('the intro’s end: the screen takes no press from the start, fades out plainly and quickly, then hides', async () => {
+  const { fadeAway, LEAVE_MS } = await import('../src/invitation/dialogueUi.js');
   const order = [];
   const { el, anims } = leavingLayer();
-  ditherAway(el, { masks, reduced: false }, () => order.push(el.hidden ? 'done, hidden' : 'done, showing'));
+  fadeAway(el, () => order.push(el.hidden ? 'done, hidden' : 'done, showing'));
   // (1. At once: out of reach, so free play has every press and key; still on screen.)
   assert.equal(el.hidden, false, 'still showing');
   assert.ok(el.classList.contains('is-leaving') && el.hasAttribute('inert'), 'out of reach at once');
-  // (2. Its mask through the fade's steps the other way, each held, about 0.2 s.)
+  // (2. A plain fade, no dither: its opacity down to nothing over a moment.)
   assert.equal(anims.length, 1);
   const { frames, o } = anims[0];
   assert.deepEqual(
-    frames.map((f) => f.maskImage),
-    ['none', ...masks],
-    'from whole to none of it',
+    frames.map((f) => f.opacity),
+    [1, 0],
   );
   assert.ok(
-    frames.every((f) => /^steps\(1/.test(f.easing)),
-    'each step held',
+    frames.every((f) => f.maskImage === undefined && !/steps/.test(f.easing ?? '')),
+    'not dithered, not stepped',
   );
-  assert.ok(o.duration >= 160 && o.duration <= 260, `about 0.2 s: ${o.duration}`);
+  assert.equal(o.duration, LEAVE_MS);
+  assert.ok(LEAVE_MS >= 100 && LEAVE_MS <= 200, `quick: ${LEAVE_MS} ms`);
   assert.deepEqual(order, [], 'not done yet');
-  // (3. Then hidden, back in reach for next time, its mask let go, and done.)
+  // (3. Then hidden, back in reach for next time, its fade let go, and done.)
   anims[0].onfinish();
   assert.equal(el.hidden, true);
   assert.ok(!el.classList.contains('is-leaving') && !el.hasAttribute('inert'), 'ready to open again');
-  assert.equal(anims[0].cancelled, true, 'its mask let go, so it opens whole');
+  assert.equal(anims[0].cancelled, true, 'its fade let go, so it opens whole');
   assert.deepEqual(order, ['done, hidden']);
 
-  // (Reduced motion: a quick plain fade, then the same.)
-  const r = leavingLayer();
-  ditherAway(r.el, { masks, reduced: true });
-  const fade = r.anims[0];
-  assert.deepEqual(
-    fade.frames.map((f) => f.opacity),
-    [1, 0],
-  );
-  assert.ok(fade.o.duration <= 150, 'quick');
-  fade.onfinish();
-  assert.equal(r.el.hidden, true);
-
-  // (No tiles drawn, or nothing animates: a plain fade, or hidden at once.)
-  const n = leavingLayer();
-  ditherAway(n.el, { masks: masks.map(() => undefined), reduced: false });
-  assert.deepEqual(
-    n.anims[0].frames.map((f) => f.opacity),
-    [1, 0],
-  );
+  // (Nothing animates: hidden at once.)
   const still = leavingLayer({ animates: false });
   let done = false;
-  ditherAway(still.el, { masks, reduced: false }, () => (done = true));
+  fadeAway(still.el, () => (done = true));
   assert.ok(still.el.hidden && done, 'hidden at once');
 
   // (Opened again before it had gone: the stop puts it back as it was, never hidden after.)
   const back = leavingLayer();
   let ended = false;
-  const stop = ditherAway(back.el, { masks, reduced: false }, () => (ended = true));
+  const stop = fadeAway(back.el, () => (ended = true));
   stop();
   assert.equal(back.anims[0].cancelled, true);
   assert.ok(!back.el.classList.contains('is-leaving') && !back.el.hasAttribute('inert'));
@@ -834,6 +787,8 @@ test('the intro’s end: the screen takes no press from the start, dithers out t
   const at = css.indexOf('.inv-talk.is-leaving {');
   assert.ok(at >= 0);
   assert.match(css.slice(at, css.indexOf('}', at)), /pointer-events: none/);
+  const ui = await import('../src/invitation/dialogueUi.js');
+  assert.equal('ditherAway' in ui, false, 'no dithered end any more');
 });
 
 test('a held press keeps its label above the dither; the pressed class looks as :active does', async () => {

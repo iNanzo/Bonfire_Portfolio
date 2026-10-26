@@ -341,11 +341,12 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   screen (Auto, Next, Log, Skip Intro, the replies, the Log's and the question's) fills with a
   light dither on hover and a heavier one pressed (a finger held on one too, where a phone's own
   pressed state can't be relied on), its words on a plate of the button's own colour so the
-  press never hides them. The screen dithers in as it opens and all of it dithers out as the
-  intro ends (out of reach from the first step, so play comes back at once), the replies dither
-  in one after another, the line that was up dithers out before the next one types (the two
-  never overlap), and a tap or a key that goes on dips the box a step with a flash of dither.
-  With reduced motion these are quick plain fades, with no dip and no bob.
+  press never hides them. The replies dither in one after another, and a tap or a key that goes
+  on dips the box a step with a flash of dither. The box itself fades plainly: it rises into
+  place with a quick fade as the intro opens, a new line takes the old one's place at once and
+  types from its start (the two never overlap), and the whole screen fades out quickly as the
+  intro ends (out of reach from the first step, so play comes back at once). With reduced motion
+  the box comes without its rise and the replies fade in plainly, with no dip and no bob.
 - **Going on:** a tap or click anywhere first finishes the line, then goes on to the next box;
   Space and Enter do the same (after a click or tap on Auto, Next or Log too; from the keyboard,
   a focused button presses itself). Some boxes ask a question: two or three replies show as buttons
@@ -983,9 +984,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   grab, Screen Shake switched off (look.js `shake`, `shakeOn`: left out until it's picked, on) or
   reduced motion ends it at once.
 - **The intro:** `dialogue.js` (pure, on an injected clock: `normalizeScript` makes any
-  `DialogueScript` safe, types.js; `createDialogue(script, {reduced, lead})` (lead: the seconds
-  a line after another waits before it types) with `start`, `step`, `advance`, `choose`,
-  `setAuto`, `skip` (the Next button), `pause`, `end`, `view` and `log`
+  `DialogueScript` safe, types.js; `createDialogue(script, {reduced})` with `start`, `step`,
+  `advance`, `choose`, `setAuto`, `skip` (the Next button), `pause`, `end`, `view` and `log`
   (plain text); `DIALOGUE`: 32 letters a second with a beat after punctuation, Auto's wait
   1.1 s plus 0.035 s a letter between 1.4 and 6 s, 240 letters and 3 replies at most, all
   counting the letters that show (markup.js); `lookSway`; main.js runs
@@ -996,12 +996,10 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   stays put), `.can-scroll` once it's typed and outgrows the box, the `.inv-talk-more` cues; its feedback from
   `TALK_DITHER`'s tiles, `talkTile` (icons.js `ditherMask` drawn at 2 px a cell) installed on the
   layer as `--talk-ink-N` and `--talk-mask-N`: the buttons' hover and press backgrounds, the
-  `inv-talk-dither-in` keyframes stepping the layer's and the replies' `mask-image`, and from
-  script the ghost (`ditherOut`, a copy of the line before, masked out step by step; the next
-  line's letters and ▼ wait unseen while it goes, and main.js passes `TALK_DITHER.fadeMs` as the
-  runner's `lead` so it starts typing then), the press flash (`pressFlash`) and the end
-  (`ditherAway`: `.is-leaving` and inert at once, the layer's mask through the fade's steps over
-  `TALK_DITHER.leaveMs`, then hidden; `close({cut})` drops it at once for a replay or the
+  `inv-talk-dither-in` keyframes stepping the replies' `mask-image`, and from script the press
+  flash (`pressFlash`); the box's own plain fades: `inv-talk-rise` as it opens (CSS), and the
+  end (`fadeAway`: `.is-leaving` and inert at once, the layer's opacity down over `LEAVE_MS`,
+  then hidden; `close({cut})` drops it at once for a replay or the
   preview); `holdPressed` (`.is-pressed` from a pointerdown until it lifts, is cancelled or
   leaves the button) and `.inv-talk-label` (a button's words on a plate of its inherited fill)),
   brain.js's `talk` state (`BrainIn.dialogue`: the
