@@ -222,7 +222,7 @@ the sheet and leaves the slider as it was.
 
 | Setting | Choices | What it does |
 | --- | --- | --- |
-| Pixel Size | 16×16 to 256×256, Native, Off | NEWT's sprite resolution: at 64×64 he's drawn roughly 64 pixels tall, more or fewer as each pixel rounds to a whole number of the screen's own (at the default 128×128, 105 to 191 across common screens). A slider, coarse to fine, then Native and Off at its fine end, with a button at each end; the line under it says how many pixels tall he really is on this screen. 128×128 is the default (on a 1280×800 desktop it draws as Native, the same pixels there). Each pixel is a whole number of the screen's own pixels, and two steps that would draw the same picture on a screen show as one there, reading as the one picked (128×128 on a 1429×1115 desktop, where it draws as 96×96 does). **Native** gives every one of the screen's own pixels a pixel, even a phone's three to a CSS pixel, with the pixel look still on (outlines, dithering, toon shading); a resolution that already reaches the screen's pixels shows as Native (256×256 on a phone, 128×128 and up on a 1280×800 desktop), so a 390-wide phone lists 7 resolutions and a 1280×800 desktop 5, then Native and Off. NEWT stays the same size on screen, so a coarser resolution only makes him chunkier, and zooming the camera in or out takes his pixels with him (bigger blocks zoomed in), so he keeps the resolution you chose at any zoom; Native and Off don't change with the zoom. His shirt shows its real plaid at every resolution unless Pixel Shirt (under Shader) is on, and his face is redrawn in pixels to fit his size unless Pixel Face is off. **Off** is the smooth picture without the pixel look, at the screen's resolution (at most two pixels to a CSS pixel). |
+| Pixel Size | 16×16 to 256×256, Native, Off | NEWT's sprite resolution: at 64×64 he's drawn roughly 64 pixels tall, more or fewer as each pixel rounds to a whole number of the screen's own (at the default 128×128, 105 to 191 across common screens). A slider, coarse to fine, then Native and Off at its fine end, with a button at each end; the line under it says how many pixels tall he really is on this screen. 128×128 is the default (on a 1280×800 desktop it draws as Native, the same pixels there). Each pixel is a whole number of the screen's own pixels, and two steps that would draw the same picture on a screen show as one there, reading as the one picked (128×128 on a 1429×1115 desktop, where it draws as 96×96 does). **Native** gives every one of the screen's own pixels a pixel, even a phone's three to a CSS pixel, with the pixel look still on (outlines, dithering, toon shading); a resolution that already reaches the screen's pixels shows as Native (256×256 on a phone, 128×128 and up on a 1280×800 desktop), so a 390-wide phone lists 7 resolutions and a 1280×800 desktop 5, then Native and Off. NEWT stays the same size on screen, so a coarser resolution only makes him chunkier, and zooming the camera in or out takes his pixels with him (bigger blocks zoomed in), so he keeps the resolution you chose at any zoom; Native and Off don't change with the zoom. His shirt shows its real plaid at every resolution, and his face is redrawn in pixels to fit his size unless Pixel Face (under Shader) is off. **Off** is the smooth picture without the pixel look, at the screen's resolution (at most two pixels to a CSS pixel). |
 | Dithering | On, Off | The checkered blend between colours (how strong: Dither Strength, under Shader). |
 | Outlines | On, Off | A one-pixel line around NEWT (none in his shadow; how dark, its colour and where: under Shader). |
 | Style | Default, DS, Soft, Custom | Default (what a first visit shows, set in the admin's Invitation page; as shipped, Soft with 6 colours, a full-strength dither, full-strength tinted lines on the outer ring, two toon bands and the highlight). DS: like the old handheld, 15-bit colour with a fine dither, dark 1-pixel lines, a hard shadow. Soft: fewer colours, pastel, a warm ring outside him and a softer, dithered shadow. Each sets every Shader option; Custom shows once one of them is yours (it can't be picked: choose a style, or Reset To Style, to go back). |
@@ -243,7 +243,6 @@ and turns the Style to Custom, and **Reset To Style** puts the style's values ba
 | Outer Ring | On, Off | Lines just outside his outline, like a sprite's, instead of on his edge. |
 | Toon Shading | Smooth, 2, 3, 4 | Smooth light, or that many flat bands of it. |
 | Highlight | On, Off | White where the light falls straight on him. |
-| Pixel Shirt | On, Off | Off in every style: his real plaid at every resolution (under about 100 pixels tall its checks are smaller than a pixel, so it shows as a mottled mix of its colours). On: below 128 pixels tall his shirt shows bold pixel checks. |
 | Pixel Face | On, Off | On in every style: his face redrawn in pixels to fit his size, drawn after his smooth face (the same eyes, brows, mouth and blush, scaled down; the smooth face again at the finest steps zoomed in). Off: the smooth face at every resolution (drawn sharper with the pixel look on, the more the fewer pixels he has, down to the sheet's own pixels at 32×32 and coarser, so his eyes and mouth stay). |
 | Shadow | Hard, Soft | A crisp shadow, or one with a dithered, two-tone edge. |
 | Shadow Strength | Off to 100% | How dark his shadow is. |
@@ -709,11 +708,10 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
 - **The model:** `npm run model -- newt` rebuilds `public/models/newt.glb` from `tools/newt.py`
   with headless Blender (`$NEWT_BLEND` names the .blend; it defaults to the user's
   `NEWT_optimized.blend`, which is never overwritten).
-- **The pixel face and shirt** (the face only with Pixel Face on, the preset's
-  `texture.pixelFace`, on in every style; the shirt only with Pixel Shirt on, `texture.pixelShirt`,
-  off in every style; off, the glb's smooth face and own atlas show at every resolution; a look
-  stored with the one switch they split from, `pixelArt`, sets both, `LEGACY_SHADER`, and the
-  admin's content rules read it with a warning): at the coarser
+- **The pixel face** (only with Pixel Face on, the preset's `texture.pixelFace`, on in every
+  style; off, the glb's smooth face shows at every resolution; a look stored with the one switch
+  it split from, `pixelArt`, sets it, `LEGACY_SHADER`, and the admin's content rules read it with
+  a warning): at the coarser
   resolutions his head is only a dozen or two texels wide, so
   `node tools/newt-face.mjs` redraws the glb's face sheet as `public/models/newt-face.png`,
   his smooth face scaled down faithfully to each cell size: its design measured from the glb's
@@ -734,14 +732,14 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   half face in texels (3 px at 16×16 up to 62, his half face at Native on a phone); past 1.25
   times the largest (`SMOOTH_FACE_OVER`: zoomed in at Native or the finest resolutions) it
   shows the glb's smooth face again, as at Off. A copy of the image cached from before the
-  ladder grew shows the sheets it has, and the smooth face past them (`layoutFor`). His shirt shows the bold pixel plaid (`newt-atlas-pixel.png`, `tools/newt-atlas.mjs`)
-  until he's `ORIGINAL_ATLAS_TEXELS` (128) texels tall in the default view at the Pixel Size's
-  own grid (stage.js hands main.js that grid as `home`: neither the zoom's bigger blocks nor the
-  governor's coarser ones change his shirt), then the glb's own plaid, sampled at the preset's
-  `texture.fineMipBias`. The face sheet and the pixel atlas are asked for at the same time as
-  the glb, and the first frame waits (up to 3 s more) for each one whose switch is on, so NEWT
-  never shows a blank face or the blurred atlas first; one whose switch is off never holds it
-  up.
+  ladder grew shows the sheets it has, and the smooth face past them (`layoutFor`). His shirt
+  shows the glb's own plaid at every resolution, sampled at the preset's `texture.fineMipBias`
+  (under about 100 texels tall its checks are smaller than a texel, so it shows as a mottled mix
+  of its colours). Pixel Shirt, a bold black-and-white pixel plaid at the coarser resolutions, is
+  gone: a look stored with it loads with the key ignored (`RETIRED_SHADER`), and the admin's
+  content rules read it in the Default look with a warning. The face sheet is asked for at the
+  same time as the glb, and while Pixel Face is on the first frame waits for it (up to 3 s more),
+  so NEWT never shows a blank face first; with it off it never holds him up.
 - **The dialogue faces** (sad, angry, shy and smug, for the intro's boxes: `clips.js`
   `EXTRA_FACES`) have sheets of their own beside the glb, laid out like his: `node
   tools/newt-face-smooth.mjs` draws the smooth one (`newt-face-smooth-extra.png`, 1024) from his
@@ -970,8 +968,7 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   shows Native, a resolution at 1 px a texel included; null at Off), `newtTexels`: his height in
   texels and `newtTall` in CSS px in the default view, `faceSheet`: the face sheet showing (a
   cell width, or `'smooth'`, as at Off), `faceShown`: the face really showing (a dialogue face's
-  stand-in until its sheet is in), `faceTexels`, `atlas`: `'pixel'` or `'original'`,
-  `shader`: every Shader option's value, `custom`: whether one is the user's, `pass`: what
+  stand-in until its sheet is in), `faceTexels`, `shader`: every Shader option's value, `custom`: whether one is the user's, `pass`: what
   reached the renderer (the post shader's values, the light's strength and angle, the shadow's
   strength, `zoom`: the zoom the texels follow, `pd`: device px a texel as drawn, `governor`:
   whether it's on, its level and the last second's p90), and `warmed`: the pass's other path compiled),

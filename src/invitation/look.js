@@ -14,8 +14,9 @@
 // loads as the nearest one: 2×, 3× and 4× as they looked on a 390-wide phone, OLD_PIXEL, and
 // 'fine', 'ds' or 'chunky' as the default; the page never shipped with them; a look stored before
 // Motion loads as Smooth with its other values kept, one stored before the Shader options as its
-// style, and one with Pixel Shirt & Face, the one switch Pixel Shirt and Pixel Face split from,
-// with both set as it was: LEGACY_SHADER). The admin's Default look (content.json
+// style, one with Pixel Shirt & Face, the one switch Pixel Face split from, with the face set as
+// it was: LEGACY_SHADER, and one with Pixel Shirt, since taken away, with the key ignored:
+// RETIRED_SHADER). The admin's Default look (content.json
 // `invitation.defaults`, which main.js hands installDefaults at boot) overrides the built-in
 // Default style and the first visit's settings; a stored look still wins, a value it lacks
 // taking the Default look's. Ground Cues (the ring and the drop line under him while he's held:
@@ -108,10 +109,20 @@ let first = DEFAULT_LOOK;
 
 /**
  * Shader options split from one stored before them: each one's old key, read where a look has
- * no value of its own (Pixel Shirt & Face, `pixelArt`, became Pixel Shirt and Pixel Face).
+ * no value of its own (Pixel Shirt & Face, `pixelArt`, became Pixel Shirt and Pixel Face; the
+ * shirt has gone since).
  * @type {Record<string, string>}
  */
-export const LEGACY_SHADER = { pixelShirt: 'pixelArt', pixelFace: 'pixelArt' };
+export const LEGACY_SHADER = { pixelFace: 'pixelArt' };
+
+/**
+ * Shader options taken away: a stored look or the admin's Default look that still has one loads
+ * all the same, the key ignored (validShader keeps only SHADER_CONTROLS'), and the admin's content
+ * rules read it with a warning. Pixel Shirt (`pixelShirt`): the bold black-and-white pixel plaid
+ * on his shirt at the coarser resolutions; his real plaid shows at every one now.
+ * @type {readonly string[]}
+ */
+export const RETIRED_SHADER = Object.freeze(['pixelShirt']);
 
 /**
  * The user's Shader changes from anything, against the style `style`: each value snapped onto
@@ -129,7 +140,7 @@ function validShader(raw, style) {
   /** @type {import('./shader.js').ShaderValues} */
   const out = {};
   for (const c of SHADER_CONTROLS) {
-    // (A look stored with the one switch they split from, Pixel Shirt & Face: it sets both.)
+    // (A look stored with the one switch Pixel Face split from, Pixel Shirt & Face: it sets it.)
     const legacy = Object.hasOwn(LEGACY_SHADER, c.key) && !Object.hasOwn(values, c.key);
     const v = snapShader(c, values[legacy ? LEGACY_SHADER[c.key] : c.key]);
     if (v !== undefined && v !== own[c.key]) out[c.key] = v;

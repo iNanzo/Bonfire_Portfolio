@@ -178,10 +178,9 @@ function ringMaterial() {
  * @property {() => import('./pixels.js').Insets} [focus]  where the point the camera looks at
  *   shows: the middle of the space these leave (`insets` by default; the open Look sheet's clear
  *   space), how far back it is unchanged
- * @property {(stage: {grid: import('./pixels.js').Grid, view: import('./pixels.js').View, home: import('./pixels.js').Grid}) => void} [onResize]
- *   the grid refitted: the grid as drawn (the zoom's block and the governor's level in it), the
- *   default view, and `home`, the Pixel Size's own grid (at the default zoom, no governor: what
- *   decides his shirt, so neither the zoom nor the governor changes it)
+ * @property {(stage: {grid: import('./pixels.js').Grid, view: import('./pixels.js').View}) => void} [onResize]
+ *   the grid refitted: the grid as drawn (the zoom's block and the governor's level in it) and
+ *   the default view
  */
 
 /**
@@ -420,11 +419,6 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
     });
   }
 
-  /** The Pixel Size's own grid for the stage: at the default zoom, without the governor. */
-  function homeGrid() {
-    return texelGrid({ ...size, pixelSize: current.look.pixelSize, devW: device?.w, devH: device?.h });
-  }
-
   /** Size the canvas, the pass and the camera to the stage. */
   function resize() {
     const cssW = container.clientWidth;
@@ -452,7 +446,7 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
     // (setViewOffset sets the aspect too: the canvas's.)
     camera.setViewOffset(grid.canvasW, grid.canvasH, -view.shift.x, -view.shift.y, grid.canvasW, grid.canvasH);
     placeCamera();
-    onResize?.({ grid, view, home: homeGrid() });
+    onResize?.({ grid, view });
   }
 
   const observer = new ResizeObserver((entries) => {

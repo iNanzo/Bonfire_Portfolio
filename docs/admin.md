@@ -164,7 +164,8 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     menu: Pixel Size (16×16 to 256×256, Native or Off), Dithering, Outlines, the style it's
     **Built On** (DS or Soft: its own colors carry over), Motion, and every Shader option
     the Look menu shows, by the same names, with the same ranges and choices. Visitors'
-    own picks stay in their browser, over these.
+    own picks stay in their browser, over these. One saved with a Shader option since taken
+    away (Pixel Shirt) still passes, with a warning that the toy ignores it.
   - **Speech:** the shortest and longest quiet spell before an idle line (seconds), and each
     moment's **Chance** (0 never, 1 every time) and **Cooldown** (seconds), under the
     plan's kinds: Reactions, Running, Carried, Moving, Sitting, Passive and Camera.

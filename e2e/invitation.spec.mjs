@@ -4,8 +4,9 @@
 // 4×4 CSS px texels) survives a reload, Pixel Size Native draws a texel a device pixel at a phone's
 // full DPR with the pixel look on (and survives a reload), and Off draws smooth at the screen's
 // resolution (its smooth face reported as such); and the portfolio's
-// first load carries none of its code; the pixel atlas and face load alongside the glb and the
-// first frame waits for them; the dialogue faces' sheets load too, and each of his eight faces
+// first load carries none of its code; the pixel face loads alongside the glb and the first
+// frame waits for it (no pixel atlas: Pixel Shirt is gone, and a look stored with it loads with
+// the key ignored); the dialogue faces' sheets load too, and each of his eight faces
 // shows on him by name. NEWT stands about a quarter of a phone's short side tall
 // (a fifth of a desktop's), and running off to the rim never takes him off a phone's screen.
 // Playing with him: a tap makes him wave or start, a touch
@@ -421,87 +422,70 @@ test.describe('on a phone', () => {
     expect(errors).toEqual([]);
   });
 
-  test('with Pixel Shirt on (and Pixel Face, every style’s own), the pixel atlas and the pixel face load alongside the glb, and the first frame waits for them', async ({
+  test('a look stored with Pixel Shirt on (since taken away) loads as the Default style with the key ignored: no Pixel Shirt in Settings, no pixel atlas asked for, his real plaid', async ({
     page,
   }) => {
     const errors = watch(page);
     await page.addInitScript(() =>
       localStorage.setItem('invitation.look.v1', JSON.stringify({ shader: { pixelShirt: true } })),
     );
-    /** @type {number|null} when the glb was let through (it's held a while, as on a slow phone) */
-    let glbAt = null;
-    const asked = {};
-    await page.route('**/models/newt.glb', async (route) => {
-      await sleep(1000);
-      glbAt = Date.now();
-      await route.continue();
-    });
-    await page.route(/\/models\/newt-(atlas-pixel|face)\.png$/, async (route) => {
-      const name = /newt-[a-z-]+\.png/.exec(route.request().url())[0];
-      asked[name] = { at: Date.now(), glbThen: glbAt };
-      // Held until a while after the glb: the page doesn't draw until they're in.
-      while (glbAt === null) await sleep(20);
-      await sleep(Math.max(0, glbAt + 600 - Date.now()));
-      asked[name].readyBefore = await page.evaluate(() =>
-        document.querySelector('[data-stage]').classList.contains('is-ready'),
-      );
-      await route.continue();
+    /** @type {string[]} every request for a pixel atlas */
+    const atlases = [];
+    page.on('request', (r) => {
+      if (/newt-atlas/.test(r.url())) atlases.push(r.url());
     });
     await ready(page);
-    expect(Object.keys(asked).sort()).toEqual(['newt-atlas-pixel.png', 'newt-face.png']);
-    for (const [name, a] of Object.entries(asked)) {
-      expect(a.glbThen, `${name} asked for while the glb was still on its way`).toBeNull();
-      expect(a.readyBefore, `the first frame waited for ${name}`).toBe(false);
-    }
+    const snap = await snapshot(page);
+    expect('pixelShirt' in snap.shader, 'no Pixel Shirt among the Shader options').toBe(false);
+    expect(snap.custom, 'the stored key is no change of the user’s').toBe(false);
+    expect('atlas' in snap, 'nothing to report about his shirt').toBe(false);
+    expect(typeof snap.faceSheet, `a pixel face sheet (${snap.faceSheet})`).toBe('number');
+    await page.getByRole('button', { name: 'Settings' }).click();
+    const sheet = page.getByRole('dialog', { name: 'Settings' });
+    await expect(sheet.getByRole('switch', { name: 'Pixel Face' })).toBeChecked();
+    await expect(sheet.getByText('Pixel Shirt')).toHaveCount(0);
+    await expect(sheet.locator('[data-shader="pixelShirt"]')).toHaveCount(0);
+    await expect(sheet.getByRole('group', { name: 'Style' }).getByRole('radio', { name: 'Default' })).toBeChecked();
+    expect(atlases, 'no pixel atlas asked for').toEqual([]);
     expect(errors).toEqual([]);
   });
 
-  test('with the default look (Pixel Face on, Pixel Shirt off) the first frame waits for the pixel face, never for the pixel atlas, and NEWT wears his real plaid and his pixel face', async ({
+  test('with the default look (Pixel Face on) the pixel face loads alongside the glb and the first frame waits for it, and NEWT wears his real plaid and his pixel face', async ({
     page,
   }) => {
     const errors = watch(page);
     /** @type {number|null} when the glb was let through (it's held a while, as on a slow phone) */
     let glbAt = null;
-    /** @type {boolean|null} whether the page had drawn by the time the pixel atlas was let through */
-    let drawnFirst = null;
-    /** @type {boolean|null} whether it had drawn by the time the pixel face was let through */
-    let faceLate = null;
+    /** @type {{glbThen: number|null, readyBefore?: boolean}|null} when the pixel face was asked for, and whether the page had drawn when it was let through */
+    let asked = null;
+    /** @type {string[]} every request for a pixel atlas */
+    const atlases = [];
+    page.on('request', (r) => {
+      if (/newt-atlas/.test(r.url())) atlases.push(r.url());
+    });
     await page.route('**/models/newt.glb', async (route) => {
       await sleep(1000);
       glbAt = Date.now();
       await route.continue();
     });
     await page.route(/\/models\/newt-face\.png$/, async (route) => {
+      asked = { glbThen: glbAt };
       // Held until a while after the glb: the page doesn't draw until it's in.
       while (glbAt === null) await sleep(20);
       await sleep(Math.max(0, glbAt + 600 - Date.now()));
-      faceLate = await page.evaluate(() => document.querySelector('[data-stage]').classList.contains('is-ready'));
-      await route.continue();
-    });
-    await page.route(/\/models\/newt-atlas-pixel\.png$/, async (route) => {
-      // (Held until the page draws, or 8 s: it never waits on it.)
-      const t0 = Date.now();
-      while (Date.now() - t0 < 8000) {
-        const drawn = await page
-          .evaluate(() => document.querySelector('[data-stage]')?.classList.contains('is-ready'))
-          .catch(() => false);
-        if (drawn) break;
-        await sleep(50);
-      }
-      drawnFirst ??= await page
-        .evaluate(() => document.querySelector('[data-stage]')?.classList.contains('is-ready'))
-        .catch(() => false);
+      asked.readyBefore = await page.evaluate(() =>
+        document.querySelector('[data-stage]').classList.contains('is-ready'),
+      );
       await route.continue();
     });
     await ready(page);
-    await expect.poll(() => drawnFirst).not.toBeNull();
-    expect(drawnFirst, 'drawn before the pixel atlas came').toBe(true);
-    expect(faceLate, 'the first frame waited for the pixel face').toBe(false);
+    expect(asked?.glbThen, 'the pixel face asked for while the glb was still on its way').toBeNull();
+    expect(asked?.readyBefore, 'the first frame waited for the pixel face').toBe(false);
     const snap = await snapshot(page);
-    expect(snap.atlas).toBe('original');
     expect(typeof snap.faceSheet, `a pixel face sheet (${snap.faceSheet})`).toBe('number');
-    expect(snap.shader.pixelShirt).toBe(false);
     expect(snap.shader.pixelFace).toBe(true);
+    expect('pixelShirt' in snap.shader).toBe(false);
+    expect(atlases, 'no pixel atlas asked for').toEqual([]);
     expect(errors).toEqual([]);
   });
 
@@ -1721,9 +1705,9 @@ test.describe('on a desktop', () => {
       expect(f.inside, `Shift+Tab ${i}: ${f.what}`).toBe(true);
     }
     // Done, Pixel Size (its slider and the buttons at its two ends), Dithering, Outlines, Style,
-    // Motion, the 17 Shader options (Reset To Style rests until one is the user's own), Ground
-    // Cues, Rose Petals and Wander (no Drag row: the bead hold is the only carry).
-    expect(stops.size, [...stops].join(', ')).toBe(28);
+    // Motion, the 16 Shader options (Reset To Style rests until one is the user's own; no Pixel
+    // Shirt), Ground Cues, Rose Petals and Wander (no Drag row: the bead hold is the only carry).
+    expect(stops.size, [...stops].join(', ')).toBe(27);
     // Focus on the page (a click on empty space): Tab comes back into the sheet.
     await page.mouse.click(200, 120);
     await page.keyboard.press('Tab');
@@ -2455,48 +2439,6 @@ test.describe('on a 1429×1115 desktop', () => {
     await expect(sheet.getByRole('slider', { name: 'Pixel Size' })).toHaveAttribute('aria-valuetext', '128 by 128');
     await expect(sheet.getByRole('group', { name: 'Style' }).getByRole('radio', { name: 'Default' })).toBeChecked();
     expect((await snapshot(page)).resolution).toBe(128);
-  });
-});
-
-test.describe('on a hi-DPI desktop', () => {
-  test.use({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 });
-
-  test('with Pixel Shirt on at 128×128 his shirt is the Pixel Size’s to decide: zoomed in (bigger blocks) or with the governor a step coarser, it keeps the real plaid', async ({
-    page,
-  }) => {
-    await page.addInitScript(() =>
-      localStorage.setItem('invitation.look.v1', JSON.stringify({ pixelSize: '128', shader: { pixelShirt: true } })),
-    );
-    await ready(page, '/invitation/?test&calm&seed=3');
-    const base = await snapshot(page);
-    // (He's about 156 texels tall here: the glb's own plaid, over ORIGINAL_ATLAS_TEXELS.)
-    expect(base.atlas).toBe('original');
-    const body = await on(page, 'body');
-    await page.mouse.move(body.x + 200, body.y);
-    for (let i = 0; i < 6; i++) {
-      await page.mouse.wheel(0, -60);
-      await framesFor(page, 250);
-      const s = await snapshot(page);
-      expect(
-        s.atlas,
-        `zoomed ${(s.cameraHome.distance / s.camera.distance).toFixed(2)}×, ${s.pass.pd} px a texel`,
-      ).toBe('original');
-    }
-    expect((await snapshot(page)).pass.pd, 'the blocks grew with the zoom').toBeGreaterThan(base.pass.pd);
-    // The governor a level coarser (a busy page) changes the texels, not the shirt.
-    await ready(page, '/invitation/?test&calm&seed=3&govern');
-    await page.evaluate(() => {
-      const spin = () => {
-        if (window.__calm) return;
-        const t = performance.now();
-        while (performance.now() - t < 35);
-        requestAnimationFrame(spin);
-      };
-      requestAnimationFrame(spin);
-    });
-    await until(page, (s) => s.pass.governor.level === 1, 'a level coarser', 25_000);
-    expect((await snapshot(page)).atlas).toBe('original');
-    await page.evaluate(() => (window.__calm = true));
   });
 });
 

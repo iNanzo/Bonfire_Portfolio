@@ -3,13 +3,13 @@
 // that stays in his soft gradients, not over his dark hair and clothes; a pastel grade that keeps
 // him peachy and his eyes near black; coloured outlines, a darker plum shade of the colour beside
 // them, drawn on the paper just outside his silhouette like a sprite's (never on his face); his
-// textures a mip and a half coarser, so the toon bands shade him rather than his shirt's pattern
-// (half a mip from 128 texels tall, where the glb's own plaid shows and has the texels to resolve);
-// and a soft shadow, its edge spread over one texel and dithered into two tones on a warm white
-// page; no blob under him while he stands (only a flat one while he's lifted); his real plaid at
-// every resolution (Pixel Shirt off) and his face redrawn in pixels to fit his size (Pixel Face
-// on). Every look value lives here so the look designer edits data, never code (look.js has the
-// shape, LookPreset; retro.js the pass's own extras, RetroExtras).
+// textures a mip and a half coarser, so the toon bands shade him rather than a texture's noise,
+// but his atlas, his real plaid at every resolution, only half a mip (fineMipBias: more blurs its
+// checks into grey; character.js); a soft shadow, its edge spread over one texel and dithered
+// into two tones on a warm white page; no blob under him while he stands (only a flat one while
+// he's lifted); and his face redrawn in pixels to fit his size (Pixel Face on). Every look value
+// lives here so the look designer edits data, never code (look.js has the shape, LookPreset;
+// retro.js the pass's own extras, RetroExtras).
 
 /** @type {import('../look.js').LookPreset & import('../retro.js').RetroExtras} */
 export default {
@@ -36,6 +36,6 @@ export default {
   hemi: { sky: '#fdf8ff', ground: '#e6c8c0', intensity: 1.3 },
   blob: { opacity: 0, lifted: 0.34 },
   marker: { color: '#a3826f' },
-  texture: { mipBias: 1.5, fineMipBias: 0.5, pixelShirt: false, pixelFace: true },
+  texture: { mipBias: 1.5, fineMipBias: 0.5, pixelFace: true },
   animFps: 0,
 };
