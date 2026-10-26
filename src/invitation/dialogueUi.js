@@ -29,8 +29,9 @@
 // size from the line's start, so it never grows as it types), and a longer one scrolls inside
 // that: the view follows the typing a row at a time (followRow); once it's all typed the wheel, a
 // finger and the arrow and Page keys scroll it, with pixel cues over and under it where there's more.
-// It's plain, as before round 18 (dialogue.css): a button presses down (a press held with a
-// finger too, holdPressed: CSS :active isn't reliable on touch), the replies pop in, the box
+// It's plain, as before round 18 (dialogue.css): a light hover where there's a mouse, and a
+// button or the box pressed shows a step darker and down (a press held with a finger too,
+// holdPressed: CSS :active isn't reliable on touch), the replies pop in, the box
 // rises in with a plain fade and the screen fades out plainly at the end. Its one dither: a press
 // that goes on, or a reply picked, brings the next box on with the click fade (clickFade,
 // TALK_FADE): the old line (a copy of it, where it was) dithers out with its name tab and the
@@ -126,16 +127,17 @@ export function followRow({ mid, rowH, clientHeight, scrollTop }) {
 }
 
 /**
- * A press held on a button in `root` shows as pressed (`cls` on it, dialogue.css) from its
- * pointerdown until that pointer lifts, is cancelled or slides off the button: CSS :active isn't
- * reliable on touch, where a finger held on Next or a reply showed nothing. A finger's press is
- * captured by its button till it lifts (no pointerleave meanwhile, where the browser keeps it),
- * so it's let go of, and its moves off the button's box count as sliding off too.
- * Returns a function that stops it.
+ * A press held on a button in `root` (or what else `pressable` names) shows as pressed (`cls`
+ * on it, dialogue.css) from its pointerdown until that pointer lifts, is cancelled or slides off
+ * it: CSS :active isn't reliable on touch, where a finger held on Next or a reply showed
+ * nothing. A finger's press is captured by its target till it lifts (no pointerleave meanwhile,
+ * where the browser keeps it), so it's let go of, and its moves off the pressed one's box count
+ * as sliding off too. Returns a function that stops it.
  * @param {HTMLElement} root
  * @param {string} [cls]
+ * @param {string} [pressable]  a selector: buttons, or the screen's box too
  */
-export function holdPressed(root, cls = 'is-pressed') {
+export function holdPressed(root, cls = 'is-pressed', pressable = 'button') {
   /** @type {HTMLElement|null} */
   let held = null;
   let id = -1;
@@ -158,7 +160,7 @@ export function holdPressed(root, cls = 'is-pressed') {
   /** @param {PointerEvent} e */
   const down = (e) => {
     const at = /** @type {Element|null} */ (e.target);
-    const button = /** @type {HTMLButtonElement|null} */ (at?.closest?.('button') ?? null);
+    const button = /** @type {HTMLButtonElement|null} */ (at?.closest?.(pressable) ?? null);
     if (!button || button.disabled || e.button !== 0) return;
     release();
     held = button;
@@ -363,8 +365,8 @@ export function createDialogueUi(
   stage.append(layer);
   const view = doc.defaultView;
   const masks = talkMasks(doc);
-  // (A finger held on a button shows it pressed, as the mouse's :active does.)
-  const unhold = holdPressed(layer);
+  // (A finger held on a button or the box shows it pressed, as the mouse's :active does.)
+  const unhold = holdPressed(layer, 'is-pressed', 'button, .inv-talk-box');
   const $ = (sel) => /** @type {HTMLElement} */ (layer.querySelector(sel));
   const name = $('.inv-talk-name');
   const typed = $('.inv-talk-typed');
@@ -408,6 +410,8 @@ export function createDialogueUi(
    * inert (out of reach of taps, clicks and Tab); the replies too until they show.
    */
   const reach = () => {
+    // (The box takes no hover or press then either: dialogue.css.)
+    layer.classList.toggle('is-modal', modal());
     topRow.toggleAttribute('inert', modal());
     skipIntro.toggleAttribute('inert', modal());
     choices.toggleAttribute('inert', modal() || !shown.up);

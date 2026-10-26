@@ -583,7 +583,8 @@ test('the chat screen is plain, as before round 18: no dither on its buttons or 
   const pop = frames('inv-talk-pop');
   assert.match(pop, /opacity: 0/);
   assert.match(pop, /scale: 0\.92/);
-  assert.match(rule('.inv-talk-choice'), /background: var\(--talk-fill\)/);
+  // (The replies on their cream.)
+  assert.match(css, /\.inv-talk-choice \{[^}]*(background|--talk-btn-fill): var\(--talk-fill\)/);
   // (The ▼ bobs smoothly, as it did.)
   assert.match(rule('.inv-talk-next'), /animation: inv-talk-bob 0\.9s ease-in-out infinite;/);
   assert.match(frames('inv-talk-bob'), /50% \{\s*transform: translateY\(4px\);/);
@@ -607,6 +608,66 @@ test('the chat screen is plain, as before round 18: no dither on its buttons or 
         .includes(sel),
       `reduced motion: ${sel} still`,
     );
+});
+
+test('a light plain hover and a plain pressed state on the buttons and the box: a step warmer, a step darker and down, never a dither', async () => {
+  const css = readFileSync(new URL('../src/invitation/dialogue.css', import.meta.url), 'utf8');
+  const rule = (sel) => {
+    const at = css.indexOf(`${sel} {`);
+    assert.ok(at >= 0, `a rule for ${sel}`);
+    return css.slice(at, css.indexOf('}', at));
+  };
+  // (Each button's steps from its own fill: paper, the replies' cream, the on colour of Auto and
+  // Log while they're on; warmer toward the on colour, darker toward the ink.)
+  const btn = rule('.inv-talk .inv-btn');
+  assert.match(btn, /--talk-btn-fill: var\(--inv-paper/);
+  assert.match(btn, /--talk-btn-hover: color-mix\(in srgb, var\(--talk-btn-fill\), var\(--inv-on[^)]*\) \d+%\)/);
+  assert.match(btn, /--talk-btn-down: color-mix\(in srgb, var\(--talk-btn-fill\), var\(--talk-ink\) \d+%\)/);
+  assert.match(btn, /background: var\(--talk-btn-fill\)/);
+  assert.match(rule('.inv-talk .inv-talk-choice'), /--talk-btn-fill: var\(--talk-fill\)/);
+  const on = rule(".inv-talk .inv-btn[aria-pressed='true'],\n.inv-talk .inv-btn[aria-expanded='true']");
+  assert.match(on, /--talk-btn-fill: var\(--inv-on/);
+  assert.match(on, /--talk-btn-hover: color-mix\(in srgb, var\(--talk-btn-fill\), #fff \d+%\)/, 'on: lighter');
+  // (Hover only where there's a mouse: a step warmer and lifted a pixel, its drop a pixel longer.)
+  const hoverAt = css.indexOf('@media (hover: hover) and (pointer: fine)');
+  assert.ok(hoverAt >= 0);
+  const hover = css.slice(hoverAt, css.indexOf('\n}\n', hoverAt));
+  const over = /\.inv-talk \.inv-btn:hover:not\(:disabled\) \{([^}]*)\}/.exec(hover)?.[1] ?? '';
+  assert.match(over, /background-color: var\(--talk-btn-hover\)/);
+  assert.match(over, /transform: translateY\(-1px\)/);
+  assert.match(over, /box-shadow: 0 5px 0 var\(--talk-ink\)/);
+  assert.match(hover, /\.inv-talk \.inv-talk-btn:hover:not\(:disabled\) \{\s*box-shadow: 0 4px 0 var\(--talk-ink\)/);
+  // (Pressed, by the mouse or a finger held on it: a step darker, down its drop.)
+  const down =
+    /\.inv-talk \.inv-btn:active:not\(:disabled\),\n\.inv-talk \.inv-btn\.is-pressed:not\(:disabled\) \{([^}]*)\}/.exec(
+      css,
+    )?.[1] ?? '';
+  assert.match(down, /background-color: var\(--talk-btn-down\)/);
+  assert.match(down, /transform: translateY\(3px\)/);
+  assert.match(down, /box-shadow: 0 1px 0 var\(--talk-ink\)/);
+  // (The box goes on when pressed, so it answers the same way: a step warmer under the mouse, a
+  // step darker and down 2 px pressed; not while the replies are up or the Log or the question
+  // is open, when a press on it goes nowhere.)
+  const live = '.inv-talk:not(.is-choosing, .is-modal) .inv-talk-box';
+  assert.match(
+    hover,
+    new RegExp(
+      `${live.replace(/[.()]/g, '\\$&')}:hover \\{\\s*background-color: color-mix\\(in srgb, var\\(--talk-fill\\), var\\(--inv-on`,
+    ),
+  );
+  const boxDown =
+    new RegExp(
+      `${live.replace(/[.()]/g, '\\$&')}:active,\\n${live.replace(/[.()]/g, '\\$&')}\\.is-pressed \\{([^}]*)\\}`,
+    ).exec(css)?.[1] ?? '';
+  assert.match(boxDown, /background-color: color-mix\(in srgb, var\(--talk-fill\), var\(--talk-ink\) \d+%\)/);
+  assert.match(boxDown, /translate: 0 2px/);
+  assert.match(boxDown, /box-shadow: 0 2px 0 var\(--talk-ink\)/);
+  assert.match(rule('.inv-talk-box'), /transition:[^;]*background-color/);
+  // (The screen: a finger held on the box shows it pressed too; under the Log or the question the
+  // layer says so.)
+  const src = readFileSync(new URL('../src/invitation/dialogueUi.js', import.meta.url), 'utf8');
+  assert.match(src, /holdPressed\(layer, 'is-pressed', 'button, \.inv-talk-box'\)/);
+  assert.match(src, /layer\.classList\.toggle\('is-modal', modal\(\)\)/);
 });
 
 test('a press that goes on, or a reply picked: the old line dithers out, then the next in, each in a few held Bayer steps', async () => {
@@ -791,8 +852,11 @@ function pressTree() {
   const label = stand('span', next);
   const reply = stand('button', root);
   const off = stand('p', root);
-  for (const el of [root, next, label, reply, off]) el.ownerDocument = doc;
-  return { win, doc, root, next, label, reply, off };
+  const box = stand('section', root);
+  box.classes.add('inv-talk-box');
+  const line = stand('p', box);
+  for (const el of [root, next, label, reply, off, box, line]) el.ownerDocument = doc;
+  return { win, doc, root, next, label, reply, off, box, line };
 }
 /** @param {string} tag @param {any} parent */
 function stand(tag, parent) {
@@ -806,8 +870,11 @@ function stand(tag, parent) {
     on: /** @type {Record<string, Function[]>} */ ({}),
     addEventListener: (type, f) => (el.on[type] ??= []).push(f),
     removeEventListener: (type, f) => (el.on[type] = (el.on[type] ?? []).filter((g) => g !== f)),
+    // (By tag or by class, in a list: 'button, .inv-talk-box'.)
     closest: (sel) => {
-      for (let n = el; n; n = n.parent) if (n.tagName === sel.toUpperCase()) return n;
+      const any = sel.split(',').map((v) => v.trim());
+      for (let n = el; n; n = n.parent)
+        if (any.some((v) => (v.startsWith('.') ? n.classes?.has(v.slice(1)) : n.tagName === v.toUpperCase()))) return n;
       return null;
     },
     hasPointerCapture: () => el.captured,
@@ -872,6 +939,23 @@ test('a press held on a button shows pressed until it lifts, is cancelled or sli
   t.reply.disabled = false;
   fire(t.next, 'pointerdown', { pointerId: 10, button: 2 });
   assert.ok(!pressed(t.next) && !pressed(t.reply), 'none pressed');
+  // (Off the buttons on the box: nothing, unless the box is asked for too, as the screen asks.)
+  fire(t.line, 'pointerdown', { pointerId: 13 });
+  assert.ok(!pressed(t.box), 'the box is no button');
+  fire(t.line, 'pointerup', { pointerId: 13 });
+  const t3 = pressTree();
+  holdPressed(t3.root, 'is-pressed', 'button, .inv-talk-box');
+  t3.box.captured = true;
+  fire(t3.line, 'pointerdown', { pointerId: 2 });
+  assert.ok(pressed(t3.box), 'a finger on the box shows it pressed');
+  assert.equal(t3.box.captured, false, 'its capture let go');
+  fire(t3.line, 'pointermove', { pointerId: 2, clientX: 300, clientY: 20 });
+  assert.ok(!pressed(t3.box), 'slid off it: not pressed');
+  fire(t3.line, 'pointerdown', { pointerId: 4 });
+  fire(t3.line, 'pointerup', { pointerId: 4 });
+  assert.ok(!pressed(t3.box), 'lifted: not pressed');
+  fire(t3.label, 'pointerdown', { pointerId: 5 });
+  assert.ok(pressed(t3.next) && !pressed(t3.box), 'a button still its own press');
   // (Disposed: presses show nothing.)
   const t2 = pressTree();
   holdPressed(t2.root)();

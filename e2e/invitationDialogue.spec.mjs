@@ -78,6 +78,24 @@ const looksOf = (loc) =>
       fill: c.backgroundColor,
     };
   });
+/** A computed colour's red, green and blue, 0 to 255 (rgb(), or color(srgb …) as color-mix gives). */
+function rgbOf(c) {
+  const rgb = /^rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/.exec(c);
+  if (rgb) return rgb.slice(1, 4).map(Number);
+  const srgb = /^color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)/.exec(c);
+  if (srgb) return srgb.slice(1, 4).map((v) => Number(v) * 255);
+  throw new Error(`not a colour: ${c}`);
+}
+/** How light a colour is (luma, 0 to 255). */
+const lightOf = (c) => {
+  const [r, g, b] = rgbOf(c);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+/** How warm a colour is: its red over its blue. */
+const warmthOf = (c) => {
+  const [r, , b] = rgbOf(c);
+  return r - b;
+};
 /** The letters of the chat box's line that show (typed: the rest keep their place, unseen). */
 const shownLine = (page) =>
   page.evaluate(() =>
@@ -1302,13 +1320,17 @@ test.describe('on a phone', () => {
     await until(page, (s) => s.state === 'react', 'a tap makes him react');
   });
 
-  test('a finger held on Next or a reply presses it down, plainly, with no dither or outline', async ({ page }) => {
+  test('a finger held on Next, a reply or the box presses it a step darker and down, plainly, with no dither', async ({
+    page,
+  }) => {
     const errors = watch(page);
     await calm(page);
     await useBehaviorIntro(page);
     const { ask } = askAndBefore(await script(page));
     test.skip(!ask, 'this script has no replies');
     await open(page, true);
+    // (The steps' ends, not their fades.)
+    await page.addStyleTag({ content: '.inv-talk, .inv-talk * { transition: none !important; }' });
     const cdp = await page.context().newCDPSession(page);
     const finger = (type, p) =>
       cdp.send('Input.dispatchTouchEvent', {
@@ -1319,32 +1341,51 @@ test.describe('on a phone', () => {
       const r = await loc.boundingBox();
       return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
     };
-    /** Held: pressed down its drop, 3 px, with no dither and its words with no outline. */
-    const heldLooksPressed = async (loc, what) => {
-      await expect.poll(async () => (await looksOf(loc)).down, { message: `${what}: pressed down` }).toBe(3);
+    /** Held: a step darker than at rest, down `by` px, with no dither and no outline round its words. */
+    const heldLooksPressed = async (loc, rest, what, by = 3) => {
+      await expect.poll(async () => (await looksOf(loc)).pressed, { message: `${what}: pressed` }).toBe(true);
       const l = await looksOf(loc);
-      expect([l.image, l.shadow], `${what}: plain`).toEqual(['none', 'none']);
+      expect([l.image, l.shadow, l.down], `${what}: plain, down ${by} px`).toEqual(['none', 'none', by]);
+      expect(lightOf(l.fill), `${what}: a step darker`).toBeLessThan(lightOf(rest.fill) - 4);
     };
     const next = page.getByRole('button', { name: 'Next', exact: true });
-    expect((await looksOf(next)).pressed).toBe(false);
+    const nextRest = await looksOf(next);
+    expect(nextRest.pressed).toBe(false);
     const at = await centre(next);
     await finger('touchStart', at);
-    await expect.poll(async () => (await looksOf(next)).pressed, { message: 'Next pressed' }).toBe(true);
-    await heldLooksPressed(next, 'Next held');
+    await heldLooksPressed(next, nextRest, 'Next held');
     // Slid off it, not pressed any more.
     await finger('touchMove', { x: at.x - 160, y: at.y + 160 });
     await expect.poll(async () => (await looksOf(next)).pressed, { message: 'slid off' }).toBe(false);
+    expect((await looksOf(next)).fill, 'its own fill again').toBe(nextRest.fill);
     await finger('touchEnd');
-    // A reply held: pressed the same; the touch cancelled, not.
+    // The box held (it goes on when it's tapped): a step darker, down 2 px; lifted, it goes on.
+    const boxEl = box(page);
+    const boxRest = await looksOf(boxEl);
+    const seq = (await snapshot(page)).dialogue.seq;
+    const onBox = await centre(boxEl);
+    await finger('touchStart', onBox);
+    await heldLooksPressed(boxEl, boxRest, 'the box held', 2);
+    await finger('touchEnd');
+    await expect.poll(async () => (await looksOf(boxEl)).pressed, { message: 'the box let go' }).toBe(false);
+    await until(page, (s) => s.dialogue.typed || s.dialogue.seq > seq, 'the tap on the box went on');
+    // A reply held: pressed the same, from its cream; the touch cancelled, not.
     await next.tap();
     await until(page, (s) => s.dialogue.id === ask.id && Boolean(s.dialogue.repliesLive), 'at the replies');
     const reply = page.locator('.inv-talk-choice').first();
+    const replyRest = await looksOf(reply);
+    expect(replyRest.fill, 'the replies’ cream, not the paper at the top').not.toBe(nextRest.fill);
     await finger('touchStart', await centre(reply));
-    await expect.poll(async () => (await looksOf(reply)).pressed, { message: 'the reply pressed' }).toBe(true);
-    await heldLooksPressed(reply, 'a reply held');
+    await heldLooksPressed(reply, replyRest, 'a reply held');
     await finger('touchCancel');
     await expect.poll(async () => (await looksOf(reply)).pressed, { message: 'cancelled' }).toBe(false);
     expect((await snapshot(page)).dialogue.id, 'a cancelled press picks nothing').toBe(ask.id);
+    // With the replies up the box goes nowhere, so a finger on it shows nothing.
+    const hold = await centre(boxEl);
+    await finger('touchStart', hold);
+    await expect.poll(async () => (await looksOf(boxEl)).fill, { message: 'the box as it was' }).toBe(boxRest.fill);
+    expect((await looksOf(boxEl)).down, 'not down').toBe(0);
+    await finger('touchCancel');
     expect(errors).toEqual([]);
   });
 
@@ -1471,6 +1512,89 @@ test.describe('on a desktop', () => {
     await plainly('on');
     await auto.click();
     await expect(auto).toHaveAttribute('aria-pressed', 'false');
+    expect(errors).toEqual([]);
+  });
+
+  test('a mouse over a button or the box warms it a step (a button lifts a pixel); pressed, a step darker and down; never a dither', async ({
+    page,
+  }) => {
+    const errors = watch(page);
+    await calm(page);
+    await useBehaviorIntro(page);
+    const { ask } = askAndBefore(await script(page));
+    test.skip(!ask, 'this script has no replies');
+    await open(page);
+    // (The steps' ends, not their fades.)
+    await page.addStyleTag({ content: '.inv-talk, .inv-talk * { transition: none !important; }' });
+    await page.mouse.move(5, 5);
+    /**
+     * At rest, under the mouse, then held down on it; let go off it, the click that makes (on the
+     * layer, the two's common ancestor) kept from the screen, so it presses nothing.
+     */
+    const steps = async (loc) => {
+      const rest = await looksOf(loc);
+      const r = await loc.boundingBox();
+      await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
+      const over = await looksOf(loc);
+      await page.mouse.down();
+      const down = await looksOf(loc);
+      await page.evaluate(() => {
+        window.__keep = (e) => e.stopImmediatePropagation();
+        window.addEventListener('click', window.__keep, true);
+      });
+      await page.mouse.move(5, 5);
+      await page.mouse.up();
+      await page.evaluate(() => window.removeEventListener('click', window.__keep, true));
+      return { rest, over, down };
+    };
+    const plain = (l, what) => expect([l.image, l.shadow], `${what}: no dither, no outline`).toEqual(['none', 'none']);
+    for (const name of ['Auto', 'Next', 'Log', 'Skip Intro']) {
+      const { rest, over, down } = await steps(page.getByRole('button', { name, exact: true }));
+      for (const [l, what] of [
+        [rest, 'at rest'],
+        [over, 'hovered'],
+        [down, 'pressed'],
+      ])
+        plain(l, `${name} ${what}`);
+      expect(warmthOf(over.fill), `${name} hovered: a step warmer`).toBeGreaterThan(warmthOf(rest.fill) + 4);
+      expect([rest.down, over.down, down.down], `${name}: lifted a pixel, then down`).toEqual([0, -1, 3]);
+      expect(lightOf(down.fill), `${name} pressed: a step darker`).toBeLessThan(lightOf(rest.fill) - 4);
+    }
+    // Auto on: its own colour, a step lighter under the mouse.
+    const auto = page.getByRole('button', { name: 'Auto', exact: true });
+    await auto.click();
+    await page.mouse.move(5, 5);
+    const on = await looksOf(auto);
+    const r = await auto.boundingBox();
+    await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
+    expect(lightOf((await looksOf(auto)).fill), 'Auto on, hovered: lighter').toBeGreaterThan(lightOf(on.fill) + 4);
+    await auto.click();
+    await page.mouse.move(5, 5);
+    // The box: a step warmer under the mouse, a step darker and down 2 px pressed (let go off it).
+    const b = await steps(box(page));
+    for (const [l, what] of [
+      [b.rest, 'at rest'],
+      [b.over, 'hovered'],
+      [b.down, 'pressed'],
+    ])
+      plain(l, `the box ${what}`);
+    expect(warmthOf(b.over.fill), 'the box hovered: a step warmer').toBeGreaterThan(warmthOf(b.rest.fill) + 4);
+    expect([b.rest.down, b.over.down, b.down.down], 'the box: not lifted, then down 2 px').toEqual([0, 0, 2]);
+    expect(lightOf(b.down.fill), 'the box pressed: a step darker').toBeLessThan(lightOf(b.rest.fill) - 4);
+    // A reply the same, from its cream; and with the replies up the box takes no hover (a click
+    // on it goes nowhere then).
+    await page.getByRole('button', { name: 'Next', exact: true }).click();
+    await until(page, (s) => s.dialogue.id === ask.id && Boolean(s.dialogue.repliesLive), 'at the replies');
+    await page.mouse.move(5, 5);
+    const reply = await steps(page.locator('.inv-talk-choice').first());
+    expect(warmthOf(reply.over.fill), 'a reply hovered: warmer').toBeGreaterThan(warmthOf(reply.rest.fill) + 4);
+    expect([reply.over.down, reply.down.down], 'a reply: lifted, then down').toEqual([-1, 3]);
+    expect(lightOf(reply.down.fill), 'a reply pressed: darker').toBeLessThan(lightOf(reply.rest.fill) - 4);
+    const idle = await looksOf(box(page));
+    const bb = await box(page).boundingBox();
+    await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2);
+    expect((await looksOf(box(page))).fill, 'the box under the replies: as it was').toBe(idle.fill);
+    expect((await snapshot(page)).dialogue.id, 'nothing picked').toBe(ask.id);
     expect(errors).toEqual([]);
   });
 

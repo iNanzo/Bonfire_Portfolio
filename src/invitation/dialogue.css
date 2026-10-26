@@ -8,8 +8,10 @@
    desktop and lower on a phone held sideways. The layer takes every press, so the canvas under
    it gets none, until the intro ends. The lines' text effects: markup.css.
    Plain, as before round 18: no dither on the buttons or the box, no outline round the words;
-   a button presses down (:active, or .is-pressed for a finger held on it, where :active isn't
-   reliable: dialogueUi.js holdPressed); the replies pop in together; the ▼ bobs; the box rises
+   a light hover where there's a mouse (a step warmer, a button lifted a pixel) and a plain press
+   (a step darker and down: :active, or .is-pressed for a finger held on one, where :active isn't
+   reliable: dialogueUi.js holdPressed), the box too while a press on it goes on; the replies pop
+   in together; the ▼ bobs; the box rises
    in with a plain quick fade over the dim, and the screen fades out plainly as the intro ends
    (from script, out of reach from its first step). Its one dither: a press that goes on, or a
    reply picked, dithers the old line out with its name tab (and the replies) and then the next
@@ -76,9 +78,43 @@
   font-size: 14px;
   box-shadow: 0 3px 0 var(--talk-ink);
 }
-/* (A finger held on a button presses it down as the mouse's :active does: dialogueUi.js
-   holdPressed, where :active isn't reliable on touch.) */
+/* (Every button in the layer: plain, a step warmer under the mouse and lifted a pixel (its drop a
+   pixel longer), a step darker and down its drop pressed (:active, or .is-pressed for a finger
+   held on it: dialogueUi.js holdPressed, where :active isn't reliable on touch). Each step from
+   the button's own fill, --talk-btn-fill: paper, the replies' cream, the on colour of Auto and
+   Log while they're on (lighter, not warmer, under the mouse).) */
+.inv-talk .inv-btn {
+  --talk-btn-fill: var(--inv-paper, #fbf9f5);
+  --talk-btn-hover: color-mix(in srgb, var(--talk-btn-fill), var(--inv-on, #f4cf7a) 25%);
+  --talk-btn-down: color-mix(in srgb, var(--talk-btn-fill), var(--talk-ink) 12%);
+  background: var(--talk-btn-fill);
+}
+.inv-talk .inv-talk-choice {
+  --talk-btn-fill: var(--talk-fill);
+}
+.inv-talk .inv-btn[aria-pressed='true'],
+.inv-talk .inv-btn[aria-expanded='true'] {
+  --talk-btn-fill: var(--inv-on, #f4cf7a);
+  --talk-btn-hover: color-mix(in srgb, var(--talk-btn-fill), #fff 35%);
+}
+@media (hover: hover) and (pointer: fine) {
+  .inv-talk .inv-btn:hover:not(:disabled) {
+    background-color: var(--talk-btn-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 5px 0 var(--talk-ink);
+  }
+  .inv-talk .inv-talk-btn:hover:not(:disabled) {
+    box-shadow: 0 4px 0 var(--talk-ink);
+  }
+  /* (The box, which goes on when it's pressed: a step warmer under the mouse. Not while the
+     replies are up or the Log or the question is open: a press on it goes nowhere then.) */
+  .inv-talk:not(.is-choosing, .is-modal) .inv-talk-box:hover {
+    background-color: color-mix(in srgb, var(--talk-fill), var(--inv-on, #f4cf7a) 20%);
+  }
+}
+.inv-talk .inv-btn:active:not(:disabled),
 .inv-talk .inv-btn.is-pressed:not(:disabled) {
+  background-color: var(--talk-btn-down);
   transform: translateY(3px);
   box-shadow: 0 1px 0 var(--talk-ink);
 }
@@ -99,6 +135,17 @@
   background: var(--talk-fill);
   box-shadow: 0 4px 0 var(--talk-ink);
   animation: inv-talk-rise 0.28s ease-out;
+  transition:
+    background-color 120ms,
+    translate 60ms ease-out,
+    box-shadow 60ms ease-out;
+}
+/* (Pressed, by the mouse or a finger held on it: a step darker and down 2 px, as a button goes.) */
+.inv-talk:not(.is-choosing, .is-modal) .inv-talk-box:active,
+.inv-talk:not(.is-choosing, .is-modal) .inv-talk-box.is-pressed {
+  background-color: color-mix(in srgb, var(--talk-fill), var(--talk-ink) 10%);
+  translate: 0 2px;
+  box-shadow: 0 2px 0 var(--talk-ink);
 }
 .inv-talk-name {
   position: absolute;
@@ -236,7 +283,6 @@
   min-height: 54px;
   padding: 8px 16px;
   border-radius: 16px;
-  background: var(--talk-fill);
   font-size: 17px;
   line-height: 1.2;
 }
