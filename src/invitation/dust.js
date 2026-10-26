@@ -40,7 +40,7 @@ export const DUST = Object.freeze({
   full: 8,
   count: Object.freeze([2, 14]),
   max: 28,
-  start: 0.12,
+  start: 0.2,
   spread: Object.freeze([0.18, 0.6]),
   rise: Object.freeze([0.03, 0.18]),
   size: Object.freeze([0.05, 0.12]),
@@ -48,7 +48,7 @@ export const DUST = Object.freeze({
   drag: 3.2,
   strength: Object.freeze([0.75, 1]),
   fade: 0.85,
-  fadeIn: 16,
+  fadeIn: 30,
   slide: 0.3,
 });
 
