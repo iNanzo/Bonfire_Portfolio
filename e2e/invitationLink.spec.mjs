@@ -115,11 +115,18 @@ async function clockOn(page, s = 0.6) {
     .poll(() => page.evaluate(() => window.__invitation.clock()), { message: 'the toy’s clock on' })
     .toBeGreaterThan(from + s);
 }
-/** A press on the link opens its page in a new tab: that page, then closed. */
+/** A press on the link opens its page in a new tab: that page, then closed. (A press that opens
+ *  none fails here in 15 s, named, not at the test's own 60 s timeout.) */
 async function opensPage(page, press) {
-  const popup = page.context().waitForEvent('page');
-  await press();
-  const opened = await popup;
+  const [opened] = await Promise.all([
+    page
+      .context()
+      .waitForEvent('page', { timeout: 15_000 })
+      .catch((e) => {
+        throw new Error(`the press opened no page: ${e.message}`);
+      }),
+    press(),
+  ]);
   expect(opened.url(), 'its page, in a tab of its own').toMatch(/\/favicon\.svg$/);
   await opened.close();
 }
