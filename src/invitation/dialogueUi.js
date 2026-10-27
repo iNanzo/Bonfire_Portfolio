@@ -134,11 +134,12 @@ export function followRow({ mid, rowH, clientHeight, scrollTop }) {
 /**
  * A finger's drag on the chat screen (dragScroll): it's a drag once it's gone `slop` px (less is
  * a tap); lifted, it flings on at the speed it had over its last `sample` ms, if that's over
- * `flick` px/ms, slowing as e^(−t/tau) (about a phone's own) till it's under `rest` px/ms; a
- * touch on a fling still faster than `stops` px/ms only stops it, as a phone's does; and the
- * click a drag ends in, if it comes within `click` ms, goes nowhere.
+ * `flick` px/ms, slowing as e^(−t/tau) (about a phone's own) till it's under `rest` px/ms (about
+ * a CSS px a frame, where it no longer shows moving); a touch on a fling only stops it, as a
+ * phone's does; and the click a drag that scrolled ends in, if it comes within `click` ms, goes
+ * nowhere.
  */
-export const DRAG = { slop: 8, sample: 100, flick: 0.15, tau: 325, rest: 0.02, stops: 0.15, click: 700 };
+export const DRAG = { slop: 8, sample: 100, flick: 0.15, tau: 325, rest: 0.05, click: 700 };
 
 /**
  * How fast a finger was going as it lifted at `at` ms, px/ms down the line (scrollTop's way: a
@@ -164,25 +165,34 @@ export const flingSpeed = (v, t) => v * Math.exp(-t / DRAG.tau);
  * `canScroll()` (a long line, all typed): wherever it starts (the box, its name tab, a button,
  * the stage over it), and from the moment it can (a drag begun while the line still types takes
  * it on from where it is then, with no jump); lifted moving, it flings on and slows to rest
- * (DRAG). A drag never presses what it started on (its click goes nowhere), nor does a touch that
- * stops a fling still going fast. The browser's own pan isn't used (the screen's touch-action is
- * none, dialogue.css): it took a finger only on the line itself, and only one begun once it was
- * typed. The mouse keeps the wheel and the keys. `skip(target)`: a press that isn't the screen's
- * (the Log, the question).
+ * (DRAG). With more than one finger down, the first to move past the slop scrolls it (a thumb
+ * resting on the screen's edge holds nothing up), and if it lifts first another still down takes
+ * it on. A drag that scrolled never presses what it started on (its click goes nowhere;
+ * `onDrag()` as it starts scrolling: the press showing let go of), nor does a touch on a fling;
+ * one that scrolled nothing (a tap rolled a little, the line still typing or short) leaves the
+ * browser to say whether it was a tap. The browser's own pan isn't used (the screen's
+ * touch-action is none, dialogue.css): it took a finger only on the line itself, and only one
+ * begun once it was typed. The mouse keeps the wheel and the keys. `skip(target)`: a press that
+ * isn't the screen's (the Log, the question).
  * @param {HTMLElement} root
  * @param {HTMLElement} scroller
- * @param {{canScroll(): boolean, skip(target: Element|null): boolean}} o
+ * @param {{canScroll(): boolean, skip(target: Element|null): boolean, onDrag?(): void}} o
  * @returns {{stop(): void, dispose(): void}}  stop: the fling stopped and a drag under way
  *   taking the view on from where it is (a new line); dispose: no more
  */
-export function dragScroll(root, scroller, { canScroll, skip }) {
+export function dragScroll(root, scroller, { canScroll, skip, onDrag = () => {} }) {
   const win = /** @type {Window} */ (root.ownerDocument.defaultView);
   const now = () => win.performance.now();
-  /** The finger dragging: its pointerId (-1: none), where it went down, its last y, whether it's a drag yet, its moves. */
-  const finger = { id: -1, x: 0, y: 0, lastY: 0, dragging: false, moves: /** @type {{t: number, y: number}[]} */ ([]) };
+  /** The fingers (and pens) down on the screen: where each went down and where it is, client px. */
+  const downs = /** @type {Map<number, {x0: number, y0: number, x: number, y: number}>} */ (new Map());
+  /**
+   * The one scrolling the line: its pointerId (-1: none yet, till one goes past the slop), its
+   * last y, its moves (when, ms, and where); and whether this gesture has scrolled the line.
+   */
+  const drag = { id: -1, lastY: 0, moves: /** @type {{t: number, y: number}[]} */ ([]), scrolled: false };
   /** Where the drag has the view, px (NaN: read it from the view at the next move). */
   let pos = NaN;
-  /** This press's click goes nowhere (a drag, or a touch that stopped a fast fling); until when, once it's lifted. */
+  /** This gesture's click goes nowhere (it scrolled, or stopped a fling); until when, once it's over. */
   let swallow = false;
   let swallowBy = 0;
   /** The fling: its speed as it began (px/ms), when (ms) and from where (px), its frame (0: none). */
@@ -206,37 +216,51 @@ export function dragScroll(root, scroller, { canScroll, skip }) {
 
   /** @param {PointerEvent} e */
   const down = (e) => {
-    // (Any press stops a fling, and is no drag's click.)
-    const fast = fling.raf !== 0 && Math.abs(flingSpeed(fling.v, now() - fling.at)) > DRAG.stops;
+    // (Any press stops a fling, and is no drag's click; a touch on a fling only stops it.)
+    const flinging = fling.raf !== 0;
     stopFling();
     swallowBy = 0;
-    if (e.pointerType === 'mouse' || !e.isPrimary || skip(/** @type {Element|null} */ (e.target))) return;
-    Object.assign(finger, { id: e.pointerId, x: e.clientX, y: e.clientY, dragging: false, moves: [] });
-    pos = NaN;
-    swallow = fast;
+    if (e.pointerType === 'mouse' || skip(/** @type {Element|null} */ (e.target))) return;
+    // (The first touch of a gesture: no finger before it is down any more, whatever was missed.)
+    if (e.isPrimary) {
+      downs.clear();
+      Object.assign(drag, { id: -1, moves: [], scrolled: false });
+      pos = NaN;
+      swallow = flinging;
+    }
+    downs.set(e.pointerId, { x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY });
   };
   /** @param {PointerEvent} e */
   const move = (e) => {
-    if (e.pointerId !== finger.id) return;
-    if (!finger.dragging) {
-      const dy = e.clientY - finger.y;
-      if (Math.hypot(e.clientX - finger.x, dy) <= DRAG.slop) return;
-      // (A drag from here: the line moves by what the finger goes past the slop.)
-      finger.dragging = true;
-      swallow = true;
-      finger.lastY = finger.y + Math.sign(dy) * Math.min(Math.abs(dy), DRAG.slop);
-    }
+    const p = downs.get(e.pointerId);
+    if (!p) return;
+    p.x = e.clientX;
+    p.y = e.clientY;
+    if (drag.id === -1) {
+      const dy = p.y - p.y0;
+      if (Math.hypot(p.x - p.x0, dy) <= DRAG.slop) return;
+      // (This finger's a drag from here: the line moves by what it goes past the slop.)
+      Object.assign(drag, {
+        id: e.pointerId,
+        lastY: p.y0 + Math.sign(dy) * Math.min(Math.abs(dy), DRAG.slop),
+        moves: [],
+      });
+    } else if (drag.id !== e.pointerId) return;
     // (Each of its samples since the last move the page saw: the browser gives a frame one move,
     // and a phone's finger can be read several times a frame.)
     const samples = e.getCoalescedEvents?.() ?? [];
-    for (const c of samples.length ? samples : [e]) finger.moves.push({ t: c.timeStamp, y: c.clientY });
-    if (finger.moves.length > 32) finger.moves.splice(0, finger.moves.length - 32);
-    const by = finger.lastY - e.clientY;
-    finger.lastY = e.clientY;
+    for (const c of samples.length ? samples : [e]) drag.moves.push({ t: c.timeStamp, y: c.clientY });
+    if (drag.moves.length > 32) drag.moves.splice(0, drag.moves.length - 32);
+    const by = drag.lastY - p.y;
+    drag.lastY = p.y;
     // (While the line can't scroll, the finger's moves go by; once it can, on from the view.)
     if (!canScroll()) {
       pos = NaN;
       return;
+    }
+    if (!drag.scrolled) {
+      drag.scrolled = swallow = true;
+      onDrag();
     }
     if (Number.isNaN(pos)) pos = scroller.scrollTop;
     pos = Math.min(Math.max(0, pos + by), most());
@@ -244,11 +268,23 @@ export function dragScroll(root, scroller, { canScroll, skip }) {
   };
   /** @param {PointerEvent} e */
   const up = (e) => {
-    if (e.pointerId !== finger.id) return;
-    finger.id = -1;
+    if (!downs.delete(e.pointerId)) return;
+    const driving = e.pointerId === drag.id;
+    if (driving) {
+      // (Another finger still down takes it on from where it is, with no slop.)
+      const next = [...downs].at(-1);
+      if (next) {
+        Object.assign(drag, { id: next[0], lastY: next[1].y, moves: [] });
+        pos = NaN;
+        return;
+      }
+      drag.id = -1;
+    }
+    if (downs.size) return;
+    // (The gesture's over.)
     if (swallow) swallowBy = now() + DRAG.click;
-    if (!finger.dragging || e.type === 'pointercancel' || !canScroll()) return;
-    const v = liftSpeed(finger.moves, e.timeStamp);
+    if (!driving || !drag.scrolled || e.type === 'pointercancel' || !canScroll()) return;
+    const v = liftSpeed(drag.moves, e.timeStamp);
     if (Math.abs(v) < DRAG.flick) return;
     Object.assign(fling, { v, at: now(), from: scroller.scrollTop });
     fling.raf = win.requestAnimationFrame(step);
@@ -292,18 +328,17 @@ export function dragScroll(root, scroller, { canScroll, skip }) {
  * it: CSS :active isn't reliable on touch, where a finger held on Next or a reply showed
  * nothing. A finger's press is captured by its target till it lifts (no pointerleave meanwhile,
  * where the browser keeps it), so it's let go of, and its moves off the pressed one's box count
- * as sliding off too; so does a finger's or a pen's drag past DRAG.slop, on it or not (the
- * screen's drag scrolls the line then: dragScroll). Returns a function that stops it.
+ * as sliding off too. Returns a function that stops it, with `release()`: the press showing let
+ * go of (a drag that scrolls the line: dragScroll's onDrag).
  * @param {HTMLElement} root
  * @param {string} [cls]
  * @param {string} [pressable]  a selector: buttons, or the screen's box too
+ * @returns {(() => void) & {release(): void}}
  */
 export function holdPressed(root, cls = 'is-pressed', pressable = 'button') {
   /** @type {HTMLElement|null} */
   let held = null;
   let id = -1;
-  /** Where a finger or a pen went down (null: the mouse, which presses till it's off the button). */
-  let from = /** @type {{x: number, y: number}|null} */ (null);
   const release = () => {
     if (!held) return;
     held.classList.remove(cls);
@@ -317,7 +352,6 @@ export function holdPressed(root, cls = 'is-pressed', pressable = 'button') {
   /** @param {PointerEvent} e */
   const move = (e) => {
     if (e.pointerId !== id || !held) return;
-    if (from && Math.hypot(e.clientX - from.x, e.clientY - from.y) > DRAG.slop) return release();
     const r = held.getBoundingClientRect();
     if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) release();
   };
@@ -329,7 +363,6 @@ export function holdPressed(root, cls = 'is-pressed', pressable = 'button') {
     release();
     held = button;
     id = e.pointerId;
-    from = e.pointerType === 'touch' || e.pointerType === 'pen' ? { x: e.clientX, y: e.clientY } : null;
     button.classList.add(cls);
     if (button.hasPointerCapture?.(e.pointerId)) button.releasePointerCapture(e.pointerId);
     button.addEventListener('pointerleave', leave);
@@ -339,13 +372,14 @@ export function holdPressed(root, cls = 'is-pressed', pressable = 'button') {
   win?.addEventListener('pointerup', leave);
   win?.addEventListener('pointercancel', leave);
   win?.addEventListener('pointermove', move);
-  return () => {
+  const stop = () => {
     release();
     root.removeEventListener('pointerdown', down);
     win?.removeEventListener('pointerup', leave);
     win?.removeEventListener('pointercancel', leave);
     win?.removeEventListener('pointermove', move);
   };
+  return Object.assign(stop, { release });
 }
 
 /**
@@ -824,6 +858,8 @@ export function createDialogueUi(
   const drag = dragScroll(layer, text, {
     canScroll: () => !layer.hidden && !leaving && !modal() && text.classList.contains('can-scroll'),
     skip: (el) => modal() || Boolean(el?.closest('.inv-talk-log, .inv-talk-ask')),
+    // (Scrolling, it's no press: the button or the box it started on shows pressed no longer.)
+    onDrag: () => unhold.release(),
   });
 
   /** The Log was opened with a pointer (a click or a tap), not from the keyboard. */
