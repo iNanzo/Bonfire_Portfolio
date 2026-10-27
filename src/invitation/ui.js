@@ -57,7 +57,7 @@ import { LOOKS, MOTIONS, STYLES, isCustom, petalsOn, shakeOn, shaderOf, validLoo
 import { SHADER_CONTROLS, controlFor, shaderText } from './shader.js';
 import { CUE_DEFAULT, CUE_LABELS, CUE_MODES } from './cues.js';
 import { LABEL_ICONS, iconSvg, installDither } from './icons.js';
-import { LINK_FADE, LINK_LABEL, linkTarget } from './link.js';
+import { LINK_CLEAR_MS, LINK_FADE, LINK_LABEL, linkTarget } from './link.js';
 
 /** @typedef {import('./types.js').ButtonName} ButtonName */
 
@@ -834,6 +834,12 @@ export function bindUi(
     swapOpacity: 1,
     /** the intro's Log or question holds the focus */
     blocked: false,
+    /** whether the corner it's going to is clear (placeLink's `clear`: the top right's, else always) */
+    clear: () => true,
+    /** till when it waits for that, at the most (performance.now(), ms: LINK_CLEAR_MS) */
+    clearBy: 0,
+    /** this move is with reduced motion: out of sight and back, no fade */
+    reduced: false,
     timer: 0,
   };
   /** Out of reach (inert) under the open Settings sheet, or the intro's Log or question. */
@@ -849,14 +855,20 @@ export function bindUi(
   };
   /**
    * The fade's next step, as its opacity's transition ends (or at the latest 3 × LINK_FADE.ms
-   * after it began, should it never run): out, it changes corners and fades in; in, it's done.
+   * after it began, should it never run): out, it changes corners, once the new one's clear
+   * (looked at every frame or so, till clearBy at the most), and fades in (with reduced motion,
+   * shows at once); in, it's done.
    */
   const linkStep = () => {
     clearTimeout(linkNow.timer);
     if (linkNow.phase === 'out') {
+      if (!linkNow.clear() && performance.now() < linkNow.clearBy) {
+        linkNow.timer = window.setTimeout(linkStep, 16);
+        return;
+      }
       linkSwap();
-      linkNow.phase = 'in';
-      linkNow.timer = window.setTimeout(linkStep, 3 * LINK_FADE.ms);
+      linkNow.phase = linkNow.reduced ? null : 'in';
+      if (linkNow.phase) linkNow.timer = window.setTimeout(linkStep, 3 * LINK_FADE.ms);
     } else linkNow.phase = null;
   };
   linkEl.addEventListener('transitionend', (e) => {
@@ -1023,12 +1035,14 @@ export function bindUi(
     },
     /**
      * The link button's corner (link.js linkCorner): it fades out, then in at the new one
-     * (LINK_FADE); hidden, or with reduced motion, it's there at once. Back to the corner it's
-     * still at, it fades back in.
+     * (LINK_FADE), at the top right only once what sat there has gone (`clear` says, LINK_CLEAR_MS
+     * at the most: with reduced motion it goes out of sight till then, no fade); hidden, or with
+     * reduced motion to the top left, it's there at once. Back to the corner it's still at, it
+     * fades back in.
      * @param {import('./link.js').LinkCorner} next
-     * @param {{reduced?: boolean}} [o]
+     * @param {{reduced?: boolean, clear?: () => boolean}} [o]  `clear`: the top right's clear
      */
-    placeLink(next, { reduced = false } = {}) {
+    placeLink(next, { reduced = false, clear = () => true } = {}) {
       if (next === linkNow.corner) return;
       linkNow.corner = next;
       clearTimeout(linkNow.timer);
@@ -1038,14 +1052,18 @@ export function bindUi(
         if (linkNow.phase) linkNow.timer = window.setTimeout(linkStep, 3 * LINK_FADE.ms);
         return;
       }
-      if (reduced || linkEl.hidden) {
+      const right = next === 'right';
+      linkNow.clear = right ? clear : () => true;
+      linkNow.clearBy = performance.now() + LINK_CLEAR_MS;
+      linkNow.reduced = reduced;
+      if (linkEl.hidden || (reduced && !right)) {
         linkNow.phase = null;
         linkSwap();
         return;
       }
       linkNow.phase = 'out';
       linkEl.classList.add('is-moving');
-      linkNow.timer = window.setTimeout(linkStep, 3 * LINK_FADE.ms);
+      linkNow.timer = window.setTimeout(linkStep, reduced ? 0 : 3 * LINK_FADE.ms);
     },
     /**
      * The link button out of reach while a dialog over the stage holds the focus (the intro's

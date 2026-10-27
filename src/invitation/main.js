@@ -383,6 +383,8 @@ function prefersReduced() {
 let toyReady = false;
 /** The envelope stopped covering the toy (start() sets it: the loop runs again). */
 let envelopeGone = () => {};
+/** The intro's chat screen is out of sight, its fade as it ends over (start() makes it so). */
+let talkGone = () => true;
 const hudEl = /** @type {HTMLElement} */ (stageEl.querySelector('.inv-hud'));
 /** @type {ReturnType<typeof createEnvelopeScene>} the envelope (at boot, or Replay Intro's), null once there's none */
 let envelope = null;
@@ -409,6 +411,8 @@ function spawnEnvelope() {
   if (envelope) hudEl.setAttribute('inert', '');
   syncLink();
 }
+/** The top right is clear for the link button: the envelope's Skip Intro and the intro's Auto, Next and Log have gone. */
+const linkClear = () => (!envelope || envelope.skipGone) && talkGone();
 /** @type {Element|null} the modal layer that owns the link button for screen readers, if any */
 let linkOwner = null;
 /**
@@ -419,7 +423,10 @@ let linkOwner = null;
  */
 function syncLink() {
   const covers = Boolean(envelope?.covers);
-  ui.placeLink(linkCorner({ envelope: covers, intro: introWanted || ui.talking }), { reduced: prefersReduced() });
+  ui.placeLink(linkCorner({ envelope: covers, intro: introWanted || ui.talking }), {
+    reduced: prefersReduced(),
+    clear: linkClear,
+  });
   const owner = !ui.linkStops().length
     ? null
     : covers
@@ -784,6 +791,7 @@ function start(s) {
     palette: textPalette(),
     more: () => ui.linkStops(),
   });
+  talkGone = () => talkUi.gone;
   // (A resize while the intro runs, or the chat box growing with a longer line: the shot framed
   // again for the new clear space.)
   const reframe = new ResizeObserver(() => {

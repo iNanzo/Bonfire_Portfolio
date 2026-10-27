@@ -7,7 +7,8 @@
 // so it stays put from the one into the other; else the top right), and what the content rules
 // say of it (linkProblems: src/contentRules.js reports them). Between the two it fades
 // out and back in (LINK_FADE: invitation.css fades it a little quicker, so it's gone before it
-// moves; with reduced motion it moves at once). ui.js draws and binds it (linkHtml, bindUi).
+// moves; with reduced motion it moves at once), coming in at the top right only once what sat
+// there has gone (main.js says when; LINK_CLEAR_MS at the most). ui.js draws and binds it (linkHtml, bindUi).
 // Its safe-link rule is the site's own (src/html.js isSafeUrl), copied (safeHref): the toy
 // imports nothing from src/ (it would share a chunk with the portfolio's first load), and
 // test/invitationLink.test.mjs holds the two together. Pure.
@@ -18,6 +19,14 @@ export const LINK_LABEL = 'Link';
 export const LINK_LABEL_MAX = 24;
 /** Its move between corners: out, then in at the new one, ms each way (invitation.css .inv-link). */
 export const LINK_FADE = { ms: 120 };
+/**
+ * The longest the button waits out of sight for the top right to clear as it goes there, ms
+ * from the move. What sat there fades as it goes (the envelope's Skip Intro over 0.2 s,
+ * envelope.css; the intro's Auto, Next and Log over dialogueUi.js LEAVE_MS), and it comes in once
+ * they've gone (main.js says when: a busy frame can start their fades late), never over them,
+ * with reduced motion too; this only so it never waits for good.
+ */
+export const LINK_CLEAR_MS = 1000;
 
 /** @typedef {{href: string, label: string}} Link  the admin's link as the toy reads it */
 /** @typedef {'left'|'right'} LinkCorner  the top left or the top right */

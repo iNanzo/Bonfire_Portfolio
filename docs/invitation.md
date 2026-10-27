@@ -229,8 +229,9 @@ loading screen too: NEWT loads behind it.
   fits). It sits over everything there and takes its own presses: a click or tap on it never opens
   the envelope, swipes it, goes on or skips a line, and a drag that starts on it never moves the
   letter. When the intro ends, or the envelope's skipped, it fades out and back in at the top
-  right (about a tenth of a second each way; at once with reduced motion), and Replay Intro takes
-  it back to the top left.
+  right (about a tenth of a second each way), coming in only once what sat there (the envelope's
+  Skip Intro, the intro's Auto, Next and Log) has faded away, so it never shows over them; with
+  reduced motion it doesn't fade, it's gone till then. Replay Intro takes it back to the top left.
 - **Its name:** with a mouse it shows as a pixel tab under the button when you point at it or
   Tab to it, over a dither fill; on a phone it shows its icon only, and a press held still shows
   the name and opens nothing. A screen reader reads the name, and finds the button in the
@@ -745,11 +746,15 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   a site path from the base, a new tab for all but a `mailto:`, null for an empty or unsafe href;
   `safeHref` is `src/html.js` `isSafeUrl`'s rule, copied, since the page imports nothing from
   `src/`, and `test/invitationLink.test.mjs` holds the two together; `linkCorner` picks the
-  corner; `linkProblems` is what the content rules report; `LINK_FADE`), `ui.js` (`linkHtml`, an
+  corner; `linkProblems` is what the content rules report; `LINK_FADE`, and `LINK_CLEAR_MS`, the
+  longest it waits for the top right to clear), `ui.js` (`linkHtml`, an
   `<a>` in the toolbar's look with `target="_blank" rel="noopener noreferrer"` but for a
   `mailto:`, hidden with no href when it can't be used; `bindUi` puts it after the HUD, outside
   it, with the toolbar's held-press labels, and gives `setLink`, `placeLink` (it fades out, swaps
-  corners as its opacity's transition ends, and fades in; at once with reduced motion or hidden),
+  corners as its opacity's transition ends, at the top right only once its `clear` says so
+  (`main.js` `linkClear`: the envelope's `skipGone` and the intro screen's `gone`, looked at each
+  frame or so, `LINK_CLEAR_MS` at the most), and fades in; with reduced motion out of sight till then and back with no fade, and to the top left
+  at once, as when hidden),
   `setLinkBlocked`, `linkStops` and `linkState`; the stage gets `has-link` while it shows),
   `invitation.css` (`.inv-link`: z-index 5, over the envelope's 3 and its petals' 4; the left
   corner's size and inset follow the intro's buttons, `--inv-link-size` and `--inv-link-inset`;
@@ -1154,8 +1159,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   reads the admin's; none under `?preview`), so no spec depends on the editable content, and the
   snapshot's `link` is how it stands: `shown`, its `href` as the page has it and `target`, its
   `label`, the `corner` it's going to and the one it's drawn `at`, its fade's `phase` (`'out'`,
-  `'in'` or null), its `swapOpacity` (its opacity as it last changed corners: 0 after a fade, 1
-  at once) and `inert`. `?seed=N` makes the randomness repeatable; `?calm` stops him wandering and sitting by himself; `?perf` shows the frame times
+  `'in'` or null), its `swapOpacity` (its opacity as it last changed corners: 0 when it was out of
+  sight, 1 at once) and `inert`. `?seed=N` makes the randomness repeatable; `?calm` stops him wandering and sitting by himself; `?perf` shows the frame times
   (p50 and p90), the GPU's time a frame where the browser can measure it, the grid, the
   governor's level and the zoom in a corner; `?govern` turns the governor on under `?test`.
 - **Preview mode** (`?preview`, `src/invitation/preview.js`; the admin's Intro Preview,

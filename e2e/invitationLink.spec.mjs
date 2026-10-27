@@ -7,7 +7,8 @@
 // top right. A click, a tap or Enter on it opens its page in a new tab, and never opens the
 // envelope, swipes it, goes on or skips a line; a finger that goes down on it and drags never
 // drags the envelope. When the intro ends (or the envelope's skipped) it fades out and back in at
-// the top right, never sliding across (reduced motion: at once), and Replay Intro takes it back
+// the top right, never sliding across, and only once what sat there has gone (reduced motion: out
+// of sight and back, no fade), and Replay Intro takes it back
 // to the top left. Tab reaches it after the letter and Skip Intro, after the intro's own buttons,
 // and after the toolbar, its ring and its label (a pixel tab under it) only after a key; a
 // mouse shows the label on hover, over a dither fill; on a phone a press held still shows the
@@ -163,15 +164,25 @@ const onTop = (page) =>
   });
 /**
  * Each frame from now until the link has settled at the right, as drawn: where it is (its box's
- * left), which corner it's at, its opacity and its fade's phase ('out', 'in' or null). Start it
- * before what moves it.
+ * left), which corner it's at, its opacity, its fade's phase ('out', 'in' or null) and how much
+ * shows of what sat at the top right (the envelope's Skip Intro, the intro's Auto, Next and Log:
+ * the most of any, their layers' fades counted in). Start it before what moves it.
  */
 const moveFrames = (page) =>
   page.evaluate(
     () =>
       new Promise((resolve) => {
-        /** @type {{x: number, at: string, opacity: number, phase: string|null}[]} */
+        /** @type {{x: number, at: string, opacity: number, phase: string|null, under: number}[]} */
         const frames = [];
+        /** How much of it shows, its own and its layers' opacity together (0: none, or hidden). */
+        const shows = (/** @type {string} */ sel) => {
+          const el = document.querySelector(sel);
+          if (!el || el.closest('[hidden]')) return 0;
+          let o = 1;
+          for (let n = /** @type {Element|null} */ (el); n; n = n.parentElement)
+            o *= Number(getComputedStyle(n).opacity);
+          return o;
+        };
         const tick = () => {
           const el = /** @type {HTMLElement} */ (document.querySelector('[data-link]'));
           const s = window.__invitation.snapshot().link;
@@ -180,6 +191,7 @@ const moveFrames = (page) =>
             at: el.dataset.corner ?? '',
             opacity: Number(getComputedStyle(el).opacity),
             phase: s.phase,
+            under: Math.max(shows('.inv-envelope-skip'), shows('.inv-talk-top')),
           });
           const last = frames.at(-1);
           if ((last.at === 'right' && !last.phase && last.opacity > 0.99) || frames.length > 900)
@@ -212,6 +224,9 @@ async function fadedAcross(page, frames, vw) {
   const ins = frames.filter((f) => f.phase === 'in').map((f) => f.opacity);
   outs.forEach((o, i) => i && expect(o, 'fading out').toBeLessThanOrEqual(outs[i - 1] + 1e-6));
   ins.forEach((o, i) => i && expect(o, 'fading in').toBeGreaterThanOrEqual(ins[i - 1] - 1e-6));
+  // (In at the right only once what sat there had gone.)
+  for (const f of frames.slice(flip))
+    if (f.opacity > 0.02) expect(f.under, 'the top right clear before it comes in').toBeLessThan(0.02);
   // (Out of sight as it changed corners: the fade out was done.)
   expect((await snapshot(page)).link.swapOpacity, 'gone before it moves').toBeLessThan(0.05);
   expect(frames.at(-1).opacity).toBeGreaterThan(0.99);
@@ -367,7 +382,9 @@ test.describe('on a desktop', () => {
     expect(errors).toEqual([]);
   });
 
-  test('with reduced motion it changes corners at once, no fade', async ({ page }) => {
+  test('with reduced motion it changes corners with no fade, out of sight till the top right is clear', async ({
+    page,
+  }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await toy(page);
     await page.evaluate((i) => window.__invitation.setIntro(i), INTRO);
@@ -379,16 +396,17 @@ test.describe('on a desktop', () => {
     await page.locator('.inv-talk-skip-intro').click();
     const seen = await frames;
     expect(
-      seen.every((f) => f.opacity > 0.99),
-      'never faded',
+      seen.every((f) => f.opacity < 0.01 || f.opacity > 0.99),
+      'never half faded',
     ).toBe(true);
     expect(
-      seen.some((f) => f.phase),
-      'never fading',
+      seen.some((f) => f.phase === 'in'),
+      'never fading in',
     ).toBe(false);
+    for (const f of seen)
+      if (f.at === 'right' && f.opacity > 0.02) expect(f.under, 'the top right clear first').toBeLessThan(0.02);
     expect(seen.at(-1).at).toBe('right');
     await settled(page, 'right');
-    expect((await snapshot(page)).link.swapOpacity, 'at once').toBeGreaterThan(0.99);
   });
 
   test('in the toy: at the top right, after the toolbar in Tab order, its label a tab under it on hover (a dither fill) and on keyboard focus; inert under the Settings sheet', async ({

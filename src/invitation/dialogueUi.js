@@ -911,6 +911,10 @@ export function createDialogueUi(
     get showing() {
       return !layer.hidden && !leaving;
     },
+    /** Out of sight: hidden, its fade as the intro ends over (the link button may take the top right). */
+    get gone() {
+      return Boolean(layer.hidden);
+    },
     get logOpen() {
       return !logBox.hidden;
     },

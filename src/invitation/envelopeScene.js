@@ -927,6 +927,10 @@ export function createEnvelopeScene(
     get covers() {
       return env.covers;
     },
+    /** Its Skip Intro is out of sight (faded as it went, or the layer's left the page): the link button may take the top right. */
+    get skipGone() {
+      return !layer.isConnected || Number(getComputedStyle(skipBtn).opacity) < 0.02;
+    },
     veils,
     /**
      * For ?test: the state, reduced motion, the pose now, the flap's open angle, frames drawn,

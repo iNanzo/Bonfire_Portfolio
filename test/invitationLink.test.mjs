@@ -6,13 +6,14 @@
 // its label as its own text, no title=; a new tab for every link but a mailto:, a site path from
 // the site's root; hidden, with no href, when it's empty or not safe), the corner each scene puts
 // it in (the top left while the envelope is up or the intro runs, else the top right), and its
-// plain fade between them (the CSS's quicker than the script's swap, and none with reduced
-// motion). Its icon is checked with the rest in test/invitationIcons.test.mjs.
+// plain fade between them (the CSS's quicker than the script's swap, none with reduced motion,
+// and in at the top right only once what sat there has gone). Its icon is checked with the rest in test/invitationIcons.test.mjs.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { isSafeUrl } from '../src/html.js';
 import {
+  LINK_CLEAR_MS,
   LINK_FADE,
   LINK_LABEL,
   LINK_LABEL_MAX,
@@ -148,6 +149,19 @@ test('its corner: the top left while the envelope is up or the intro runs (or is
   assert.equal(linkCorner({ envelope: true, intro: true }), 'left');
   assert.equal(linkCorner({ envelope: false, intro: false }), 'right');
   assert.equal(linkCorner({}), 'right');
+});
+
+test('at the top right it waits for what sat there to go (the envelope’s Skip Intro, the intro’s top row), at most a moment', async () => {
+  const { LEAVE_MS } = await import('../src/invitation/dialogueUi.js');
+  const css = readFileSync(new URL('../src/invitation/envelope.css', import.meta.url), 'utf8');
+  const at = css.indexOf('.inv-envelope-skip {');
+  assert.ok(at >= 0, 'Skip Intro is styled');
+  const fade = /opacity ([\d.]+)(m?s)/.exec(css.slice(at, css.indexOf('}', at)));
+  assert.ok(fade, 'Skip Intro fades as the envelope goes');
+  const skipMs = Number(fade[1]) * (fade[2] === 's' ? 1000 : 1);
+  assert.ok(LINK_CLEAR_MS > skipMs, `after Skip Intro's fade (${skipMs} ms): ${LINK_CLEAR_MS} ms`);
+  assert.ok(LINK_CLEAR_MS > LEAVE_MS, `after the intro's (${LEAVE_MS} ms): ${LINK_CLEAR_MS} ms`);
+  assert.ok(LINK_CLEAR_MS <= 1500, `never long: ${LINK_CLEAR_MS} ms at the most`);
 });
 
 test('its move between corners: a short plain fade, out then in (the CSS’s done before the script swaps it), none with reduced motion', () => {
