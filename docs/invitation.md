@@ -370,9 +370,11 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   triangles at its right where there's more above or below (a line finished at once by a tap
   stays where it was, the cue showing the rest). The finger's drag is the screen's own: it
   starts on the box, its edge or its name tab, a button or the stage over it; one that went
-  down while the line still typed takes it on once it's all there; a quick one flings on and
-  slows to rest; a touch on a moving fling only stops it; and a drag never goes on or presses
-  what it started on. On a phone about 100 letters fill the three rows; a 230-letter
+  down while the line still typed takes it on once it's all there; with more than one finger
+  down (a thumb resting on the edge) the one that moves scrolls it, and another takes over if it
+  lifts first; a quick one flings on and slows to rest; a touch on a moving fling only stops it;
+  and a drag that scrolled never goes on or presses what it started on, while one that scrolled
+  nothing (a tap that rolled a little, the line still typing) is still the tap it was. On a phone about 100 letters fill the three rows; a 230-letter
   line fits a desktop's four rows and scrolls on a phone or a short screen.
   The toolbar goes while the intro runs and comes back after it.
 - **Feedback,** plain: under a mouse the box and every button on the screen (Auto, Next, Log,
