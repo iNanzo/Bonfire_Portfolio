@@ -824,8 +824,6 @@ export function bindUi(
   // --- The link button's link, its reach and its corner.
   const linkLabel = /** @type {HTMLElement} */ (linkEl.querySelector('.inv-btn-label'));
   const linkNow = {
-    /** @type {import('./link.js').Link|null} */
-    link,
     /** @type {import('./link.js').LinkCorner} the corner it's going to (or at) */
     corner,
     /** @type {import('./link.js').LinkCorner} the corner it's drawn at */
@@ -1008,7 +1006,6 @@ export function bindUi(
      * @param {import('./link.js').Link|null} next
      */
     setLink(next) {
-      linkNow.link = next;
       const to = next ? linkTarget(next.href, base) : null;
       if (to) {
         linkEl.setAttribute('href', to.url);
