@@ -603,32 +603,44 @@ const frame = (page) => page.evaluate(() => new Promise((done) => requestAnimati
 /**
  * A finger through Chrome's own touch input (CDP): `down` at a point, `drag` it by `dy` px in
  * `steps` moves a frame apart (as a hand moves; `still` frames held at the end, so it lifts with
- * no speed; `flick`: lifted straight after the last, still moving), `up`.
+ * no speed; `flick`: lifted straight after the last, still moving), `up`. Each touch is stamped
+ * on the gesture's own clock (`timestamp`, which Chrome gives the page's events), a 60th of a
+ * second a move or a frame held, so its speed as it lifts is a hand's however slowly a busy
+ * runner draws its frames.
  */
 function touchFinger(page, cdp) {
   let at = { x: 0, y: 0 };
+  /** The gesture's clock, s since the epoch. */
+  let clock = 0;
   const send = (type, p) =>
     cdp.send('Input.dispatchTouchEvent', {
       type,
+      timestamp: clock,
       touchPoints: p ? [{ x: p.x, y: p.y, id: 1, radiusX: 2, radiusY: 2, force: 1 }] : [],
     });
   return {
     async down(p) {
       at = { ...p };
+      clock = Date.now() / 1000;
       await send('touchStart', at);
     },
     async drag(dy, { steps = 8, still = 0, flick = false } = {}) {
       for (let k = 0; k < steps; k++) {
         at = { x: at.x, y: at.y + dy / steps };
+        clock += 1 / 60;
         await send('touchMove', at);
         if (!flick || k < steps - 1) await frame(page);
       }
       for (let k = 0; k < still; k++) {
+        clock += 1 / 60;
         await send('touchMove', at);
         await frame(page);
       }
     },
-    up: () => send('touchEnd'),
+    up() {
+      clock += 0.001;
+      return send('touchEnd');
+    },
   };
 }
 /** Where the long line's view is: how far it's scrolled, its room, and its line and phase. */
@@ -1076,6 +1088,8 @@ test.describe('on a phone', () => {
   test('a finger scrolls a long line from anywhere on the screen, begun as it types or right after a tap finishes it; a drag never goes on, a fling slows to rest', async ({
     page,
   }) => {
+    // (Two long lines typing and a dozen swipes a frame a move: longer than most on a busy runner.)
+    test.setTimeout(180_000);
     await fingerScrollsAnywhere(page);
   });
 
