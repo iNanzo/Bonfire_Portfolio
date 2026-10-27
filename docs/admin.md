@@ -182,6 +182,13 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     previews (`INVITATION_PREVIEWS`, schema.js `PREVIEWS`; form.js draws them with the toy's
     `markup.js` and `markup.css`) follow the text as it's typed and these colors as they
     change.
+  - **Link Button:** the toy's link button (`invitation.link`;
+    [invitation.md](invitation.md#the-link-button)): its **Link**, where it goes (`https://…`, `mailto:…` or a path on the site like
+    `visualizer/`, which goes from the site's root; empty, there's no button), and its
+    **Label**, its name, shown on hover (a held press on a phone) and read by screen readers,
+    up to 24 letters (empty: Link). It opens in a new tab, all but a `mailto:`, so the toy keeps
+    where it was. It sits at the toy's top right, and at the top left over the envelope and
+    through the intro. As shipped there's no link.
   - **Intro:** the chat **Play Intro** opens (`invitation.intro`, `types.js`
     `DialogueScript`): the **Speaker** on every box's name tab (tags style it, up to 24
     letters, with a **Preview**), the **Start Box** (every Play
@@ -224,11 +231,15 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     24, at most 3 choices a box, its faces, animations and cameras from the toy's lists, and
     Auto between 0 and 15 seconds; a box nothing leads to, boxes that go round with no choice
     to leave, a Next or End a box's choices or End override, and a box with a single choice
-    (only a tap that looks like one) are warnings, each naming its box. The section is
-    optional, so content from before the toy (or before Text Effects) still passes, and each
-    of its five parts it lacks shows **Start From the Toy’s Own**, which fills that part in
-    with the toy's built-in values (the built-in Default look, its speech settings, every
-    moment with no lines yet, its own short intro, its colors) to edit from (`INVITATION_STARTERS`, schema.js `STARTERS`). The toy reads it through
+    (only a tap that looks like one) are warnings, each naming its box. The link button's Link
+    is empty or one the toy can use (the site's own rule, `src/html.js` `isSafeUrl`:
+    `javascript:`, `data:` and the like are errors) and its Label up to 24 letters; a Link with
+    no Label is a warning (the button is named Link; `src/invitation/link.js` `linkProblems`).
+    The section is optional, so content from before the toy (or before Text Effects or the Link
+    Button) still passes, and each of its six parts it lacks shows **Start From the Toy’s
+    Own**, which fills that part in with the toy's built-in values (the built-in Default look,
+    its speech settings, every moment with no lines yet, its own short intro, its colors, no
+    link) to edit from (`INVITATION_STARTERS`, schema.js `STARTERS`). The toy reads it through
     `virtual:invitation-content` (`vite.config.js`), never `content.json` itself, and the
     other pages' copy of the content leaves it out. A change to its shape needs
     `npm run admin:deploy` after the merge.

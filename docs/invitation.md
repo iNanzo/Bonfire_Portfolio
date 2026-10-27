@@ -84,8 +84,9 @@ loading screen too: NEWT loads behind it.
   and "Swipe down to skip") shows while the mouse is over it or it has keyboard focus, and on a
   touch screen after a moment without a touch; while you drag it reads "Open ↑" or "Skip ↓".
 - **Focus:** it has focus from the start, but its ring only shows once you press a key (Tab goes
-  between it and Skip Intro). Skipped, focus goes to the toolbar's first button, again with its
-  ring (and its label) only if your last press was a key: a swipe or a drag shows neither.
+  round it, Skip Intro and the link button, when there is one). Skipped, focus goes to the
+  toolbar's first button, again with its ring (and its label) only if your last press was a key:
+  a swipe or a drag shows neither.
 - **Reduced motion:** it holds still, with no petals (none on the cursor either); the flap is open at once and the seal and
   the letter fade away plainly.
 - **Replay Intro** on the toolbar brings it back: the scene starts over underneath (NEWT on his
@@ -213,6 +214,33 @@ loading screen too: NEWT loads behind it.
   swinging as he walks, turns, is carried or thrashes. At the coarse Pixel Sizes the cross gets
   smaller art (five pixels tall at 48 and 64, a three-pixel plus at 32), never much bigger than
   it really is on him; at 16 and 24 it's too small to draw, so the earrings don't show.
+
+## The Link Button
+
+- **A link of the admin's** (the Invitation page's Link Button: where it goes and its name): a
+  rounded square with a Phosphor link icon (bold weight: two chain links), in the toolbar's
+  look. It opens its link in a new tab, so the toy keeps where it was (a `mailto:` opens in
+  place), and a path on the site goes from the site's root (`visualizer/` is Bonfire Live). With
+  no link, or one the toy won't use, there's no button at all; as shipped there's none.
+- **Where it sits:** in the toy, at the top right. Over the envelope and all through the intro,
+  at the top left, in the same spot from the one into the other: the envelope's Skip Intro is at
+  its top right, and the intro's sits just right of the link (on a narrow phone Auto, Next and
+  Log sit a little tighter, and on the narrowest Skip Intro takes two rows, so the row fits).
+  It sits over everything there and takes its own presses: a click or tap on it never opens
+  the envelope, swipes it, goes on or skips a line, and a drag that starts on it never moves
+  the letter. When the intro ends, or the envelope's skipped, it fades out and back in at the
+  top right (about a tenth of a second each way; at once with reduced motion), and Replay
+  Intro takes it back to the top left.
+- **Its name:** with a mouse it shows as a pixel tab under the button when you point at it or
+  Tab to it, over a dither fill; on a phone it shows its icon only, and a press held still shows
+  the name and opens nothing. A screen reader reads the name, and finds the button in the
+  envelope's or the intro's dialog while it's in their corner.
+- **Keyboard:** Tab reaches it after the envelope and Skip Intro; in the intro, after its own
+  buttons (Auto, Next, Log, Skip Intro and the replies), then round to the first; in the toy,
+  after the toolbar. Enter follows it, and neither Enter nor Space on it opens the envelope or
+  goes on. Its ring and its name show only if your last press was a key. Under the open
+  Settings sheet, and while the intro's Log or its question is open, it's out of reach, as the
+  toolbar's buttons are.
 
 ## Settings
 
@@ -712,6 +740,24 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   `invitationBubble`, `invitationContent`, `invitationIntro` (the intro's content rules and
   `introFrom`), and `admin/test/invitation.test.mjs` and `invitationIntro.test.mjs` (the
   content rules and the admin page).
+- **The link button:** `link.js` (pure: `linkFrom` reads the admin's `invitation.link`, its label
+  `LINK_LABEL` when empty and cut to `LINK_LABEL_MAX`, 24 letters; `linkTarget` gives where it goes,
+  a site path from the base, a new tab for all but a `mailto:`, null for an empty or unsafe href;
+  `safeHref` is `src/html.js` `isSafeUrl`'s rule, copied, since the page imports nothing from
+  `src/`, and `test/invitationLink.test.mjs` holds the two together; `linkCorner` picks the
+  corner; `linkProblems` is what the content rules report; `LINK_FADE`), `ui.js` (`linkHtml`, an
+  `<a>` in the toolbar's look with `target="_blank" rel="noopener noreferrer"` but for a
+  `mailto:`, hidden with no href when it can't be used; `bindUi` puts it after the HUD, outside
+  it, with the toolbar's held-press labels, and gives `setLink`, `placeLink` (it fades out, swaps
+  corners as its opacity's transition ends, and fades in; at once with reduced motion or hidden),
+  `setLinkBlocked`, `linkStops` and `linkState`; the stage gets `has-link` while it shows),
+  `invitation.css` (`.inv-link`: z-index 5, over the envelope's 3 and its petals' 4; the left
+  corner's size and inset follow the intro's buttons, `--inv-link-size` and `--inv-link-inset`;
+  the label tab under it), `dialogue.css` (Skip Intro beside it under `.has-link`, and the narrow
+  phone's tighter top row), `envelopeScene.js` and `dialogueUi.js` (`more`: the stops their Tab
+  order takes after their own; a focused link presses itself) and `main.js` (`syncLink` each frame
+  and as the envelope comes and goes: the corner, and `aria-owns` on the envelope's or the
+  intro's layer while it's in their corner; `content.js` `linkSettings()`, none under `?preview`).
 - **Text effects:** `markup.js` (pure: `parseMarkup(text, palette)` gives the styled `runs`,
   the `letters` that show (graphemes, `Intl.Segmenter`), the `plain` text and the `errors`,
   each a sentence for the admin; `paletteOf` reads `invitation.text.colors`, `DEFAULT_TEXT_COLORS`
@@ -1044,13 +1090,17 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   shapes, variety, the stepped simulation and every flow, the trail's spacing and rate),
   `invitationPetalSetting` (Rose Petals stored with the look), `invitationPetalLayer` (no WebGL
   context till petals may come), `invitationDust` (the landing's speed, the dust's count, spread,
-  rise and fade by it, bounded) and `invitationShake` (the shake's threshold, size, decay, none
-  when off, and Screen Shake stored with the look),
+  rise and fade by it, bounded), `invitationShake` (the shake's threshold, size, decay, none
+  when off, and Screen Shake stored with the look) and `invitationLink` (the link button's
+  reading, safe-link rule, markup, corners and fade; `admin/test/invitationLink.test.mjs` its
+  rules and its admin section),
   `e2e/invitation.spec.mjs`, `e2e/invitationDialogue.spec.mjs`,
   `e2e/invitationEnvelope.spec.mjs`, `e2e/invitationPetals.spec.mjs` (the page's petal layer:
   the mouse, a finger, Rose Petals off, reduced motion) and `e2e/invitationDrop.spec.mjs` (the
   landings' dust and shake: from high, from the hold's height, set down, Screen Shake off,
-  reduced motion, a finger and a second finger's lift) (`npm run e2e -- invitation`).
+  reduced motion, a finger and a second finger's lift) and `e2e/invitationLink.spec.mjs` (the
+  link button in each scene, its presses, Tab order, a held press, inert, hidden, `?preview`, and
+  nothing over it at seven sizes) (`npm run e2e -- invitation`).
 - **Test hooks:** `[data-stage].is-ready` once the first frame is drawn, `data-webgl="off"`
   without WebGL. `?test` adds `window.__invitation`: `snapshot()` (his state, clip, face,
   position, head turn, the camera's yaw, elevation and distance, the states he went through,
@@ -1097,7 +1147,13 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   stands still while the envelope covers him) and `envelope()` the envelope's state, reduced
   motion, pose, frames drawn, `petals` (`live`, and how many each flow has `emitted`), `seal`
   (its `first` and `last` placements), `hover` (`k`, `pulse`) and `turn` (`now`, `pointer`,
-  `key`); `petals()` the page's petal layer (`gpu`: `none` till its renderer is made, `up` or `failed`; `running`, `on`, `live`, `emitted`, `texels`). `?seed=N` makes the randomness repeatable; `?calm` stops him wandering and sitting by himself; `?perf` shows the frame times
+  `key`); `petals()` the page's petal layer (`gpu`: `none` till its renderer is made, `up` or `failed`; `running`, `on`, `live`, `emitted`, `texels`).
+  `setLink({href, label})` gives the link button a link of the spec's own (read as `linkFrom`
+  reads the admin's; none under `?preview`), so no spec depends on the editable content, and the
+  snapshot's `link` is how it stands: `shown`, its `href` as the page has it and `target`, its
+  `label`, the `corner` it's going to and the one it's drawn `at`, its fade's `phase` (`'out'`,
+  `'in'` or null), its `swapOpacity` (its opacity as it last changed corners: 0 after a fade, 1
+  at once) and `inert`. `?seed=N` makes the randomness repeatable; `?calm` stops him wandering and sitting by himself; `?perf` shows the frame times
   (p50 and p90), the GPU's time a frame where the browser can measure it, the grid, the
   governor's level and the zoom in a corner; `?govern` turns the governor on under `?test`.
 - **Preview mode** (`?preview`, `src/invitation/preview.js`; the admin's Intro Preview,
