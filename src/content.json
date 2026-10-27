@@ -1839,7 +1839,7 @@
       "dither": true,
       "outlines": true,
       "style": "soft",
-      "motion": "smooth",
+      "motion": "choppy",
       "shader": {
         "levels": 6,
         "dither": 1,
@@ -1863,52 +1863,52 @@
       "idleMin": 20,
       "idleMax": 40,
       "wave": {
-        "chance": 0.7,
-        "cooldown": 8
+        "chance": 0.75,
+        "cooldown": 2
       },
       "spook": {
         "chance": 0.7,
-        "cooldown": 8
+        "cooldown": 2
       },
       "flee": {
         "chance": 0.8,
-        "cooldown": 10
+        "cooldown": 5
       },
       "caught": {
-        "chance": 0.9,
-        "cooldown": 10
+        "chance": 0.75,
+        "cooldown": 7
       },
       "pickedUp": {
         "chance": 0.7,
-        "cooldown": 8
+        "cooldown": 3
       },
       "shaken": {
         "chance": 0.8,
         "cooldown": 6
       },
       "thrash": {
-        "chance": 0.6,
-        "cooldown": 8
+        "chance": 0.75,
+        "cooldown": 6
       },
       "dropped": {
-        "chance": 0.5,
-        "cooldown": 8
+        "chance": 0.55,
+        "cooldown": 3
       },
       "landed": {
         "chance": 0.6,
-        "cooldown": 8
+        "cooldown": 6
       },
       "walkTo": {
         "chance": 0.35,
-        "cooldown": 12
+        "cooldown": 8
       },
       "wander": {
-        "chance": 0.15,
-        "cooldown": 30
+        "chance": 0.25,
+        "cooldown": 9
       },
       "sitDown": {
         "chance": 0.8,
-        "cooldown": 30
+        "cooldown": 25
       },
       "sitting": {
         "chance": 0.9,
@@ -1916,7 +1916,7 @@
       },
       "standUp": {
         "chance": 0.5,
-        "cooldown": 15
+        "cooldown": 7
       },
       "device": {
         "chance": 0.9,
@@ -1932,7 +1932,7 @@
       },
       "spin": {
         "chance": 0.9,
-        "cooldown": 20
+        "cooldown": 15
       },
       "zoom": {
         "chance": 0.9,
@@ -2006,7 +2006,8 @@
         "{purple,big,bold,wave,shake|Unhand me wench!}",
         "{RED,big,bold,wave,shake|RAHHHHHHH}",
         "Let me go let me go {wave,shake|let me go!}",
-        "{big,bold,shake,wave|HELP I'VE BEEN TAKEN HOSTAGE!}"
+        "{big,bold,shake,wave|HELP I'VE BEEN TAKEN HOSTAGE!}",
+        "{wave|This is democracy manifest!}"
       ],
       "dropped": [
         "{big,bold,wave|Wheee!}",
@@ -2015,7 +2016,8 @@
         "I invented gravity!",
         "{big,bold,wave|Wahoo!}",
         "Not the first time I've been dropped!",
-        "o m o !"
+        "o m o !",
+        "{gold,wave|Icarus laughed as he fell…}"
       ],
       "landed": [
         "{big,bold|Oof.}",
@@ -2023,8 +2025,10 @@
         "I am {red,big,bold,wave|Spiderman}...",
         "{big,bold,shake|Yeowch!|}",
         "And {wave|pose!}",
-        "{wave,red,big,bold|HENSHIN!}",
-        "{shake|o m o !}"
+        "{wave,red,big,bold|HENSHIN ! ! !}",
+        "{shake|o m o !}",
+        "I seem to have shattered every bone in my foot",
+        "{gold|I had once soared…}"
       ],
       "walkTo": [
         "On my way!",
