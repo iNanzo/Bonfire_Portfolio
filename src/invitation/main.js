@@ -361,7 +361,7 @@ let carrying = () => false;
 /**
  * The page's rose petals (the cursor trail and a ring at every press), for good (its renderer
  * made only once petals may come): over the stage and under the HUD and the dialogue, over the
- * envelope while it's up; no trail while he's carried.
+ * envelope while it's up; the trail stays active while he's carried, without click rings.
  */
 const petalLayer = createPetalLayer(stageEl, {
   on: () => petalsOn(look) && !prefersReduced() && !options.preview,

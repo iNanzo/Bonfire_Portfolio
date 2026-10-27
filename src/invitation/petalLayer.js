@@ -13,8 +13,8 @@
 // ring at every click or tap (createClick: let go within CLICK.tol px of where it went down, on
 // the release, never as it goes down and never once the press turns into a drag of the camera,
 // the letter or NEWT), over the envelope and through the toy alike; none over the UI (QUIET: a
-// button, the toolbar, the pad, Settings, the dialogue's boxes), and nothing while NEWT is
-// carried. It draws only while petals are
+// button, the toolbar, the pad, Settings, the dialogue's boxes). Carrying NEWT keeps the trail
+// active but never bursts a ring. It draws only while petals are
 // up or a finger is held, and sleeps otherwise (cleared, no frames). Rose Petals off (Settings) or
 // reduced motion: none at all (any up shrink away). ?test reads snapshot().
 import * as THREE from 'three';
@@ -124,7 +124,7 @@ export function createClick({ tol = CLICK.tol } = {}) {
  * @property {() => boolean} on  whether petals may come now (Rose Petals on, no reduced motion)
  * @property {Element|null} [before]  what it goes in before (the HUD: it's under it); else last
  * @property {() => boolean} [over]  whether it goes over everything now (the envelope is up)
- * @property {() => boolean} [carrying]  whether NEWT is being carried now (no trail then)
+ * @property {() => boolean} [carrying]  whether NEWT is being carried now (no click ring then)
  */
 
 /**
@@ -330,9 +330,9 @@ export function createPetalLayer(root, { on, before = null, over = () => false, 
   const onMove = (e) => {
     if (!e.isPrimary) return;
     click.move(e.pointerId, e.clientX, e.clientY);
-    // (Over the UI or carrying NEWT: nothing, and the next move off it starts afresh there.)
+    // (Carrying keeps the trail, but its press is never a click. UI still interrupts the trail.)
     if (ask(carrying)) click.spoil();
-    if (ask(carrying) || overUi(e)) {
+    if (overUi(e)) {
       trail.lift();
       return;
     }
@@ -390,11 +390,8 @@ export function createPetalLayer(root, { on, before = null, over = () => false, 
     const dt = Math.min(0.05, Math.max(0, now - last));
     last = now;
     place();
-    // (A finger held still on NEWT while he's carried keeps none coming, and its press is no tap.)
-    if (ask(carrying)) {
-      trail.lift();
-      click.spoil();
-    }
+    // (A finger held still on carried NEWT keeps its trail, but the press is never a tap.)
+    if (ask(carrying)) click.spoil();
     const steps = trail.hold(now);
     if (allowed()) shed(steps);
     else g.petals.cut(0.2);

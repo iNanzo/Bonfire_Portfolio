@@ -3,8 +3,8 @@
 // press goes through; the mouse moving over the toy trails petals and a click bursts a ring of
 // them as it's let go (never as it goes down, and never when the press turns into a drag of the
 // camera, the letter or NEWT), but none over a button, the toolbar, the pad, Settings or the
-// dialogue, and nothing while NEWT is carried; on a phone a tap bursts one the same way, a finger
-// dragging trails them and a finger held still keeps a few
+// dialogue; carrying NEWT keeps the trail active without a ring. On a phone a tap bursts one
+// the same way, a finger dragging trails them and a finger held still keeps a few
 // coming; each about 10-16 CSS px long, whatever the screen; with Rose Petals off (Settings) or
 // reduced motion, none at all; and it sleeps once they've gone. Every wait is on a state (?test's
 // snapshot), never a duration.
@@ -152,9 +152,7 @@ test.describe('with a mouse', () => {
     expect((await petals(page)).emitted.ring, 'a click with a wobble').toBeGreaterThanOrEqual(10);
   });
 
-  test('carrying NEWT trails nothing across him and bursts nothing; put down, the floor trails again', async ({
-    page,
-  }) => {
+  test('carrying NEWT keeps the trail active without a burst; put down, the floor still trails', async ({ page }) => {
     await toyUp(page);
     const at = await page.evaluate(() => window.__invitation.screen('body'));
     await page.mouse.move(at.x, at.y);
@@ -165,14 +163,17 @@ test.describe('with a mouse', () => {
     for (let i = 1; i <= 16; i++) await page.mouse.move(at.x + i * 10, at.y - i * 4);
     for (let i = 15; i >= 0; i--) await page.mouse.move(at.x + i * 10, at.y - 64 - i * 2);
     expect((await toy(page)).held).toBe(true);
-    expect((await petals(page)).emitted.trail, 'none while he is carried').toBe(grab.emitted.trail);
+    expect((await petals(page)).emitted.trail, 'petals follow the carried NEWT').toBeGreaterThan(
+      grab.emitted.trail + 3,
+    );
     await page.mouse.up();
     await expect.poll(async () => (await toy(page)).held, { message: 'let go' }).toBe(false);
     expect((await petals(page)).emitted.ring, 'nor as he’s let go').toBe(0);
+    const released = (await petals(page)).emitted.trail;
     const a = clear(page, 0.15, 0.3);
     await page.mouse.move(a.x, a.y);
     await page.mouse.move(a.x + 300, a.y + 60, { steps: 20 });
-    await expect.poll(async () => (await petals(page)).emitted.trail).toBeGreaterThan(grab.emitted.trail + 3);
+    await expect.poll(async () => (await petals(page)).emitted.trail).toBeGreaterThan(released + 3);
   });
 
   test('over the toolbar, the camera pad, Settings and the dialogue: no trail and no burst', async ({ page }) => {
@@ -361,7 +362,7 @@ test.describe('on a phone', () => {
     await expect.poll(async () => (await petals(page)).running, { timeout: 15_000 }).toBe(false);
   });
 
-  test('a finger carrying NEWT, moving or held still, trails nothing; the petals are a little smaller than on a desktop', async ({
+  test('a finger carrying NEWT trails petals while moving and held still, without a release burst', async ({
     page,
   }) => {
     await toyUp(page);
@@ -371,12 +372,15 @@ test.describe('on a phone', () => {
     await expect.poll(async () => (await toy(page)).held, { message: 'held' }).toBe(true);
     const grab = (await petals(page)).emitted.trail;
     for (let i = 1; i <= 10; i++) await touch('touchMove', [{ x: at.x + i * 8, y: at.y - i * 10 }]);
-    // (Held still up there while the toy's clock goes on: still none.)
-    const c0 = await page.evaluate(() => window.__invitation.clock());
-    await expect.poll(() => page.evaluate(() => window.__invitation.clock())).toBeGreaterThan(c0 + 0.6);
+    expect((await petals(page)).emitted.trail, 'petals while dragging').toBeGreaterThan(grab);
+    const moved = (await petals(page)).emitted.trail;
+    // (Holding NEWT still keeps the finger's gentle trail coming.)
+    await expect.poll(async () => (await petals(page)).emitted.trail).toBeGreaterThan(moved);
     expect((await toy(page)).held).toBe(true);
-    expect((await petals(page)).emitted.trail, 'none while he is carried').toBe(grab);
+    expect((await petals(page)).emitted.ring, 'no ring while carrying').toBe(0);
     await touch('touchEnd', []);
+    await expect.poll(async () => (await toy(page)).held).toBe(false);
+    expect((await petals(page)).emitted.ring, 'no ring on release').toBe(0);
     const px = (await petals(page)).petalPx;
     expect(px * 0.75).toBeGreaterThanOrEqual(8);
     expect(px * 1.3).toBeLessThanOrEqual(15);
