@@ -21,6 +21,10 @@ Round 10: menus and search, the knight's fixes, hygiene and performance.
 
 ### NEWT's intro (round 18)
 
+- Rose petals keep trailing the mouse or finger while NEWT is carried, including a finger
+  held still. Picking him up and letting him go still burst no ring; controls, Rose Petals
+  off and reduced motion stay quiet.
+
 - A new `italic` text effect slants a word: `{italic|so}`. Pixelify Sans has no italic of its
   own, so each letter leans where it stands and the line never reflows. It combines with the
   others, as in `{italic,gold|really}`.

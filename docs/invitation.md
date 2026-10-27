@@ -39,8 +39,9 @@ loading screen too: NEWT loads behind it.
   of 10–14 of them as it's let go: not as the button or finger goes down, and not when the press
   turns into a drag (the camera, the letter, NEWT) or wanders more than about 8 px. On a
   phone a finger dragging trails them, and a finger held still keeps a few coming. None come
-  over the UI (a button, the toolbar, the camera pad, Settings, or the intro's boxes), and none
-  come while you carry NEWT (no ring for picking him up or letting him go). They're
+  over the UI (a button, the toolbar, the camera pad, Settings, or the intro's boxes). The trail
+  stays active while you carry NEWT, including a finger held still, but picking him up or
+  letting him go never bursts a ring. They're
   drawn on a layer of their own over the toy and under its toolbar, Settings and the intro (over
   the envelope while that's up) that every press goes through. **Rose Petals**
   in Settings turns them all off (the envelope's too); it's on by default and kept with the
@@ -928,8 +929,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   pad, Settings, the speech bubble and the dialogue), raised to z-index 4 over the envelope while
   `over()` (the envelope is in the page); no trail or ring while the element under the pointer
   is inside `QUIET` (`quietAt`: the HUD's parts, the dialogue's boxes, any button: the trail lifts
-  there, so leaving it sheds nothing across it), and no trail while `carrying()` (NEWT held; a
-  finger held still on him too); its own
+  there, so leaving it sheds nothing across it). `carrying()` prevents click rings without
+  interrupting the moving or held-finger trail; its own
   WebGLRenderer at the envelope's texel size held within `TEXEL_PX` (1.25–1.75 CSS px, `texelPx`, so
   even its smallest petal is 5 texels long), made with the first press or move that may shed
   petals (never with Rose Petals off or reduced motion; refused, it tries once), `pageUnit` (`LAYER_SCALE` of the envelope's letter

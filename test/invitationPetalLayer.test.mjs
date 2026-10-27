@@ -202,12 +202,19 @@ test('over a button, the toolbar, the pad, Settings or the dialogue, a press or 
   assert.equal(layer?.snapshot().gpu, 'none');
 });
 
-test('while NEWT is carried, the pointer trails nothing', () => {
+test('while NEWT is carried, pointer movement still starts the petal renderer', () => {
   const page = fakePage();
   const layer = createPetalLayer(page.root, { on: () => true, carrying: () => true });
-  for (let i = 0; i < 8; i++) page.move(100 + i * 40, 100);
-  assert.equal(page.asked(), 0, 'nothing shed while he is carried');
-  assert.equal(layer?.snapshot().gpu, 'none');
+  const said = console.error;
+  console.error = () => {};
+  try {
+    for (let i = 0; i < 8; i++) page.move(100 + i * 40, 100);
+  } finally {
+    console.error = said;
+  }
+  assert.ok(page.asked() >= 1, 'carrying permits the trail to request its renderer');
+  assert.equal(layer.snapshot().gpu, 'failed', 'the fake page refuses WebGL');
+  layer.dispose();
 });
 
 test('the page’s petals are sized in CSS px, about 10–16 px long, a little smaller on a phone', () => {
