@@ -24,6 +24,7 @@ import { LEGACY_SHADER, MOTIONS, RETIRED_SHADER, STYLES } from './invitation/loo
 import { PIXEL_SIZES as INVITATION_PIXEL_SIZES } from './invitation/pixels.js';
 import { SHADER_CONTROLS } from './invitation/shader.js';
 import { LINE_MAX, LINE_RAW_MAX, LINES_MAX, SPEECH_RANGES, TRIGGERS } from './invitation/speech.js';
+import { linkProblems } from './invitation/link.js';
 import {
   COLOR_NAME_RE,
   DEFAULT_TEXT_COLORS,
@@ -283,8 +284,9 @@ const BOX_NEEDS = ['id', 'text', 'face', 'animation', 'camera'];
  * control, shader.js SHADER_CONTROLS), its speech settings (`speech`: the quiet spell before an
  * idle line, each trigger's chance and cooldown, speech.js SPEECH_RANGES), its lines (`lines`:
  * each trigger's list of text, at most LINES_MAX of at most LINE_MAX characters) and its intro
- * (`intro`: the chat Play Intro opens, types.js DialogueScript; invitationIntro) and its text
- * effects (`text`: the colours a line's tags name, invitationText). The tags in the lines and
+ * (`intro`: the chat Play Intro opens, types.js DialogueScript; invitationIntro), its text
+ * effects (`text`: the colours a line's tags name, invitationText) and its link button (`link`:
+ * where it goes and its name, link.js linkProblems). The tags in the lines and
  * the chat boxes' text are checked against those colours (the built-in ones when there's no
  * `text.colors`: markup.js DEFAULT_TEXT_COLORS), and their limits count the letters that show.
  * Every part is optional, and so is every value outside the intro: the toy falls back on its own (speech.js
@@ -321,12 +323,15 @@ export function validateInvitation(inv, err, warn, base = 'invitation') {
     },
   };
   for (const k of Object.keys(inv))
-    if (!['defaults', 'speech', 'lines', 'intro', 'text'].includes(k)) err(at(k), 'Unknown section.');
+    if (!['defaults', 'speech', 'lines', 'intro', 'text', 'link'].includes(k)) err(at(k), 'Unknown section.');
   if (inv.defaults !== undefined && check.group(inv.defaults, 'defaults')) invitationDefaults(inv.defaults, check);
   if (inv.speech !== undefined && check.group(inv.speech, 'speech')) invitationSpeech(inv.speech, check);
   if (inv.lines !== undefined && check.group(inv.lines, 'lines')) invitationLines(inv.lines, check);
   if (inv.intro !== undefined && check.group(inv.intro, 'intro')) invitationIntro(inv.intro, check);
   if (inv.text !== undefined && check.group(inv.text, 'text')) invitationText(inv.text, check);
+  // (The link button: an href it can use, its label's length: link.js linkProblems.)
+  if (inv.link !== undefined && check.group(inv.link, 'link'))
+    for (const p of linkProblems(inv.link)) (p.warn ? warn : err)(at(`link.${p.field}`), p.message);
 }
 
 /**

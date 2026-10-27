@@ -4,7 +4,8 @@
 // site's root, a new tab for every link but a mailto:, so the toy keeps its state; nothing at all
 // for an empty or unsafe one, and then no button), and the corner each scene puts it in
 // (linkCorner: the top left while the envelope is up and while the intro runs or is about to,
-// so it stays put from the one into the other; else the top right). Between the two it fades
+// so it stays put from the one into the other; else the top right), and what the content rules
+// say of it (linkProblems: src/contentRules.js reports them). Between the two it fades
 // out and back in (LINK_FADE: invitation.css fades it a little quicker, so it's gone before it
 // moves; with reduced motion it moves at once). ui.js draws and binds it (linkHtml, bindUi).
 // Its safe-link rule is the site's own (src/html.js isSafeUrl), copied (safeHref): the toy
@@ -59,6 +60,35 @@ export function linkFrom(data) {
   const href = typeof o.href === 'string' ? o.href.trim() : '';
   const label = typeof o.label === 'string' ? o.label.trim() : '';
   return { href, label: label ? Array.from(label).slice(0, LINK_LABEL_MAX).join('') : LINK_LABEL };
+}
+
+/**
+ * What's wrong with the admin's link, for the content rules (src/contentRules.js, at
+ * invitation.link.<field>): its href empty (no button) or one it can use (safeHref: https://,
+ * mailto: or a path on the site; javascript:, data: and the rest are refused), its label its name
+ * of up to LINK_LABEL_MAX letters, nothing else; a link with no label is a warning (it's named
+ * LINK_LABEL). Both are optional: linkFrom reads what's missing as empty.
+ * @param {Record<string, unknown>} l  content.json's invitation.link, a group of fields
+ * @returns {{field: string, message: string, warn?: boolean}[]}
+ */
+export function linkProblems(l) {
+  /** @type {{field: string, message: string, warn?: boolean}[]} */
+  const out = Object.keys(l)
+    .filter((k) => k !== 'href' && k !== 'label')
+    .map((field) => ({ field, message: 'Unknown setting.' }));
+  const { href = '', label = '' } = l;
+  if (typeof href !== 'string') out.push({ field: 'href', message: 'Must be text.' });
+  else if (href && !safeHref(href))
+    out.push({
+      field: 'href',
+      message: 'Not a link the toy can use (https://…, mailto:…, or a site path like visualizer/).',
+    });
+  if (typeof label !== 'string') return [...out, { field: 'label', message: 'Must be text.' }];
+  const n = Array.from(label.trim()).length;
+  if (n > LINK_LABEL_MAX) out.push({ field: 'label', message: `At most ${LINK_LABEL_MAX} letters.` });
+  else if (!n && href)
+    out.push({ field: 'label', message: `No label: the button is named ${LINK_LABEL}.`, warn: true });
+  return out;
 }
 
 /**
