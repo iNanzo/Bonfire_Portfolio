@@ -1943,11 +1943,12 @@
       "wave": [
         ":3",
         "Howdy!",
-        "Hey! Over here!",
+        "Hey down here!",
         "{wave,pink|Annyeong Haseyo₊˚⊹♡}",
         "{pink|Konnichiikawa}",
         "Wassup motha sucka",
-        "{wave|meow!}"
+        "{wave|meow!}",
+        "o w o ] {wave|/}"
       ],
       "spook": [
         "{shake|Eep!}",
@@ -1955,7 +1956,8 @@
         "I pooped my pants...",
         "{wave,big,bold|:o!}",
         "{shake|meow!}",
-        "{wave|mmmmfgh.,..,}"
+        "{wave|mmmmfgh.,..,}",
+        "{shake|o m o !}"
       ],
       "flee": [
         "{shake|Nope, nope, nope!}",
@@ -1976,7 +1978,8 @@
         "Be gentle im frail...",
         "Please, I’m just a little guy :(",
         "{wave|mmmmfgh.,..,}",
-        "{big,shake|🫪}"
+        "{big,shake|🫪}",
+        "o m o !"
       ],
       "pickedUp": [
         "So this is what tall people see",
@@ -1987,14 +1990,16 @@
         "{wave|mmmmfgh.,..,}",
         "Oh no I've been stockholm syndromed...",
         "...",
-        "{big,wave|🫪}"
+        "{big,wave|🫪}",
+        "{wave|o w o !}"
       ],
       "shaken": [
         "{wave,shake|Please,} I have epilepsy!",
         "{shake|Shiver me timbers!}",
         "{shake|Rattle me bones!}",
         "{wave,shake,green|I frew up...}",
-        "{shake|uuuuuuooooooo}"
+        "{shake|uuuuuuooooooo}",
+        "{shake|o m o}"
       ],
       "thrash": [
         "Lemme go!",
@@ -2009,7 +2014,8 @@
         "I am {red,big,bold,wave|Spiderman}...",
         "I invented gravity!",
         "{big,bold,wave|Wahoo!}",
-        "Not the first time I've been dropped!"
+        "Not the first time I've been dropped!",
+        "o m o !"
       ],
       "landed": [
         "{big,bold|Oof.}",
@@ -2017,7 +2023,8 @@
         "I am {red,big,bold,wave|Spiderman}...",
         "{big,bold,shake|Yeowch!|}",
         "And {wave|pose!}",
-        "{wave,red,big,bold|HENSHIN!}"
+        "{wave,red,big,bold|HENSHIN!}",
+        "{shake|o m o !}"
       ],
       "walkTo": [
         "On my way!",
@@ -2028,14 +2035,17 @@
         "On it!",
         "Here I come suckas!",
         "{big|🫡}",
-        "{big|🚶}"
+        "{big|🚶}",
+        "o w o !"
       ],
       "wander": [
         "What’s over here?",
         "Just stretching my legs.",
         "{wave,pink|U-uwa-wa-uwa✧･ﾟ: *✧･ﾟ:*}",
         "Hmm, I wonder…",
-        "{big|🚶}"
+        "{big|🚶}",
+        "o w o !",
+        "o m o..."
       ],
       "sitDown": [
         "Break time!",
@@ -2068,7 +2078,8 @@
         "{big,bold|Screen time! screen time!}",
         "See you in 5 hours",
         "{big|🦭}",
-        "{big|🫪}"
+        "{big|🫪}",
+        "o w o !"
       ],
       "lieDown": [
         "It's comfier this way :3",
@@ -2077,7 +2088,8 @@
         "Nobody talk to me, I’m busy.",
         "Just one more video...",
         "See you in 5 more hours",
-        "{big|🦭}"
+        "{big|🦭}",
+        "o w o"
       ],
       "idle": [
         "{wave,big,bold|*Mongolian throat singing*}",
@@ -2089,7 +2101,9 @@
         "I'm {big,bold|Batman}...",
         "I'm Chris Hansen with Dateline NBC...",
         "I am a cannibal, ethically.",
-        "{big|🫪}"
+        "{big|🫪}",
+        "o - o",
+        "o w o"
       ],
       "spin": [
         "I can't tell if that's the room or my head spinning...",
