@@ -327,7 +327,8 @@ function buildCompose() {
  * @property {() => void} [onDone]  it's gone and disposed
  * @property {boolean} [petals]  Rose Petals (Settings, on by default): off, none at all
  * @property {() => HTMLElement[]} [more]  the stops outside it Tab goes round with its own, after
- *   them (the link button's, ui.js linkStops); a focused one presses itself on Enter or Space
+ *   them (the link button's, ui.js linkStops); Enter and Space on a focused one are its own (the
+ *   link follows itself on Enter), never the envelope's
  */
 
 /**
