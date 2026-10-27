@@ -678,12 +678,22 @@ test.describe('on a phone', () => {
   }) => {
     const errors = watch(page);
     await calm(page);
+    // Admin content may start in Choppy; measure Smooth only after selecting it explicitly.
+    await page.getByRole('button', { name: 'Settings' }).click();
+    const sheet = page.getByRole('dialog', { name: 'Settings' });
+    await sheet
+      .getByRole('group', { name: 'Motion', exact: true })
+      .getByRole('radio', { name: 'Smooth', exact: true })
+      .check();
+    await expect(
+      sheet.getByRole('group', { name: 'Motion', exact: true }).getByRole('radio', { name: 'Smooth', exact: true }),
+    ).toBeChecked();
+    await sheet.getByRole('button', { name: 'Done' }).click();
     const smooth = await poses(page, 1200);
     expect(smooth.changes, `Smooth: ${smooth.changes} new poses in ${smooth.frames} frames`).toBeGreaterThanOrEqual(
       0.8 * smooth.frames,
     );
     await page.getByRole('button', { name: 'Settings' }).click();
-    const sheet = page.getByRole('dialog', { name: 'Settings' });
     await sheet.getByRole('radio', { name: 'Choppy', exact: true }).check();
     await sheet.getByRole('button', { name: 'Done' }).click();
     const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('invitation.look.v1') ?? '{}'));
