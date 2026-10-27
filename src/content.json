@@ -1946,27 +1946,37 @@
         "Hey! Over here!",
         "{wave,pink|Annyeong Haseyo₊˚⊹♡}",
         "{pink|Konnichiikawa}",
-        "Wassup motha sucka"
+        "Wassup motha sucka",
+        "{wave|meow!}"
       ],
       "spook": [
         "{shake|Eep!}",
         "Gah!",
         "I pooped my pants...",
-        "{wave|:o!}",
-        "I"
+        "{wave,big,bold|:o!}",
+        "{shake|meow!}",
+        "{wave|mmmmfgh.,..,}"
       ],
       "flee": [
-        "Nope, nope, nope!",
-        "Gotta go, gotta go!",
+        "{shake|Nope, nope, nope!}",
+        "{blue,wave|Gotta go fast!}",
         "I’m outta here!",
         "Can’t catch me!",
-        "Personal space! Personal space!"
+        "{WAVE|Seeya sucka!}",
+        "{wave,shake|*wheezing*}",
+        "{big,shake,wave|🏃💨}"
       ],
       "caught": [
-        "Hey! No fair!",
-        "Caught. Ugh, fine.",
-        "I was SO close!",
-        "Okay, you’re fast. Rude, but fast."
+        "{purple,big,bold,wave,shake|Unhand me wench!}",
+        "{big,bold,shake,wave|HELP I'VE BEEN TAKEN HOSTAGE!}",
+        "{wave,shake|*wheezing*}",
+        "{wave,big,bold|:o!}",
+        "{wave,shake|meow!}",
+        "{wave,shake|Please...} im fragile...",
+        "Be gentle im frail...",
+        "Please, I’m just a little guy :(",
+        "{wave|mmmmfgh.,..,}",
+        "{big,shake|🫪}"
       ],
       "pickedUp": [
         "So this is what tall people see",
@@ -1976,20 +1986,22 @@
         "You see how this looks, right?",
         "{wave|mmmmfgh.,..,}",
         "Oh no I've been stockholm syndromed...",
-        "..."
+        "...",
+        "{big,wave|🫪}"
       ],
       "shaken": [
         "{wave,shake|Please,} I have epilepsy!",
-        "Shiver me timbers!",
-        "Rattle me bones!",
-        "{wave,shake|I frew up...}"
+        "{shake|Shiver me timbers!}",
+        "{shake|Rattle me bones!}",
+        "{wave,shake,green|I frew up...}",
+        "{shake|uuuuuuooooooo}"
       ],
       "thrash": [
         "Lemme go!",
         "{purple,big,bold,wave,shake|Unhand me wench!}",
         "{RED,big,bold,wave,shake|RAHHHHHHH}",
         "Let me go let me go {wave,shake|let me go!}",
-        "HELP I'VE BEEN TAKEN HOSTAGE"
+        "{big,bold,shake,wave|HELP I'VE BEEN TAKEN HOSTAGE!}"
       ],
       "dropped": [
         "{big,bold,wave|Wheee!}",
@@ -2003,7 +2015,9 @@
         "{big,bold|Oof.}",
         "{big,bold,wave,shake|MY LEG}",
         "I am {red,big,bold,wave|Spiderman}...",
-        "{big,bold,shake|Yeowch!|}"
+        "{big,bold,shake|Yeowch!|}",
+        "And {wave|pose!}",
+        "{wave,red,big,bold|HENSHIN!}"
       ],
       "walkTo": [
         "On my way!",
@@ -2012,32 +2026,39 @@
         "{wave,pink|U-uwa-wa-uwa✧･ﾟ: *✧･ﾟ:*}",
         "Give me a sec I only average 200 steps a day...",
         "On it!",
-        "Here I come suckas!"
+        "Here I come suckas!",
+        "{big|🫡}",
+        "{big|🚶}"
       ],
       "wander": [
         "What’s over here?",
         "Just stretching my legs.",
         "{wave,pink|U-uwa-wa-uwa✧･ﾟ: *✧･ﾟ:*}",
-        "Hmm, I wonder…"
+        "Hmm, I wonder…",
+        "{big|🚶}"
       ],
       "sitDown": [
         "Break time!",
         "I can't feel my legs...",
         "Ahh, that’s better.",
-        "My legs are so tired."
+        "My legs are so tired.",
+        "{big|🦭}"
       ],
       "sitting": [
         "...",
         "The floor’s pretty comfy.",
         "Hello? Anyone there?",
         "{wave|Yaaawn…}",
-        "I could sit here all day..."
+        "I could sit here all day...",
+        "{big|🦭}"
       ],
       "standUp": [
         "Okay, okay, I’m up!",
         "Up and at ’em!",
         "Oh, we’re doing things now?",
-        "What's happenin'?"
+        "What's happenin'?",
+        "{big|🫡}",
+        "{wave|*sigh...*}"
       ],
       "device": [
         "Break time!",
@@ -2045,7 +2066,9 @@
         "Treat?",
         "Low battery? Nah, I’d win.",
         "{big,bold|Screen time! screen time!}",
-        "See you in 5 hours"
+        "See you in 5 hours",
+        "{big|🦭}",
+        "{big|🫪}"
       ],
       "lieDown": [
         "It's comfier this way :3",
@@ -2053,7 +2076,8 @@
         "Five more minutes...",
         "Nobody talk to me, I’m busy.",
         "Just one more video...",
-        "See you in 5 more hours"
+        "See you in 5 more hours",
+        "{big|🦭}"
       ],
       "idle": [
         "{wave,big,bold|*Mongolian throat singing*}",
@@ -2064,7 +2088,8 @@
         "I'm the {green,big,bold|Joker} baby!",
         "I'm {big,bold|Batman}...",
         "I'm Chris Hansen with Dateline NBC...",
-        "I am a cannibal, ethically."
+        "I am a cannibal, ethically.",
+        "{big|🫪}"
       ],
       "spin": [
         "I can't tell if that's the room or my head spinning...",
@@ -2486,7 +2511,7 @@
         },
         {
           "name": "green",
-          "color": "#34ad3c"
+          "color": "#2e8e35"
         },
         {
           "name": "purple",
