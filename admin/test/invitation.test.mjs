@@ -444,11 +444,14 @@ test('the speech and the lines go under the plan’s kinds, every trigger in one
     'lieDown',
   ]);
   // Each of round 16's moments named and helped, and in content.json with lines of its own.
+  // The admin can expand the starter copy up to the real content limit, not just six lines.
   const now = content().invitation;
   for (const k of ['thrash', 'device', 'lieDown']) {
     assert.ok(titleCase(LABELS[`invitation.speech.${k}`] ?? '').length > 3, `${k}: named`);
-    assert.ok(now.speech[k] && now.lines[k]?.length >= 3 && now.lines[k].length <= 6, `${k}: 3–6 starter lines`);
+    assert.ok(now.speech[k], `${k}: speech configured`);
+    assert.ok(Array.isArray(now.lines[k]) && now.lines[k].length > 0, `${k}: lines configured`);
   }
+  assert.deepEqual(problems(now).errors, [], 'the configured lines satisfy the content rules');
   for (const k of TRIGGERS) assert.equal(titleCase(hint(ADD_LABELS, `invitation.lines.${k}`)), 'Line', k);
 });
 
