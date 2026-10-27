@@ -397,16 +397,35 @@ test.describe('on a desktop', () => {
     expect(s.dialogue).toBeNull();
   });
 
-  test('focused at boot it shows no ring; once Tab is pressed, the ring follows focus', async ({ page }) => {
-    await envelopeUp(page);
-    await expect(envelope(page)).toBeFocused();
-    await expect(envelope(page)).toHaveCSS('box-shadow', 'none');
-    await page.keyboard.press('Tab');
-    await expect(skipIntro(page)).toBeFocused();
-    await page.keyboard.press('Tab');
-    await expect(envelope(page)).toBeFocused();
-    await expect(envelope(page)).not.toHaveCSS('box-shadow', 'none');
-  });
+  for (const linked of [false, true]) {
+    test(`focused at boot it shows no ring; once Tab is pressed, the ring follows focus (${linked ? 'with' : 'without'} a link)`, async ({
+      page,
+    }) => {
+      await envelopeUp(page);
+      // The admin can configure a link: give this test both focus orders explicitly.
+      await page.evaluate(
+        (on) => window.__invitation.setLink({ href: on ? 'favicon.svg' : '', label: 'Test Link' }),
+        linked,
+      );
+      const link = page.locator('[data-link]');
+      if (linked) await expect(link).toBeVisible();
+      else await expect(link).toBeHidden();
+      await expect(envelope(page)).toBeFocused();
+      await expect(envelope(page)).toHaveCSS('box-shadow', 'none');
+      await page.keyboard.press('Tab');
+      await expect(skipIntro(page)).toBeFocused();
+      await page.keyboard.press('Tab');
+      if (linked) {
+        await expect(link).toBeFocused();
+        await expect(link).toHaveCSS('outline-style', 'solid');
+        await page.keyboard.press('Tab');
+      }
+      await expect(envelope(page)).toBeFocused();
+      await expect(envelope(page)).not.toHaveCSS('box-shadow', 'none');
+      await page.keyboard.press('Shift+Tab');
+      await expect(linked ? link : skipIntro(page)).toBeFocused();
+    });
+  }
 
   test('Enter opens it', async ({ page }) => {
     await envelopeUp(page);
