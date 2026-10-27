@@ -224,13 +224,13 @@ loading screen too: NEWT loads behind it.
   no link, or one the toy won't use, there's no button at all; as shipped there's none.
 - **Where it sits:** in the toy, at the top right. Over the envelope and all through the intro,
   at the top left, in the same spot from the one into the other: the envelope's Skip Intro is at
-  its top right, and the intro's sits just right of the link (on a narrow phone Auto, Next and
-  Log sit a little tighter, and on the narrowest Skip Intro takes two rows, so the row fits).
-  It sits over everything there and takes its own presses: a click or tap on it never opens
-  the envelope, swipes it, goes on or skips a line, and a drag that starts on it never moves
-  the letter. When the intro ends, or the envelope's skipped, it fades out and back in at the
-  top right (about a tenth of a second each way; at once with reduced motion), and Replay
-  Intro takes it back to the top left.
+  its top right, level with it, and the intro's sits just right of it (on a narrow phone Auto,
+  Next and Log sit a little tighter, and on the narrowest Skip Intro takes two rows, so the row
+  fits). It sits over everything there and takes its own presses: a click or tap on it never opens
+  the envelope, swipes it, goes on or skips a line, and a drag that starts on it never moves the
+  letter. When the intro ends, or the envelope's skipped, it fades out and back in at the top
+  right (about a tenth of a second each way; at once with reduced motion), and Replay Intro takes
+  it back to the top left.
 - **Its name:** with a mouse it shows as a pixel tab under the button when you point at it or
   Tab to it, over a dither fill; on a phone it shows its icon only, and a press held still shows
   the name and opens nothing. A screen reader reads the name, and finds the button in the
@@ -754,10 +754,12 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   `invitation.css` (`.inv-link`: z-index 5, over the envelope's 3 and its petals' 4; the left
   corner's size and inset follow the intro's buttons, `--inv-link-size` and `--inv-link-inset`;
   the label tab under it), `dialogue.css` (Skip Intro beside it under `.has-link`, and the narrow
-  phone's tighter top row), `envelopeScene.js` and `dialogueUi.js` (`more`: the stops their Tab
-  order takes after their own; a focused link presses itself) and `main.js` (`syncLink` each frame
-  and as the envelope comes and goes: the corner, and `aria-owns` on the envelope's or the
-  intro's layer while it's in their corner; `content.js` `linkSettings()`, none under `?preview`).
+  phone's tighter top row), `envelope.css` (its Skip Intro grows on the link's breakpoint too, so
+  the envelope's two top corners stay level), `envelopeScene.js` and `dialogueUi.js` (`more`: the
+  stops their Tab order takes after their own; a focused link presses itself) and `main.js`
+  (`syncLink` each frame and as the envelope comes and goes: the corner, and `aria-owns` on the
+  envelope's or the intro's layer while it's in their corner; `content.js` `linkSettings()`, none
+  under `?preview`).
 - **Text effects:** `markup.js` (pure: `parseMarkup(text, palette)` gives the styled `runs`,
   the `letters` that show (graphemes, `Intl.Segmenter`), the `plain` text and the `errors`,
   each a sentence for the admin; `paletteOf` reads `invitation.text.colors`, `DEFAULT_TEXT_COLORS`

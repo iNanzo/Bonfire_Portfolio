@@ -123,9 +123,14 @@
   .inv-envelope-hint-skip {
     font-size: 18px;
   }
+}
+/* (Skip Intro grows on the link button's breakpoint, not the hint's, so the envelope's two top
+   corners stay level, as the intro's top row does after them: invitation.css --inv-link-*,
+   dialogue.css.) */
+@media (min-width: 700px) and (min-height: 560px) {
   .inv-envelope-skip {
-    top: 16px;
-    right: 16px;
+    top: calc(16px + env(safe-area-inset-top));
+    right: calc(16px + env(safe-area-inset-right));
     min-height: 44px;
     font-size: 15px;
   }

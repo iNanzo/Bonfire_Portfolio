@@ -13,7 +13,8 @@
 // mouse shows the label on hover, over a dither fill; on a phone a press held still shows the
 // label and opens nothing. Under the Settings sheet it's inert; empty or unsafe it's hidden from
 // everyone; a mailto: opens in place; under ?preview there's none. Nothing overlaps it or its
-// label at 320×568, 390×844, 844×390, 640×800, 1280×400, 1280×800 and 1920×1080, in any scene.
+// label at 320×568, 390×844, 844×390, 700×600, 640×800, 1280×400, 1280×800 and 1920×1080, in any
+// scene, and over the envelope and in the intro Skip Intro is as high up and as tall as it.
 // Every wait is on a state (?test's snapshot), never on a duration.
 import { test, expect } from '@playwright/test';
 
@@ -466,7 +467,7 @@ test.describe('on a desktop', () => {
     await expect(linkEl(page)).toBeHidden();
   });
 
-  test('nothing overlaps it or its label, in any scene, at 320×568, 390×844, 844×390, 640×800, 1280×400, 1280×800 and 1920×1080', async ({
+  test('nothing overlaps it or its label, in any scene, at 320×568, 390×844, 844×390, 700×600, 640×800, 1280×400, 1280×800 and 1920×1080; Skip Intro level with it over the envelope and in the intro', async ({
     page,
   }) => {
     test.setTimeout(180_000);
@@ -474,6 +475,9 @@ test.describe('on a desktop', () => {
       [320, 568],
       [390, 844],
       [844, 390],
+      // (The link's big size but under the hint's 720px; 844×390 and 1280×400, wide but short,
+      // are the other way round. Skip Intro keeps level with it at each.)
+      [700, 600],
       [640, 800],
       [1280, 400],
       [1280, 800],
@@ -511,14 +515,21 @@ test.describe('on a desktop', () => {
       }, others);
     const overlap = (a, b) =>
       a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
-    /** At each size: the link and its label on screen, clear of each other one. */
-    async function check(scene, others) {
+    /** At each size: the link and its label on screen, clear of each other one, and the `level`
+     *  button (if any) as high up and as tall as the link. */
+    async function check(scene, others, level) {
       for (const [w, h] of SIZES) {
         await page.setViewportSize({ width: w, height: h });
         await expect.poll(() => page.evaluate(() => innerWidth)).toBe(w);
         await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
         const m = await measure(others);
         const at = `${scene} at ${w}×${h}`;
+        if (level) {
+          const l = await page.locator(level).boundingBox();
+          expect(l, `${at}: ${level} there`).not.toBeNull();
+          expect(Math.abs(l.y - m.link.top), `${at}: ${level} level with it`).toBeLessThanOrEqual(1);
+          expect(Math.abs(l.height - (m.link.bottom - m.link.top)), `${at}: ${level} as tall`).toBeLessThanOrEqual(1);
+        }
         for (const [name, b] of [
           ['the link', m.link],
           ['its label', m.tab],
@@ -538,7 +549,7 @@ test.describe('on a desktop', () => {
     await envelopeUp(page);
     await setLink(page, LONG);
     await settled(page, 'left');
-    await check('the envelope', '.inv-envelope-skip');
+    await check('the envelope', '.inv-envelope-skip', '.inv-envelope-skip');
     // Opened: the intro, the link still at the top left.
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.keyboard.press('Enter');
@@ -548,7 +559,7 @@ test.describe('on a desktop', () => {
       'the intro under way',
     );
     await settled(page, 'left');
-    await check('the intro', '.inv-talk .inv-btn, .inv-talk-box');
+    await check('the intro', '.inv-talk .inv-btn, .inv-talk-box', '.inv-talk-skip-intro');
     // Skipped to the toy: the link at the top right.
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.locator('.inv-talk-skip-intro').click();
