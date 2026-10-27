@@ -98,7 +98,9 @@
 // view({yaw, elevation, zoom}) eases the camera there; `?seed=N` and `?calm` go to the brain (and
 // the seed to talk).
 // clock() is the toy's clock (it stands still while the envelope covers him), envelope() the
-// envelope's state and pose (null without one).
+// envelope's state and pose (null without one); setLink({href, label}) gives the link button a
+// link of the spec's own (link.js linkFrom; none under ?preview), and snapshot().link is how it
+// stands (shown, its href and label, its corner, where it's drawn, its fade, inert).
 //
 // `?preview` is the admin's intro preview (admin/ui/introPreview.js frames it): no envelope, calm
 // (no wandering), no bubble lines and no petals. It listens only to its parent window, at the
@@ -217,7 +219,7 @@ import { createTalk } from './speech.js';
 import { LIFT, createStage } from './stage.js';
 import { centreOf } from './steer.js';
 import { bindUi, deviceLabelOf, loadWander, parseQuery, saveWander } from './ui.js';
-import { linkCorner } from './link.js';
+import { linkCorner, linkFrom } from './link.js';
 
 /** The longest step a frame takes, seconds (a slow frame or a tab coming back never jumps). */
 const MAX_DT = 0.05;
@@ -2145,6 +2147,9 @@ function start(s) {
         burst: Boolean(burst),
         // (The envelope's state, null without one: types.js EnvelopeState.)
         envelope: envelopeState(),
+        // (The link button: shown, its href and label, its corner and where it's drawn, its
+        // fade's phase and its opacity as it last changed corners, inert.)
+        link: ui.linkState(),
         // (It still hides him, as of the last step: the intro's first line waits on it.)
         envelopeVeils,
         // (The admin's intro preview: the origin it listens to, and the box it was asked for.)
@@ -2222,6 +2227,15 @@ function start(s) {
       },
       /** The intro's script as the envelope and Replay Intro run it (playScript). */
       intro: () => playScript(),
+      /**
+       * The link button's link, the spec's own (link.js linkFrom: anything; an empty or unsafe
+       * href hides it); none under ?preview, as the page has none there.
+       * @param {unknown} value
+       */
+      setLink(value) {
+        ui.setLink(options.preview ? null : linkFrom(value));
+        syncLink();
+      },
       /** Use a controlled script for UI behavior tests; null restores the admin’s content.
        * @param {unknown} value
        */
