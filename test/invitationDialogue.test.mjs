@@ -194,6 +194,56 @@ test('a line after another types at once, from its first letter, as the first on
   assert.equal(r.step(0.5 + 1 / DIALOGUE.cps + 1e-6).shown, 1);
 });
 
+test('a line a press brings on waits its lead, then types from its first letter; Auto, Next and the first line don’t wait', () => {
+  const lead = 0.32;
+  const letter = 1 / DIALOGUE.cps;
+  const d = run(SCRIPT, { lead });
+  assert.equal(d.step(letter + 1e-6).shown, 1, 'the first line types at once');
+  assert.equal(d.advance(0.1), 'typed');
+  assert.equal(d.advance(0.2), 'next');
+  assert.equal(d.view.box?.id, 'me');
+  assert.equal(d.step(0.2 + lead - 1e-3).shown, 0, 'it waits its lead (the screen fades the lines meanwhile)');
+  assert.equal(d.view.typed, false);
+  assert.equal(d.step(0.2 + lead + letter + 1e-6).shown, 1, 'then its first letter');
+  const v = d.step(0.2 + lead + typeDuration('I am NEWT') + 1e-6);
+  assert.ok(v.typed && v.shown === v.length, 'typed as long after its lead as the first');
+  // (A tap in its lead finishes it at once, as any tap does.)
+  assert.equal(d.advance(0.8), 'next');
+  assert.equal(d.advance(0.85), 'typed');
+  assert.ok(d.view.typed, 'finished in its lead');
+  // (Paused in its lead: the lead waits too.)
+  const p = run(SCRIPT, { lead });
+  p.advance(0);
+  p.advance(0.1);
+  p.pause(true, 0.15);
+  p.pause(false, 1.15);
+  assert.equal(p.step(1.1 + lead - 1e-3).shown, 0, 'still waiting after the pause');
+  assert.equal(p.step(1.1 + lead + letter + 1e-6).shown, 1);
+  // (A reply picked: its box waits the lead too.)
+  const r = run(SCRIPT, { lead });
+  r.skip(0);
+  assert.ok(r.choose(0, 0.5));
+  assert.equal(r.view.box?.id, 'yes');
+  assert.equal(r.step(0.5 + lead - 1e-3).shown, 0);
+  assert.equal(r.step(0.5 + lead + letter + 1e-6).shown, 1);
+  // (Auto going on by itself doesn't: nothing fades.)
+  const a = run(SCRIPT, { lead });
+  a.setAuto(true, 0);
+  let t = 0;
+  while (a.view.box?.id === 'hi' && t < 20) a.step((t += 1 / 60));
+  assert.equal(a.view.box?.id, 'me');
+  assert.equal(a.step(t + letter + 1e-6).shown, 1, 'Auto’s box types at once');
+  // (Next goes to the box with replies typed whole, as ever.)
+  const n = run(SCRIPT, { lead });
+  n.skip(0.1);
+  assert.ok(n.view.typed && n.view.box?.id === 'ask');
+  // (A lead that isn't a number: none.)
+  const z = run(SCRIPT, { lead: NaN });
+  z.advance(0);
+  z.advance(0.1);
+  assert.equal(z.step(0.1 + letter + 1e-6).shown, 1);
+});
+
 test('the last box ends it, and so does a next that isn’t there', () => {
   const d = run({ speaker: 'NEWT', start: 'a', boxes: [{ id: 'a', text: 'one', next: 'gone' }] });
   d.advance(0);
@@ -487,10 +537,154 @@ test('text effects: typing, Auto’s wait and the cap count the letters that sho
   );
 });
 
-test('the chat screen’s feedback: the buttons’ dither in the toolbar’s style, the box’s plain fades', async () => {
-  const { TALK_DITHER, talkTile, talkHtml } = await import('../src/invitation/dialogueUi.js');
-  // (A tile is the toolbar's Bayer 4×4 drawn at two CSS px a cell: 8×8, its cells inside the next coverage's.)
-  for (const n of [...TALK_DITHER.ink, ...TALK_DITHER.fade]) {
+test('the chat screen is plain, as before round 18: no dither on its buttons or its box, no press flash, no outline round the words; the replies pop in, the ▼ bobs smoothly', async () => {
+  const ui = await import('../src/invitation/dialogueUi.js');
+  for (const k of ['TALK_DITHER', 'pressFlash', 'SHADE_BANDS']) assert.equal(k in ui, false, `no ${k}`);
+  const markup = ui.talkHtml();
+  assert.ok(!/inv-talk-flash|inv-talk-label|inv-talk-ghost/.test(markup), 'no flash, no plates, no copy of a line');
+  // (The buttons' words straight in them, as before; a reply's styled letters in their holder.)
+  for (const b of ['auto', 'skip', 'log', 'log-close', 'no', 'yes'])
+    assert.match(markup, new RegExp(`data-talk="${b}"[^>]*>[^<]+</button>`), b);
+  assert.match(markup, /data-intro-skip>Skip Intro<\/button>/);
+  const src = readFileSync(new URL('../src/invitation/dialogueUi.js', import.meta.url), 'utf8');
+  assert.ok(!/inv-talk-label|inv-talk-flash|pressFlash|--talk-ink-|--talk-mask-/.test(src), 'none of it in the screen');
+  assert.match(
+    src,
+    /class="inv-btn inv-talk-choice"[^>]*><span class="inv-talk-choice-text" aria-hidden="true" data-styled=/,
+  );
+
+  const css = readFileSync(new URL('../src/invitation/dialogue.css', import.meta.url), 'utf8');
+  const rule = (sel, from = 0) => {
+    const at = css.indexOf(`${sel} {`, from);
+    assert.ok(at >= 0, `a rule for ${sel}`);
+    return css.slice(at, css.indexOf('}', at));
+  };
+  // (No dither anywhere on the screen: no tiles, no background images, no outline round the
+  // words; the only dither is the click fade's, run from script.)
+  for (const gone of [
+    'background-image',
+    'image-rendering',
+    'text-shadow',
+    '--talk-ink-',
+    '--talk-mask-',
+    'inv-talk-flash',
+    'inv-talk-label',
+    'inv-talk-dither-in',
+    'steps(',
+  ])
+    assert.ok(!css.includes(gone), `no ${gone}`);
+  assert.equal(css.match(/@import /g)?.length, 1, 'the text effects imported once');
+  // (The box rises into place with its plain quick fade, as it did.)
+  assert.match(rule('.inv-talk-box'), /animation: inv-talk-rise 0\.28s ease-out;/);
+  const frames = (name) => new RegExp(`@keyframes ${name} \\{([\\s\\S]*?)\\n\\}`).exec(css)?.[1] ?? '';
+  assert.match(frames('inv-talk-rise'), /opacity: 0/);
+  // (The replies pop in together, a quick smooth scale and fade, as they did.)
+  assert.match(rule('.inv-talk-choices:not(.is-waiting) .inv-talk-choice'), /animation: inv-talk-pop 0\.22s ease-out;/);
+  assert.ok(!/nth-child/.test(css), 'together, not one after another');
+  const pop = frames('inv-talk-pop');
+  assert.match(pop, /opacity: 0/);
+  assert.match(pop, /scale: 0\.92/);
+  // (The replies on their cream.)
+  assert.match(css, /\.inv-talk-choice \{[^}]*(background|--talk-btn-fill): var\(--talk-fill\)/);
+  // (The ▼ bobs smoothly, as it did.)
+  assert.match(rule('.inv-talk-next'), /animation: inv-talk-bob 0\.9s ease-in-out infinite;/);
+  assert.match(frames('inv-talk-bob'), /50% \{\s*transform: translateY\(4px\);/);
+  // (A finger held on a button presses it down as the mouse's :active does: holdPressed.)
+  const pressed = /\.inv-talk \.inv-btn\.is-pressed:not\(:disabled\) \{([^}]*)\}/.exec(css)?.[1] ?? '';
+  assert.match(pressed, /transform: translateY\(3px\)/);
+  assert.match(pressed, /box-shadow: 0 1px 0 var\(--talk-ink\)/);
+  // (Reduced motion: no rise, no bob, no pop, the dim just there.)
+  const reduced = css.slice(css.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
+  const still = /([^{}]+)\{\s*animation: none;\s*\}/.exec(reduced)?.[1] ?? '';
+  for (const sel of [
+    '.inv-talk-next',
+    '.inv-talk-box',
+    '.inv-talk-dim',
+    '.inv-talk-choices:not(.is-waiting) .inv-talk-choice',
+  ])
+    assert.ok(
+      still
+        .split(',')
+        .map((v) => v.trim())
+        .includes(sel),
+      `reduced motion: ${sel} still`,
+    );
+});
+
+test('a light plain hover and a plain pressed state on the buttons and the box: a step warmer, a step darker and down, never a dither', async () => {
+  const css = readFileSync(new URL('../src/invitation/dialogue.css', import.meta.url), 'utf8');
+  const rule = (sel) => {
+    const at = css.indexOf(`${sel} {`);
+    assert.ok(at >= 0, `a rule for ${sel}`);
+    return css.slice(at, css.indexOf('}', at));
+  };
+  // (Each button's steps from its own fill: paper, the replies' cream, the on colour of Auto and
+  // Log while they're on; warmer toward the on colour, darker toward the ink.)
+  const btn = rule('.inv-talk .inv-btn');
+  assert.match(btn, /--talk-btn-fill: var\(--inv-paper/);
+  assert.match(btn, /--talk-btn-hover: color-mix\(in srgb, var\(--talk-btn-fill\), var\(--inv-on[^)]*\) \d+%\)/);
+  assert.match(btn, /--talk-btn-down: color-mix\(in srgb, var\(--talk-btn-fill\), var\(--talk-ink\) \d+%\)/);
+  assert.match(btn, /background: var\(--talk-btn-fill\)/);
+  assert.match(rule('.inv-talk .inv-talk-choice'), /--talk-btn-fill: var\(--talk-fill\)/);
+  const on = rule(".inv-talk .inv-btn[aria-pressed='true'],\n.inv-talk .inv-btn[aria-expanded='true']");
+  assert.match(on, /--talk-btn-fill: var\(--inv-on/);
+  assert.match(on, /--talk-btn-hover: color-mix\(in srgb, var\(--talk-btn-fill\), #fff \d+%\)/, 'on: lighter');
+  // (Hover only where there's a mouse: a step warmer and lifted a pixel, its drop a pixel longer.)
+  const hoverAt = css.indexOf('@media (hover: hover) and (pointer: fine)');
+  assert.ok(hoverAt >= 0);
+  const hover = css.slice(hoverAt, css.indexOf('\n}\n', hoverAt));
+  const over = /\.inv-talk \.inv-btn:hover:not\(:disabled\) \{([^}]*)\}/.exec(hover)?.[1] ?? '';
+  assert.match(over, /background-color: var\(--talk-btn-hover\)/);
+  assert.match(over, /transform: translateY\(-1px\)/);
+  assert.match(over, /box-shadow: 0 5px 0 var\(--talk-ink\)/);
+  assert.match(hover, /\.inv-talk \.inv-talk-btn:hover:not\(:disabled\) \{\s*box-shadow: 0 4px 0 var\(--talk-ink\)/);
+  // (Pressed, by the mouse or a finger held on it: a step darker, down its drop.)
+  const down =
+    /\.inv-talk \.inv-btn:active:not\(:disabled\),\n\.inv-talk \.inv-btn\.is-pressed:not\(:disabled\) \{([^}]*)\}/.exec(
+      css,
+    )?.[1] ?? '';
+  assert.match(down, /background-color: var\(--talk-btn-down\)/);
+  assert.match(down, /transform: translateY\(3px\)/);
+  assert.match(down, /box-shadow: 0 1px 0 var\(--talk-ink\)/);
+  // (The box goes on when pressed, so it answers the same way: a step warmer under the mouse, a
+  // step darker and down 2 px pressed; not while the replies are up or the Log or the question
+  // is open, when a press on it goes nowhere.)
+  const live = '.inv-talk:not(.is-choosing, .is-modal) .inv-talk-box';
+  assert.match(
+    hover,
+    new RegExp(
+      `${live.replace(/[.()]/g, '\\$&')}:hover \\{\\s*background-color: color-mix\\(in srgb, var\\(--talk-fill\\), var\\(--inv-on`,
+    ),
+  );
+  const boxDown =
+    new RegExp(
+      `${live.replace(/[.()]/g, '\\$&')}:active,\\n${live.replace(/[.()]/g, '\\$&')}\\.is-pressed \\{([^}]*)\\}`,
+    ).exec(css)?.[1] ?? '';
+  assert.match(boxDown, /background-color: color-mix\(in srgb, var\(--talk-fill\), var\(--talk-ink\) \d+%\)/);
+  assert.match(boxDown, /translate: 0 2px/);
+  assert.match(boxDown, /box-shadow: 0 2px 0 var\(--talk-ink\)/);
+  assert.match(rule('.inv-talk-box'), /transition:[^;]*background-color/);
+  // (The screen: a finger held on the box shows it pressed too; under the Log or the question the
+  // layer says so.)
+  const src = readFileSync(new URL('../src/invitation/dialogueUi.js', import.meta.url), 'utf8');
+  assert.match(src, /holdPressed\(layer, 'is-pressed', 'button, \.inv-talk-box'\)/);
+  assert.match(src, /layer\.classList\.toggle\('is-modal', modal\(\)\)/);
+});
+
+test('a press that goes on, or a reply picked: the old line dithers out, then the next in, each in a few held Bayer steps', async () => {
+  const { TALK_FADE, TALK_LEAD, fadeFrames, talkTile } = await import('../src/invitation/dialogueUi.js');
+  // (Short: about a sixth of a second each way, and the next line types once both are over.)
+  assert.ok(TALK_FADE.ms >= 150 && TALK_FADE.ms <= 200, `each way ${TALK_FADE.ms} ms`);
+  assert.equal(TALK_LEAD, (2 * TALK_FADE.ms) / 1000, 'the runner’s lead: out, then in');
+  assert.ok(TALK_FADE.plainMs > 0 && TALK_FADE.plainMs < TALK_FADE.ms, 'reduced motion: a quicker plain fade');
+  // (The steps: the coverages, heavy to light, each the toolbar's Bayer tile at 2 px a cell.)
+  const { steps } = TALK_FADE;
+  assert.ok(steps.length >= 2 && steps.length <= 4, `a few steps: ${steps}`);
+  assert.ok(
+    steps.every((n, i) => n > 0 && n < 16 && (i === 0 || n < steps[i - 1])),
+    'down from heavy to light',
+  );
+  for (const n of [0, ...steps]) {
     const t = talkTile(n);
     assert.equal(t.length, 64, `${n}: 8×8`);
     assert.equal(t.filter(Boolean).length, n * 4, `${n}/16 of it`);
@@ -503,63 +697,58 @@ test('the chat screen’s feedback: the buttons’ dither in the toolbar’s sty
         );
       }
   }
-  const more = talkTile(8);
+  const heavier = talkTile(steps[0]);
   assert.ok(
-    talkTile(4).every((on, i) => !on || more[i]),
+    talkTile(steps.at(-1)).every((on, i) => !on || heavier[i]),
     'a lighter tile’s cells are in the heavier one',
   );
-  // (The fade goes up from nothing, in even steps, short of whole: the last step is no mask at all.)
-  assert.equal(TALK_DITHER.fade[0], 0);
-  assert.ok(TALK_DITHER.fade.every((n, i) => i === 0 || n > TALK_DITHER.fade[i - 1]) && TALK_DITHER.fade.at(-1) < 16);
-  // (No dithered fade of the box or its line any more: nothing for a line to wait out.)
-  assert.deepEqual(Object.keys(TALK_DITHER).sort(), ['fade', 'ink', 'pressMs']);
-  const markup = talkHtml();
-  assert.match(markup, /class="inv-talk-flash" aria-hidden="true"/);
-  assert.ok(!/inv-talk-ghost/.test(markup), 'no copy of the line before, dithering out');
+  const masks = new Map([0, ...steps].map((n) => [n, `url(tile-${n})`]));
+  const out = fadeFrames(true, masks);
+  const inn = fadeFrames(false, masks);
+  assert.deepEqual(
+    out.map((f) => f.maskImage),
+    [...steps.map((n) => `url(tile-${n})`), 'url(tile-0)'],
+    'out: lighter step by step, then nothing (held there till it goes)',
+  );
+  assert.deepEqual(
+    inn.map((f) => f.maskImage),
+    [...[...steps].reverse().map((n) => `url(tile-${n})`), 'none'],
+    'in: heavier step by step, then whole',
+  );
+  for (const frames of [out, inn]) {
+    assert.deepEqual(
+      frames.map((f) => f.offset),
+      frames.map((_, i) => i / (frames.length - 1)),
+      'even steps',
+    );
+    for (const f of frames) assert.equal(f.easing, 'steps(1, end)', 'each held: a dither steps, it never blends');
+  }
 
+  // (The old line's copy, over the new one where it was, takes no press; nor do the replies'.)
   const css = readFileSync(new URL('../src/invitation/dialogue.css', import.meta.url), 'utf8');
-  const rule = (sel, from = 0) => {
-    const at = css.indexOf(`${sel} {`, from);
+  const rule = (sel) => {
+    const at = css.indexOf(`${sel} {`);
     assert.ok(at >= 0, `a rule for ${sel}`);
     return css.slice(at, css.indexOf('}', at));
   };
-  // (Hover a light ink dither, press a heavier one, on every button in the layer, as on the toolbar.)
-  assert.match(rule('.inv-talk .inv-btn:hover:not(:disabled)'), /background-image: var\(--talk-ink-2\)/);
-  // (Pressed: :active, or the class a held finger sets, holdPressed.)
-  assert.match(rule('.inv-talk .inv-btn.is-pressed:not(:disabled)'), /background-image: var\(--talk-ink-6\)/);
-  assert.match(rule('.inv-talk .inv-btn'), /background-size: 8px 8px/);
-  // (The screen doesn't dither in: the box rises into place with a plain quick fade, as before.)
-  assert.ok(!/\.inv-talk:not\(\[hidden\]\) \{/.test(css), 'no animation on the whole layer');
-  assert.match(rule('.inv-talk-box'), /animation: inv-talk-rise 0\.2\d?s ease-out;/);
-  const rise = /@keyframes inv-talk-rise \{([\s\S]*?)\n\}/.exec(css)?.[1] ?? '';
-  assert.match(rise, /opacity: 0/);
-  assert.ok(!/mask-image|steps\(/.test(rise), 'smooth, not stepped');
-  // (The replies dither in one after another: their mask through the fade's steps.)
-  const fade = /@keyframes inv-talk-dither-in \{([\s\S]*?)\n\}/.exec(css)?.[1] ?? '';
-  const steps = [...fade.matchAll(/mask-image: var\(--talk-mask-(\d+)\)/g)].map((m) => Number(m[1]));
-  assert.deepEqual(steps, TALK_DITHER.fade);
-  assert.match(fade, /100% \{\s*mask-image: none;/);
-  assert.match(rule('.inv-talk-choices:not(.is-waiting) .inv-talk-choice'), /animation: inv-talk-dither-in/);
-  const delays = [2, 3].map((n) =>
-    Number(
-      /animation-delay: ([\d.]+)s/.exec(
-        rule(`.inv-talk-choices:not(.is-waiting) .inv-talk-choice:nth-child(${n})`),
-      )?.[1],
-    ),
-  );
-  assert.ok(delays[0] > 0 && delays[1] > delays[0], `staggered: ${delays}`);
-  // (The ▼ steps, a pixel sprite's bob.)
-  assert.match(rule('.inv-talk-next'), /animation: inv-talk-bob [\d.]+s steps\(/);
-  // (Reduced motion: the box comes without its rise, the replies with a quick plain fade.)
-  const reduced = css.slice(css.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
-  assert.match(reduced, /\.inv-talk-box \{\s*animation: none;/);
-  assert.match(
-    reduced,
-    /\.inv-talk-choices:not\(\.is-waiting\) \.inv-talk-choice \{\s*animation: inv-talk-fade 0\.1\d?s/,
-  );
+  // (Its own rule: the last of its name, after the one it shares with the line.)
+  const ghostAt = css.lastIndexOf('\n.inv-talk-ghost {');
+  assert.ok(ghostAt >= 0, 'a rule for .inv-talk-ghost');
+  const ghost = css.slice(ghostAt, css.indexOf('}', ghostAt));
+  for (const d of [/position: absolute/, /inset: 0/, /overflow: hidden/, /pointer-events: none/])
+    assert.match(ghost, d);
+  assert.match(rule('.inv-talk-choices.is-ghost'), /pointer-events: none/);
+  // (The line's type is its view's, so the copy is set just as the line was; the admin's own line
+  // breaks show in the line and in its copy, never in the view, where the markup's breaks
+  // between its parts would each take a row.)
+  const view = rule('.inv-talk-view');
+  for (const d of [/font-size: 18px/, /line-height: 1\.42/, /overflow-wrap: break-word/]) assert.match(view, d);
+  assert.ok(!/white-space/.test(view), 'no breaks kept in the view');
+  assert.ok(!/font-size/.test(rule('.inv-talk-text')), 'the line takes its view’s type');
+  assert.match(css, /\.inv-talk-text,\n\.inv-talk-ghost \{\s*white-space: pre-line;/);
 });
 
-test('a long line grows the box up to about half the screen, then scrolls in it, following the typing a row at a time', async () => {
+test('a long line grows the box a row at most (four rows, three on a short screen), then scrolls in it, following the typing a row at a time', async () => {
   const { followRow, talkHtml, FOLLOW_JUMP } = await import('../src/invitation/dialogueUi.js');
   const row = 25;
   const view = { rowH: row, clientHeight: 3 * row };
@@ -581,42 +770,43 @@ test('a long line grows the box up to about half the screen, then scrolls in it,
     assert.ok(at >= 0, `a rule for ${sel}`);
     return css.slice(at, css.indexOf('}', at));
   };
-  // (The layer is a size container, so the box's room is measured against the screen it covers.)
-  assert.match(rule('.inv-talk'), /container-type: size/);
-  // (Never held at a few rows any more: a long line grows the box, as it did before round 18.)
-  assert.ok(!/max-height: calc\(\d \* 1\.42em\)/.test(css), 'no fixed rows');
-  // (At least three rows on a phone and a desktop, two on a short screen, so a short line keeps
-  // the box's shape; a longer line grows it a row at a time up to about half the screen (two
-  // fifths on a short one), the box's own padding and border taken off, in whole rows; past that
-  // it scrolls.)
-  const border = Number(/border: (\d+)px solid/.exec(rule('.inv-talk-box'))?.[1]);
-  assert.equal(border, 3);
-  const at = (media) => {
-    const i = css.indexOf(media);
-    assert.ok(i >= 0, media);
-    return i;
+  // (Rows, not a share of the screen: no size container, nothing measured in cqh.)
+  assert.ok(!/container-type|cqh/.test(css), 'no share of the screen');
+  // (Three rows at least on a phone and a desktop, two on a short screen, so a short line keeps
+  // the shape the box had before round 18; a longer line grows it by a row at most, four rows
+  // (three on a short screen), and past that it scrolls.)
+  /** The rules inside the `@media` starting `media` (to its closing brace). */
+  const media = (start) => {
+    const i = css.indexOf(start);
+    assert.ok(i >= 0, start);
+    let depth = 0;
+    for (let j = css.indexOf('{', i); j < css.length; j++) {
+      if (css[j] === '{') depth++;
+      else if (css[j] === '}' && --depth === 0) return css.slice(i, j + 1);
+    }
+    assert.fail(`${start} unclosed`);
   };
+  /** A declaration of `.inv-talk-text` in `block` (or the base rule's, when the block has none). */
+  const textRows = (block, prop) => {
+    const at = block.indexOf('.inv-talk-text {');
+    const own =
+      at >= 0
+        ? new RegExp(`${prop}: calc\\((\\d) \\* 1\\.42em\\)`).exec(block.slice(at, block.indexOf('}', at)))
+        : null;
+    return Number((own ?? new RegExp(`${prop}: calc\\((\\d) \\* 1\\.42em\\)`).exec(rule('.inv-talk-text')))?.[1]);
+  };
+  const base = css.slice(0, css.indexOf('@media'));
   const layouts = [
-    { name: 'a phone', from: 0, rows: 3, share: 50 },
-    { name: 'a desktop', from: at('@media (min-width: 700px)'), rows: 3, share: 50 },
-    { name: 'a short screen', from: at('@media (orientation: landscape)'), rows: 2, share: 40 },
+    { name: 'a phone', block: base, least: 3 },
+    { name: 'a desktop', block: media('@media (min-width: 700px)'), least: 3 },
+    { name: 'a short screen', block: media('@media (orientation: landscape)'), least: 2 },
   ];
-  const firstMin = /min-height: calc\((\d) \* 1\.42em\)/.exec(rule('.inv-talk-text'))?.[1];
-  for (const { name, from, rows, share } of layouts) {
-    const box = rule('.inv-talk-box', from);
-    const text = rule('.inv-talk-text', from);
-    const [, top, bottom] = /padding: (\d+)px \d+px (\d+)px/.exec(box) ?? [];
-    assert.ok(top && bottom, `${name}: the box's padding`);
-    const chrome = Number(top) + Number(bottom) + 2 * border;
-    const min = /min-height: calc\((\d) \* 1\.42em\)/.exec(text)?.[1] ?? firstMin;
-    assert.equal(Number(min), rows, `${name}: ${rows} rows at least`);
-    const cap = /max-height: round\(down, calc\((\d+)cqh - (\d+)px\), 1\.42em\)/.exec(text);
-    assert.ok(cap, `${name}: grows up to a share of the screen, in whole rows`);
-    assert.equal(Number(cap[1]), share, `${name}: ${share}% of the screen`);
-    assert.equal(Number(cap[2]), chrome, `${name}: the box's padding and border off (${chrome} px)`);
+  for (const { name, block, least } of layouts) {
+    assert.equal(textRows(block, 'min-height'), least, `${name}: ${least} rows at least`);
+    assert.equal(textRows(block, 'max-height'), least + 1, `${name}: a row more at most`);
   }
   // (A short screen's box is shorter: no 132 px floor under its two rows.)
-  assert.match(rule('.inv-talk-box', at('@media (orientation: landscape)')), /min-height: 0/);
+  assert.match(rule('.inv-talk-box', css.indexOf('@media (orientation: landscape)')), /min-height: 0/);
   // (Its line hidden past the room, its scrollbar unseen; once it's all typed the wheel, a finger
   // and the keys scroll it.)
   const text = rule('.inv-talk-text');
@@ -628,14 +818,29 @@ test('a long line grows the box up to about half the screen, then scrolls in it,
   assert.match(free, /overscroll-behavior: contain/);
 });
 
-test('the chat box has no dark dither of its own: no bands in it, nothing receding on hover', async () => {
+test('the chat box has no dark dither of its own; behind it, the gentle plain dim it had before round 18', async () => {
   const ui = await import('../src/invitation/dialogueUi.js');
   assert.equal('SHADE_BANDS' in ui, false, 'no bands');
-  assert.ok(!/inv-talk-shade|inv-talk-dim/.test(ui.talkHtml()), 'nothing in the box, nor behind it');
+  const markup = ui.talkHtml();
+  assert.ok(!/inv-talk-shade/.test(markup), 'nothing in the box');
   const css = readFileSync(new URL('../src/invitation/dialogue.css', import.meta.url), 'utf8');
   assert.ok(!/inv-talk-shade|is-receding|--talk-band|--talk-sink-steps/.test(css), 'no rules for it');
   const src = readFileSync(new URL('../src/invitation/dialogueUi.js', import.meta.url), 'utf8');
   assert.ok(!/is-receding/.test(src), 'no hover, focus or press makes anything recede');
+  // (The dim: first in the layer, under all of it, hidden from a screen reader.)
+  assert.match(markup, /^<div class="inv-talk-dim" aria-hidden="true"><\/div>/);
+  const at = css.indexOf('.inv-talk-dim {');
+  assert.ok(at >= 0, 'a rule for the dim');
+  const dim = css.slice(at, css.indexOf('}', at));
+  // (A smooth gradient of the ink up from the bottom, gone by the middle: no dither, no tiles.)
+  assert.match(dim, /background: linear-gradient\(\s*to top,/);
+  assert.match(dim, /transparent 48%/);
+  assert.ok(!/mask|url\(|var\(--talk-ink-/.test(dim), 'plain, not dithered');
+  assert.match(dim, /pointer-events: none/);
+  // (It fades in plainly with the screen; reduced motion, it's just there.)
+  assert.match(dim, /animation: inv-talk-fade 0\.35s ease-out/);
+  const reduced = css.slice(css.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
+  assert.match(reduced, /\.inv-talk-dim[,\s][\s\S]*?animation: none/);
 });
 
 // ---- the screen's presses on stand-in elements ---------------------------------------------
@@ -654,8 +859,11 @@ function pressTree() {
   const label = stand('span', next);
   const reply = stand('button', root);
   const off = stand('p', root);
-  for (const el of [root, next, label, reply, off]) el.ownerDocument = doc;
-  return { win, doc, root, next, label, reply, off };
+  const box = stand('section', root);
+  box.classes.add('inv-talk-box');
+  const line = stand('p', box);
+  for (const el of [root, next, label, reply, off, box, line]) el.ownerDocument = doc;
+  return { win, doc, root, next, label, reply, off, box, line };
 }
 /** @param {string} tag @param {any} parent */
 function stand(tag, parent) {
@@ -669,8 +877,11 @@ function stand(tag, parent) {
     on: /** @type {Record<string, Function[]>} */ ({}),
     addEventListener: (type, f) => (el.on[type] ??= []).push(f),
     removeEventListener: (type, f) => (el.on[type] = (el.on[type] ?? []).filter((g) => g !== f)),
+    // (By tag or by class, in a list: 'button, .inv-talk-box'.)
     closest: (sel) => {
-      for (let n = el; n; n = n.parent) if (n.tagName === sel.toUpperCase()) return n;
+      const any = sel.split(',').map((v) => v.trim());
+      for (let n = el; n; n = n.parent)
+        if (any.some((v) => (v.startsWith('.') ? n.classes?.has(v.slice(1)) : n.tagName === v.toUpperCase()))) return n;
       return null;
     },
     hasPointerCapture: () => el.captured,
@@ -735,6 +946,23 @@ test('a press held on a button shows pressed until it lifts, is cancelled or sli
   t.reply.disabled = false;
   fire(t.next, 'pointerdown', { pointerId: 10, button: 2 });
   assert.ok(!pressed(t.next) && !pressed(t.reply), 'none pressed');
+  // (Off the buttons on the box: nothing, unless the box is asked for too, as the screen asks.)
+  fire(t.line, 'pointerdown', { pointerId: 13 });
+  assert.ok(!pressed(t.box), 'the box is no button');
+  fire(t.line, 'pointerup', { pointerId: 13 });
+  const t3 = pressTree();
+  holdPressed(t3.root, 'is-pressed', 'button, .inv-talk-box');
+  t3.box.captured = true;
+  fire(t3.line, 'pointerdown', { pointerId: 2 });
+  assert.ok(pressed(t3.box), 'a finger on the box shows it pressed');
+  assert.equal(t3.box.captured, false, 'its capture let go');
+  fire(t3.line, 'pointermove', { pointerId: 2, clientX: 300, clientY: 20 });
+  assert.ok(!pressed(t3.box), 'slid off it: not pressed');
+  fire(t3.line, 'pointerdown', { pointerId: 4 });
+  fire(t3.line, 'pointerup', { pointerId: 4 });
+  assert.ok(!pressed(t3.box), 'lifted: not pressed');
+  fire(t3.label, 'pointerdown', { pointerId: 5 });
+  assert.ok(pressed(t3.next) && !pressed(t3.box), 'a button still its own press');
   // (Disposed: presses show nothing.)
   const t2 = pressTree();
   holdPressed(t2.root)();
@@ -820,61 +1048,4 @@ test('the intro’s end: the screen takes no press from the start, fades out pla
   assert.match(css.slice(at, css.indexOf('}', at)), /pointer-events: none/);
   const ui = await import('../src/invitation/dialogueUi.js');
   assert.equal('ditherAway' in ui, false, 'no dithered end any more');
-});
-
-test('a button’s words on no plate: a crisp 2 px ring of its own fill round each letter, the dither up to it; the pressed class looks as :active does', async () => {
-  const { talkHtml } = await import('../src/invitation/dialogueUi.js');
-  const markup = talkHtml();
-  const src = readFileSync(new URL('../src/invitation/dialogueUi.js', import.meta.url), 'utf8');
-  const css = readFileSync(new URL('../src/invitation/dialogue.css', import.meta.url), 'utf8');
-  // (No plate left: the words straight in each button, a reply's styled letters in its holder.)
-  assert.ok(!/inv-talk-label/.test(markup + src + css), 'no plate element or class left');
-  for (const b of ['auto', 'skip', 'log', 'log-close', 'no', 'yes'])
-    assert.match(markup, new RegExp(`data-talk="${b}"[^>]*>[^<]+</button>`), b);
-  assert.match(markup, /data-intro-skip>Skip Intro<\/button>/);
-  assert.match(
-    src,
-    /class="inv-btn inv-talk-choice"[^>]*><span class="inv-talk-choice-text" aria-hidden="true" data-styled=/,
-  );
-  const rule = (sel) => {
-    const at = css.indexOf(`${sel} {`);
-    assert.ok(at >= 0, `a rule for ${sel}`);
-    return css.slice(at, css.indexOf('}', at));
-  };
-  // (The outline: crisp shadows round the letters, no blur, in the button's own fill, the one its
-  // background takes, so the two never differ; markup.js's letters inherit it. A ring 2 px out
-  // from each side and 1 px out at each corner: a dither cell's width clear round a letter.)
-  const btn = rule('.inv-talk .inv-btn');
-  assert.match(btn, /--talk-btn-fill: var\(--inv-paper/);
-  assert.match(btn, /background-color: var\(--talk-btn-fill\);/);
-  const rings = (/text-shadow:([^;]+);/.exec(btn)?.[1] ?? '').split(',').map((v) => v.trim());
-  const ways = new Set();
-  for (const r of rings) {
-    const m = /^(0|-?[12]px) (0|-?[12]px) var\(--talk-btn-fill\)$/.exec(r);
-    assert.ok(m, `a whole-pixel shadow in the fill, no blur: ${r}`);
-    ways.add([m[1], m[2]].map((v) => parseInt(v, 10)).join(','));
-  }
-  const ring = [...['-1,-1', '-1,0', '-1,1', '0,-1', '0,1', '1,-1', '1,0', '1,1'], ...['-2,0', '2,0', '0,-2', '0,2']];
-  assert.equal(rings.length, ring.length, 'no shadow twice');
-  assert.deepEqual([...ways].sort(), ring.sort(), 'the eight ways a pixel out, the four sides two');
-  assert.match(btn, /transition:[^;]*background-color 120ms[^;]*text-shadow 120ms/, 'the outline fades with the fill');
-  // (Each fill: the replies' cream; Auto's and Log's colour when on.)
-  assert.match(rule('.inv-talk .inv-talk-choice'), /--talk-btn-fill: var\(--talk-fill\);/);
-  assert.match(
-    rule(".inv-talk .inv-btn[aria-pressed='true'],\n.inv-talk .inv-btn[aria-expanded='true']"),
-    /--talk-btn-fill: var\(--inv-on/,
-  );
-  // (No other text-shadow in the layer or on the letters to break the ring.)
-  assert.equal(css.match(/text-shadow:/g)?.length, 1);
-  const fx = readFileSync(new URL('../src/invitation/markup.css', import.meta.url), 'utf8');
-  assert.ok(!/text-shadow/.test(fx), 'markup.css leaves the letters their inherited outline');
-  // (Hover and press keep their dither; a finger's press has the press's dither and press-down too.)
-  assert.match(rule('.inv-talk .inv-btn:hover:not(:disabled)'), /background-image: var\(--talk-ink-2\)/);
-  const pressed =
-    /\.inv-talk \.inv-btn:active:not\(:disabled\),\n\.inv-talk \.inv-btn\.is-pressed:not\(:disabled\) \{([^}]*)\}/.exec(
-      css,
-    )?.[1];
-  assert.ok(pressed, 'the pressed class beside :active');
-  assert.match(pressed, /background-image: var\(--talk-ink-6\)/);
-  assert.match(pressed, /transform: translateY\(3px\)/);
 });

@@ -3,19 +3,23 @@
    Sans. A wide box along the bottom (inside the safe area, where the toolbar was: it hides while
    the intro runs) with the speaker's name on a tab at its top left, the line typed out in it and
    a small bouncing ▼ at its bottom right once it's up; Auto, Next and Log at the top right; the
-   replies stacked in the middle of the screen, under his face; the Log and the "Skip the Intro?"
-   question as cards over it all. Phone first (390×844), roomier on a
-   desktop and lower on a phone held sideways. The layer takes every press, so the canvas under
-   it gets none, until the intro ends. The lines' text effects: markup.css.
-   Feedback in the toolbar's style, ordered dither (the tiles dialogueUi.js draws on the layer:
-   --talk-ink-N, the ink at N/16; --talk-mask-N, a mask at N/16): every button's hover a light ink
-   dither and its press a heavier one (a finger's too, .is-pressed), right up to its words, which
-   a crisp 2 px outline of the button's own fill keeps clear of it; the replies dither in one
-   after another (their mask through the fade's steps); a press that goes on dips the box with a
-   flash of dither (the flash, from script); the ▼ bobs in pixel steps. The box has no dither of
-   its own: it rises in with a plain quick fade, a new line takes the old one's place at once, and
-   the screen fades out plainly as the intro ends (from script, out of reach from its first step).
-   Reduced motion: no rise, no bob, no dip, quick plain fades. */
+   replies stacked in the middle of the screen, under his face; a gentle dim along the bottom
+   behind the box; the Log and the "Skip the Intro?" question as cards over it all. Phone first
+   (390×844), roomier on a desktop and lower on a phone held sideways. The layer takes every
+   press, so the canvas under it gets none, until the intro ends. The lines' text effects:
+   markup.css. The box holds three rows (two on a short screen) and a long line grows it by a
+   row at most before it scrolls.
+   Plain, as before round 18: no dither on the buttons or the box, no outline round the words;
+   a light hover where there's a mouse (a step warmer, a button lifted a pixel) and a plain press
+   (a step darker and down: :active, or .is-pressed for a finger held on one, where :active isn't
+   reliable: dialogueUi.js holdPressed), the box too while a press on it goes on; the replies pop
+   in together; the ▼ bobs; the box rises in with a plain quick fade over the dim, and the screen
+   fades out plainly as the intro ends (from script, out of reach from its first step). Its one
+   dither: a press that goes on, or a reply picked, dithers the old line out with its name tab
+   (and the replies) and then the next one in, from script (dialogueUi.js clickFade): the old
+   line's copy (.inv-talk-ghost) over the new one's place, the replies' copy
+   (.inv-talk-choices.is-ghost), both out of reach. Reduced motion: no rise, no bob, no pop,
+   quick plain fades. */
 
 @import './markup.css';
 
@@ -32,14 +36,27 @@
   touch-action: none;
   cursor: pointer;
   outline: none;
-  /* (A size container: the box grows with its line up to a share of the screen it covers, cqh.) */
-  container-type: size;
 }
 /* (Closing as the intro ends: the whole screen fades out, from script (dialogueUi.js
    fadeAway), and from its first step a press goes to the stage under it.) */
 .inv-talk.is-leaving {
   pointer-events: none;
   cursor: auto;
+}
+
+/* (The dim: darker at the very bottom, gone by the middle; it never takes a press itself.) */
+.inv-talk-dim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgb(58 51 45 / 26%) 0%,
+    rgb(58 51 45 / 12%) 20%,
+    rgb(58 51 45 / 3%) 36%,
+    transparent 48%
+  );
+  pointer-events: none;
+  animation: inv-talk-fade 0.35s ease-out;
 }
 
 .inv-talk-top {
@@ -62,38 +79,16 @@
   font-size: 14px;
   box-shadow: 0 3px 0 var(--talk-ink);
 }
-/* (Every button in the layer: the toolbar's ordered dither of the ink, light on hover, heavier
-   pressed, its 2 px cells crisp. Pressed is :active, or .is-pressed for a finger held on it,
-   where :active isn't reliable (dialogueUi.js holdPressed). Either dither shows right up to its
-   words: no plate under them, just a crisp outline round each letter, 2 px out from its sides
-   and 1 px at its corners (a dither cell's width clear of it; whole-pixel shadows, no blur; a
-   reply's styled letters inherit it), in the button's own fill, --talk-btn-fill, which its
-   background takes too, so the two never differ: paper, the replies' cream, the on colour of
-   Auto and Log while they're on. The outline fades with the fill.) */
+/* (Every button in the layer: plain, a step warmer under the mouse and lifted a pixel (its drop a
+   pixel longer), a step darker and down its drop pressed (:active, or .is-pressed for a finger
+   held on it: dialogueUi.js holdPressed, where :active isn't reliable on touch). Each step from
+   the button's own fill, --talk-btn-fill: paper, the replies' cream, the on colour of Auto and
+   Log while they're on (lighter, not warmer, under the mouse).) */
 .inv-talk .inv-btn {
   --talk-btn-fill: var(--inv-paper, #fbf9f5);
-  background-color: var(--talk-btn-fill);
-  background-repeat: repeat;
-  background-size: 8px 8px;
-  image-rendering: pixelated;
-  text-shadow:
-    1px 0 var(--talk-btn-fill),
-    -1px 0 var(--talk-btn-fill),
-    0 1px var(--talk-btn-fill),
-    0 -1px var(--talk-btn-fill),
-    1px 1px var(--talk-btn-fill),
-    -1px 1px var(--talk-btn-fill),
-    1px -1px var(--talk-btn-fill),
-    -1px -1px var(--talk-btn-fill),
-    2px 0 var(--talk-btn-fill),
-    -2px 0 var(--talk-btn-fill),
-    0 2px var(--talk-btn-fill),
-    0 -2px var(--talk-btn-fill);
-  transition:
-    transform 60ms ease-out,
-    box-shadow 60ms ease-out,
-    background-color 120ms,
-    text-shadow 120ms;
+  --talk-btn-hover: color-mix(in srgb, var(--talk-btn-fill), var(--inv-on, #f4cf7a) 25%);
+  --talk-btn-down: color-mix(in srgb, var(--talk-btn-fill), var(--talk-ink) 12%);
+  background: var(--talk-btn-fill);
 }
 .inv-talk .inv-talk-choice {
   --talk-btn-fill: var(--talk-fill);
@@ -101,15 +96,26 @@
 .inv-talk .inv-btn[aria-pressed='true'],
 .inv-talk .inv-btn[aria-expanded='true'] {
   --talk-btn-fill: var(--inv-on, #f4cf7a);
+  --talk-btn-hover: color-mix(in srgb, var(--talk-btn-fill), #fff 35%);
 }
 @media (hover: hover) and (pointer: fine) {
   .inv-talk .inv-btn:hover:not(:disabled) {
-    background-image: var(--talk-ink-2);
+    background-color: var(--talk-btn-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 5px 0 var(--talk-ink);
+  }
+  .inv-talk .inv-talk-btn:hover:not(:disabled) {
+    box-shadow: 0 4px 0 var(--talk-ink);
+  }
+  /* (The box, which goes on when it's pressed: a step warmer under the mouse. Not while the
+     replies are up or the Log or the question is open: a press on it goes nowhere then.) */
+  .inv-talk:not(.is-choosing, .is-modal) .inv-talk-box:hover {
+    background-color: color-mix(in srgb, var(--talk-fill), var(--inv-on, #f4cf7a) 20%);
   }
 }
 .inv-talk .inv-btn:active:not(:disabled),
 .inv-talk .inv-btn.is-pressed:not(:disabled) {
-  background-image: var(--talk-ink-6);
+  background-color: var(--talk-btn-down);
   transform: translateY(3px);
   box-shadow: 0 1px 0 var(--talk-ink);
 }
@@ -130,17 +136,17 @@
   background: var(--talk-fill);
   box-shadow: 0 4px 0 var(--talk-ink);
   animation: inv-talk-rise 0.28s ease-out;
+  transition:
+    background-color 120ms,
+    translate 60ms ease-out,
+    box-shadow 60ms ease-out;
 }
-/* (A press that goes on: the ink's dither over the box's fill for a moment, under its tab and its
-   line, dialogueUi.js pressFlash.) */
-.inv-talk-flash {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background-repeat: repeat;
-  background-size: 8px 8px;
-  image-rendering: pixelated;
-  pointer-events: none;
+/* (Pressed, by the mouse or a finger held on it: a step darker and down 2 px, as a button goes.) */
+.inv-talk:not(.is-choosing, .is-modal) .inv-talk-box:active,
+.inv-talk:not(.is-choosing, .is-modal) .inv-talk-box.is-pressed {
+  background-color: color-mix(in srgb, var(--talk-fill), var(--talk-ink) 10%);
+  translate: 0 2px;
+  box-shadow: 0 2px 0 var(--talk-ink);
 }
 .inv-talk-name {
   position: absolute;
@@ -158,27 +164,30 @@
   letter-spacing: 0.03em;
   transform: translateY(-62%);
 }
+/* (The line's type is its view's, so the old line's copy going over it is set as it was.) */
 .inv-talk-view {
   position: relative;
+  font-size: 18px;
+  line-height: 1.42;
+  letter-spacing: 0.01em;
+  overflow-wrap: break-word;
+}
+/* (The admin's own line breaks show, in the line and its copy: never on the view, where the
+   breaks between its parts in the markup would each take a row.) */
+.inv-talk-text,
+.inv-talk-ghost {
+  white-space: pre-line;
 }
 .inv-talk-text {
   position: relative;
   margin: 0;
   /* (Three lines' room at least, so a short line keeps the box's shape; a longer line grows the
-     box with it, a row at a time, up to about half the screen (the box's padding and border, 56
-     px, taken off, in whole rows), and only past that does it scroll inside it, dialogueUi.js
-     keeping the newest row in view as it types. Without round(): the same room, a part row.) */
+     box by a row at most, and past four rows it scrolls inside it, dialogueUi.js keeping the
+     newest row in view as it types.) */
   min-height: calc(3 * 1.42em);
-  max-height: calc(50cqh - 56px);
-  max-height: round(down, calc(50cqh - 56px), 1.42em);
+  max-height: calc(4 * 1.42em);
   overflow-y: hidden;
   scrollbar-width: none;
-  font-size: 18px;
-  line-height: 1.42;
-  letter-spacing: 0.01em;
-  overflow-wrap: break-word;
-  /* (The admin's own line breaks show.) */
-  white-space: pre-line;
 }
 .inv-talk-text::-webkit-scrollbar {
   display: none;
@@ -226,13 +235,22 @@
 .inv-talk-more[hidden] {
   display: none;
 }
+/* (The line before, dithering out over the next one's place as a press goes on: dialogueUi.js
+   clickFade, scrolled where it was.) */
+.inv-talk-ghost {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
 .inv-talk-next {
   position: absolute;
   right: 16px;
   bottom: 8px;
   font-size: 14px;
   line-height: 1;
-  animation: inv-talk-bob 0.8s steps(1, end) infinite;
+  animation: inv-talk-bob 0.9s ease-in-out infinite;
 }
 
 /* (For a screen reader only: the whole line once, how to go on, and a styled name's or reply's
@@ -274,13 +292,14 @@
   line-height: 1.2;
 }
 .inv-talk-choices:not(.is-waiting) .inv-talk-choice {
-  animation: inv-talk-dither-in 0.2s steps(1, end) both;
+  animation: inv-talk-pop 0.22s ease-out;
 }
-.inv-talk-choices:not(.is-waiting) .inv-talk-choice:nth-child(2) {
-  animation-delay: 0.08s;
+/* (The replies picked, dithering out where they were: clickFade's copy, out of reach.) */
+.inv-talk-choices.is-ghost {
+  pointer-events: none;
 }
-.inv-talk-choices:not(.is-waiting) .inv-talk-choice:nth-child(3) {
-  animation-delay: 0.16s;
+.inv-talk-choices.is-ghost .inv-talk-choice {
+  animation: none;
 }
 
 /* --- The Log and the question: cards over everything, the Log's list scrolling. */
@@ -366,19 +385,13 @@
   visibility: hidden;
 }
 
-/* (A pixel bob: down two px, four, two, back, a step at a time.) */
 @keyframes inv-talk-bob {
-  0% {
-    translate: 0 0;
-  }
-  25% {
-    translate: 0 2px;
+  0%,
+  100% {
+    transform: translateY(0);
   }
   50% {
-    translate: 0 4px;
-  }
-  75% {
-    translate: 0 2px;
+    transform: translateY(4px);
   }
 }
 @keyframes inv-talk-rise {
@@ -387,34 +400,10 @@
     transform: translateY(12px);
   }
 }
-/* (In through the fade's steps, each held: a mask of more and more of the pixels, then none.) */
-@keyframes inv-talk-dither-in {
-  0% {
-    mask-image: var(--talk-mask-0);
-  }
-  12.5% {
-    mask-image: var(--talk-mask-2);
-  }
-  25% {
-    mask-image: var(--talk-mask-4);
-  }
-  37.5% {
-    mask-image: var(--talk-mask-6);
-  }
-  50% {
-    mask-image: var(--talk-mask-8);
-  }
-  62.5% {
-    mask-image: var(--talk-mask-10);
-  }
-  75% {
-    mask-image: var(--talk-mask-12);
-  }
-  87.5% {
-    mask-image: var(--talk-mask-14);
-  }
-  100% {
-    mask-image: none;
+@keyframes inv-talk-pop {
+  from {
+    opacity: 0;
+    scale: 0.92;
   }
 }
 @keyframes inv-talk-fade {
@@ -434,9 +423,7 @@
     left: 22px;
     font-size: 18px;
   }
-  .inv-talk-text {
-    max-height: calc(50cqh - 64px);
-    max-height: round(down, calc(50cqh - 64px), 1.42em);
+  .inv-talk-view {
     font-size: 21px;
   }
   .inv-talk-top {
@@ -466,12 +453,13 @@
     padding: 18px 18px 20px;
     bottom: calc(8px + env(safe-area-inset-bottom));
   }
-  /* (Two rows at least, and up to two fifths of the screen: more of it is left for him.) */
+  .inv-talk-view {
+    font-size: 16px;
+  }
+  /* (Two rows at least and three at most: more of the screen is left for him.) */
   .inv-talk-text {
     min-height: calc(2 * 1.42em);
-    max-height: calc(40cqh - 44px);
-    max-height: round(down, calc(40cqh - 44px), 1.42em);
-    font-size: 16px;
+    max-height: calc(3 * 1.42em);
   }
   .inv-talk-choices {
     top: 38%;
@@ -484,10 +472,9 @@
 
 @media (prefers-reduced-motion: reduce) {
   .inv-talk-next,
-  .inv-talk-box {
-    animation: none;
-  }
+  .inv-talk-box,
+  .inv-talk-dim,
   .inv-talk-choices:not(.is-waiting) .inv-talk-choice {
-    animation: inv-talk-fade 0.12s linear both;
+    animation: none;
   }
 }

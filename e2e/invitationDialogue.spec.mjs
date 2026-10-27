@@ -20,19 +20,19 @@
 // intro()). Tests requiring a specific script shape install a fixture; the admin integration
 // tests exercise the current content. Every wait is on a state (the script as
 // content.js reads it). Down every reply each box shows its face (the four dialogue faces from
-// their own sheets) and plays its animation. The screen answers in the toolbar's style: its
-// buttons dither on hover and press (a finger held on one too) right up to their words, on no
-// plate, ringed by a crisp 2 px outline of the button's own fill (a reply's styled letters too),
-// the replies dither in one after another, a press that goes on flashes the box, the ▼ bobs in
-// steps, and reduced motion fades plainly. The box has no dither of its own: it rises in with a
-// plain fade, and a new line takes the old one's place at once, typing from its start, so
-// their letters never show together. The box adapts to the screen and its line, as before round
-// 18 held it at three rows: on a desktop, a half-width and a half-height window, a phone and a
-// phone held sideways, a short line keeps its three rows (two on a short screen) and a long one
-// grows it to the heights it had then, up to about half the screen (two fifths on a short one),
-// his head clear over it; a line taller than that scrolls inside it (the box keeps its size as
-// it types): it follows the typing, then a finger, the wheel or the arrow keys scroll it, with
-// cues where there's more.
+// their own sheets) and plays its animation. The screen is plain, as before round 18: no dither
+// on its buttons (a finger held on one presses it down, as a mouse does), no flash on the box,
+// no outline round the words, the replies popping in together, the ▼ bobbing smoothly, and the
+// box rising in with a plain fade over a gentle dim. Its one dither: a press that goes on (a
+// click, a tap, Space or Enter) or a reply picked dithers the old line out with its name tab
+// (and the replies), then the next line in, and only then does it type, so the two never show
+// together; Auto and Next change lines at once, and reduced motion fades plainly. The box keeps
+// the shape it had before round 18 and grows
+// little: on a desktop, a half-width and a half-height window, a phone and a phone held
+// sideways, a short line keeps its three rows (two on a short screen) at the height it had then,
+// and a long one grows it by a row at most, his head clear over it; a line taller than that
+// scrolls inside it (the box keeps its size as it types): it follows the typing, then a finger,
+// the wheel or the arrow keys scroll it, with cues where there's more.
 import { readFileSync } from 'node:fs';
 import { test, expect } from '@playwright/test';
 import { routeToEnd } from './helpers/dialogue-route.mjs';
@@ -64,37 +64,38 @@ const script = (page) => page.evaluate(() => window.__invitation.intro());
 const replayIntro = (page) => page.getByRole('button', { name: 'Replay Intro', exact: true });
 const box = (page) => page.locator('.inv-talk-box');
 /**
- * A button's words as drawn: its fill, their outline (its text-shadow: each shadow's colour,
- * offsets and blur, px), every styled letter's own text-shadow, and any plate left under them.
+ * A button (or the box) as drawn: held (.is-pressed), any background image (a dither tile), its
+ * words' outline (text-shadow), how far it's moved down (px), and its fill.
  */
-const wordsOf = (loc) =>
+const looksOf = (loc) =>
   loc.evaluate((b) => {
-    const css = getComputedStyle(b);
-    const parts = css.textShadow === 'none' ? [] : css.textShadow.split(/,(?![^(]*\))/).map((v) => v.trim());
+    const c = getComputedStyle(b);
     return {
-      fill: css.backgroundColor,
-      shadow: css.textShadow,
-      outline: parts.map((v) => {
-        const m = /^(rgba?\([^)]*\)) (-?[\d.]+)px (-?[\d.]+)px (-?[\d.]+)px$/.exec(v);
-        return m ? { color: m[1], x: Number(m[2]), y: Number(m[3]), blur: Number(m[4]) } : { raw: v };
-      }),
-      letters: [...b.querySelectorAll('.inv-fx')].map((e) => getComputedStyle(e).textShadow),
-      plates: b.querySelectorAll('.inv-talk-label').length,
+      pressed: b.classList.contains('is-pressed'),
+      image: c.backgroundImage,
+      shadow: c.textShadow,
+      down: new DOMMatrix(c.transform).f + (parseFloat(c.translate.split(' ')[1] ?? '0') || 0),
+      fill: c.backgroundColor,
     };
   });
-/** The ring round a letter: the eight ways a pixel out, its four sides two (sorted). */
-const RING = ['-1,-1', '-1,0', '-1,1', '-2,0', '0,-1', '0,-2', '0,1', '0,2', '1,-1', '1,0', '1,1', '2,0'];
-/** Its words on no plate, ringed by a crisp 2 px outline of the button's own fill, each letter too. */
-function outlinedInFill(w, what) {
-  expect(w.plates, `${what}: no plate under the words`).toBe(0);
-  expect(w.fill, `${what}: a fill`).not.toBe('rgba(0, 0, 0, 0)');
-  expect(w.outline.map((o) => `${o.x},${o.y}`).sort(), `${what}: an outline all round`).toEqual(RING);
-  for (const o of w.outline) {
-    expect(o.color, `${what}: the outline in the button's own fill`).toBe(w.fill);
-    expect(o.blur, `${what}: crisp`).toBe(0);
-  }
-  for (const l of w.letters) expect(l, `${what}: each styled letter outlined the same`).toBe(w.shadow);
+/** A computed colour's red, green and blue, 0 to 255 (rgb(), or color(srgb …) as color-mix gives). */
+function rgbOf(c) {
+  const rgb = /^rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/.exec(c);
+  if (rgb) return rgb.slice(1, 4).map(Number);
+  const srgb = /^color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)/.exec(c);
+  if (srgb) return srgb.slice(1, 4).map((v) => Number(v) * 255);
+  throw new Error(`not a colour: ${c}`);
 }
+/** How light a colour is (luma, 0 to 255). */
+const lightOf = (c) => {
+  const [r, g, b] = rgbOf(c);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+/** How warm a colour is: its red over its blue. */
+const warmthOf = (c) => {
+  const [r, , b] = rgbOf(c);
+  return r - b;
+};
 /** The letters of the chat box's line that show (typed: the rest keep their place, unseen). */
 const shownLine = (page) =>
   page.evaluate(() =>
@@ -135,6 +136,16 @@ function reachable(intro) {
   return [...seen];
 }
 
+/**
+ * With the page's clock paused (page.clock.pauseAt), runs it on a frame at a time until the
+ * replies are on the screen: once the press that brought their box on has dithered it in.
+ */
+async function runUntilReplies(page) {
+  const showing = () =>
+    page.evaluate(() => !document.querySelector('.inv-talk-choices:not(.is-ghost)').classList.contains('is-waiting'));
+  for (let i = 0; i < 120 && !(await showing()); i++) await page.clock.runFor(16);
+  expect(await showing(), 'the replies on the screen').toBe(true);
+}
 /**
  * Picks reply `i` once the replies show and have settled (dialogueUi.js REPLY_SETTLE: a press
  * straight after the one that finished the line goes nowhere).
@@ -461,10 +472,12 @@ async function tagsShowStyled(page, tap) {
   await expect(yes).toBeVisible();
   await expect(yes.locator('.inv-fx-italic').first()).toHaveCSS('color', 'rgb(200, 50, 60)');
   await expect(yes).toHaveText('Yes!');
-  // (Its letters, coloured or not, each ringed by the reply's 2 px outline in its own fill.)
-  const words = await wordsOf(yes);
-  expect(words.letters.length).toBeGreaterThan(0);
-  outlinedInFill(words, 'a styled reply');
+  // (Its words plain on its fill, as before round 18: no outline round them or its styled letters.)
+  const shadows = await yes.evaluate((b) =>
+    [b, ...b.querySelectorAll('.inv-fx')].map((e) => getComputedStyle(e).textShadow),
+  );
+  expect(shadows.length).toBeGreaterThan(1);
+  for (const shadow of shadows) expect(shadow).toBe('none');
   await expect(page.getByRole('button', { name: 'No', exact: true }).locator('.inv-fx-bold')).toHaveCount(2);
   await pick(page, 0, tap);
   await until(page, (x) => x.dialogue?.id === 'b', 'on to b');
@@ -491,7 +504,7 @@ const LONG_LINE =
   'This line runs on and on, far longer than three rows of the box on a phone, so the box grows. ' +
   'It keeps going with more words about nothing much at all, then a few more, and still more, ' +
   'until at last it reaches the very end of it.';
-/** A line taller than half of any screen: 24 short rows of its own (about 180 letters). */
+/** A line taller than the box on any screen: 24 short rows of its own (about 180 letters). */
 const TALL_LINE = Array.from({ length: 24 }, (_, i) => `Row ${i + 1}.`).join('\n');
 /** The long line's view: how far it's scrolled, its room, its height, and the cues. */
 const lineView = (page) =>
@@ -513,7 +526,7 @@ const lineView = (page) =>
     };
   });
 /**
- * A line taller than the box's room (about half the screen) scrolls in the box: the box keeps
+ * A line taller than the box's room (four rows) scrolls in the box: the box keeps
  * its size, the view follows the typing (the newest row in view), and once it's all typed a
  * finger (`tap`) or the wheel and the keys scroll it, with the cues saying where there's more; a
  * tap still goes on.
@@ -600,8 +613,153 @@ const scrollStill = (page) =>
   );
 
 /**
+ * Records, from now on (stopFrames returns them): each frame (performance.now(), what was done
+ * last: window.__mark, which line is up: its letters' first node, how many of its letters show
+ * of all, whether the old line's copy is there, and the box's fade: data-fade); and each change
+ * of the box's fade as it happens (a frame after a press can come late on a busy page, after a
+ * phase has gone): when it's noted (once the frame that made it is done: never before it came),
+ * the press it came from (the last click's or key's own time), the old line's copy (its letters,
+ * its fade's keyframes and length), the replies' copy's keyframes, the name tab's (and length),
+ * and the new line's letters that show.
+ */
+const recordFrames = (page) =>
+  page.evaluate(() => {
+    const typed = document.querySelector('.inv-talk-typed');
+    const name = document.querySelector('.inv-talk-name');
+    const boxEl = document.querySelector('.inv-talk-box');
+    const lines = new Map();
+    const rec = (window.__frames = []);
+    const fades = (window.__fades = []);
+    for (const type of ['click', 'keydown'])
+      window.addEventListener(type, (e) => (window.__pressAt = e.timeStamp), true);
+    /** An element's own animations' keyframes: each opacity, or each mask. */
+    const keys = (el) =>
+      el
+        .getAnimations()
+        .filter((a) => !(a instanceof CSSAnimation))
+        .flatMap((a) =>
+          a.effect.getKeyframes().map((k) => (k.opacity !== undefined ? `opacity ${k.opacity}` : k.maskImage)),
+        );
+    /** How long its own animations last, ms. */
+    const lasts = (el) =>
+      el
+        .getAnimations()
+        .filter((a) => !(a instanceof CSSAnimation))
+        .map((a) => a.effect.getTiming().duration);
+    const shown = () => typed.querySelectorAll('.inv-fx:not(.is-unseen)').length;
+    window.__fadeWatch = new MutationObserver(() => {
+      const ghost = document.querySelector('.inv-talk-ghost');
+      const replies = document.querySelector('.inv-talk-choices.is-ghost');
+      fades.push({
+        at: performance.now(),
+        mark: window.__mark ?? '',
+        press: window.__pressAt ?? 0,
+        fade: boxEl.dataset.fade ?? '',
+        ghost: ghost
+          ? {
+              letters: ghost.querySelectorAll('.inv-fx:not(.is-unseen)').length,
+              keys: keys(ghost),
+              lasts: lasts(ghost),
+            }
+          : null,
+        replies: replies ? keys(replies) : null,
+        name: name.hidden ? null : keys(name),
+        nameLasts: name.hidden ? [] : lasts(name),
+        letters: shown(),
+      });
+    });
+    window.__fadeWatch.observe(boxEl, { attributes: true, attributeFilter: ['data-fade'] });
+    const tick = () => {
+      const head = typed.firstChild;
+      if (head && !lines.has(head)) lines.set(head, lines.size);
+      rec.push({
+        at: performance.now(),
+        mark: window.__mark ?? '',
+        line: head ? lines.get(head) : -1,
+        letters: shown(),
+        all: typed.querySelectorAll('.inv-fx').length,
+        ghost: Boolean(document.querySelector('.inv-talk-ghost')),
+        fade: boxEl.dataset.fade ?? '',
+      });
+      window.__framesTick = requestAnimationFrame(tick);
+    };
+    tick();
+  });
+const stopFrames = (page) =>
+  page.evaluate(() => {
+    cancelAnimationFrame(window.__framesTick);
+    window.__fadeWatch.disconnect();
+    return { rec: window.__frames, fades: window.__fades };
+  });
+/** A dither tile as the computed style gives one. */
+const TILE = /^url\("data:image\/png;base64,[^"]+"\)$/;
+/**
+ * A fade's keyframes: a plain one, its opacity one way; or the dither's held steps, each a tile
+ * of its own, then nothing (out) or no mask (in).
+ */
+function fadeKeys(k, what, { plain, out }) {
+  if (plain) {
+    expect(k, `${what}: a plain fade`).toEqual(out ? ['opacity 1', 'opacity 0'] : ['opacity 0', 'opacity 1']);
+    return;
+  }
+  const tiles = out ? k : k.slice(0, -1);
+  if (!out) expect(k.at(-1), `${what}: whole at the end`).toBe('none');
+  expect(tiles.length, `${what}: a few steps`).toBeGreaterThanOrEqual(3);
+  for (const t of tiles) expect(t, `${what}: each step a tile`).toMatch(TILE);
+  expect(new Set(tiles).size, `${what}: each step its own`).toBe(tiles.length);
+}
+/**
+ * What the press noted as `what` did: at the press the old line's copy goes, dithered (`plain`:
+ * a plain fade, reduced motion), with the name tab (and the replies' copy, `replies`), none of
+ * the new line showing; once that's had its time the copy is gone and the name tab comes in
+ * the same way, still none of it; then that's over; and only after both does the line type,
+ * from its start. In no frame do the old line and a new letter show together.
+ */
+function dithersOutThenIn({ rec, fades }, what, { replies = false, plain = false } = {}) {
+  const mine = fades.filter((f) => f.mark === what);
+  expect(
+    mine.map((f) => f.fade),
+    `${what}: out, then in, then over`,
+  ).toEqual(['out', 'in', '']);
+  const [out, inn, over] = mine;
+  // Out, from the press.
+  expect(out.at - out.press, `${what}: out from the press`).toBeLessThan(100);
+  expect(out.ghost, `${what}: the old line's copy going`).not.toBeNull();
+  expect(out.ghost.letters, `${what}: the old line in it`).toBeGreaterThan(0);
+  fadeKeys(out.ghost.keys, `${what}: the old line going`, { plain, out: true });
+  if (out.name) fadeKeys(out.name, `${what}: its name going with it`, { plain, out: true });
+  if (replies) {
+    expect(out.replies, `${what}: the replies' copy going`).not.toBeNull();
+    fadeKeys(out.replies, `${what}: the replies going`, { plain, out: true });
+  } else expect(out.replies, `${what}: no replies to go`).toBeNull();
+  expect(out.letters, `${what}: none of the new line yet`).toBe(0);
+  // In, once out has had its time: the copies gone, the name tab coming.
+  // (Each way its own length: about a sixth of a second dithered, half that plainly.)
+  const [shortest, longest] = plain ? [50, 120] : [150, 200];
+  for (const ms of [...out.ghost.lasts, ...out.nameLasts]) {
+    expect(ms, `${what}: out over its length`).toBeGreaterThanOrEqual(shortest);
+    expect(ms, `${what}: a short fade`).toBeLessThanOrEqual(longest);
+  }
+  expect(inn.at - out.press, `${what}: in once out's had its time`).toBeGreaterThan(shortest);
+  expect([inn.ghost, inn.replies, inn.letters], `${what}: the old line gone, nothing typed`).toEqual([null, null, 0]);
+  if (inn.name) fadeKeys(inn.name, `${what}: its name coming`, { plain, out: false });
+  for (const ms of inn.nameLasts) expect(ms, `${what}: in over its length`).toBeGreaterThanOrEqual(shortest);
+  // Over, once in has had its time too; then the line types, from its start.
+  expect(over.at - out.press, `${what}: over once both have had their time`).toBeGreaterThan(2 * shortest);
+  const first = rec.find((r) => r.mark === what && r.at > over.at && r.letters > 0);
+  expect(first, `${what}: it types`).toBeTruthy();
+  expect(first.fade, `${what}: nothing fading as it types`).toBe('');
+  if (!plain) expect(first.letters, `${what}: from its start`).toBeLessThan(first.all);
+  expect(first.at - out.press, `${what}: once out and in are over`).toBeGreaterThan(300);
+  expect(
+    rec.filter((r) => r.mark === what && r.at >= out.at && r.at < over.at && r.letters > 0).length,
+    `${what}: no letter of it while it fades`,
+  ).toBe(0);
+}
+
+/**
  * The box as laid out, client px: its height and its name tab's top, its line's row height, how
- * many rows show and how many it has, whether it scrolls, and the screen's height.
+ * many rows show and how many it has, and whether it scrolls.
  */
 const boxShape = (page) =>
   page.evaluate(() => {
@@ -615,19 +773,17 @@ const boxShape = (page) =>
       shows: t.clientHeight / row,
       rows: t.scrollHeight / row,
       canScroll: t.classList.contains('can-scroll'),
-      screen: document.querySelector('.inv-talk').getBoundingClientRect().height,
     };
   });
 /**
- * The box takes its line's shape at this screen's size, as it did before round 18 held it at
- * three rows: a short line in its least rows (three; two on a short screen), a long one in all of
- * its rows, growing the box (`was`: the heights it had then, px), up to about half the screen
- * (two fifths on a short one) in whole rows; a taller line scrolls in that; and the shot frames
- * NEWT's head clear over the box each time.
+ * The box takes its line's shape at this screen's size: a short line in its least rows (three;
+ * two on a short screen), as before round 18 (`was`: its height then, px); a longer one grows it
+ * by a row at most (`most`: four rows' height; three on a short screen) and scrolls past that; a
+ * tall line holds it there; and the shot frames NEWT's head clear over the box each time.
  * @param {import('@playwright/test').Page} page
- * @param {{touch: boolean, short: boolean, was: {short: number, long: number}}} o
+ * @param {{touch: boolean, short: boolean, was: number, most: number}} o
  */
-async function boxAdapts(page, { touch, short, was }) {
+async function boxAdapts(page, { touch, short, was, most }) {
   const errors = watch(page);
   await calm(page);
   // (The fixture's first three boxes, one after another: a short line, a long one, a tall one.)
@@ -640,7 +796,7 @@ async function boxAdapts(page, { touch, short, was }) {
   await page.evaluate((i) => window.__invitation.setIntro(i), intro);
   await open(page, touch);
   const least = short ? 2 : 3;
-  const share = short ? 0.4 : 0.5;
+  const cap = least + 1;
   /** @type {Record<string, any>} */
   const shapes = {};
   for (const kind of ['short', 'long', 'tall']) {
@@ -671,70 +827,75 @@ async function boxAdapts(page, { touch, short, was }) {
     }
   }
   const { short: sh, long: lo, tall: ta } = shapes;
-  // (The rows that fit: about half the screen, less the box's padding and border, in whole rows.)
-  const chrome = sh.height - sh.shows * sh.row;
-  const fit = Math.floor((share * sh.screen - chrome) / sh.row + 1e-3);
   // A short line: the box's least rows, as before.
   expect(sh.shows, 'a short line in the least rows').toBeCloseTo(least, 1);
   expect(sh.canScroll).toBe(false);
-  expect(Math.abs(sh.height - was.short), `${sh.height} px, as it was (${was.short})`).toBeLessThan(1.5);
-  // A long line: all of its rows, the box grown with it (as before: give or take a row's wrap),
-  // and scrolling only past what fits.
-  expect(lo.shows, 'all of its rows that fit').toBeCloseTo(Math.max(least, Math.min(Math.round(lo.rows), fit)), 1);
-  expect(lo.canScroll, 'scrolls only past what fits').toBe(Math.round(lo.rows) > fit);
-  if (Math.round(lo.rows) > least) expect(lo.height, 'grown with its line').toBeGreaterThan(sh.height + lo.row - 1);
-  expect(Math.abs(lo.height - was.long), `${lo.height} px, as it was (${was.long})`).toBeLessThan(lo.row + 1.5);
-  // A tall line: the box up to about half the screen and never more, its rows whole, the rest scrolling.
-  expect(ta.height, 'never more than its share of the screen').toBeLessThanOrEqual(share * ta.screen + 0.5);
-  expect(ta.height, 'up to it, within a row').toBeGreaterThan(share * ta.screen - ta.row - 0.5);
-  expect(ta.shows, 'whole rows').toBeCloseTo(fit, 1);
+  expect(Math.abs(sh.height - was), `${sh.height} px, as it was (${was})`).toBeLessThan(1.5);
+  // A long line: all of its rows up to a row more than that, the box grown with it; past the
+  // cap it scrolls.
+  expect(lo.shows, 'its rows, a row more at most').toBeCloseTo(Math.max(least, Math.min(Math.round(lo.rows), cap)), 1);
+  expect(lo.canScroll, 'scrolls only past the cap').toBe(Math.round(lo.rows) > cap);
+  if (Math.round(lo.rows) > least)
+    expect(Math.abs(lo.height - most), `${lo.height} px, a row up (${most})`).toBeLessThan(1.5);
+  expect(lo.height, 'never more than a row up').toBeLessThanOrEqual(sh.height + sh.row + 0.5);
+  // A tall line: the box at its cap and never more, the rest scrolling.
+  expect(Math.abs(ta.height - most), `${ta.height} px, at the cap (${most})`).toBeLessThan(1.5);
+  expect(ta.shows, `${cap} rows`).toBeCloseTo(cap, 1);
   expect(ta.rows).toBeGreaterThan(ta.shows + 1);
   expect(ta.canScroll, 'the rest scrolls').toBe(true);
   expect(errors).toEqual([]);
 }
 
-/** The five screens the box adapts to, and its heights there before round 18 (px; c5fa4f6). */
+/**
+ * The five screens the box adapts to: its height there for a short line before round 18 (px;
+ * c5fa4f6), and at its cap, a row more (four rows; three on a short screen).
+ */
 const SCREENS = [
   {
     name: 'on a desktop, 1280×800',
     use: { viewport: { width: 1280, height: 800 } },
     touch: false,
     short: false,
-    was: { short: 153, long: 183 },
+    was: 153,
+    most: 183,
   },
   {
     name: 'in a half-width window, 640×800',
     use: { viewport: { width: 640, height: 800 } },
     touch: false,
     short: false,
-    was: { short: 133, long: 158 },
+    was: 133,
+    most: 158,
   },
   {
     name: 'in a half-height window, 1280×400',
     use: { viewport: { width: 1280, height: 400 } },
     touch: false,
     short: true,
-    was: { short: 89, long: 135 },
+    was: 89,
+    most: 112,
   },
   {
     name: 'on a phone, 390×844',
     use: { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true },
     touch: true,
     short: false,
-    was: { short: 133, long: 235 },
+    was: 133,
+    most: 158,
   },
   {
     name: 'on a phone held sideways, 844×390',
     use: { viewport: { width: 844, height: 390 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true },
     touch: true,
     short: true,
-    was: { short: 89, long: 135 },
+    was: 89,
+    most: 112,
   },
 ];
 for (const screen of SCREENS)
   test.describe(`the chat box ${screen.name}`, () => {
     test.use(screen.use);
-    test(`a short line keeps ${screen.short ? 'two' : 'three'} rows, a long one grows the box up to about ${screen.short ? 'two fifths' : 'half'} of the screen, a taller one scrolls`, async ({
+    test(`a short line keeps ${screen.short ? 'two' : 'three'} rows, a long one grows the box a row at most (${screen.short ? 'three' : 'four'}), then it scrolls`, async ({
       page,
     }) => {
       await boxAdapts(page, screen);
@@ -742,7 +903,7 @@ for (const screen of SCREENS)
   });
 
 test.describe('on a phone', () => {
-  test('a line taller than half the screen scrolls in the box: it follows the typing, then a finger scrolls it', async ({
+  test('a line taller than four rows scrolls in the box: it follows the typing, then a finger scrolls it', async ({
     page,
   }) => {
     await longLineScrolls(page, true);
@@ -931,6 +1092,8 @@ test.describe('on a phone', () => {
     const log = (await snapshot(page)).dialogue.log;
     await page.touchscreen.tap(spot.x, spot.y);
     await until(page, (s) => Boolean(s.dialogue.choices), 'its replies');
+    // (On the screen once the question has come in: the tap that brought it dithers it in.)
+    await runUntilReplies(page);
     // (Its words are letters in it: the reply is what's under them.)
     const hit = await page.evaluate(
       ({ x, y }) => document.elementFromPoint(x, y)?.closest('.inv-talk-choice')?.className ?? '',
@@ -1182,7 +1345,7 @@ test.describe('on a phone', () => {
     await until(page, (s) => s.state === 'react', 'a tap makes him react');
   });
 
-  test('a finger held on Next or a reply shows it pressed, the dither up to its words, outlined in its fill', async ({
+  test('a finger held on Next, a reply or the box presses it a step darker and down, plainly, with no dither', async ({
     page,
   }) => {
     const errors = watch(page);
@@ -1191,49 +1354,63 @@ test.describe('on a phone', () => {
     const { ask } = askAndBefore(await script(page));
     test.skip(!ask, 'this script has no replies');
     await open(page, true);
+    // (The steps' ends, not their fades.)
+    await page.addStyleTag({ content: '.inv-talk, .inv-talk * { transition: none !important; }' });
     const cdp = await page.context().newCDPSession(page);
     const finger = (type, p) =>
       cdp.send('Input.dispatchTouchEvent', {
         type,
         touchPoints: p ? [{ x: p.x, y: p.y, id: 1, radiusX: 2, radiusY: 2, force: 1 }] : [],
       });
-    /** A button as it's held: pressed or not, and its dither. */
-    const look = (loc) =>
-      loc.evaluate((b) => ({
-        pressed: b.classList.contains('is-pressed'),
-        dither: getComputedStyle(b).backgroundImage,
-      }));
     const centre = async (loc) => {
       const r = await loc.boundingBox();
       return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
     };
-    /** Held: pressed, with the press's dither right up to its words, outlined in its own fill. */
-    const heldLooksPressed = async (loc, what) => {
-      expect((await look(loc)).dither).toMatch(/^url\("data:image\/png/);
-      outlinedInFill(await wordsOf(loc), what);
+    /** Held: a step darker than at rest, down `by` px, with no dither and no outline round its words. */
+    const heldLooksPressed = async (loc, rest, what, by = 3) => {
+      await expect.poll(async () => (await looksOf(loc)).pressed, { message: `${what}: pressed` }).toBe(true);
+      const l = await looksOf(loc);
+      expect([l.image, l.shadow, l.down], `${what}: plain, down ${by} px`).toEqual(['none', 'none', by]);
+      expect(lightOf(l.fill), `${what}: a step darker`).toBeLessThan(lightOf(rest.fill) - 4);
     };
     const next = page.getByRole('button', { name: 'Next', exact: true });
-    expect((await look(next)).pressed).toBe(false);
+    const nextRest = await looksOf(next);
+    expect(nextRest.pressed).toBe(false);
     const at = await centre(next);
     await finger('touchStart', at);
-    await expect.poll(async () => (await look(next)).pressed, { message: 'Next pressed' }).toBe(true);
-    await heldLooksPressed(next, 'Next held');
+    await heldLooksPressed(next, nextRest, 'Next held');
     // Slid off it, not pressed any more.
     await finger('touchMove', { x: at.x - 160, y: at.y + 160 });
-    await expect.poll(async () => (await look(next)).pressed, { message: 'slid off' }).toBe(false);
+    await expect.poll(async () => (await looksOf(next)).pressed, { message: 'slid off' }).toBe(false);
+    expect((await looksOf(next)).fill, 'its own fill again').toBe(nextRest.fill);
     await finger('touchEnd');
-    // A reply held: pressed the same; the touch cancelled, not.
+    // The box held (it goes on when it's tapped): a step darker, down 2 px; lifted, it goes on.
+    const boxEl = box(page);
+    const boxRest = await looksOf(boxEl);
+    const seq = (await snapshot(page)).dialogue.seq;
+    const onBox = await centre(boxEl);
+    await finger('touchStart', onBox);
+    await heldLooksPressed(boxEl, boxRest, 'the box held', 2);
+    await finger('touchEnd');
+    await expect.poll(async () => (await looksOf(boxEl)).pressed, { message: 'the box let go' }).toBe(false);
+    await until(page, (s) => s.dialogue.typed || s.dialogue.seq > seq, 'the tap on the box went on');
+    // A reply held: pressed the same, from its cream; the touch cancelled, not.
     await next.tap();
     await until(page, (s) => s.dialogue.id === ask.id && Boolean(s.dialogue.repliesLive), 'at the replies');
     const reply = page.locator('.inv-talk-choice').first();
+    const replyRest = await looksOf(reply);
+    expect(replyRest.fill, 'the replies’ cream, not the paper at the top').not.toBe(nextRest.fill);
     await finger('touchStart', await centre(reply));
-    await expect.poll(async () => (await look(reply)).pressed, { message: 'the reply pressed' }).toBe(true);
-    await heldLooksPressed(reply, 'a reply held');
-    // (The cream of the replies, not the paper of the buttons at the top.)
-    expect((await wordsOf(reply)).fill).not.toBe((await wordsOf(next)).fill);
+    await heldLooksPressed(reply, replyRest, 'a reply held');
     await finger('touchCancel');
-    await expect.poll(async () => (await look(reply)).pressed, { message: 'cancelled' }).toBe(false);
+    await expect.poll(async () => (await looksOf(reply)).pressed, { message: 'cancelled' }).toBe(false);
     expect((await snapshot(page)).dialogue.id, 'a cancelled press picks nothing').toBe(ask.id);
+    // With the replies up the box goes nowhere, so a finger on it shows nothing.
+    const hold = await centre(boxEl);
+    await finger('touchStart', hold);
+    await expect.poll(async () => (await looksOf(boxEl)).fill, { message: 'the box as it was' }).toBe(boxRest.fill);
+    expect((await looksOf(boxEl)).down, 'not down').toBe(0);
+    await finger('touchCancel');
     expect(errors).toEqual([]);
   });
 
@@ -1257,20 +1434,18 @@ test.describe('on a phone', () => {
 });
 
 test.describe('on a desktop', () => {
-  test('a line taller than half the screen scrolls in the box: it follows the typing, then the wheel and keys scroll it', async ({
+  test('a line taller than four rows scrolls in the box: it follows the typing, then the wheel and keys scroll it', async ({
     page,
   }) => {
     await longLineScrolls(page, false);
   });
 
-  test('the buttons dither on hover and press, and a press that goes on flashes the box; the box itself fades in plainly', async ({
+  test('the chat screen is plain as before round 18: no dither on its buttons, no press flash, the box rising in plainly over its dim', async ({
     page,
   }) => {
     const errors = watch(page);
     await calm(page);
     await useBehaviorIntro(page);
-    /** A dither tile, as the computed style gives one. */
-    const TILE = /^url\("data:image\/png;base64,[^"]+"\)$/;
     // Opening: nothing on the screen dithers in; the box rises into place with a plain fade
     // (read the moment the layer shows).
     await page.evaluate(() => {
@@ -1279,6 +1454,7 @@ test.describe('on a desktop', () => {
         if (layer.hidden) return;
         observer.disconnect();
         const boxEl = layer.querySelector('.inv-talk-box');
+        const dim = layer.querySelector('.inv-talk-dim');
         const css = (el) => getComputedStyle(el);
         window.opening = {
           layer: css(layer).animationName,
@@ -1286,6 +1462,10 @@ test.describe('on a desktop', () => {
           box: css(boxEl).animationName,
           boxEasing: css(boxEl).animationTimingFunction,
           boxMask: css(boxEl).maskImage,
+          dim: css(dim).animationName,
+          dimLook: css(dim).backgroundImage.startsWith('linear-gradient('),
+          dimMask: css(dim).maskImage,
+          dimTakes: css(dim).pointerEvents,
         };
       }).observe(layer, { attributes: true, attributeFilter: ['hidden'] });
     });
@@ -1297,47 +1477,47 @@ test.describe('on a desktop', () => {
       box: 'inv-talk-rise',
       boxEasing: 'ease-out',
       boxMask: 'none',
+      // (The gentle dim behind the box, as before round 18: a smooth gradient fading in plainly.)
+      dim: 'inv-talk-fade',
+      dimLook: true,
+      dimMask: 'none',
+      dimTakes: 'none',
     });
     await until(page, (s) => s.dialogue && s.state === 'talk' && !s.dialogue.waiting, 'the intro under way');
-    // No dither of the box's own: no bands in it, no copy of a line going, its fill plain.
-    await expect(page.locator('.inv-talk-shade, .inv-talk-ghost')).toHaveCount(0);
+    // No dither on the box: no bands, no flash, no plates, no copy of a line going, its fill plain.
+    await expect(page.locator('.inv-talk-shade, .inv-talk-flash, .inv-talk-label, .inv-talk-ghost')).toHaveCount(0);
     await expect(box(page)).toHaveCSS('background-image', 'none');
-    // The ▼ bobs in steps.
-    await expect(page.locator('.inv-talk-next')).toHaveCSS('animation-timing-function', /steps/);
-    // Hover: a light dither of the ink; pressed: a heavier one; neither on a button at rest. Its
-    // words on no plate, ringed by a 2 px outline of its fill all through, so the dither shows
-    // right up to the letters.
-    await expect(page.locator('.inv-talk .inv-talk-label')).toHaveCount(0);
+    // The ▼ bobs smoothly, as it did.
+    const arrow = page.locator('.inv-talk-next');
+    await expect(arrow).toHaveCSS('animation-name', 'inv-talk-bob');
+    await expect(arrow).toHaveCSS('animation-timing-function', 'ease-in-out');
+    // A button at rest, under the mouse and pressed: no dither and no outline round its words,
+    // pressed down its drop.
     const auto = page.getByRole('button', { name: 'Auto', exact: true });
-    const bg = () => auto.evaluate((e) => getComputedStyle(e).backgroundImage);
-    expect(await bg()).toBe('none');
-    outlinedInFill(await wordsOf(auto), 'Auto at rest');
+    const plainly = async (what) => {
+      const l = await looksOf(auto);
+      expect([l.image, l.shadow], `Auto ${what}: plain`).toEqual(['none', 'none']);
+    };
+    await plainly('at rest');
     await auto.hover();
-    const hover = await bg();
-    expect(hover).toMatch(TILE);
-    outlinedInFill(await wordsOf(auto), 'Auto hovered');
+    await plainly('hovered');
     await page.mouse.down();
-    const pressed = await bg();
-    expect(pressed).toMatch(TILE);
-    expect(pressed).not.toBe(hover);
-    outlinedInFill(await wordsOf(auto), 'Auto pressed');
+    await expect.poll(async () => (await looksOf(auto)).down, { message: 'Auto pressed down' }).toBe(3);
+    await plainly('pressed');
     await page.mouse.move(5, 5);
     await page.mouse.up();
-    // A press that goes on: the box flashes the ink's dither and dips a step.
+    // A press that goes on: no flash, and the box itself doesn't dip (nothing run on it from script).
     await page.evaluate(() => {
-      window.seen = { flash: [], dip: [] };
-      /** The keyframes' `prop` of the animations run from script on `sel`. */
-      const frames = (sel, prop) =>
-        document
-          .querySelector(sel)
-          .getAnimations()
-          .filter((a) => !(a instanceof CSSAnimation))
-          .flatMap((a) => a.effect.getKeyframes().map((k) => k[prop] ?? ''));
-      // (After the layer's own click handler: the flash it started, read at once.)
-      document.addEventListener('click', () => {
-        window.seen.flash.push(frames('.inv-talk-flash', 'backgroundImage'));
-        window.seen.dip.push(frames('.inv-talk-box', 'translate'));
-      });
+      window.seen = [];
+      // (After the layer's own click handler: what it started on the box, read at once.)
+      document.addEventListener('click', () =>
+        window.seen.push(
+          document
+            .querySelector('.inv-talk-box')
+            .getAnimations()
+            .filter((a) => !(a instanceof CSSAnimation)).length,
+        ),
+      );
     });
     const before = await snapshot(page);
     if (!before.dialogue.typed) {
@@ -1346,86 +1526,165 @@ test.describe('on a desktop', () => {
     }
     await goOn(page);
     await until(page, (s) => s.dialogue?.seq > before.dialogue.seq, 'the next line');
-    const seen = await page.evaluate(() => window.seen);
-    expect(
-      seen.flash.at(-1)?.some((v) => TILE.test(v) || /^url\(/.test(v)),
-      'the press flash',
-    ).toBe(true);
-    expect(
-      seen.dip.at(-1)?.some((v) => /2px/.test(v)),
-      'the box dips',
-    ).toBe(true);
-    // Auto on: its fill turns, and its words' outline with it (once the fill's fade is over).
-    const rest = (await wordsOf(auto)).fill;
+    expect(await page.evaluate(() => window.seen), 'nothing on the box from script').toEqual(
+      before.dialogue.typed ? [0] : [0, 0],
+    );
+    // Auto on: its fill turns to the on colour, still plain.
+    const rest = (await looksOf(auto)).fill;
     await auto.click();
     await expect(auto).toHaveAttribute('aria-pressed', 'true');
-    await expect.poll(async () => (await wordsOf(auto)).fill, { message: 'Auto’s on colour' }).not.toBe(rest);
-    await expect(async () => outlinedInFill(await wordsOf(auto), 'Auto on')).toPass();
+    await expect.poll(async () => (await looksOf(auto)).fill, { message: 'Auto’s on colour' }).not.toBe(rest);
+    await plainly('on');
     await auto.click();
     await expect(auto).toHaveAttribute('aria-pressed', 'false');
     expect(errors).toEqual([]);
   });
 
-  test('a new line takes the old one’s place at once and types from its start: the two never show together', async ({
+  test('a mouse over a button or the box warms it a step (a button lifts a pixel); pressed, a step darker and down; never a dither', async ({
     page,
   }) => {
     const errors = watch(page);
     await calm(page);
     await useBehaviorIntro(page);
+    const { ask } = askAndBefore(await script(page));
+    test.skip(!ask, 'this script has no replies');
     await open(page);
-    // Every frame from here: the toy's clock, which line is up (its letters' first node), how
-    // many of its letters show, and anything else in the box with words in it.
-    await page.evaluate(() => {
-      const typed = document.querySelector('.inv-talk-typed');
-      const view = document.querySelector('.inv-talk-view');
-      const lines = new Map();
-      const rec = (window.swap = []);
-      const tick = () => {
-        const head = typed.firstChild;
-        if (head && !lines.has(head)) lines.set(head, lines.size);
-        rec.push({
-          t: window.__invitation.clock(),
-          line: head ? lines.get(head) : -1,
-          letters: typed.querySelectorAll('.inv-fx:not(.is-unseen)').length,
-          all: typed.querySelectorAll('.inv-fx').length,
-          others: [...view.children].filter((el) => !el.matches('.inv-talk-text') && el.textContent.trim()).length,
-        });
-        window.swapFrame = requestAnimationFrame(tick);
-      };
-      tick();
-    });
-    for (const press of [() => goOn(page), () => page.keyboard.press('Space')]) {
-      const s = await snapshot(page);
-      if (!s.dialogue.typed) {
-        await press();
-        await until(page, (x) => x.dialogue.typed, 'the line up');
-      }
-      await press();
-      await until(page, (x) => x.dialogue?.seq > s.dialogue.seq, 'the next line');
-      await until(page, (x) => x.dialogue.typed, 'typed out');
+    // (The steps' ends, not their fades.)
+    await page.addStyleTag({ content: '.inv-talk, .inv-talk * { transition: none !important; }' });
+    await page.mouse.move(5, 5);
+    /**
+     * At rest, under the mouse, then held down on it; let go off it, the click that makes (on the
+     * layer, the two's common ancestor) kept from the screen, so it presses nothing.
+     */
+    const steps = async (loc) => {
+      const rest = await looksOf(loc);
+      const r = await loc.boundingBox();
+      await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
+      const over = await looksOf(loc);
+      await page.mouse.down();
+      const down = await looksOf(loc);
+      await page.evaluate(() => {
+        window.__keep = (e) => e.stopImmediatePropagation();
+        window.addEventListener('click', window.__keep, true);
+      });
+      await page.mouse.move(5, 5);
+      await page.mouse.up();
+      await page.evaluate(() => window.removeEventListener('click', window.__keep, true));
+      return { rest, over, down };
+    };
+    const plain = (l, what) => expect([l.image, l.shadow], `${what}: no dither, no outline`).toEqual(['none', 'none']);
+    for (const name of ['Auto', 'Next', 'Log', 'Skip Intro']) {
+      const { rest, over, down } = await steps(page.getByRole('button', { name, exact: true }));
+      for (const [l, what] of [
+        [rest, 'at rest'],
+        [over, 'hovered'],
+        [down, 'pressed'],
+      ])
+        plain(l, `${name} ${what}`);
+      expect(warmthOf(over.fill), `${name} hovered: a step warmer`).toBeGreaterThan(warmthOf(rest.fill) + 4);
+      expect([rest.down, over.down, down.down], `${name}: lifted a pixel, then down`).toEqual([0, -1, 3]);
+      expect(lightOf(down.fill), `${name} pressed: a step darker`).toBeLessThan(lightOf(rest.fill) - 4);
     }
-    const rec = await page.evaluate(() => {
-      cancelAnimationFrame(window.swapFrame);
-      return window.swap;
-    });
-    const comes = rec.flatMap((r, i) => (i > 0 && r.line !== rec[i - 1].line ? [i] : []));
-    expect(comes.length, 'two new lines').toBe(2);
-    for (const i of comes) {
-      expect(rec[i].letters, 'from its start, not whole').toBeLessThan(rec[i].all);
-      // (Its first letter a letter's time after it came, 1/32 s, give or take a frame: no wait
-      // for the line before to go.)
-      const first = rec.findIndex((r, j) => j >= i && r.letters > 0);
-      expect(first).toBeGreaterThanOrEqual(i);
-      expect(rec[first].t - rec[i].t, 'typing at once').toBeLessThan(0.12);
-    }
-    expect(
-      rec.filter((r) => r.others > 0).length,
-      'nothing else in the box with words: the old line gone the frame the new one came',
-    ).toBe(0);
+    // Auto on: its own colour, a step lighter under the mouse.
+    const auto = page.getByRole('button', { name: 'Auto', exact: true });
+    await auto.click();
+    await page.mouse.move(5, 5);
+    const on = await looksOf(auto);
+    const r = await auto.boundingBox();
+    await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
+    expect(lightOf((await looksOf(auto)).fill), 'Auto on, hovered: lighter').toBeGreaterThan(lightOf(on.fill) + 4);
+    await auto.click();
+    await page.mouse.move(5, 5);
+    // The box: a step warmer under the mouse, a step darker and down 2 px pressed (let go off it).
+    const b = await steps(box(page));
+    for (const [l, what] of [
+      [b.rest, 'at rest'],
+      [b.over, 'hovered'],
+      [b.down, 'pressed'],
+    ])
+      plain(l, `the box ${what}`);
+    expect(warmthOf(b.over.fill), 'the box hovered: a step warmer').toBeGreaterThan(warmthOf(b.rest.fill) + 4);
+    expect([b.rest.down, b.over.down, b.down.down], 'the box: not lifted, then down 2 px').toEqual([0, 0, 2]);
+    expect(lightOf(b.down.fill), 'the box pressed: a step darker').toBeLessThan(lightOf(b.rest.fill) - 4);
+    // A reply the same, from its cream; and with the replies up the box takes no hover (a click
+    // on it goes nowhere then).
+    await page.getByRole('button', { name: 'Next', exact: true }).click();
+    await until(page, (s) => s.dialogue.id === ask.id && Boolean(s.dialogue.repliesLive), 'at the replies');
+    await page.mouse.move(5, 5);
+    const reply = await steps(page.locator('.inv-talk-choice').first());
+    expect(warmthOf(reply.over.fill), 'a reply hovered: warmer').toBeGreaterThan(warmthOf(reply.rest.fill) + 4);
+    expect([reply.over.down, reply.down.down], 'a reply: lifted, then down').toEqual([-1, 3]);
+    expect(lightOf(reply.down.fill), 'a reply pressed: darker').toBeLessThan(lightOf(reply.rest.fill) - 4);
+    const idle = await looksOf(box(page));
+    const bb = await box(page).boundingBox();
+    await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2);
+    expect((await looksOf(box(page))).fill, 'the box under the replies: as it was').toBe(idle.fill);
+    expect((await snapshot(page)).dialogue.id, 'nothing picked').toBe(ask.id);
     expect(errors).toEqual([]);
   });
 
-  test('the replies dither in one after another; with reduced motion they fade plainly', async ({ page }) => {
+  test('a press that goes on dithers the old line out, then the next one in, then it types; a reply picked too; Auto and Next change lines plainly', async ({
+    page,
+  }) => {
+    const errors = watch(page);
+    await calm(page);
+    await useBehaviorIntro(page);
+    const { ask } = askAndBefore(await script(page));
+    test.skip(!ask, 'this script has no replies');
+    await open(page);
+    await recordFrames(page);
+    /** Notes what's done next, in every frame from here, and waits for its line to come. */
+    const act = async (what, doIt) => {
+      const s = await snapshot(page);
+      if (!s.dialogue.typed) {
+        await goOn(page);
+        await until(page, (x) => x.dialogue.typed, 'the line up');
+      }
+      await page.evaluate((m) => (window.__mark = m), what);
+      await doIt();
+      await until(page, (x) => !x.dialogue || x.dialogue.seq > s.dialogue.seq, `${what}: the next line`);
+      await until(page, (x) => !x.dialogue || x.dialogue.typed, `${what}: typed`);
+      // (Its letters all up on the screen too, nothing fading.)
+      await expect
+        .poll(() => page.evaluate(() => document.querySelectorAll('.inv-talk-typed .inv-fx.is-unseen').length))
+        .toBe(0);
+    };
+    await act('click', () => goOn(page));
+    await act('space', () => page.keyboard.press('Space'));
+    await act('next', () => page.getByRole('button', { name: 'Next', exact: true }).click());
+    expect((await snapshot(page)).dialogue.id).toBe(ask.id);
+    await act('reply', () => pick(page, 0));
+    const auto = page.getByRole('button', { name: 'Auto', exact: true });
+    await act('auto', async () => {
+      await auto.click();
+      await page.mouse.move(5, 5);
+    });
+    await auto.click();
+    // Reduced motion: plain quick fades, in the same order.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await act('reduced', () => goOn(page));
+    const seen = await stopFrames(page);
+    const { rec } = seen;
+    const comes = rec.flatMap((r, i) => (i > 0 && r.line !== rec[i - 1].line ? [i] : []));
+    const by = Object.fromEntries(comes.map((i) => [rec[i].mark, i]));
+    expect(Object.keys(by).sort()).toEqual(['auto', 'click', 'next', 'reduced', 'reply', 'space']);
+    for (const what of ['click', 'space']) dithersOutThenIn(seen, what);
+    dithersOutThenIn(seen, 'reply', { replies: true });
+    dithersOutThenIn(seen, 'reduced', { plain: true });
+    // The old line and a new letter never show together.
+    expect(rec.filter((r) => r.ghost && r.letters > 0).length, 'never both').toBe(0);
+    // Nothing else fades: Auto's next line types at once, Next's shows whole at once.
+    for (const what of ['auto', 'next']) {
+      expect(seen.fades.filter((f) => f.mark === what).length, `${what}: no fade`).toBe(0);
+      const i = by[what];
+      const first = rec.findIndex((r, j) => j >= i && r.letters > 0);
+      expect(rec[first].at - rec[i].at, `${what}: no wait`).toBeLessThan(150);
+    }
+    expect(rec[by.next].letters, 'Next: the line whole at once').toBe(rec[by.next].all);
+    expect(errors).toEqual([]);
+  });
+
+  test('the replies pop in together, plainly; with reduced motion they just show', async ({ page }) => {
     await calm(page);
     await useBehaviorIntro(page);
     const { ask } = askAndBefore(await script(page));
@@ -1433,20 +1692,20 @@ test.describe('on a desktop', () => {
     await open(page);
     await page.getByRole('button', { name: 'Next', exact: true }).click();
     await until(page, (s) => s.dialogue.id === ask.id && Boolean(s.dialogue.choices), 'at the replies');
-    const looks = await page.locator('.inv-talk-choice').evaluateAll((els) =>
-      els.map((e) => ({
-        name: getComputedStyle(e).animationName,
-        delay: parseFloat(getComputedStyle(e).animationDelay),
-      })),
+    const looks = await page.locator('.inv-talk-choices:not(.is-ghost) .inv-talk-choice').evaluateAll((els) =>
+      els.map((e) => {
+        const c = getComputedStyle(e);
+        return { name: c.animationName, delay: parseFloat(c.animationDelay), mask: c.maskImage };
+      }),
     );
     expect(looks.length).toBeGreaterThan(1);
-    for (const l of looks) expect(l.name).toBe('inv-talk-dither-in');
-    for (let i = 1; i < looks.length; i++) expect(looks[i].delay).toBeGreaterThan(looks[i - 1].delay);
+    for (const l of looks) expect(l).toEqual({ name: 'inv-talk-pop', delay: 0, mask: 'none' });
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await expect(page.locator('.inv-talk-choice').first()).toHaveCSS('animation-name', 'inv-talk-fade');
+    await expect(page.locator('.inv-talk-choice').first()).toHaveCSS('animation-name', 'none');
     await expect(page.locator('.inv-talk')).toHaveCSS('animation-name', 'none');
     await expect(box(page)).toHaveCSS('animation-name', 'none');
     await expect(page.locator('.inv-talk-next')).toHaveCSS('animation-name', 'none');
+    await expect(page.locator('.inv-talk-dim')).toHaveCSS('animation-name', 'none');
   });
 
   test('tags in a reply and a name show styled, read plain; an italic word slants in place', async ({ page }) => {
@@ -1797,6 +2056,8 @@ test.describe('on a desktop', () => {
       await page.clock.runFor(16);
       await page.keyboard.press(key);
       await until(page, (s) => s.dialogue.id === ask.id && Boolean(s.dialogue.choices), `${key}: its replies`);
+      // (On the screen once the question has come in: the press that brought it dithers it in.)
+      await runUntilReplies(page);
       const log = (await snapshot(page)).dialogue.log;
       await page.clock.runFor(16);
       await page.keyboard.press(key);
