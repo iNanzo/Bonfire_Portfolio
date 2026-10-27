@@ -719,52 +719,63 @@ export function bindUi(stage, { look, wander = true, onButton, onLook, onCamera,
     held = null;
     return b;
   };
-  $('.inv-toolbar').addEventListener('pointerdown', (e) => {
-    const button = /** @type {HTMLElement} */ (e.target).closest?.('.inv-tool');
-    if (e.pointerType === 'mouse' || !(button instanceof HTMLButtonElement) || button.disabled) return;
-    holdEnd();
-    hold.down(e.clientX, e.clientY, now());
-    held = {
-      button,
-      id: e.pointerId,
-      timer: window.setTimeout(() => {
-        if (held?.button === button && hold.tick(now())) showLabel(button, true);
-      }, HOLD_MS + 10),
-    };
-  });
-  $('.inv-toolbar').addEventListener('pointermove', (e) => {
-    if (!held || e.pointerId !== held.id) return;
-    // (Moved off its spot: no label for this press; the timer finds it moved.)
-    hold.move(e.clientX, e.clientY);
-  });
-  $('.inv-toolbar').addEventListener('pointerup', (e) => {
-    if (!held || e.pointerId !== held.id) return;
-    const button = /** @type {HTMLElement} */ (holdEnd());
-    if (hold.up(now()) === 'label') {
-      showLabel(button, true);
-      hideSoon(button);
-      swallow = { button, until: performance.now() + 700 };
-    }
-  });
-  $('.inv-toolbar').addEventListener('pointercancel', (e) => {
-    if (!held || e.pointerId !== held.id) return;
-    const button = holdEnd();
-    hold.cancel();
-    if (button?.classList.contains('is-label')) hideSoon(button);
-  });
-  $('.inv-toolbar').addEventListener('contextmenu', (e) => e.preventDefault());
-  hud.addEventListener(
-    'click',
-    (e) => {
-      const b = swallow.button;
-      if (!b || performance.now() > swallow.until) return;
-      swallow = { button: null, until: 0 };
-      if (!b.contains(/** @type {Node} */ (e.target))) return;
-      e.preventDefault();
-      e.stopPropagation();
-    },
-    true,
-  );
+  /**
+   * The held-press labels for the tool buttons in `root` (the toolbar and its Camera pad, or a
+   * tool button of its own), and no long-press menu there.
+   * @param {HTMLElement} root
+   */
+  const holdLabels = (root) => {
+    root.addEventListener('pointerdown', (e) => {
+      const button = /** @type {HTMLElement} */ (e.target).closest?.('.inv-tool');
+      if (e.pointerType === 'mouse' || !(button instanceof HTMLElement)) return;
+      if (button instanceof HTMLButtonElement && button.disabled) return;
+      holdEnd();
+      hold.down(e.clientX, e.clientY, now());
+      held = {
+        button,
+        id: e.pointerId,
+        timer: window.setTimeout(() => {
+          if (held?.button === button && hold.tick(now())) showLabel(button, true);
+        }, HOLD_MS + 10),
+      };
+    });
+    root.addEventListener('pointermove', (e) => {
+      if (!held || e.pointerId !== held.id) return;
+      // (Moved off its spot: no label for this press; the timer finds it moved.)
+      hold.move(e.clientX, e.clientY);
+    });
+    root.addEventListener('pointerup', (e) => {
+      if (!held || e.pointerId !== held.id) return;
+      const button = /** @type {HTMLElement} */ (holdEnd());
+      if (hold.up(now()) === 'label') {
+        showLabel(button, true);
+        hideSoon(button);
+        swallow = { button, until: performance.now() + 700 };
+      }
+    });
+    root.addEventListener('pointercancel', (e) => {
+      if (!held || e.pointerId !== held.id) return;
+      const button = holdEnd();
+      hold.cancel();
+      if (button?.classList.contains('is-label')) hideSoon(button);
+    });
+    root.addEventListener('contextmenu', (e) => e.preventDefault());
+  };
+  holdLabels($('.inv-toolbar'));
+  /**
+   * The click after a held label, swallowed (on the stage, so it hears it before the HUD does,
+   * and before a tool button of its own).
+   * @param {MouseEvent} e
+   */
+  const onHeldClick = (e) => {
+    const b = swallow.button;
+    if (!b || performance.now() > swallow.until) return;
+    swallow = { button: null, until: 0 };
+    if (!b.contains(/** @type {Node} */ (e.target))) return;
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  stage.addEventListener('click', onHeldClick, true);
 
   hud.addEventListener('click', (e) => {
     const el = /** @type {HTMLElement} */ (e.target).closest('button');
@@ -906,6 +917,7 @@ export function bindUi(stage, { look, wander = true, onButton, onLook, onCamera,
       document.removeEventListener('keydown', onPadKey);
       window.removeEventListener('keydown', onAnyKey, true);
       window.removeEventListener('pointerdown', onAnyPointer, true);
+      stage.removeEventListener('click', onHeldClick, true);
       hud.remove();
     },
   };
