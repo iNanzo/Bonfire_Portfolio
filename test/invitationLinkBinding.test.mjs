@@ -51,9 +51,22 @@ class Element {
     if (!this.queries.has(sel)) {
       const el = new Element();
       if (['.inv-sheet', '.inv-camera-pad'].includes(sel)) el.hidden = true;
+      el.selector = sel;
       this.queries.set(sel, el);
     }
     return this.queries.get(sel);
+  }
+  matches(sel) {
+    return this.selector === sel;
+  }
+  closest() {
+    return this;
+  }
+  contains(el) {
+    return el === this || [...this.queries.values()].some((child) => child.contains(el));
+  }
+  focus(options) {
+    this.focusOptions = options;
   }
   querySelectorAll() {
     return [];
@@ -87,6 +100,9 @@ function setup(t) {
   const win = new Element();
   win.setTimeout = globalThis.setTimeout;
   const replacements = {
+    HTMLElement: Element,
+    HTMLButtonElement: class extends Element {},
+    HTMLInputElement: class extends Element {},
     document: doc,
     window: win,
     performance: { now: () => now },
@@ -110,6 +126,9 @@ function setup(t) {
   return {
     ui,
     stage,
+    win,
+    doc,
+    hud: stage.children[0],
     el: stage.children[1],
     tick(ms) {
       now += ms;
@@ -121,6 +140,11 @@ function setup(t) {
 test('link binding updates destination and reach, and clears stale navigation attributes when hidden', (t) => {
   const { ui, stage, el } = setup(t);
   assert.deepEqual(ui.linkStops(), []);
+  ui.placeLink('left');
+  assert.equal(ui.linkState().at, 'left', 'an unconfigured link moves immediately');
+  ui.placeLink('right');
+  ui.placeLink('right');
+  assert.equal(ui.linkState().phase, null);
   ui.setLink({ href: 'visualizer/', label: 'Live' });
   assert.equal(ui.linkState().href, '/visualizer/');
   assert.equal(ui.linkState().target, '_blank');
@@ -128,6 +152,7 @@ test('link binding updates destination and reach, and clears stale navigation at
   assert.equal(ui.linkState().label, 'Live');
   assert.deepEqual(ui.linkStops(), [el]);
   assert.ok(stage.classList.contains('has-link'));
+  ui.setLinkBlocked(true);
   ui.setLinkBlocked(true);
   assert.ok(ui.linkState().inert);
   assert.deepEqual(ui.linkStops(), []);
@@ -181,4 +206,62 @@ test('link corner changes wait for a clear destination, reverse safely, and fini
   assert.equal(ui.linkState().phase, null);
   ui.destroy();
   assert.ok(el.removed);
+});
+
+test('the link respects Settings and shared toolbar focus, while a held touch shows a label without navigating', (t) => {
+  const { ui, el, hud, stage, win, doc, tick } = setup(t);
+  ui.setLink({ href: 'https://example.com', label: 'Portfolio' });
+  const click = (selector) => hud.emit('click', { target: hud.querySelector(selector) });
+  click('[data-look-open]');
+  assert.ok(ui.sheetOpen && ui.linkState().inert);
+  assert.deepEqual(ui.linkStops(), []);
+  doc.emit('keydown', { key: 'Tab', preventDefault() {} });
+  doc.emit('keydown', { key: 'Escape', preventDefault() {} });
+  assert.equal(ui.sheetOpen, false);
+  assert.deepEqual(ui.linkStops(), [el]);
+  click('[data-camera-open]');
+  assert.ok(ui.padOpen);
+  doc.emit('keydown', { key: 'Escape', preventDefault() {} });
+  assert.equal(ui.padOpen, false);
+  assert.ok(ui.pad.hidden && ui.sheet.hidden);
+  win.emit('keydown', { key: 'Shift' });
+  win.emit('keydown', { key: 'Tab' });
+  ui.focusToolbar();
+  const first = ui.toolbar.querySelector('button:not(:disabled)');
+  assert.equal(first.focusOptions.focusVisible, true);
+  win.emit('pointerdown', {});
+  ui.focusToolbar();
+  assert.equal(first.focusOptions.focusVisible, false);
+  ui.setEnabled(false);
+  ui.setTalking(true);
+  ui.setTalking(true);
+  assert.ok(ui.talking && ui.toolbar.inert);
+  ui.setTalking(false);
+  ui.setEnabled(true);
+  assert.equal(ui.talking, false);
+  assert.equal(ui.toolbar.inert, false);
+  ui.setToolbar(false);
+  assert.equal(ui.toolbar.hidden, true);
+  ui.setToolbar(true);
+  ui.setWander(false);
+  assert.equal(hud.querySelector('[data-setting="wander"]').checked, false);
+  ui.setStatus('Loading', { reload: true });
+  assert.equal(hud.querySelector('.inv-status-text').textContent, 'Loading');
+  ui.setStatus(null);
+  assert.ok(hud.querySelector('.inv-status').hidden);
+  el.emit('pointerdown', { target: el, pointerType: 'touch', clientX: 5, clientY: 5, pointerId: 1 });
+  tick(1000);
+  assert.ok(el.classList.contains('is-label'));
+  el.emit('pointerup', { target: el, pointerId: 1 });
+  let prevented = false;
+  stage.emit('click', {
+    target: el,
+    preventDefault() {
+      prevented = true;
+    },
+    stopPropagation() {},
+  });
+  assert.ok(prevented, 'releasing the held label cannot follow the link');
+  tick(1200);
+  assert.equal(el.classList.contains('is-label'), false);
 });
