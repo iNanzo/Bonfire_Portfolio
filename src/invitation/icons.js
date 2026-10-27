@@ -1,5 +1,5 @@
-// The invitation toy's icons and dither tiles. Each toolbar and Camera-pad button wears a
-// Phosphor icon (bold weight; MIT, its licence below), the glyph's path data vendored here and
+// The invitation toy's icons and dither tiles. Each toolbar and Camera-pad button, and the link
+// button (ui.js linkHtml), wears a Phosphor icon (bold weight; MIT, its licence below), the glyph's path data vendored here and
 // drawn as inline SVG on Phosphor's 256 grid, 24 px on screen in the button's text colour
 // (currentColor). The SVG is hidden from screen readers and carries no text: the button's own
 // label, a span beside it, names it (ui.js). Each pair reads as one: Turn Right is Turn Left
@@ -57,6 +57,7 @@ export const ICON_SOURCES = /** @type {const} */ ({
   zoomOut: 'magnifying-glass-minus',
   follow: 'crosshair',
   reset: 'house',
+  link: 'link',
 });
 
 /** Each icon's path data (Phosphor bold, on its viewBox 0 0 256 256). */
@@ -109,6 +110,8 @@ export const ICONS = {
   // Reset Camera: home.
   reset:
     'M222.14,105.85l-80-80a20,20,0,0,0-28.28,0l-80,80A19.86,19.86,0,0,0,28,120v96a12,12,0,0,0,12,12h64a12,12,0,0,0,12-12V164h24v52a12,12,0,0,0,12,12h64a12,12,0,0,0,12-12V120A19.86,19.86,0,0,0,222.14,105.85ZM204,204H164V152a12,12,0,0,0-12-12H104a12,12,0,0,0-12,12v52H52V121.65l76-76,76,76Z',
+  // The link button (the admin's link: link.js): two chain links.
+  link: 'M117.18,188.74a12,12,0,0,1,0,17l-5.12,5.12A58.26,58.26,0,0,1,70.6,228h0A58.62,58.62,0,0,1,29.14,127.92L63.89,93.17a58.64,58.64,0,0,1,98.56,28.11,12,12,0,1,1-23.37,5.44,34.65,34.65,0,0,0-58.22-16.58L46.11,144.89A34.62,34.62,0,0,0,70.57,204h0a34.41,34.41,0,0,0,24.49-10.14l5.11-5.12A12,12,0,0,1,117.18,188.74ZM226.83,45.17a58.65,58.65,0,0,0-82.93,0l-5.11,5.11a12,12,0,0,0,17,17l5.12-5.12a34.63,34.63,0,1,1,49,49L175.1,145.86A34.39,34.39,0,0,1,150.61,156h0a34.63,34.63,0,0,1-33.69-26.72,12,12,0,0,0-23.38,5.44A58.64,58.64,0,0,0,150.56,180h.05a58.28,58.28,0,0,0,41.47-17.17l34.75-34.75a58.62,58.62,0,0,0,0-82.91Z',
 };
 
 /** @typedef {keyof typeof ICONS} IconName */
