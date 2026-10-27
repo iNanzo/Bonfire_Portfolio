@@ -23,7 +23,8 @@
 // Input is all its own while it's up: a tap or click, Enter, Space or ArrowUp opens it; Escape or
 // ArrowDown skips; a drag follows the finger with some give (the seal starting to open as it goes
 // up) and opens or skips on release (releaseGesture), else springs back; the wheel opens or skips
-// once it adds up; Skip Intro skips. While it floats it leans clearly toward the pointer (a finger
+// once it adds up; Skip Intro skips. (The link button over it, ui.js, takes its own presses: Tab
+// goes round the envelope, Skip Intro and it.) While it floats it leans clearly toward the pointer (a finger
 // while it's down), and a sideways drag or a held ArrowLeft or ArrowRight turns it further, springing
 // back (turnGoal; a sideways drag never opens or skips it); hovered, a glow pulses slowly round
 // it (hoverPulse: a wide dithered gold glow, a warm rim, the letter lifting a little toward the
@@ -325,6 +326,8 @@ function buildCompose() {
  *   into the intro, or skipped
  * @property {() => void} [onDone]  it's gone and disposed
  * @property {boolean} [petals]  Rose Petals (Settings, on by default): off, none at all
+ * @property {() => HTMLElement[]} [more]  the stops outside it Tab goes round with its own, after
+ *   them (the link button's, ui.js linkStops); a focused one presses itself on Enter or Space
  */
 
 /**
@@ -332,7 +335,10 @@ function buildCompose() {
  * @param {HTMLElement} root
  * @param {EnvelopeSceneOpts} opts
  */
-export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, onDone, petals: petalsOn = true }) {
+export function createEnvelopeScene(
+  root,
+  { reduced, ready, onOpen, onUncover, onDone, petals: petalsOn = true, more = () => [] },
+) {
   const doc = root.ownerDocument;
   const win = doc.defaultView ?? window;
   const touchScreen = () => win.matchMedia?.('(hover: none)').matches ?? false;
@@ -609,10 +615,12 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
   function onKey(e) {
     lastInput = clock();
     if (e.key === 'Tab') {
-      // (Round the two: the envelope and Skip Intro.)
+      // (Round its two, the envelope and Skip Intro, then the link button over it; Shift back.)
       byKeyboard();
       e.preventDefault();
-      (doc.activeElement === hit ? skipBtn : hit).focus();
+      const stops = [hit, skipBtn, ...more()];
+      const at = stops.findIndex((s) => s === doc.activeElement);
+      stops[at < 0 ? 0 : (at + (e.shiftKey ? -1 : 1) + stops.length) % stops.length].focus();
       return;
     }
     // (The arrows across turn it further while they're held.)
@@ -624,8 +632,9 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     }
     const what = envelopeKey(e.key);
     if (!what) return;
-    // (Skip Intro presses itself with Enter or Space.)
-    if (doc.activeElement === skipBtn && (e.key === 'Enter' || e.key === ' ')) return;
+    // (Skip Intro presses itself with Enter or Space, and the link button follows itself.)
+    const own = doc.activeElement === skipBtn || more().some((s) => s === doc.activeElement);
+    if (own && (e.key === 'Enter' || e.key === ' ')) return;
     e.preventDefault();
     e.stopPropagation();
     byKeyboard();

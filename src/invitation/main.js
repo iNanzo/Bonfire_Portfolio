@@ -58,6 +58,14 @@
 // the grab ring and the hover gone), the toy paused behind it as at boot; opened, the intro starts
 // the same way. Under ?test without &envelope, Replay Intro runs the dialogue alone.
 //
+// The link button (ui.js linkHtml and link.js; content.js linkSettings(), the admin's link) sits
+// over everything at the top left while the envelope is up and while the intro runs or is about
+// to (opened, not yet begun), so it stays put from the one into the other, and at the top right
+// in the toy (syncLink: each frame, and as the envelope comes and goes; ui.js fades it between
+// the two). In the envelope's and the intro's corner their layer owns it (aria-owns) and their
+// Tab order takes it after their own buttons (linkStops); the intro's Log and question put it out
+// of reach, as the Settings sheet does. Under ?preview there's none.
+//
 // Replay Intro without an envelope runs the intro's dialogue (dialogue.js, on content.js introScript():
 // content.json's invitation.intro as the admin writes it, mended, or the toy's own) on the toy's
 // clock, shown by dialogueUi.js over the stage: the toolbar rests out of sight, the speech bubble
@@ -112,7 +120,15 @@ import './dialogue.css';
 import './envelope.css';
 import { DANGLE, createBrain, dangleLift, talkPhase } from './brain.js';
 import { createBubble, speakerPoint } from './bubble.js';
-import { introFrom, introScript, invitationDefaults, invitationLines, speechSettings, textPalette } from './content.js';
+import {
+  introFrom,
+  introScript,
+  invitationDefaults,
+  invitationLines,
+  linkSettings,
+  speechSettings,
+  textPalette,
+} from './content.js';
 import { CARRY, createHand, handFeel, handStep } from './carry.js';
 import {
   CUES,
@@ -201,6 +217,7 @@ import { createTalk } from './speech.js';
 import { LIFT, createStage } from './stage.js';
 import { centreOf } from './steer.js';
 import { bindUi, deviceLabelOf, loadWander, parseQuery, saveWander } from './ui.js';
+import { linkCorner } from './link.js';
 
 /** The longest step a frame takes, seconds (a slow frame or a tab coming back never jumps). */
 const MAX_DT = 0.05;
@@ -313,6 +330,11 @@ let introWanted = false;
 const ui = bindUi(stageEl, {
   look,
   wander: wanderWanted ?? !options.calm,
+  // (The admin's link button, none in its intro preview; at the top left from the start under
+  // the envelope.)
+  link: options.preview ? null : linkSettings(),
+  base: BASE,
+  corner: options.envelope ? 'left' : 'right',
   onButton: (name) => {
     pressed = name;
   },
@@ -372,15 +394,41 @@ function spawnEnvelope() {
     reduced: prefersReduced(),
     petals: petalsOn(look),
     ready: () => toyReady,
+    more: () => ui.linkStops(),
     onUncover: (how) => {
       hudEl.removeAttribute('inert');
       if (how === 'open') introWanted = true;
       // (Skipped: the toy is free, focus on the toolbar's first button, its ring only after a key.)
       else ui.focusToolbar();
       envelopeGone();
+      syncLink();
     },
   });
   if (envelope) hudEl.setAttribute('inert', '');
+  syncLink();
+}
+/** @type {Element|null} the modal layer that owns the link button for screen readers, if any */
+let linkOwner = null;
+/**
+ * The link button's corner (link.js linkCorner): the top left while the envelope's up and while
+ * the intro runs or is about to (opened, it hasn't started yet), so it stays put from the one
+ * into the other; else the top right. And while it's in a modal layer's corner (the envelope's,
+ * the intro's), that layer owns it (aria-owns), so a screen reader finds it in the dialog.
+ */
+function syncLink() {
+  const covers = Boolean(envelope?.covers);
+  ui.placeLink(linkCorner({ envelope: covers, intro: introWanted || ui.talking }), { reduced: prefersReduced() });
+  const owner = !ui.linkStops().length
+    ? null
+    : covers
+      ? (envelope?.element ?? null)
+      : ui.talking
+        ? stageEl.querySelector('.inv-talk')
+        : null;
+  if (owner === linkOwner) return;
+  linkOwner?.removeAttribute('aria-owns');
+  owner?.setAttribute('aria-owns', 'inv-link');
+  linkOwner = owner;
 }
 if (options.envelope) spawnEnvelope();
 /** The envelope's state for ?test (types.js EnvelopeState), null without one. */
@@ -732,6 +780,7 @@ function start(s) {
     log: () => intro?.log ?? [],
     replySettle: options.settle ?? REPLY_SETTLE,
     palette: textPalette(),
+    more: () => ui.linkStops(),
   });
   // (A resize while the intro runs, or the chat box growing with a longer line: the shot framed
   // again for the new clear space.)
@@ -1855,6 +1904,9 @@ function start(s) {
       step(dt, ms / 1000);
       dropFx();
       s.render();
+      // (The link button: its corner, and out of reach while the intro's Log or question is up.)
+      ui.setLinkBlocked(talkUi.logOpen || talkUi.asking);
+      syncLink();
     } catch {
       lost = true;
       sync();

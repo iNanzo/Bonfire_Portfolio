@@ -163,7 +163,11 @@ test('its move between corners: a short plain fade, out then in (the CSS’s don
   const ms = /opacity (\d+)ms/.exec(fade);
   assert.ok(ms, 'its opacity fades');
   assert.ok(Number(ms[1]) < LINK_FADE.ms, `the fade (${ms[1]} ms) ends before the swap (${LINK_FADE.ms} ms)`);
-  assert.doesNotMatch(fade, /transform|left|right|top|inset|translate/, 'no slide across');
+  assert.doesNotMatch(
+    fade,
+    /\b(left|right|top|bottom|inset|translate|all)\b/,
+    'no slide across (its press may still go down)',
+  );
   assert.match(rule('.inv-link.is-moving'), /opacity: 0/);
   assert.doesNotMatch(rule('.inv-link.is-moving'), /background-image|--inv-dv/, 'no dither');
   const reduced = css.slice(css.lastIndexOf('@media (prefers-reduced-motion: reduce)'));

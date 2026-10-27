@@ -326,6 +326,82 @@ body {
   opacity: 0.45;
 }
 
+/* --- The link button (ui.js linkHtml; link.js): the toolbar's squircle alone in a corner of the
+   stage, over everything there (the envelope, its petals and the intro's screen too), at the
+   intro's buttons' inset. In the toy, the top right, the toolbar's size; over the envelope and
+   through the intro, the top left, as tall as the intro's buttons (Skip Intro sits just right of
+   it then: dialogue.css). Its label is a tab under it, flush with its corner's edge so it stays on
+   screen, its notch pointing up at it. Between the corners it fades out, then in at the new one
+   (ui.js placeLink: .is-moving), never sliding; under the open Settings sheet it rests as the
+   toolbar's buttons do (inert). */
+:root {
+  --inv-link-inset: 10px;
+  --inv-link-size: 40px;
+}
+@media (min-width: 700px) and (min-height: 560px) {
+  :root {
+    --inv-link-inset: 16px;
+    --inv-link-size: 44px;
+  }
+}
+.inv-link {
+  position: absolute;
+  z-index: 5;
+  top: calc(var(--inv-link-inset) + env(safe-area-inset-top));
+  box-sizing: border-box;
+  text-decoration: none;
+  -webkit-user-drag: none;
+  transition:
+    opacity 100ms linear,
+    transform 60ms ease-out,
+    box-shadow 60ms ease-out,
+    background-color 120ms;
+}
+.inv-link[data-corner='left'] {
+  left: calc(var(--inv-link-inset) + env(safe-area-inset-left));
+  width: var(--inv-link-size);
+  height: var(--inv-link-size);
+}
+.inv-link[data-corner='right'] {
+  right: calc(var(--inv-link-inset) + env(safe-area-inset-right));
+}
+.inv-link[inert] {
+  opacity: 0.45;
+}
+.inv-link.is-moving {
+  opacity: 0;
+  pointer-events: none;
+}
+.inv-link .inv-btn-label {
+  --inv-tab-x: 0;
+  top: calc(100% + 14px);
+  bottom: auto;
+  transform: translate(var(--inv-tab-x), -3px);
+}
+.inv-link[data-corner='left'] .inv-btn-label {
+  --inv-notch: calc(var(--inv-link-size) / 2);
+  left: -2px;
+}
+.inv-link[data-corner='right'] .inv-btn-label {
+  --inv-notch: calc(100% - var(--inv-tool) / 2);
+  left: auto;
+  right: -2px;
+}
+/* (Its notch over it, pointing up at the button: one pixel, then three.) */
+.inv-link .inv-btn-label::after {
+  top: auto;
+  bottom: calc(100% + 4px);
+  box-shadow:
+    -2px 2px 0 var(--inv-ink),
+    0 2px 0 var(--inv-ink),
+    2px 2px 0 var(--inv-ink);
+}
+@media (prefers-reduced-motion: reduce) {
+  .inv-link {
+    transition: none;
+  }
+}
+
 /* --- The Settings sheet: a bottom sheet over the toolbar. */
 .inv-sheet {
   position: absolute;

@@ -66,11 +66,15 @@
   display: flex;
   gap: 6px;
 }
-/* Skip Intro, at the top left all through the intro. */
+/* Skip Intro, at the top left all through the intro: just right of the link button when there is
+   one (it keeps the very corner: invitation.css .inv-link, ui.js), the top row's gap between. */
 .inv-talk-skip-intro {
   position: absolute;
   top: calc(10px + env(safe-area-inset-top));
   left: calc(10px + env(safe-area-inset-left));
+}
+.inv-stage.has-link .inv-talk-skip-intro {
+  left: calc(var(--inv-link-inset, 10px) + env(safe-area-inset-left) + var(--inv-link-size, 40px) + 6px);
 }
 .inv-talk-btn {
   min-height: 40px;
@@ -435,6 +439,9 @@
     top: 16px;
     left: 16px;
   }
+  .inv-stage.has-link .inv-talk-skip-intro {
+    left: calc(16px + var(--inv-link-size, 44px) + 8px);
+  }
   .inv-talk-btn {
     min-height: 44px;
     min-width: 64px;
@@ -442,6 +449,22 @@
   }
   .inv-talk-choices {
     width: min(400px, calc(100% - 48px));
+  }
+}
+
+/* A narrow phone with the link button beside Skip Intro: Auto, Next and Log a little tighter, and
+   on the narrowest Skip Intro on two rows, so the top row still fits (measured at 320 and 360). */
+@media (max-width: 379px) {
+  .inv-stage.has-link .inv-talk-top .inv-talk-btn {
+    min-width: 48px;
+    padding: 0 8px;
+  }
+}
+@media (max-width: 359px) {
+  .inv-stage.has-link .inv-talk-skip-intro {
+    width: min-content;
+    padding: 0 8px;
+    line-height: 1.05;
   }
 }
 
