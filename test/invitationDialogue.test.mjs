@@ -1234,6 +1234,13 @@ test('a finger’s speed as it lifts, and a fling’s path: speed × tau at most
   assert.equal(liftSpeed(up, 1080 + DRAG.sample + 1), 0, 'held still before it lifted: no speed');
   assert.equal(liftSpeed(up.slice(0, 1), 1000), 0, 'one move: no speed');
   assert.ok(liftSpeed(up, 1150) < 0.5, 'a pause before the lift slows it');
+  // (Its moves far apart, as a busy page's frames can be: still moving as it lifted, its speed from
+  // the move before.)
+  const sparse = [
+    { t: 1000, y: 500 },
+    { t: 1150, y: 440 },
+  ];
+  assert.ok(Math.abs(liftSpeed(sparse, 1160) - 0.375) < 1e-9, 'a frame or two apart');
   // (Only its last moves count: a slow start doesn't slow a quick end.)
   const late = [{ t: 0, y: 900 }, { t: 500, y: 890 }, ...up];
   assert.ok(Math.abs(liftSpeed(late, 1080) - 1) < 1e-9);

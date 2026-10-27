@@ -596,12 +596,14 @@ async function longLineScrolls(page, tap) {
   expect(v.canScroll).toBe(false);
   expect(errors).toEqual([]);
 }
+/** A line of 80 numbered rows (230 letters, under the cap): room for a fling to run on. */
+const RUNG_LINE = Array.from({ length: 80 }, (_, i) => String(i + 1)).join('\n');
 /** The next frame the page draws (a hand's moves come a frame or so apart). */
 const frame = (page) => page.evaluate(() => new Promise((done) => requestAnimationFrame(() => done(true))));
 /**
  * A finger through Chrome's own touch input (CDP): `down` at a point, `drag` it by `dy` px in
  * `steps` moves a frame apart (as a hand moves; `still` frames held at the end, so it lifts with
- * no speed), `up`.
+ * no speed; `flick`: lifted straight after the last, still moving), `up`.
  */
 function touchFinger(page, cdp) {
   let at = { x: 0, y: 0 };
@@ -615,11 +617,11 @@ function touchFinger(page, cdp) {
       at = { ...p };
       await send('touchStart', at);
     },
-    async drag(dy, { steps = 8, still = 0 } = {}) {
+    async drag(dy, { steps = 8, still = 0, flick = false } = {}) {
       for (let k = 0; k < steps; k++) {
         at = { x: at.x, y: at.y + dy / steps };
         await send('touchMove', at);
-        await frame(page);
+        if (!flick || k < steps - 1) await frame(page);
       }
       for (let k = 0; k < still; k++) {
         await send('touchMove', at);
@@ -661,10 +663,9 @@ async function fingerScrollsAnywhere(page) {
   await calm(page);
   const intro = structuredClone(behaviorIntro);
   const at = intro.boxes.findIndex((b) => b.id === intro.start);
-  for (const b of intro.boxes.slice(at, at + 2)) {
-    b.text = TALL_LINE;
-    b.choices = [];
-  }
+  intro.boxes[at].text = TALL_LINE;
+  intro.boxes[at + 1].text = RUNG_LINE;
+  for (const b of intro.boxes.slice(at, at + 2)) b.choices = [];
   await page.evaluate((i) => window.__invitation.setIntro(i), intro);
   await open(page, true);
   const cdp = await page.context().newCDPSession(page);
@@ -728,21 +729,26 @@ async function fingerScrollsAnywhere(page) {
   expect(v.typed, 'the tap finished it').toBe(true);
   expect(v.seq, 'and went no further').toBe(seq2);
   expect(v.top, 'the finger right after scrolled it').toBeGreaterThan(tapped + 30);
-  // Lifted moving, it flings on and slows to rest.
+  // Flicked, it flings on past where the finger lifted (where the view was then, noted in the
+  // page as the finger lifts), and slows to rest.
   await scrollTo(page, 0);
+  await page.evaluate(() =>
+    addEventListener('pointerup', () => (window.__liftTop = document.querySelector('.inv-talk-text').scrollTop), {
+      capture: true,
+      once: true,
+    }),
+  );
   await f.down(stage);
-  await f.drag(-48, { steps: 4 });
+  await f.drag(-240, { steps: 4, flick: true });
   await f.up();
-  const lifted = (await where(page)).top;
-  await expect
-    .poll(async () => (await where(page)).top, { message: 'on after the finger' })
-    .toBeGreaterThan(lifted + 5);
   await scrollStill(page);
+  const lifted = await page.evaluate(() => window.__liftTop);
+  expect((await where(page)).top, 'flung on past where the finger lifted').toBeGreaterThan(lifted + 20);
   expect((await where(page)).seq, 'the fling goes nowhere').toBe(seq2);
   // A touch on a fling still moving only stops it; a tap with it at rest goes on.
   await scrollTo(page, 0);
   await f.down(stage);
-  await f.drag(-48, { steps: 4 });
+  await f.drag(-240, { steps: 4, flick: true });
   await f.up();
   await page.touchscreen.tap(stage.x, stage.y);
   await scrollStill(page);
