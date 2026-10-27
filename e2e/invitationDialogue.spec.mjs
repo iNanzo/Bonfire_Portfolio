@@ -1824,6 +1824,7 @@ test.describe('on a desktop', () => {
         await goOn(page);
         await until(page, (x) => x.dialogue.typed, 'the line up');
       }
+      const priorLine = await page.evaluate(() => window.__frames.at(-1).line);
       await page.evaluate((m) => (window.__mark = m), what);
       await doIt();
       await until(page, (x) => !x.dialogue || x.dialogue.seq > s.dialogue.seq, `${what}: the next line`);
@@ -1832,6 +1833,17 @@ test.describe('on a desktop', () => {
       await expect
         .poll(() => page.evaluate(() => document.querySelectorAll('.inv-talk-typed .inv-fx.is-unseen').length))
         .toBe(0);
+      // Next can finish synchronously. Let the recorder see its new line before another
+      // action changes the mark, so a fast response cannot be attributed to the next press.
+      await expect
+        .poll(() =>
+          page.evaluate(
+            ({ what, priorLine }) =>
+              window.__frames.some((r) => r.mark === what && r.line !== priorLine && r.letters === r.all),
+            { what, priorLine },
+          ),
+        )
+        .toBe(true);
     };
     await act('click', () => goOn(page));
     await act('space', () => page.keyboard.press('Space'));

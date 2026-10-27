@@ -37,6 +37,7 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import sharp from 'sharp';
+import { paletteOf, parseMarkup } from '../src/invitation/markup.js';
 
 /** Collect the page's errors (uncaught ones, console errors, failed requests) for the test to check. */
 function watch(page, errors = []) {
@@ -793,7 +794,9 @@ test.describe('on a phone', () => {
     }
     const { showing } = (await snapshot(page)).talk;
     expect(showing, 'he said something').toBeTruthy();
-    await expect(page.locator('.inv-bubble-live')).toHaveText(`NEWT: ${showing.line}`);
+    await expect(page.locator('.inv-bubble-live')).toHaveText(
+      `NEWT: ${parseMarkup(showing.line, paletteOf(inv.text?.colors)).plain}`,
+    );
     let at = null;
     await expect.poll(async () => !(at = await bubbleAt(page)).away, { message: 'placed' }).toBe(true);
     expect(at.tail).toBe('down');
@@ -2091,8 +2094,12 @@ test.describe('on a desktop', () => {
     expect(showing, 'he said something').toBeTruthy();
     expect(['wave', 'spook', 'flee']).toContain(showing.trigger);
     expect(lines).toContain(showing.line);
-    await expect(page.locator('.inv-bubble-typed'), 'typed out to the whole line').toHaveText(showing.line);
-    await expect(page.locator('.inv-bubble-live')).toHaveText(`NEWT: ${showing.line}`);
+    await expect(page.locator('.inv-bubble-typed'), 'typed out to the whole line').toHaveText(
+      parseMarkup(showing.line, paletteOf(inv.text?.colors)).plain,
+    );
+    await expect(page.locator('.inv-bubble-live')).toHaveText(
+      `NEWT: ${parseMarkup(showing.line, paletteOf(inv.text?.colors)).plain}`,
+    );
     let at = null;
     await expect.poll(async () => !(at = await bubbleAt(page)).away, { message: 'placed' }).toBe(true);
     expect(at.box.bottom, 'over his head').toBeLessThan(at.head.y);
@@ -2135,7 +2142,9 @@ test.describe('on a desktop', () => {
     const back = await snapshot(page);
     expect(back.talk.showing?.line, 'talk still has the line up').toBe(talk.showing.line);
     await expect(page.locator('.inv-bubble'), 'and its bubble still shows it').toBeVisible();
-    await expect(page.locator('.inv-bubble-live')).toHaveText(`NEWT: ${talk.showing.line}`);
+    await expect(page.locator('.inv-bubble-live')).toHaveText(
+      `NEWT: ${parseMarkup(talk.showing.line, paletteOf(inv.text?.colors)).plain}`,
+    );
     // The bubble goes when talk's line is over, not before.
     await expect(page.locator('.inv-bubble')).toBeHidden({ timeout: 20_000 });
     await until(page, (s) => !s.talk.showing, 'talk’s line over too', 2_000);
