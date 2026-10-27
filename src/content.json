@@ -1127,6 +1127,13 @@
       "button": "Break the Seal",
       "wrong": "The seal holds. That isn’t the word.",
       "working": "The ward listens…"
+    },
+    "key": {
+      "alg": "PBKDF2-SHA256",
+      "iter": 600000,
+      "salt": "z7fwz8eQ9TYxidhvFYQedg==",
+      "hash": "jWqsRVa6NbUCeAeOQ/lhGG0QcawAYhh2EAW3BCJ32cc=",
+      "set": "2026-10-27"
     }
   },
   "effects": {
@@ -1935,17 +1942,18 @@
     "lines": {
       "wave": [
         ":3",
-        "Oh, hello there!",
+        "Howdy!",
         "Hey! Over here!",
-        "Hello! I’m NEWT.",
-        "Wave back. I’ll wait."
+        "{wave,pink|Annyeong Haseyo₊˚⊹♡}",
+        "{pink|Konnichiikawa}",
+        "Wassup motha sucka"
       ],
       "spook": [
-        "Eep!",
-        "Gah! Warn a guy first!",
-        "You scared the pixels out of me!",
-        "Don’t sneak up like that!",
-        "Why are you like this?!"
+        "{shake|Eep!}",
+        "Gah!",
+        "I pooped my pants...",
+        "{wave|:o!}",
+        "I"
       ],
       "flee": [
         "Nope, nope, nope!",
@@ -1963,45 +1971,53 @@
       "pickedUp": [
         "So this is what tall people see",
         "Be gentle im frail...",
-        "Please... im fragile...",
+        "{wave,shake|Please...} im fragile...",
         "Please, I’m just a little guy :(",
         "You see how this looks, right?",
-        "mmmmfgh.,..,"
+        "{wave|mmmmfgh.,..,}",
+        "Oh no I've been stockholm syndromed...",
+        "..."
       ],
       "shaken": [
-        "Stop shaking meee!",
-        "My polygons are rattling!",
-        "Too much! Too much!",
-        "I’m getting dizzy…"
+        "{wave,shake|Please,} I have epilepsy!",
+        "Shiver me timbers!",
+        "Rattle me bones!",
+        "{wave,shake|I frew up...}"
       ],
       "thrash": [
-        "Put me DOWN!",
-        "I will bite. I have no teeth, but I will bite.",
-        "Hiyaaah! Kick! Kick!",
-        "Let me go let me go let me go",
-        "This is a hostage situation!!"
+        "Lemme go!",
+        "{purple,big,bold,wave,shake|Unhand me wench!}",
+        "{RED,big,bold,wave,shake|RAHHHHHHH}",
+        "Let me go let me go {wave,shake|let me go!}",
+        "HELP I'VE BEEN TAKEN HOSTAGE"
       ],
       "dropped": [
-        "Wheee!",
-        "Wait, wait, wait!",
-        "Gravity, my old enemy!",
-        "You dropped me?!"
+        "{big,bold,wave|Wheee!}",
+        "{shake,bold,big|Wait, wait, wait!}",
+        "I am {red,big,bold,wave|Spiderman}...",
+        "I invented gravity!",
+        "{big,bold,wave|Wahoo!}",
+        "Not the first time I've been dropped!"
       ],
       "landed": [
-        "Oof.",
-        "MY LEG",
-        "Stuck the landing!"
+        "{big,bold|Oof.}",
+        "{big,bold,wave,shake|MY LEG}",
+        "I am {red,big,bold,wave|Spiderman}...",
+        "{big,bold,shake|Yeowch!|}"
       ],
       "walkTo": [
         "On my way!",
-        "Over there? Sure!",
-        "Coming!",
-        "Walk, walk, walk…"
+        "{gold|YAHAAAAAA!}",
+        "{gold|Ura}",
+        "{wave,pink|U-uwa-wa-uwa✧･ﾟ: *✧･ﾟ:*}",
+        "Give me a sec I only average 200 steps a day...",
+        "On it!",
+        "Here I come suckas!"
       ],
       "wander": [
         "What’s over here?",
         "Just stretching my legs.",
-        "Exploring!",
+        "{wave,pink|U-uwa-wa-uwa✧･ﾟ: *✧･ﾟ:*}",
         "Hmm, I wonder…"
       ],
       "sitDown": [
@@ -2011,47 +2027,58 @@
         "My legs are so tired."
       ],
       "sitting": [
-        "Still here. Still sitting.",
-        "This floor’s surprisingly comfy.",
+        "...",
+        "The floor’s pretty comfy.",
         "Hello? Anyone there?",
-        "Yaaawn…",
-        "I could sit here all day."
+        "{wave|Yaaawn…}",
+        "I could sit here all day..."
       ],
       "standUp": [
         "Okay, okay, I’m up!",
         "Up and at ’em!",
-        "Oh, we’re doing things now?"
+        "Oh, we’re doing things now?",
+        "What's happenin'?"
       ],
       "device": [
-        "Ooh, is this for me?",
-        "Just one more level...",
-        "Don’t tell anyone, but I’m really good at this.",
-        "Shh, I’m on a streak.",
-        "Low battery? Nah, I’ll live."
+        "Break time!",
+        "Doomscroll...",
+        "Treat?",
+        "Low battery? Nah, I’d win.",
+        "{big,bold|Screen time! screen time!}",
+        "See you in 5 hours"
       ],
       "lieDown": [
-        "Okay, this is the comfy way to play.",
-        "Belly mode: activated.",
+        "It's comfier this way :3",
+        "Belly time!",
         "Five more minutes...",
-        "Nobody talk to me, I’m busy."
+        "Nobody talk to me, I’m busy.",
+        "Just one more video...",
+        "See you in 5 more hours"
       ],
       "idle": [
-        "*Mongolian throat singing*",
+        "{wave,big,bold|*Mongolian throat singing*}",
         "It’s very white in here.",
-        "Nae pi ttam nunmul~",
-        "I am Spiderman..."
+        "{wave,purple|Nae pi ttam nunmul.𖥔⊹₊ ⋆𐦍⊹₊ ⋆｡˚}",
+        "I am {red,big,bold|Spiderman}...",
+        "{wave,pink|U-uwa-wa-uwa✧･ﾟ: *✧･ﾟ:*}",
+        "I'm the {green,big,bold|Joker} baby!",
+        "I'm {big,bold|Batman}...",
+        "I'm Chris Hansen with Dateline NBC...",
+        "I am a cannibal, ethically."
       ],
       "spin": [
-        "Whoa, the room’s spinning!",
-        "Okay, now I’m dizzy.",
-        "Round and round we go!",
-        "Are you lost up there?"
+        "I can't tell if that's the room or my head spinning...",
+        "Spinny ride spinny ride!",
+        "{wave|You spin me right round baby right round}",
+        "You good up there?"
       ],
       "zoom": [
-        "Um. Hi. That’s close.",
+        "Um. Hi.",
         "Do I have something on my face?",
-        "Counting my pixels?",
-        "Too close! Back up a bit!"
+        "Can you see my pores?",
+        "Beat it pal",
+        "{wave,big,bold|:3}",
+        "{wave,big,bold|;-;}"
       ]
     },
     "intro": {
@@ -2312,22 +2339,22 @@
           "auto": 0,
           "choices": [
             {
-              "label": "Nanzo",
+              "label": "{red,big,bold|Nanzo}",
               "next": "nanzo1"
             },
             {
-              "label": "Winja",
+              "label": "{purple,big,bold|Winja}",
               "next": "winja1"
             },
             {
-              "label": "Goodbye.",
+              "label": "Goodbye!",
               "next": "bye"
             }
           ]
         },
         {
           "id": "nanzo1",
-          "speaker": "Nanzo",
+          "speaker": "{red,big,bold|Nanzo}",
           "text": "{red,bold,big|Nanzo} is like the {red,shake,wave|unhinged feral wolf}, it's a name I came up with after my brother told me to come up with one for RP. I picked up a {gold|Naruto} manga and just took Danzo's name and swapped the first letter with my name's.",
           "face": "happy",
           "animation": "Thrash",
@@ -2339,7 +2366,7 @@
         },
         {
           "id": "nanzo2",
-          "speaker": "Nanzo",
+          "speaker": "{red,big,bold|Nanzo}",
           "text": "It's the username I've been using online since I was like 12, including the {pink,bold,big|Chiikawa©} {bold|TikTok©}. But I consider the mask a separate persona.",
           "face": "neutral",
           "animation": "Talk",
@@ -2387,7 +2414,7 @@
         },
         {
           "id": "winja1",
-          "speaker": "Winja",
+          "speaker": "{purple,big,bold|Winja}",
           "text": "{purple,bold,big|Winja}, short for the {wave,purple|\"Winning Ninja\"}, is the first username I really started using online.\n\nMostly on {bold,red,big|Roblox©} (c. 2008), where I got my first taste of gamedev alongside {gold,bold,big|Scratch©}.",
           "face": "neutral",
           "animation": "Think",
@@ -2399,7 +2426,7 @@
         },
         {
           "id": "winja2",
-          "speaker": "Winja",
+          "speaker": "{purple,big,bold|Winja}",
           "text": "{purple|He} was banished long ago (both of my accounts got hacked). {bold|But somehow, {purple|He} returned.} {purple|He's} like the {purple,shake|wise, evil, eldritch cryptid wolf.}",
           "face": "neutral",
           "animation": "Talk",
@@ -2472,8 +2499,8 @@
       ]
     },
     "link": {
-      "href": "",
-      "label": "Link"
+      "href": "https://partiful.com/e/gNgVFIetfJCG04BwlOVK",
+      "label": "Partiful Link"
     }
   }
 }
