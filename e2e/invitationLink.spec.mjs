@@ -24,7 +24,7 @@ const LINK = { href: 'favicon.svg', label: 'Portfolio' };
 const LONG = { href: 'favicon.svg', label: 'Twenty Four Letter Label' };
 const ENVELOPE = '/invitation/?test&envelope&calm&seed=3';
 const TOY = '/invitation/?test&calm&seed=3';
-/** A short intro of the test's own: a long first line (it types for seconds), then the end. */
+/** A short intro of the test's own: a long first line, then the end. */
 const INTRO = {
   speaker: 'Tester',
   start: 'a',
@@ -313,14 +313,15 @@ test.describe('on a desktop', () => {
     expect(Math.abs(skip.y - link.y), 'level with it').toBeLessThanOrEqual(1);
     expect(Math.abs(skip.height - link.height), 'as tall').toBeLessThanOrEqual(1);
     expect(await onTop(page), 'over the chat screen').toBe(true);
+    // The line all typed first: from here a press that reached the layer would go on at once.
+    await until(page, (s) => s.dialogue?.typed === true, 'the first line typed');
 
-    // A click opens its page; the line types on, unfinished, the same box.
+    // A click opens its page; the same box, not gone on.
     const before = (await snapshot(page)).dialogue;
     await opensPage(page, () => linkEl(page).click());
     await clockOn(page);
     let now = (await snapshot(page)).dialogue;
-    expect(now.seq, 'the same box').toBe(before.seq);
-    expect(now.typed, 'not finished by the click').toBe(false);
+    expect([now.id, now.seq], 'the same box, not gone on by the click').toEqual([before.id, before.seq]);
 
     // Tab: round the intro's buttons and the link.
     await page.keyboard.press('Tab');
@@ -347,8 +348,7 @@ test.describe('on a desktop', () => {
     await page.keyboard.press('Space');
     await clockOn(page);
     now = (await snapshot(page)).dialogue;
-    expect(now.seq, 'still the same box').toBe(before.seq);
-    expect(now.typed, 'and still typing').toBe(false);
+    expect([now.id, now.seq], 'still the same box').toEqual([before.id, before.seq]);
 
     // Skip Intro: the intro's over, and the link fades out at the left and in at the right.
     const frames = moveFrames(page);
