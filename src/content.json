@@ -1109,7 +1109,7 @@
     "cta": "Return to the fire"
   },
   "gate": {
-    "on": false,
+    "on": true,
     "pages": {
       "portfolio": true,
       "live": true,
