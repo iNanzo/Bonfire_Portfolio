@@ -58,6 +58,14 @@
 // the grab ring and the hover gone), the toy paused behind it as at boot; opened, the intro starts
 // the same way. Under ?test without &envelope, Replay Intro runs the dialogue alone.
 //
+// The link button (ui.js linkHtml and link.js; content.js linkSettings(), the admin's link) sits
+// over everything at the top left while the envelope is up and while the intro runs or is about
+// to (opened, not yet begun), so it stays put from the one into the other, and at the top right
+// in the toy (syncLink: each frame, and as the envelope comes and goes; ui.js fades it between
+// the two). In the envelope's and the intro's corner their layer owns it (aria-owns) and their
+// Tab order takes it after their own buttons (linkStops); the intro's Log and question put it out
+// of reach, as the Settings sheet does. Under ?preview there's none.
+//
 // Replay Intro without an envelope runs the intro's dialogue (dialogue.js, on content.js introScript():
 // content.json's invitation.intro as the admin writes it, mended, or the toy's own) on the toy's
 // clock, shown by dialogueUi.js over the stage: the toolbar rests out of sight, the speech bubble
@@ -90,7 +98,9 @@
 // view({yaw, elevation, zoom}) eases the camera there; `?seed=N` and `?calm` go to the brain (and
 // the seed to talk).
 // clock() is the toy's clock (it stands still while the envelope covers him), envelope() the
-// envelope's state and pose (null without one).
+// envelope's state and pose (null without one); setLink({href, label}) gives the link button a
+// link of the spec's own (link.js linkFrom; none under ?preview), and snapshot().link is how it
+// stands (shown, its href and label, its corner, where it's drawn, its fade, inert).
 //
 // `?preview` is the admin's intro preview (admin/ui/introPreview.js frames it): no envelope, calm
 // (no wandering), no bubble lines and no petals. It listens only to its parent window, at the
@@ -112,7 +122,15 @@ import './dialogue.css';
 import './envelope.css';
 import { DANGLE, createBrain, dangleLift, talkPhase } from './brain.js';
 import { createBubble, speakerPoint } from './bubble.js';
-import { introFrom, introScript, invitationDefaults, invitationLines, speechSettings, textPalette } from './content.js';
+import {
+  introFrom,
+  introScript,
+  invitationDefaults,
+  invitationLines,
+  linkSettings,
+  speechSettings,
+  textPalette,
+} from './content.js';
 import { CARRY, createHand, handFeel, handStep } from './carry.js';
 import {
   CUES,
@@ -201,6 +219,7 @@ import { createTalk } from './speech.js';
 import { LIFT, createStage } from './stage.js';
 import { centreOf } from './steer.js';
 import { bindUi, deviceLabelOf, loadWander, parseQuery, saveWander } from './ui.js';
+import { linkCorner, linkFrom } from './link.js';
 
 /** The longest step a frame takes, seconds (a slow frame or a tab coming back never jumps). */
 const MAX_DT = 0.05;
@@ -313,6 +332,11 @@ let introWanted = false;
 const ui = bindUi(stageEl, {
   look,
   wander: wanderWanted ?? !options.calm,
+  // (The admin's link button, none in its intro preview; at the top left from the start under
+  // the envelope.)
+  link: options.preview ? null : linkSettings(),
+  base: BASE,
+  corner: options.envelope ? 'left' : 'right',
   onButton: (name) => {
     pressed = name;
   },
@@ -359,6 +383,8 @@ function prefersReduced() {
 let toyReady = false;
 /** The envelope stopped covering the toy (start() sets it: the loop runs again). */
 let envelopeGone = () => {};
+/** The intro's chat screen is out of sight, its fade as it ends over (start() makes it so). */
+let talkGone = () => true;
 const hudEl = /** @type {HTMLElement} */ (stageEl.querySelector('.inv-hud'));
 /** @type {ReturnType<typeof createEnvelopeScene>} the envelope (at boot, or Replay Intro's), null once there's none */
 let envelope = null;
@@ -372,15 +398,46 @@ function spawnEnvelope() {
     reduced: prefersReduced(),
     petals: petalsOn(look),
     ready: () => toyReady,
+    more: () => ui.linkStops(),
     onUncover: (how) => {
       hudEl.removeAttribute('inert');
       if (how === 'open') introWanted = true;
       // (Skipped: the toy is free, focus on the toolbar's first button, its ring only after a key.)
       else ui.focusToolbar();
       envelopeGone();
+      syncLink();
     },
   });
   if (envelope) hudEl.setAttribute('inert', '');
+  syncLink();
+}
+/** The top right is clear for the link button: the envelope's Skip Intro and the intro's Auto, Next and Log have gone. */
+const linkClear = () => (!envelope || envelope.skipGone) && talkGone();
+/** @type {Element|null} the modal layer that owns the link button for screen readers, if any */
+let linkOwner = null;
+/**
+ * The link button's corner (link.js linkCorner): the top left while the envelope's up and while
+ * the intro runs or is about to (opened, it hasn't started yet), so it stays put from the one
+ * into the other; else the top right. And while it's in a modal layer's corner (the envelope's,
+ * the intro's), that layer owns it (aria-owns), so a screen reader finds it in the dialog.
+ */
+function syncLink() {
+  const covers = Boolean(envelope?.covers);
+  ui.placeLink(linkCorner({ envelope: covers, intro: introWanted || ui.talking }), {
+    reduced: prefersReduced(),
+    clear: linkClear,
+  });
+  const owner = !ui.linkStops().length
+    ? null
+    : covers
+      ? (envelope?.element ?? null)
+      : ui.talking
+        ? stageEl.querySelector('.inv-talk')
+        : null;
+  if (owner === linkOwner) return;
+  linkOwner?.removeAttribute('aria-owns');
+  owner?.setAttribute('aria-owns', 'inv-link');
+  linkOwner = owner;
 }
 if (options.envelope) spawnEnvelope();
 /** The envelope's state for ?test (types.js EnvelopeState), null without one. */
@@ -732,7 +789,9 @@ function start(s) {
     log: () => intro?.log ?? [],
     replySettle: options.settle ?? REPLY_SETTLE,
     palette: textPalette(),
+    more: () => ui.linkStops(),
   });
+  talkGone = () => talkUi.gone;
   // (A resize while the intro runs, or the chat box growing with a longer line: the shot framed
   // again for the new clear space.)
   const reframe = new ResizeObserver(() => {
@@ -1855,6 +1914,9 @@ function start(s) {
       step(dt, ms / 1000);
       dropFx();
       s.render();
+      // (The link button: its corner, and out of reach while the intro's Log or question is up.)
+      ui.setLinkBlocked(talkUi.logOpen || talkUi.asking);
+      syncLink();
     } catch {
       lost = true;
       sync();
@@ -2093,6 +2155,9 @@ function start(s) {
         burst: Boolean(burst),
         // (The envelope's state, null without one: types.js EnvelopeState.)
         envelope: envelopeState(),
+        // (The link button: shown, its href and label, its corner and where it's drawn, its
+        // fade's phase and its opacity as it last changed corners, inert.)
+        link: ui.linkState(),
         // (It still hides him, as of the last step: the intro's first line waits on it.)
         envelopeVeils,
         // (The admin's intro preview: the origin it listens to, and the box it was asked for.)
@@ -2170,6 +2235,15 @@ function start(s) {
       },
       /** The intro's script as the envelope and Replay Intro run it (playScript). */
       intro: () => playScript(),
+      /**
+       * The link button's link, the spec's own (link.js linkFrom: anything; an empty or unsafe
+       * href hides it); none under ?preview, as the page has none there.
+       * @param {unknown} value
+       */
+      setLink(value) {
+        ui.setLink(options.preview ? null : linkFrom(value));
+        syncLink();
+      },
       /** Use a controlled script for UI behavior tests; null restores the admin’s content.
        * @param {unknown} value
        */

@@ -7,7 +7,8 @@
 // every field named and helped, the toy's own lists as dropdowns, its ranges as sliders, the
 // triggers grouped by the plan's kinds, and the search finding them there. (The intro has its
 // own tests: test/invitationIntro.test.mjs for its rules and admin/test/invitationIntro.test.mjs
-// for its section; the text effects too: admin/test/invitationText.test.mjs.) The lines here are the test's own:
+// for its section; the text effects too: admin/test/invitationText.test.mjs, and the link
+// button: admin/test/invitationLink.test.mjs.) The lines here are the test's own:
 // content.json's are the admin's.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -99,12 +100,19 @@ test('content from before the toy (no invitation key) passes, and a whole valid 
 });
 
 test('content from before the toy can still be edited: each of the Invitation page’s sections starts from the toy’s own built-in values, which pass the rules', () => {
-  const keys = ['invitation.defaults', 'invitation.speech', 'invitation.lines', 'invitation.intro', 'invitation.text'];
+  const keys = [
+    'invitation.defaults',
+    'invitation.speech',
+    'invitation.lines',
+    'invitation.intro',
+    'invitation.text',
+    'invitation.link',
+  ];
   for (const key of keys) assert.equal(typeof STARTERS[key], 'function', `${key} has a way to start`);
   const inv = Object.fromEntries(keys.map((key) => [key.split('.')[1], STARTERS[key]()]));
   const old = content();
   delete old.invitation;
-  assert.deepEqual(validateContent({ ...old, invitation: inv }).errors, [], 'all five, started');
+  assert.deepEqual(validateContent({ ...old, invitation: inv }).errors, [], 'all six, started');
   for (const key of keys) {
     const part = key.split('.')[1];
     assert.deepEqual(validateContent({ ...old, invitation: { [part]: inv[part] } }).errors, [], `${key} alone`);
@@ -128,11 +136,11 @@ test('content from before the toy can still be edited: each of the Invitation pa
   assert.notEqual(STARTERS['invitation.defaults']().shader, STARTERS['invitation.defaults']().shader);
 });
 
-test('the section itself: a group of fields, with only its five parts', () => {
+test('the section itself: a group of fields, with only its six parts', () => {
   assert.deepEqual(errorsAt('nope'), ['invitation']);
   assert.deepEqual(errorsAt([]), ['invitation']);
   assert.deepEqual(errorsAt({ ...valid(), extra: 1 }), ['invitation.extra']);
-  for (const part of ['defaults', 'speech', 'lines', 'intro', 'text'])
+  for (const part of ['defaults', 'speech', 'lines', 'intro', 'text', 'link'])
     assert.deepEqual(errorsAt({ ...valid(), [part]: [] }), [`invitation.${part}`], `${part}: a group`);
 });
 
@@ -301,7 +309,7 @@ function walk(v, path = ['invitation'], out = []) {
   return out;
 }
 
-test('the Invitation page: the default look, the speech, the lines, the text effects and the intro, in a group of their own', () => {
+test('the Invitation page: the default look, the speech, the lines, the text effects, the link button and the intro, in a group of their own', () => {
   const page = PAGES.find((p) => p.id === 'invitation');
   assert.ok(page, 'a page of its own');
   assert.equal(titleCase(page.label), 'Invitation');
@@ -310,6 +318,7 @@ test('the Invitation page: the default look, the speech, the lines, the text eff
     'invitation.speech',
     'invitation.lines',
     'invitation.text',
+    'invitation.link',
     'invitation.intro',
   ]);
   assert.ok(page.blurb.length >= 12 && page.blurb.length <= 160, 'a blurb');

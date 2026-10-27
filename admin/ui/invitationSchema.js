@@ -24,6 +24,10 @@
 // list of name and colour started from the toy's own (DEFAULT_TEXT_COLORS); its help shows the
 // tags. Each chat box's text, the names, the replies and each line have a live preview under them (INVITATION_PREVIEWS:
 // form.js draws it with markup.js and the draft's colours, previewPalette).
+//
+// Link Button (`invitation.link`): where the toy's link button goes (its Link: https://, mailto:
+// or a site path; empty, no button) and its Label, its name (link.js LINK_LABEL_MAX letters;
+// empty, LINK_LABEL); started from the toy's own (no link). The rules are link.js linkProblems.
 import {
   INTRO_ANIMATIONS,
   INTRO_AUTO,
@@ -40,6 +44,7 @@ import { PRESETS } from '../../src/invitation/looks/index.js';
 import { PIXEL_SIZES } from '../../src/invitation/pixels.js';
 import { SHADER_CONTROLS, styleShader } from '../../src/invitation/shader.js';
 import { DEFAULT_TEXT_COLORS, paletteOf, plainText } from '../../src/invitation/markup.js';
+import { LINK_LABEL, LINK_LABEL_MAX } from '../../src/invitation/link.js';
 import { LINE_MAX, LINES_MAX, SPEECH_DEFAULTS, SPEECH_RANGES, TRIGGERS } from '../../src/invitation/speech.js';
 import { getAt } from './paths.js';
 import { titleCase } from './text.js';
@@ -143,6 +148,9 @@ export const INVITATION_LABELS = {
   'invitation.text.colors': 'Colors',
   [`${COLOR}.name`]: 'Name',
   [`${COLOR}.color`]: 'Color',
+  'invitation.link': 'Link button',
+  'invitation.link.href': 'Link',
+  'invitation.link.label': 'Label',
 };
 export const INVITATION_HELP = {
   'invitation.defaults':
@@ -212,6 +220,11 @@ export const INVITATION_HELP = {
     'The color names a tag can use, like {gold|this}. A tag also takes a hex color itself: {#e44544|this}.',
   [`${COLOR}.name`]: 'What a tag calls it: lowercase letters, numbers and dashes, like {red|word}.',
   [`${COLOR}.color`]: 'The color its letters show in, in the chat box and his bubble.',
+  'invitation.link':
+    'A button with a link icon at the toy’s top right (top left over the envelope and the intro) that opens this link in a new tab.',
+  'invitation.link.href':
+    'Where the link button goes: https://…, mailto:… or a site path like visualizer/. Empty hides the button.',
+  'invitation.link.label': `The button’s name, shown on hover and read by screen readers. Up to ${LINK_LABEL_MAX} letters; empty, it’s ${LINK_LABEL}.`,
 };
 /** The invitation's sliders: the Shader ranges (not Colors, a list of steps), the speech's. */
 export const INVITATION_RANGES = {
@@ -248,6 +261,9 @@ export const INVITATION_MORE = {
     'Combine them with commas: {red,wave|Hey!}. A tag can hold one more: {gold|a {wave|big} deal}, but no deeper.\n' +
     'Write \\{ or \\} for a brace; *, ** and ~ are only text. An emoji counts as one letter.\n' +
     'The typing, Auto’s wait and the length limits count only the letters that show. A preview under each line shows it as the toy does.',
+  'invitation.link':
+    'A site path opens from the site’s root (visualizer/ is Bonfire Live). Every link but a mailto: opens in a new tab, so the toy keeps where it was.\n' +
+    'With a mouse its label shows on hover; on a phone it shows its icon only, and a press held still shows its label.',
   'invitation.intro.boxes':
     'Choices come first, then End, then Next: with choices, a box waits for a reply; with none of the three, a tap goes to the box after it, and the last box ends the intro.\n' +
     'A box nothing leads to, or boxes that go round with no choice to leave, get a warning.',
@@ -260,6 +276,7 @@ export const INVITATION_KEYWORDS = {
   'invitation.lines': ['newt', 'speech bubble', 'talk', 'say', 'words'],
   'invitation.intro': ['newt', 'dialogue', 'chat', 'play intro', 'story', 'cutscene', 'uma musume'],
   'invitation.text': ['newt', 'color', 'colour', 'wave', 'shake', 'bold', 'big', 'italic', 'tags', 'markup', 'style'],
+  'invitation.link': ['newt', 'link', 'url', 'href', 'mailto', 'button', 'website', 'portfolio', 'contact'],
 };
 
 /** Its triggers by the plan's kinds (the quiet spell with Passive). */
@@ -486,6 +503,8 @@ export const INVITATION_STARTERS = {
     ],
   }),
   'invitation.text': () => ({ colors: DEFAULT_TEXT_COLORS.map((c) => ({ ...c })) }),
+  // (The toy's own: no link, so no button, and the name it'd have.)
+  'invitation.link': () => ({ href: '', label: LINK_LABEL }),
 };
 
 /**

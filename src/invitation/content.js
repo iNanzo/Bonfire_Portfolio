@@ -7,13 +7,15 @@
 // checks their values, and the admin's override the built-in Default), introScript() the chat
 // the envelope and Replay Intro open (introFrom: types.js DialogueScript, each box's flow spelled out),
 // textPalette() the text effects' colours (`invitation.text.colors`, markup.js paletteOf: what
-// {red|…} in a line is). Missing or broken, each falls back: no lines (he stays quiet), the
+// {red|…} in a line is), linkSettings() the link button's (`invitation.link`, link.js linkFrom:
+// where it goes and its name). Missing or broken, each falls back: no lines (he stays quiet), the
 // built-in speech settings, {} (the built-in look), the toy's own short intro (FALLBACK_INTRO; a
 // broken part of the admin's is mended on its own), the built-in colours (DEFAULT_TEXT_COLORS;
-// a broken entry in the admin's list is left out).
+// a broken entry in the admin's list is left out), no link (no button; its name Link).
 /// <reference path="./virtualContent.d.ts" />
 import raw from 'virtual:invitation-content';
 import { DIALOGUE_CLIPS, FACE_NAMES } from './clips.js';
+import { linkFrom } from './link.js';
 import { DEFAULT_TEXT_COLORS, paletteOf } from './markup.js';
 import { linesFrom, speechFrom } from './speech.js';
 
@@ -123,7 +125,7 @@ function defaultsFrom(d) {
 
 /**
  * Content from anything (the virtual module's, or a test's): the lines, the speech settings, the
- * Default look, the intro and the text colours (the admin's list when there is one).
+ * Default look, the intro, the text colours (the admin's list when there is one) and the link.
  * @param {unknown} data  content.json's `invitation`
  */
 export function readContent(data) {
@@ -138,6 +140,7 @@ export function readContent(data) {
         ? /** @type {any} */ (o.text).colors
         : DEFAULT_TEXT_COLORS,
     ),
+    link: linkFrom(o.link),
   };
 }
 
@@ -153,3 +156,5 @@ export const invitationDefaults = () => structuredClone(content.defaults);
 export const textPalette = () => new Map(content.palette);
 /** The intro the envelope and Replay Intro open, as the toy plays it (introFrom; a copy each time). */
 export const introScript = () => structuredClone(content.intro);
+/** The link button's link: where it goes and its name (link.js linkFrom; a copy each time). */
+export const linkSettings = () => ({ ...content.link });

@@ -8,7 +8,8 @@ format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and ver
 
 Round 18: NEWT's intro with italic, styled names and replies, a plain chat screen that
 dithers only as you go on, and a box of four rows at most that scrolls a longer line; dust and
-screen shake when he lands; and no more Pixel Shirt. Round 17, below it: NEWT's envelope reworked, rose petals all through his toy, text effects for
+screen shake when he lands; a link button on his toy, set in the admin; and no more Pixel
+Shirt. Round 17, below it: NEWT's envelope reworked, rose petals all through his toy, text effects for
 his words, an intro preview in the admin, and a plainer cult altar, no vignette and a cleaner mirror in Bonfire Live. Round
 16: a password lock for the site, and NEWT's toy opened from an envelope, with a
 new toolbar, a new way to carry him and more to do. Round 15: an Uma Musume-style
@@ -58,6 +59,18 @@ Round 10: menus and search, the knight's fixes, hygiene and performance.
   resolutions, is gone from Settings and the admin's Invitation page. His shirt shows its own
   plaid at every resolution. A look saved with Pixel Shirt on still loads, without it, and the
   admin reads a Default look that still has it with a warning.
+
+### NEWT's link button (round 18)
+
+- NEWT's toy has a link button: a rounded square with a link icon, in the toolbar's look, at
+  the top right. Over the envelope and all through the intro it sits at the top left, the
+  intro's Skip Intro just beside it, and when the intro ends or the envelope is skipped it
+  fades over to the top right. It opens its link in a new tab, so the toy stays as it was, and
+  pressing it never opens the envelope or moves the intro on. Its name shows as a little tab
+  under it on hover or keyboard focus, and on a phone when it's pressed and held. The admin's
+  Invitation page sets where it goes and its name in a new Link Button section; with no link
+  there's no button, as it ships. The admin needs deploying again after this merges, since its
+  content has a new part.
 
 ### NEWT's envelope (round 17)
 

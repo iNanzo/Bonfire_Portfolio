@@ -157,9 +157,16 @@ export const PAGES = [
     label: 'Invitation',
     // (Beside it, the intro preview: a chat box of the draft played in the toy, introPreview.js.)
     introPreview: true,
-    keys: ['invitation.defaults', 'invitation.speech', 'invitation.lines', 'invitation.text', 'invitation.intro'],
+    keys: [
+      'invitation.defaults',
+      'invitation.speech',
+      'invitation.lines',
+      'invitation.text',
+      'invitation.link',
+      'invitation.intro',
+    ],
     blurb:
-      'NEWT’s toy at /invitation/: the look a first visit gets, how often he talks, what he says, its text effects and the intro he plays.',
+      'NEWT’s toy at /invitation/: the look a first visit gets, how often he talks, what he says, its text effects, its link button and the intro he plays.',
   },
 ];
 /** Old page addresses that still work (#effects was the one Effects page). */

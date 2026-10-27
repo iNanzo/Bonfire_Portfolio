@@ -22,7 +22,9 @@
 // or tap on Auto, Next or Log (or the Log's Close) leaves focus where Space and Enter go on, and
 // from the keyboard focus stays on the button (the Log's back on it as it closes); under the Log
 // or the question the buttons over the stage are out of reach (inert); Tab goes
-// round the layer's buttons. A screen reader hears each line whole once, as plain text, from a
+// round the layer's buttons, and then what goes with them outside it (`more`: the link button,
+// ui.js, at the top left all through the intro; a focused link follows itself on Enter, and
+// neither key goes on from it). A screen reader hears each line whole once, as plain text, from a
 // live region (the typed text is hidden from it), and the Log lists it plain too; the replies are buttons, and focus goes to the first reply
 // when they show, into the Log and the question when they open and back when they close.
 // A long line grows the box by a row at most (dialogue.css: four rows, three on a short screen;
@@ -346,11 +348,17 @@ export function logHtml(entries) {
  * The layer, in the stage (over the toolbar and the Look sheet): open() shows it, render() shows
  * a view, close() hides it.
  * @param {HTMLElement} stage
- * @param {{onAction(a: TalkAction): void, log(): LogEntry[], replySettle?: number, palette?: Map<string, string>}} o  log: the entries now (the Log reads them as it opens); replySettle: ms the replies wait (REPLY_SETTLE; ?test can stretch it); palette: the text effects' colours (markup.js paletteOf; content.js textPalette)
+ * @param {{onAction(a: TalkAction): void, log(): LogEntry[], replySettle?: number, palette?: Map<string, string>, more?: () => HTMLElement[]}} o  log: the entries now (the Log reads them as it opens); replySettle: ms the replies wait (REPLY_SETTLE; ?test can stretch it); palette: the text effects' colours (markup.js paletteOf; content.js textPalette); more: the stops outside the layer Tab goes round with its own, after them (the link button's, ui.js linkStops)
  */
 export function createDialogueUi(
   stage,
-  { onAction, log, replySettle = REPLY_SETTLE, palette: firstPalette = paletteOf(DEFAULT_TEXT_COLORS) },
+  {
+    onAction,
+    log,
+    replySettle = REPLY_SETTLE,
+    palette: firstPalette = paletteOf(DEFAULT_TEXT_COLORS),
+    more = () => [],
+  },
 ) {
   /** The text effects' colours (setPalette: the admin's intro preview sends its draft's). */
   let palette = firstPalette;
@@ -709,6 +717,8 @@ export function createDialogueUi(
       const stops = /** @type {HTMLElement[]} */ ([...scope.querySelectorAll('button')]).filter(
         (b) => !b.closest('[hidden], [inert]') && !(/** @type {HTMLButtonElement} */ (b).disabled),
       );
+      // (The layer's own, then the link button over it.)
+      if (scope === layer) stops.push(...more());
       if (!stops.length) return;
       const at = stops.indexOf(/** @type {HTMLElement} */ (doc.activeElement));
       e.preventDefault();
@@ -724,8 +734,9 @@ export function createDialogueUi(
     }
     if (e.key !== ' ' && e.key !== 'Enter') return;
     const target = /** @type {HTMLElement|null} */ (e.target instanceof HTMLElement ? e.target : null);
-    // (A focused button presses itself: a reply's press waits for them to settle, in the click.)
-    if (target?.closest('button')) return;
+    // (A focused button presses itself: a reply's press waits for them to settle, in the click.
+    // A focused link follows itself on Enter.)
+    if (target?.closest('button, a[href]')) return;
     e.preventDefault();
     if (modal()) return;
     settle();
@@ -899,6 +910,10 @@ export function createDialogueUi(
     /** Open (not hidden, nor going). */
     get showing() {
       return !layer.hidden && !leaving;
+    },
+    /** Out of sight: hidden, its fade as the intro ends over (the link button may take the top right). */
+    get gone() {
+      return Boolean(layer.hidden);
     },
     get logOpen() {
       return !logBox.hidden;

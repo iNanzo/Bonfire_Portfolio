@@ -35,6 +35,15 @@
 // Escape closes it wherever focus is; the canvas stays live (turning the camera while choosing a look). A finger
 // on a slider only moves it once it goes along it (slideIntent): a swipe up or down that starts
 // there scrolls the sheet, and the value the slider jumped to under the finger is put back.
+// The link button (linkHtml; link.js has where it goes and its corner): the admin's link, a real
+// link in the toolbar's squircle look (the link icon, its label its own text), outside the HUD
+// and over everything in its corner (the envelope and the intro's screen too), its presses its
+// own; with a mouse its label shows as a pixel tab under it, on touch a press held still shows
+// it, as on the toolbar. main.js says which corner (placeLink: it fades out, then in at the new
+// one; at once with reduced motion); it's inert under the open Settings sheet, and while the
+// intro's Log or question is open (setLinkBlocked), and hidden from everyone when it has no
+// link it can use. Its Tab place: after the toolbar here; the envelope and the intro put it after
+// their own buttons in theirs (linkStops).
 // Pure markup functions (no DOM) plus a thin binding (bindUi) that puts them in the stage and
 // reports presses; main.js decides what they do.
 //
@@ -48,6 +57,7 @@ import { LOOKS, MOTIONS, STYLES, isCustom, petalsOn, shakeOn, shaderOf, validLoo
 import { SHADER_CONTROLS, controlFor, shaderText } from './shader.js';
 import { CUE_DEFAULT, CUE_LABELS, CUE_MODES } from './cues.js';
 import { LABEL_ICONS, iconSvg, installDither } from './icons.js';
+import { LINK_CLEAR_MS, LINK_FADE, LINK_LABEL, linkTarget } from './link.js';
 
 /** @typedef {import('./types.js').ButtonName} ButtonName */
 
@@ -287,6 +297,26 @@ export function toolbarHtml() {
   return `<nav class="inv-toolbar" aria-label="Play With NEWT">${intro}${buttons}${camera}${settings}${padHtml()}</nav>`;
 }
 
+/** Text as an attribute's value: html's, its double quotes too. @param {string} s */
+const attrText = (s) => html(s).replace(/"/g, '&quot;');
+
+/**
+ * The link button: a real link in the toolbar's squircle look, the link icon and its label (its
+ * own text: its name, no tooltip), its address from link.js linkTarget (a new tab for all but a
+ * mailto:, so the toy keeps its state); hidden, with no address (so no focus, and nothing for a
+ * screen reader), when it has none it can use: empty, unsafe, or no link at all (the admin's
+ * preview). `corner`: the one it starts in (link.js linkCorner).
+ * @param {import('./link.js').Link|null} link
+ * @param {{base?: string, corner?: import('./link.js').LinkCorner}} [o]  base: the site's root
+ */
+export function linkHtml(link, { base = '/', corner = 'right' } = {}) {
+  const to = link ? linkTarget(link.href, base) : null;
+  const where = to
+    ? ` href="${attrText(to.url)}"${to.newTab ? ' target="_blank" rel="noopener noreferrer"' : ''}`
+    : ' hidden';
+  return `<a class="inv-btn inv-tool inv-link" id="inv-link" data-link data-corner="${corner}" draggable="false"${where}>${iconSvg('link')}<span class="inv-btn-label">${html(link?.label ?? LINK_LABEL)}</span></a>`;
+}
+
 /**
  * One choice of a radio group, as a chunky segment.
  * @param {string} group  the input's name
@@ -435,18 +465,44 @@ const MODIFIERS = new Set(['Shift', 'Control', 'Alt', 'Meta']);
 /**
  * Put the page's controls in the stage and report what's pressed.
  * @param {HTMLElement} stage
- * @param {{look: import('./look.js').Look, wander?: boolean, onButton(name: ButtonName): void, onLook(look: import('./look.js').Look): void, onCamera?(key: CameraKey): void, onWander?(on: boolean): void, onSheet?(open: boolean): void, onIntro?(): void}} o
+ * @param {{look: import('./look.js').Look, wander?: boolean, link?: import('./link.js').Link|null, base?: string, corner?: import('./link.js').LinkCorner, onButton(name: ButtonName): void, onLook(look: import('./look.js').Look): void, onCamera?(key: CameraKey): void, onWander?(on: boolean): void, onSheet?(open: boolean): void, onIntro?(): void}} o
  *   wander: the Wander switch's state to begin with; onCamera: a Camera pad control pressed
  *   (reset: Reset Camera); onWander: the Wander switch flipped; onSheet: the Settings sheet
- *   opened or closed (main.js keeps NEWT in sight beside it); onIntro: Replay Intro pressed
+ *   opened or closed (main.js keeps NEWT in sight beside it); onIntro: Replay Intro pressed;
+ *   link: the link button's (link.js linkFrom; none: no button), base the site's root, corner
+ *   the one it starts in
  */
-export function bindUi(stage, { look, wander = true, onButton, onLook, onCamera, onWander, onSheet, onIntro }) {
+export function bindUi(
+  stage,
+  {
+    look,
+    wander = true,
+    link = null,
+    base = '/',
+    corner = 'right',
+    onButton,
+    onLook,
+    onCamera,
+    onWander,
+    onSheet,
+    onIntro,
+  },
+) {
   const hud = document.createElement('div');
   hud.className = 'inv-hud';
   hud.innerHTML = statusHtml() + toolbarHtml() + sheetHtml(look, ALL_STEPS, { wander });
   stage.append(hud);
   // (The buttons' hover and press fills: the ink's ordered dither.)
-  installDither(hud, getComputedStyle(hud).getPropertyValue('--inv-ink').trim() || '#3a332d');
+  const ink = getComputedStyle(hud).getPropertyValue('--inv-ink').trim() || '#3a332d';
+  installDither(hud, ink);
+  // (The link button: after the HUD, out of it (the HUD is inert under the envelope), over
+  // everything in its corner; its own dither.)
+  const linkTemplate = document.createElement('template');
+  linkTemplate.innerHTML = linkHtml(link, { base, corner });
+  const linkEl = /** @type {HTMLAnchorElement} */ (linkTemplate.content.firstElementChild);
+  stage.append(linkEl);
+  installDither(linkEl, ink);
+  stage.classList.toggle('has-link', !linkEl.hidden);
   const $ = (sel) => /** @type {HTMLElement} */ (hud.querySelector(sel));
   const sheet = $('.inv-sheet');
   const opener = $('[data-look-open]');
@@ -637,6 +693,7 @@ export function bindUi(stage, { look, wander = true, onButton, onLook, onCamera,
     for (const name of BUTTONS) /** @type {HTMLElement} */ ($(`[data-button="${name}"]`)).inert = open;
     intro.inert = open;
     padOpener.inert = open;
+    linkReach();
     opener.setAttribute('aria-expanded', String(open));
     if (open) {
       document.addEventListener('keydown', onKey);
@@ -719,52 +776,118 @@ export function bindUi(stage, { look, wander = true, onButton, onLook, onCamera,
     held = null;
     return b;
   };
-  $('.inv-toolbar').addEventListener('pointerdown', (e) => {
-    const button = /** @type {HTMLElement} */ (e.target).closest?.('.inv-tool');
-    if (e.pointerType === 'mouse' || !(button instanceof HTMLButtonElement) || button.disabled) return;
-    holdEnd();
-    hold.down(e.clientX, e.clientY, now());
-    held = {
-      button,
-      id: e.pointerId,
-      timer: window.setTimeout(() => {
-        if (held?.button === button && hold.tick(now())) showLabel(button, true);
-      }, HOLD_MS + 10),
-    };
+  /**
+   * The held-press labels for the tool buttons in `root` (the toolbar and its Camera pad, or a
+   * tool button of its own), and no long-press menu there.
+   * @param {HTMLElement} root
+   */
+  const holdLabels = (root) => {
+    root.addEventListener('pointerdown', (e) => {
+      const button = /** @type {HTMLElement} */ (e.target).closest?.('.inv-tool');
+      if (e.pointerType === 'mouse' || !(button instanceof HTMLElement)) return;
+      if (button instanceof HTMLButtonElement && button.disabled) return;
+      holdEnd();
+      hold.down(e.clientX, e.clientY, now());
+      held = {
+        button,
+        id: e.pointerId,
+        timer: window.setTimeout(() => {
+          if (held?.button === button && hold.tick(now())) showLabel(button, true);
+        }, HOLD_MS + 10),
+      };
+    });
+    root.addEventListener('pointermove', (e) => {
+      if (!held || e.pointerId !== held.id) return;
+      // (Moved off its spot: no label for this press; the timer finds it moved.)
+      hold.move(e.clientX, e.clientY);
+    });
+    root.addEventListener('pointerup', (e) => {
+      if (!held || e.pointerId !== held.id) return;
+      const button = /** @type {HTMLElement} */ (holdEnd());
+      if (hold.up(now()) === 'label') {
+        showLabel(button, true);
+        hideSoon(button);
+        swallow = { button, until: performance.now() + 700 };
+      }
+    });
+    root.addEventListener('pointercancel', (e) => {
+      if (!held || e.pointerId !== held.id) return;
+      const button = holdEnd();
+      hold.cancel();
+      if (button?.classList.contains('is-label')) hideSoon(button);
+    });
+    root.addEventListener('contextmenu', (e) => e.preventDefault());
+  };
+  holdLabels($('.inv-toolbar'));
+  holdLabels(linkEl);
+
+  // --- The link button's link, its reach and its corner.
+  const linkLabel = /** @type {HTMLElement} */ (linkEl.querySelector('.inv-btn-label'));
+  const linkNow = {
+    /** @type {import('./link.js').LinkCorner} the corner it's going to (or at) */
+    corner,
+    /** @type {import('./link.js').LinkCorner} the corner it's drawn at */
+    at: corner,
+    /** @type {'out'|'in'|null} its fade between corners: out at the old one, in at the new */
+    phase: /** @type {'out'|'in'|null} */ (null),
+    /** its opacity as it last changed corners (0: out of sight, as the fade has it) */
+    swapOpacity: 1,
+    /** the intro's Log or question holds the focus */
+    blocked: false,
+    /** whether the corner it's going to is clear (placeLink's `clear`: the top right's, else always) */
+    clear: () => true,
+    /** till when it waits for that, at the most (performance.now(), ms: LINK_CLEAR_MS) */
+    clearBy: 0,
+    /** this move is with reduced motion: out of sight and back, no fade */
+    reduced: false,
+    timer: 0,
+  };
+  /** Out of reach (inert) under the open Settings sheet, or the intro's Log or question. */
+  const linkReach = () => {
+    linkEl.inert = !sheet.hidden || linkNow.blocked;
+  };
+  /** It changes corners, now (its opacity then kept for ?test), and shows again. */
+  const linkSwap = () => {
+    linkNow.swapOpacity = Number(getComputedStyle(linkEl).opacity);
+    linkNow.at = linkNow.corner;
+    linkEl.dataset.corner = linkNow.corner;
+    linkEl.classList.remove('is-moving');
+  };
+  /**
+   * The fade's next step, as its opacity's transition ends (or at the latest 3 × LINK_FADE.ms
+   * after it began, should it never run): out, it changes corners, once the new one's clear
+   * (looked at every frame or so, till clearBy at the most), and fades in (with reduced motion,
+   * shows at once); in, it's done.
+   */
+  const linkStep = () => {
+    clearTimeout(linkNow.timer);
+    if (linkNow.phase === 'out') {
+      if (!linkNow.clear() && performance.now() < linkNow.clearBy) {
+        linkNow.timer = window.setTimeout(linkStep, 16);
+        return;
+      }
+      linkSwap();
+      linkNow.phase = linkNow.reduced ? null : 'in';
+      if (linkNow.phase) linkNow.timer = window.setTimeout(linkStep, 3 * LINK_FADE.ms);
+    } else linkNow.phase = null;
+  };
+  linkEl.addEventListener('transitionend', (e) => {
+    if (e.target === linkEl && e.propertyName === 'opacity' && linkNow.phase) linkStep();
   });
-  $('.inv-toolbar').addEventListener('pointermove', (e) => {
-    if (!held || e.pointerId !== held.id) return;
-    // (Moved off its spot: no label for this press; the timer finds it moved.)
-    hold.move(e.clientX, e.clientY);
-  });
-  $('.inv-toolbar').addEventListener('pointerup', (e) => {
-    if (!held || e.pointerId !== held.id) return;
-    const button = /** @type {HTMLElement} */ (holdEnd());
-    if (hold.up(now()) === 'label') {
-      showLabel(button, true);
-      hideSoon(button);
-      swallow = { button, until: performance.now() + 700 };
-    }
-  });
-  $('.inv-toolbar').addEventListener('pointercancel', (e) => {
-    if (!held || e.pointerId !== held.id) return;
-    const button = holdEnd();
-    hold.cancel();
-    if (button?.classList.contains('is-label')) hideSoon(button);
-  });
-  $('.inv-toolbar').addEventListener('contextmenu', (e) => e.preventDefault());
-  hud.addEventListener(
-    'click',
-    (e) => {
-      const b = swallow.button;
-      if (!b || performance.now() > swallow.until) return;
-      swallow = { button: null, until: 0 };
-      if (!b.contains(/** @type {Node} */ (e.target))) return;
-      e.preventDefault();
-      e.stopPropagation();
-    },
-    true,
-  );
+  /**
+   * The click after a held label, swallowed (on the stage, so it hears it before the HUD does,
+   * and before a tool button of its own).
+   * @param {MouseEvent} e
+   */
+  const onHeldClick = (e) => {
+    const b = swallow.button;
+    if (!b || performance.now() > swallow.until) return;
+    swallow = { button: null, until: 0 };
+    if (!b.contains(/** @type {Node} */ (e.target))) return;
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  stage.addEventListener('click', onHeldClick, true);
 
   hud.addEventListener('click', (e) => {
     const el = /** @type {HTMLElement} */ (e.target).closest('button');
@@ -889,6 +1012,87 @@ export function bindUi(stage, { look, wander = true, onButton, onLook, onCamera,
     focusToolbar() {
       focusFor(/** @type {HTMLElement|null} */ ($('.inv-toolbar').querySelector('button:not(:disabled)')));
     },
+    /**
+     * The link button's link (link.js linkFrom), or null: no button (the admin's preview). An
+     * empty or unsafe one hides it too.
+     * @param {import('./link.js').Link|null} next
+     */
+    setLink(next) {
+      const to = next ? linkTarget(next.href, base) : null;
+      if (to) {
+        linkEl.setAttribute('href', to.url);
+        if (to.newTab) {
+          linkEl.target = '_blank';
+          linkEl.rel = 'noopener noreferrer';
+        } else {
+          linkEl.removeAttribute('target');
+          linkEl.removeAttribute('rel');
+        }
+      } else for (const a of ['href', 'target', 'rel']) linkEl.removeAttribute(a);
+      linkEl.hidden = !to;
+      linkLabel.textContent = next?.label ?? LINK_LABEL;
+      stage.classList.toggle('has-link', Boolean(to));
+    },
+    /**
+     * The link button's corner (link.js linkCorner): it fades out, then in at the new one
+     * (LINK_FADE), at the top right only once what sat there has gone (`clear` says, LINK_CLEAR_MS
+     * at the most: with reduced motion it goes out of sight till then, no fade); hidden, or with
+     * reduced motion to the top left, it's there at once. Back to the corner it's still at, it
+     * fades back in.
+     * @param {import('./link.js').LinkCorner} next
+     * @param {{reduced?: boolean, clear?: () => boolean}} [o]  `clear`: the top right's clear
+     */
+    placeLink(next, { reduced = false, clear = () => true } = {}) {
+      if (next === linkNow.corner) return;
+      linkNow.corner = next;
+      clearTimeout(linkNow.timer);
+      if (next === linkNow.at) {
+        linkEl.classList.remove('is-moving');
+        linkNow.phase = linkNow.phase && !reduced ? 'in' : null;
+        if (linkNow.phase) linkNow.timer = window.setTimeout(linkStep, 3 * LINK_FADE.ms);
+        return;
+      }
+      const right = next === 'right';
+      linkNow.clear = right ? clear : () => true;
+      linkNow.clearBy = performance.now() + LINK_CLEAR_MS;
+      linkNow.reduced = reduced;
+      if (linkEl.hidden || (reduced && !right)) {
+        linkNow.phase = null;
+        linkSwap();
+        return;
+      }
+      linkNow.phase = 'out';
+      linkEl.classList.add('is-moving');
+      linkNow.timer = window.setTimeout(linkStep, reduced ? 0 : 3 * LINK_FADE.ms);
+    },
+    /**
+     * The link button out of reach while a dialog over the stage holds the focus (the intro's
+     * Log or its question), as under the Settings sheet.
+     * @param {boolean} on
+     */
+    setLinkBlocked(on) {
+      if (on === linkNow.blocked) return;
+      linkNow.blocked = on;
+      linkReach();
+    },
+    /** The link button, where it shows and is in reach: a Tab stop the envelope and the intro add to theirs. */
+    linkStops() {
+      return linkEl.hidden || linkEl.inert ? [] : [linkEl];
+    },
+    /** The link button's state for ?test: shown, its href as the page has it, its label, its corner, its fade. */
+    linkState() {
+      return {
+        shown: !linkEl.hidden,
+        href: linkEl.getAttribute('href') ?? '',
+        target: linkEl.getAttribute('target'),
+        label: linkLabel.textContent ?? '',
+        corner: linkNow.corner,
+        at: linkNow.at,
+        phase: linkNow.phase,
+        swapOpacity: linkNow.swapOpacity,
+        inert: linkEl.inert,
+      };
+    },
     get sheetOpen() {
       return !sheet.hidden;
     },
@@ -906,7 +1110,11 @@ export function bindUi(stage, { look, wander = true, onButton, onLook, onCamera,
       document.removeEventListener('keydown', onPadKey);
       window.removeEventListener('keydown', onAnyKey, true);
       window.removeEventListener('pointerdown', onAnyPointer, true);
+      stage.removeEventListener('click', onHeldClick, true);
+      clearTimeout(linkNow.timer);
       hud.remove();
+      linkEl.remove();
+      stage.classList.remove('has-link');
     },
   };
 }
