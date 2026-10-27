@@ -9,6 +9,8 @@
 //     finds nothing says so on a phone too;
 //   • #effects still opens (on Colors); Reset Flame Colors keeps your palettes, with Undo,
 //     which the focus goes to (and back to Reset from);
+//   • the Invitation page's Link Button: its Link and Label, a javascript: link refused at its
+//     field and a real one taken, a label past 24 letters refused;
 //   • a deploy check for an older save that answers after a newer save is dropped: the
 //     status follows the newer save's commit, with one "live" toast and one loop;
 //   • every page's hover tips stay inside the window at 1280×720 and 390×844, and no title
@@ -268,6 +270,27 @@ test('#effects opens Colors; Reset Flame Colors keeps your palettes, and Undo pu
   await expect(reset, 'back on Reset').toBeFocused();
   await cards.first().locator('.card-toggle').click();
   await expect(cards.first().locator('[data-path$=".mid"] input.hex')).toHaveValue('#123456');
+});
+
+test('the Invitation page’s Link Button: its Link and Label fields, a javascript: link refused at its field, a real one taken', async ({
+  page,
+}) => {
+  await open(page, 'invitation');
+  await expect(page.locator('[data-path="invitation.link"]')).toBeVisible();
+  const href = page.locator('[data-path="invitation.link.href"]');
+  const name = page.locator('[data-path="invitation.link.label"]');
+  await expect(href.locator('label')).toHaveText('Link');
+  await expect(name.locator('label')).toHaveText('Label');
+  await expect(href.locator('.help')).toContainText('mailto:');
+  // (In this draft only: the API is read-only.)
+  await href.locator('input').fill('javascript:alert(1)');
+  await expect(href.locator(':scope > .error')).toContainText('https://');
+  await href.locator('input').fill('https://example.com/');
+  await expect(href.locator(':scope > .error')).toHaveText('');
+  await name.locator('input').fill('A'.repeat(25));
+  await expect(name.locator(':scope > .error')).not.toHaveText('');
+  await name.locator('input').fill('Portfolio');
+  await expect(name.locator(':scope > .error')).toHaveText('');
 });
 
 test('a deploy check that answers after a newer save is dropped: the status follows the newer save', async ({
