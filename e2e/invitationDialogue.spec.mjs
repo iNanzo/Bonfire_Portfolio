@@ -32,7 +32,9 @@
 // sideways, a short line keeps its three rows (two on a short screen) at the height it had then,
 // and a long one grows it by a row at most, his head clear over it; a line taller than that
 // scrolls inside it (the box keeps its size as it types): it follows the typing, then a finger,
-// the wheel or the arrow keys scroll it, with cues where there's more.
+// the wheel or the arrow keys scroll it, with cues where there's more; a finger from anywhere on
+// the screen, even one that went down as it typed or right after a tap finished it, and a drag
+// never goes on, a quick one flinging on to rest.
 import { readFileSync } from 'node:fs';
 import { test, expect } from '@playwright/test';
 import { routeToEnd } from './helpers/dialogue-route.mjs';
@@ -594,6 +596,162 @@ async function longLineScrolls(page, tap) {
   expect(v.canScroll).toBe(false);
   expect(errors).toEqual([]);
 }
+/** The next frame the page draws (a hand's moves come a frame or so apart). */
+const frame = (page) => page.evaluate(() => new Promise((done) => requestAnimationFrame(() => done(true))));
+/**
+ * A finger through Chrome's own touch input (CDP): `down` at a point, `drag` it by `dy` px in
+ * `steps` moves a frame apart (as a hand moves; `still` frames held at the end, so it lifts with
+ * no speed), `up`.
+ */
+function touchFinger(page, cdp) {
+  let at = { x: 0, y: 0 };
+  const send = (type, p) =>
+    cdp.send('Input.dispatchTouchEvent', {
+      type,
+      touchPoints: p ? [{ x: p.x, y: p.y, id: 1, radiusX: 2, radiusY: 2, force: 1 }] : [],
+    });
+  return {
+    async down(p) {
+      at = { ...p };
+      await send('touchStart', at);
+    },
+    async drag(dy, { steps = 8, still = 0 } = {}) {
+      for (let k = 0; k < steps; k++) {
+        at = { x: at.x, y: at.y + dy / steps };
+        await send('touchMove', at);
+        await frame(page);
+      }
+      for (let k = 0; k < still; k++) {
+        await send('touchMove', at);
+        await frame(page);
+      }
+    },
+    up: () => send('touchEnd'),
+  };
+}
+/** Where the long line's view is: how far it's scrolled, its room, and its line and phase. */
+const where = (page) =>
+  page.evaluate(() => {
+    const t = document.querySelector('.inv-talk-text');
+    const d = window.__invitation.snapshot().dialogue;
+    return {
+      top: t.scrollTop,
+      room: t.scrollHeight - t.clientHeight,
+      seq: d?.seq,
+      typed: Boolean(d?.typed),
+      shown: d?.shown ?? 0,
+      length: d?.length ?? 0,
+    };
+  });
+/** The long line's view set to `top` px (and left still there). */
+const scrollTo = async (page, top) => {
+  await page.evaluate((y) => (document.querySelector('.inv-talk-text').scrollTop = y), top);
+  await scrollStill(page);
+};
+
+/**
+ * A finger scrolls a long line wherever it lands on the screen (the box's edge under the line,
+ * its name tab, Next, the stage over it), even if it went down as the line still typed (it takes
+ * the line once it's typed, with no jump) or right after a tap that finished it; a drag never goes
+ * on and never presses what it started on; lifted quickly it flings on and slows to rest; a touch
+ * on a fling only stops it; and a tap still goes on.
+ */
+async function fingerScrollsAnywhere(page) {
+  const errors = watch(page);
+  await calm(page);
+  const intro = structuredClone(behaviorIntro);
+  const at = intro.boxes.findIndex((b) => b.id === intro.start);
+  for (const b of intro.boxes.slice(at, at + 2)) {
+    b.text = TALL_LINE;
+    b.choices = [];
+  }
+  await page.evaluate((i) => window.__invitation.setIntro(i), intro);
+  await open(page, true);
+  const cdp = await page.context().newCDPSession(page);
+  const f = touchFinger(page, cdp);
+  const vp = page.viewportSize();
+  const stage = { x: vp.width * 0.18, y: vp.height * 0.3 };
+  // Down while the line still types, and dragged: nothing yet; held till it's typed, the same drag
+  // goes on scrolling it (back up from the end, where the typing left it).
+  let v = await where(page);
+  expect(v.typed, 'still typing').toBe(false);
+  await f.down(stage);
+  await f.drag(24, { steps: 4 });
+  expect((await where(page)).typed, 'typed only now, under the finger').toBe(false);
+  await until(page, (s) => s.dialogue.typed, 'the line up, the finger still down');
+  await expect.poll(async () => (await lineView(page)).canScroll).toBe(true);
+  const typedAt = (await where(page)).top;
+  await f.drag(80, { still: 8 });
+  await f.up();
+  v = await where(page);
+  expect(v.top, 'scrolled back up by the same drag').toBeLessThan(typedAt - 50);
+  const seq = v.seq;
+  // From the box's edge under the line, its name tab, Next, and the stage over it: each scrolls it.
+  const text = await page.locator('.inv-talk-text').boundingBox();
+  const boxR = await box(page).boundingBox();
+  const nameR = await page.locator('.inv-talk-name').boundingBox();
+  const nextR = await page.getByRole('button', { name: 'Next', exact: true }).boundingBox();
+  const spots = {
+    'the box’s edge under the line': {
+      x: text.x + text.width / 2,
+      y: (text.y + text.height + boxR.y + boxR.height) / 2,
+    },
+    'its name tab': { x: nameR.x + nameR.width / 2, y: nameR.y + nameR.height / 2 },
+    Next: { x: nextR.x + nextR.width / 2, y: nextR.y + nextR.height / 2 },
+    'the stage over it': stage,
+  };
+  for (const [name, p] of Object.entries(spots)) {
+    // (Up the screen, down the line; from Next, at the top, down the screen and up the line.)
+    const dy = name === 'Next' ? 80 : -80;
+    await scrollTo(page, v.room / 2);
+    await f.down(p);
+    await f.drag(dy, { still: 8 });
+    await f.up();
+    const w = await where(page);
+    expect(Math.abs(w.top - v.room / 2), `a finger from ${name} scrolls it`).toBeGreaterThan(50);
+    expect(Math.sign(w.top - v.room / 2), `the way the finger went (${name})`).toBe(-Math.sign(dy));
+    expect(w.seq, `the drag from ${name} goes nowhere`).toBe(seq);
+  }
+  expect((await snapshot(page)).dialogue.id, 'Next never pressed').toBe(intro.boxes[at].id);
+  // A tap goes on; the next long line types; a tap on it finishes it, and a finger right after
+  // scrolls it.
+  await scrollStill(page);
+  await goOn(page, true);
+  await until(page, (s) => s.dialogue.seq > seq && s.dialogue.shown > 20 && !s.dialogue.typed, 'the next line typing');
+  const seq2 = (await where(page)).seq;
+  await page.touchscreen.tap(text.x + text.width / 2, text.y + text.height / 2);
+  const tapped = (await where(page)).top;
+  await f.down(spots['the box’s edge under the line']);
+  await f.drag(-80, { still: 8 });
+  await f.up();
+  v = await where(page);
+  expect(v.typed, 'the tap finished it').toBe(true);
+  expect(v.seq, 'and went no further').toBe(seq2);
+  expect(v.top, 'the finger right after scrolled it').toBeGreaterThan(tapped + 30);
+  // Lifted moving, it flings on and slows to rest.
+  await scrollTo(page, 0);
+  await f.down(stage);
+  await f.drag(-48, { steps: 4 });
+  await f.up();
+  const lifted = (await where(page)).top;
+  await expect
+    .poll(async () => (await where(page)).top, { message: 'on after the finger' })
+    .toBeGreaterThan(lifted + 5);
+  await scrollStill(page);
+  expect((await where(page)).seq, 'the fling goes nowhere').toBe(seq2);
+  // A touch on a fling still moving only stops it; a tap with it at rest goes on.
+  await scrollTo(page, 0);
+  await f.down(stage);
+  await f.drag(-48, { steps: 4 });
+  await f.up();
+  await page.touchscreen.tap(stage.x, stage.y);
+  await scrollStill(page);
+  for (let k = 0; k < 10; k++) await frame(page);
+  expect((await where(page)).seq, 'the touch only stopped the fling').toBe(seq2);
+  await goOn(page, true);
+  await until(page, (s) => s.dialogue.seq > seq2, 'at rest, a tap goes on');
+  expect(errors).toEqual([]);
+}
 /** Until the long line's view stops moving: its scroll the same for five frames running. */
 const scrollStill = (page) =>
   page.evaluate(
@@ -907,6 +1065,12 @@ test.describe('on a phone', () => {
     page,
   }) => {
     await longLineScrolls(page, true);
+  });
+
+  test('a finger scrolls a long line from anywhere on the screen, begun as it types or right after a tap finishes it; a drag never goes on, a fling slows to rest', async ({
+    page,
+  }) => {
+    await fingerScrollsAnywhere(page);
   });
 
   test('tags in a reply and a name show styled, read plain; an italic word slants in place', async ({ page }) => {

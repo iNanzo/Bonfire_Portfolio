@@ -10,7 +10,8 @@
 // text) and replies picked, text effects' tags counted by the letters that show, a pause
 // holding the clock, and a broken script ending gracefully. Play Intro's script is content.js
 // introScript() (content.json's intro, or one mended), which the runner plays as it is. The chat
-// screen (dialogueUi.js): its markup and CSS, and on stand-in elements a held press and its end.
+// screen (dialogueUi.js): its markup and CSS, and on stand-in elements a held press and its end,
+// and a finger's drag scrolling a long line from anywhere on the screen, with its fling.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -814,8 +815,11 @@ test('a long line grows the box a row at most (four rows, three on a short scree
   assert.match(text, /scrollbar-width: none/);
   const free = rule('.inv-talk-text.can-scroll');
   assert.match(free, /overflow-y: auto/);
-  assert.match(free, /touch-action: pan-y/);
   assert.match(free, /overscroll-behavior: contain/);
+  // (A finger's drag is the screen's own, from anywhere on it (dragScroll): the browser never pans
+  // the line itself, which as a scroller would take its pan back from the layer's none.)
+  assert.match(text, /touch-action: none/);
+  assert.ok(!/touch-action/.test(free), 'no pan of its own once it scrolls');
 });
 
 test('the chat box has no dark dither of its own; behind it, the gentle plain dim it had before round 18', async () => {
@@ -968,6 +972,279 @@ test('a press held on a button shows pressed until it lifts, is cancelled or sli
   holdPressed(t2.root)();
   fire(t2.next, 'pointerdown', { pointerId: 1 });
   assert.ok(!pressed(t2.next), 'disposed');
+});
+
+test('a finger held on a button and dragged past the slop is a drag, not a press: it shows pressed no longer', async () => {
+  const { holdPressed, DRAG } = await import('../src/invitation/dialogueUi.js');
+  const t = pressTree();
+  holdPressed(t.root, 'is-pressed', 'button, .inv-talk-box');
+  const pressed = (el) => el.classList.contains('is-pressed');
+  const touch = { pointerType: 'touch', pointerId: 2 };
+  fire(t.line, 'pointerdown', { ...touch, clientX: 50, clientY: 20 });
+  fire(t.line, 'pointermove', { ...touch, clientX: 50, clientY: 20 + DRAG.slop - 1 });
+  assert.ok(pressed(t.box), 'within the slop: still pressed');
+  fire(t.line, 'pointermove', { ...touch, clientX: 50, clientY: 20 + DRAG.slop + 1 });
+  assert.ok(!pressed(t.box), 'past it, on the box still: a drag (it scrolls the line), not pressed');
+  fire(t.line, 'pointerup', touch);
+  // (The mouse keeps its press while it stays on the button, as a click does.)
+  fire(t.next, 'pointerdown', { pointerType: 'mouse', pointerId: 1, clientX: 20, clientY: 10 });
+  fire(t.next, 'pointermove', { pointerType: 'mouse', pointerId: 1, clientX: 20, clientY: 30 });
+  assert.ok(pressed(t.next), 'the mouse moved on it: still pressed');
+});
+
+/**
+ * A scroller for dragScroll on the stand-in tree (pressTree's line, in the box): its view 100 px
+ * of 600, scrollTop kept in range as a browser keeps it; a clock and frames run by hand.
+ */
+function scrollTree() {
+  const t = pressTree();
+  const clock = { t: 1000 };
+  /** @type {Map<number, Function>} */
+  const frames = new Map();
+  let ids = 0;
+  t.win.performance = { now: () => clock.t };
+  t.win.requestAnimationFrame = (f) => (frames.set(++ids, f), ids);
+  t.win.cancelAnimationFrame = (id) => frames.delete(id);
+  const sc = t.line;
+  let top = 0;
+  Object.defineProperty(sc, 'scrollTop', {
+    get: () => top,
+    set: (v) => {
+      top = Math.min(Math.max(0, v), sc.scrollHeight - sc.clientHeight);
+    },
+  });
+  sc.scrollHeight = 600;
+  sc.clientHeight = 100;
+  /** Frames run for `ms` (16 ms apart): the clock on, each frame's callbacks called. */
+  const frameFor = (ms) => {
+    for (let at = 0; at < ms; at += 16) {
+      clock.t += 16;
+      const due = [...frames.values()];
+      frames.clear();
+      for (const f of due) f(clock.t);
+    }
+  };
+  /** A pointer event on the page's clock (timeStamp), a finger's unless said. */
+  const at = (target, type, o = {}) =>
+    fire(target, type, { pointerType: 'touch', pointerId: 1, isPrimary: true, timeStamp: clock.t, ...o });
+  /** A click (detail 1: a tap's, not a key's): whether it was stopped and its default prevented. */
+  const click = (target, detail = 1) => {
+    const e = { stopped: false, prevented: false };
+    fire(target, 'click', {
+      detail,
+      stopPropagation: () => (e.stopped = true),
+      preventDefault: () => (e.prevented = true),
+    });
+    return e;
+  };
+  /** A flick up the screen: past the slop, then `px` px every 10 ms four times, lifted at once. */
+  const flick = (px, y = 300) => {
+    at(t.off, 'pointerdown', { clientX: 10, clientY: y });
+    for (let k = 1; k <= 4; k++) {
+      clock.t += 10;
+      at(t.off, 'pointermove', { clientX: 10, clientY: y - 8 - k * px });
+    }
+    at(t.off, 'pointerup', {});
+  };
+  return { ...t, clock, frames, run: frameFor, at, click, flick, sc };
+}
+
+test('a finger drag anywhere on the screen scrolls a long line: from the box, a button or the stage over it, with no jump', async () => {
+  const { dragScroll, DRAG } = await import('../src/invitation/dialogueUi.js');
+  const t = scrollTree();
+  let can = true;
+  dragScroll(t.root, t.sc, { canScroll: () => can, skip: (el) => el === t.reply });
+  t.sc.scrollTop = 300;
+  // (A finger up the stage, off the line: it scrolls the line down by what it went past the slop.)
+  t.at(t.off, 'pointerdown', { clientX: 10, clientY: 400 });
+  t.at(t.off, 'pointermove', { clientX: 10, clientY: 400 - DRAG.slop });
+  assert.equal(t.sc.scrollTop, 300, 'within the slop: nothing yet');
+  t.at(t.off, 'pointermove', { clientX: 10, clientY: 400 - DRAG.slop - 50 });
+  assert.equal(t.sc.scrollTop, 350, 'past it, with the finger, a px a px');
+  // (Past the end and back: it moves back at once, nothing piled up past the end.)
+  t.at(t.off, 'pointermove', { clientX: 10, clientY: -400 });
+  assert.equal(t.sc.scrollTop, 500, 'held at the end');
+  t.at(t.off, 'pointermove', { clientX: 10, clientY: -380 });
+  assert.equal(t.sc.scrollTop, 480, 'back at once');
+  t.clock.t += DRAG.sample * 2;
+  t.at(t.off, 'pointerup', { clientX: 10, clientY: -380 });
+  assert.equal(t.frames.size, 0, 'no fling after a finger that had stopped');
+  // (From a button, Next's label: the same.)
+  t.at(t.label, 'pointerdown', { clientX: 10, clientY: 100 });
+  t.at(t.label, 'pointermove', { clientX: 10, clientY: 100 + DRAG.slop + 30 });
+  assert.equal(t.sc.scrollTop, 450, 'down the screen: back up the line');
+  t.at(t.label, 'pointercancel', {});
+  // (The mouse keeps the wheel and the keys; a press where skip() says it isn't the screen's
+  // (the Log, the question), or a second finger: nothing.)
+  t.at(t.off, 'pointerdown', { pointerType: 'mouse', clientX: 10, clientY: 100 });
+  t.at(t.off, 'pointermove', { pointerType: 'mouse', clientX: 10, clientY: 300 });
+  t.at(t.off, 'pointerup', { pointerType: 'mouse' });
+  t.at(t.reply, 'pointerdown', { clientX: 10, clientY: 100, pointerId: 4 });
+  t.at(t.reply, 'pointermove', { clientX: 10, clientY: 300, pointerId: 4 });
+  t.at(t.reply, 'pointerup', { pointerId: 4 });
+  t.at(t.off, 'pointerdown', { clientX: 10, clientY: 100, pointerId: 5, isPrimary: false });
+  t.at(t.off, 'pointermove', { clientX: 10, clientY: 300, pointerId: 5, isPrimary: false });
+  t.at(t.off, 'pointerup', { pointerId: 5, isPrimary: false });
+  assert.equal(t.sc.scrollTop, 450, 'none of those scrolled it');
+  // (Begun while the line can't scroll (it still types): nothing till it can, then on from where
+  // the view is then, with the finger's moves from there.)
+  can = false;
+  t.at(t.off, 'pointerdown', { clientX: 10, clientY: 500, pointerId: 6 });
+  t.at(t.off, 'pointermove', { clientX: 10, clientY: 440, pointerId: 6 });
+  assert.equal(t.sc.scrollTop, 450, 'not while it can’t');
+  t.sc.scrollTop = 200;
+  can = true;
+  t.at(t.off, 'pointermove', { clientX: 10, clientY: 430, pointerId: 6 });
+  assert.equal(t.sc.scrollTop, 210, 'it can now: on from where the view is, by the finger’s last move');
+  t.at(t.off, 'pointermove', { clientX: 10, clientY: 400, pointerId: 6 });
+  assert.equal(t.sc.scrollTop, 240, 'and with the finger from there');
+  t.at(t.off, 'pointerup', { pointerId: 6 });
+});
+
+test('a drag never goes on: its click goes nowhere, a tap’s still does, and a key’s press is never stopped', async () => {
+  const { dragScroll, DRAG } = await import('../src/invitation/dialogueUi.js');
+  const t = scrollTree();
+  dragScroll(t.root, t.sc, { canScroll: () => true, skip: () => false });
+  t.sc.scrollTop = 300;
+  // (A tap, moving less than the slop: its click goes on.)
+  t.at(t.off, 'pointerdown', { clientX: 10, clientY: 100 });
+  t.at(t.off, 'pointermove', { clientX: 12, clientY: 100 + DRAG.slop - 2 });
+  t.at(t.off, 'pointerup', {});
+  assert.equal(t.click(t.off).stopped, false, 'a tap goes on');
+  // (A drag: the click a browser may still send after it goes nowhere, once.)
+  t.at(t.next, 'pointerdown', { clientX: 10, clientY: 100 });
+  t.at(t.next, 'pointermove', { clientX: 10, clientY: 160 });
+  t.clock.t += DRAG.sample * 2;
+  t.at(t.next, 'pointerup', {});
+  const after = t.click(t.next);
+  assert.ok(after.stopped && after.prevented, 'a drag’s click goes nowhere');
+  assert.equal(t.click(t.next).stopped, false, 'only the one');
+  // (A drag whose click never comes: the next tap still goes on.)
+  t.at(t.off, 'pointerdown', { clientX: 10, clientY: 100 });
+  t.at(t.off, 'pointermove', { clientX: 10, clientY: 160 });
+  t.clock.t += DRAG.sample * 2;
+  t.at(t.off, 'pointerup', {});
+  t.at(t.off, 'pointerdown', { clientX: 10, clientY: 100 });
+  t.at(t.off, 'pointerup', {});
+  assert.equal(t.click(t.off).stopped, false, 'a tap after a drag goes on');
+  // (A click long after a drag isn't its.)
+  t.at(t.off, 'pointerdown', { clientX: 10, clientY: 100 });
+  t.at(t.off, 'pointermove', { clientX: 10, clientY: 160 });
+  t.clock.t += DRAG.sample * 2;
+  t.at(t.off, 'pointerup', {});
+  t.clock.t += DRAG.click + 1;
+  assert.equal(t.click(t.off).stopped, false, 'too late to be the drag’s');
+  // (Enter or Space on a focused button, after a drag: its click, detail 0, is never stopped.)
+  t.at(t.off, 'pointerdown', { clientX: 10, clientY: 100 });
+  t.at(t.off, 'pointermove', { clientX: 10, clientY: 160 });
+  t.at(t.off, 'pointerup', {});
+  assert.equal(t.click(t.next, 0).stopped, false, 'a key’s press goes');
+});
+
+test('a quick lift flings the line on, slowing to rest; a touch on a fast fling only stops it, on a slow one it goes on', async () => {
+  const { dragScroll, DRAG } = await import('../src/invitation/dialogueUi.js');
+  const t = scrollTree();
+  dragScroll(t.root, t.sc, { canScroll: () => true, skip: () => false });
+  // (1.5 px/ms up the screen, from 100: 60 px with the finger, then on.)
+  t.sc.scrollTop = 100;
+  t.flick(15);
+  assert.equal(t.sc.scrollTop, 160, 'with the finger');
+  assert.ok(t.frames.size > 0, 'a fling');
+  t.run(100);
+  const on = t.sc.scrollTop;
+  assert.ok(on > 190, `on after the finger (${on})`);
+  // (A touch while it still goes fast: it stops there, and that tap goes nowhere.)
+  t.at(t.off, 'pointerdown', { clientX: 10, clientY: 300 });
+  t.at(t.off, 'pointerup', {});
+  assert.equal(t.click(t.off).stopped, true, 'the touch that stops a fast fling goes nowhere');
+  t.run(200);
+  assert.equal(t.sc.scrollTop, on, 'stopped where it was');
+  assert.equal(t.frames.size, 0, 'no frames asked for');
+  // (Left alone it slows to rest: about speed × tau on, 0.5 px/ms here.)
+  t.sc.scrollTop = 0;
+  t.flick(5);
+  assert.equal(t.sc.scrollTop, 20);
+  t.run(3000);
+  assert.equal(t.frames.size, 0, 'at rest');
+  const all = 20 + 0.5 * DRAG.tau;
+  const went = t.sc.scrollTop;
+  assert.ok(went <= all && went > all - DRAG.rest * DRAG.tau - 2, `${went} px, ${all} at most`);
+  // (At the line's end it stops there.)
+  t.sc.scrollTop = 450;
+  t.flick(15);
+  t.run(3000);
+  assert.equal(t.sc.scrollTop, 500, 'held at the end');
+  assert.equal(t.frames.size, 0, 'stopped at the end');
+  // (Slowing, slower than DRAG.stops: a tap stops it and still goes on.)
+  t.sc.scrollTop = 0;
+  t.flick(5);
+  t.run(500);
+  assert.ok(t.frames.size > 0, 'still going, slowly');
+  t.at(t.off, 'pointerdown', { clientX: 10, clientY: 300 });
+  t.at(t.off, 'pointerup', {});
+  assert.equal(t.frames.size, 0, 'stopped');
+  assert.equal(t.click(t.off).stopped, false, 'a tap on a fling about to rest goes on');
+});
+
+test('a fling or a drag starts over for the next line (stop), a fling stops once the line can’t scroll; disposed, nothing scrolls', async () => {
+  const { dragScroll, DRAG } = await import('../src/invitation/dialogueUi.js');
+  const t = scrollTree();
+  let can = true;
+  const drag = dragScroll(t.root, t.sc, { canScroll: () => can, skip: () => false });
+  t.sc.scrollTop = 100;
+  t.flick(15);
+  drag.stop();
+  // (The next line from its top.)
+  t.sc.scrollTop = 0;
+  t.run(500);
+  assert.equal(t.sc.scrollTop, 0, 'the fling of the line before never scrolls the next');
+  // (A drag under way as the line changes takes the new view on from where it is.)
+  t.sc.scrollTop = 300;
+  t.at(t.off, 'pointerdown', { clientX: 10, clientY: 300 });
+  t.at(t.off, 'pointermove', { clientX: 10, clientY: 300 - DRAG.slop - 20 });
+  assert.equal(t.sc.scrollTop, 320);
+  drag.stop();
+  t.sc.scrollTop = 0;
+  t.at(t.off, 'pointermove', { clientX: 10, clientY: 300 - DRAG.slop - 30 });
+  assert.equal(t.sc.scrollTop, 10, 'on from the new line’s top, no jump');
+  t.clock.t += DRAG.sample * 2;
+  t.at(t.off, 'pointerup', {});
+  // (A fling stops once the line can't scroll: a new line not typed yet, the screen going.)
+  t.sc.scrollTop = 100;
+  t.flick(15);
+  can = false;
+  const at = t.sc.scrollTop;
+  t.run(200);
+  assert.equal(t.sc.scrollTop, at, 'stopped');
+  assert.equal(t.frames.size, 0);
+  can = true;
+  drag.dispose();
+  t.at(t.off, 'pointerdown', { clientX: 10, clientY: 300 });
+  t.at(t.off, 'pointermove', { clientX: 10, clientY: 100 });
+  assert.equal(t.sc.scrollTop, at, 'disposed: nothing');
+});
+
+test('a finger’s speed as it lifts, and a fling’s path: speed × tau at most, slowing to rest in a couple of seconds', async () => {
+  const { DRAG, flingBy, flingSpeed, liftSpeed } = await import('../src/invitation/dialogueUi.js');
+  // (Up the screen at 1 px/ms: the line scrolls down at 1 px/ms.)
+  const up = Array.from({ length: 6 }, (_, k) => ({ t: 1000 + k * 16, y: 500 - k * 16 }));
+  assert.ok(Math.abs(liftSpeed(up, 1080) - 1) < 1e-9, 'up the screen: down the line');
+  const down = up.map((m) => ({ ...m, y: 1000 - m.y }));
+  assert.ok(Math.abs(liftSpeed(down, 1080) + 1) < 1e-9, 'down the screen: up the line');
+  assert.equal(liftSpeed(up, 1080 + DRAG.sample + 1), 0, 'held still before it lifted: no speed');
+  assert.equal(liftSpeed(up.slice(0, 1), 1000), 0, 'one move: no speed');
+  assert.ok(liftSpeed(up, 1150) < 0.5, 'a pause before the lift slows it');
+  // (Only its last moves count: a slow start doesn't slow a quick end.)
+  const late = [{ t: 0, y: 900 }, { t: 500, y: 890 }, ...up];
+  assert.ok(Math.abs(liftSpeed(late, 1080) - 1) < 1e-9);
+  assert.equal(flingBy(2, 0), 0);
+  assert.equal(flingSpeed(2, 0), 2);
+  assert.ok(Math.abs(flingBy(2, 1e6) - 2 * DRAG.tau) < 1e-6, 'speed × tau in all');
+  assert.ok(flingBy(2, DRAG.tau) > 0.6 * 2 * DRAG.tau, 'most of it in the first tau');
+  assert.ok(flingSpeed(-2, 100) > -2 && flingSpeed(-2, 100) < 0, 'slowing, its way kept');
+  const restBy = DRAG.tau * Math.log(3 / DRAG.rest);
+  assert.ok(restBy < 2000, `a 3 px/ms flick rests in ${Math.round(restBy)} ms`);
+  assert.ok(DRAG.flick > DRAG.rest && DRAG.stops > DRAG.rest, 'a fling starts and a touch stops it above its rest');
 });
 
 /** A stand-in for the layer as fadeAway uses it, its animations kept to finish by hand. */
