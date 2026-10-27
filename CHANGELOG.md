@@ -41,6 +41,13 @@ Round 10: menus and search, the knight's fixes, hygiene and performance.
   phone held sideways or a half-height window. A longer line grows it by one row at most, then
   scrolls inside it. The newest row stays in view as it types, then the wheel, a finger or the
   arrow and Page keys scroll it, with small pixel triangles where there's more above or below.
+- On a phone, a finger scrolls a long line wherever it lands on the screen: on the box's edge,
+  the name tab, a button, or the stage above the box, not only on the words. A swipe begun
+  while the line still types takes over as soon as it's all there, and a swipe right after a
+  tap that finished it scrolls it. With a thumb resting on the screen, the finger that moves
+  scrolls it. A quick swipe flings on and slows to a stop; a touch on a moving fling stops it
+  without going on; and a swipe that scrolled never goes on to the next line or presses the
+  button it started on, while a tap that rolls a little still finishes the line or goes on.
 - In the admin's Invitation page, typing in an intro line while the Intro Preview plays it
   keeps the focus in the field, so there's no clicking back in after each edit.
 

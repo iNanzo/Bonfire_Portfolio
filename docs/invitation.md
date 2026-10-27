@@ -366,9 +366,15 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   to four rows (three on a short screen), the shot framing NEWT over it as it is. It takes its
   size as the line starts, so it never grows while it types. A line longer than that scrolls
   inside it: as it types the newest row stays in view, and once it's all there the wheel, a
-  finger dragged over it, or the arrow and Page keys scroll it, with small pixel triangles at its
-  right where there's more above or below (a line finished at once by a tap stays where it was,
-  the cue showing the rest). On a phone about 100 letters fill the three rows; a 230-letter
+  finger dragged anywhere on the screen, or the arrow and Page keys scroll it, with small pixel
+  triangles at its right where there's more above or below (a line finished at once by a tap
+  stays where it was, the cue showing the rest). The finger's drag is the screen's own: it
+  starts on the box, its edge or its name tab, a button or the stage over it; one that went
+  down while the line still typed takes it on once it's all there; with more than one finger
+  down (a thumb resting on the edge) the one that moves scrolls it, and another takes over if it
+  lifts first; a quick one flings on and slows to rest; a touch on a moving fling only stops it;
+  and a drag that scrolled never goes on or presses what it started on, while one that scrolled
+  nothing (a tap that rolled a little, the line still typing) is still the tap it was. On a phone about 100 letters fill the three rows; a 230-letter
   line fits a desktop's four rows and scrolls on a phone or a short screen.
   The toolbar goes while the intro runs and comes back after it.
 - **Feedback,** plain: under a mouse the box and every button on the screen (Auto, Next, Log,
@@ -1058,7 +1064,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   `dialogueUi.js` and `dialogue.css` (the screen: a modal layer over the stage that takes every
   press; the line in a live region once, whole; `REPLY_SETTLE`, `REPLY_ROOM`; a long line's
   view `followRow` (the newest row in view, never back up; a jump over `FOLLOW_JUMP` letters
-  stays put), `.can-scroll` once it's typed and outgrows the box's four rows
+  stays put), `.can-scroll` once it's typed and outgrows the box's four rows, scrolled by a
+  finger through `dragScroll` (`DRAG`: the slop, the fling's speed and slowing, `liftSpeed`,
+  `flingBy`; the line's `touch-action: none`, so the browser never pans it itself)
   (`.inv-talk-text`'s `max-height`, three rows on a short screen; its `min-height` three rows,
   two on a short screen; the line's type on `.inv-talk-view`), the `.inv-talk-more` cues; the
   plain hover and press (`.inv-talk .inv-btn`'s `--talk-btn-fill`: paper, the replies'

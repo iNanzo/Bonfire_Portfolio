@@ -30,8 +30,10 @@
 // A long line grows the box by a row at most (dialogue.css: four rows, three on a short screen;
 // the box takes its size from the line's start, so it never grows as it types), and a longer one
 // scrolls inside it: the view follows the typing a row at a time (followRow); once it's all
-// typed the wheel, a finger and the arrow and Page keys scroll it, with pixel cues over and
-// under it where there's more.
+// typed the wheel, the arrow and Page keys, and a finger dragged anywhere on the screen
+// (dragScroll: the screen's own, from the box, its name tab, a button or the stage over it, even
+// one that went down as it typed; it flings on, and a drag never goes on) scroll it, with pixel
+// cues over and under it where there's more.
 // It's plain, as before round 18 (dialogue.css): a light hover where there's a mouse, and a
 // button or the box pressed shows a step darker and down (a press held with a finger too,
 // holdPressed: CSS :active isn't reliable on touch), the replies pop in, the box rises in with
@@ -130,15 +132,208 @@ export function followRow({ mid, rowH, clientHeight, scrollTop }) {
 }
 
 /**
+ * A finger's drag on the chat screen (dragScroll): it's a drag once it's gone `slop` px (less is
+ * a tap); lifted, it flings on at the speed it had over its last `sample` ms, if that's over
+ * `flick` px/ms, slowing as e^(−t/tau) (about a phone's own) till it's under `rest` px/ms (about
+ * a CSS px a frame, where it no longer shows moving); a touch on a fling only stops it, as a
+ * phone's does; and the click a drag that scrolled ends in, if it comes within `click` ms, goes
+ * nowhere.
+ */
+export const DRAG = { slop: 8, sample: 100, flick: 0.15, tau: 325, rest: 0.05, click: 700 };
+
+/**
+ * How fast a finger was going as it lifted at `at` ms, px/ms down the line (scrollTop's way: a
+ * finger going up the screen scrolls it down): over its moves in DRAG.sample ms before, up to the
+ * lift (so a pause before it slows it), and the move before them if only one's there (a busy
+ * page's frames can come further apart); 0 if it hadn't moved in that time (it had stopped).
+ * @param {{t: number, y: number}[]} moves  its moves, oldest first: when (ms) and where (client px)
+ * @param {number} at
+ */
+export function liftSpeed(moves, at) {
+  const from = moves.findIndex((m) => at - m.t <= DRAG.sample);
+  if (from < 0 || moves.length < 2) return 0;
+  const first = moves[Math.min(from, moves.length - 2)];
+  return (first.y - moves[moves.length - 1].y) / Math.max(at - first.t, 8);
+}
+/** How far a fling begun at `v` px/ms has gone after `t` ms, px: v·tau·(1 − e^(−t/tau)). */
+export const flingBy = (v, t) => v * DRAG.tau * (1 - Math.exp(-t / DRAG.tau));
+/** Its speed then, px/ms. */
+export const flingSpeed = (v, t) => v * Math.exp(-t / DRAG.tau);
+
+/**
+ * A finger (or a pen) dragged up or down anywhere on `root` scrolls `scroller` while
+ * `canScroll()` (a long line, all typed): wherever it starts (the box, its name tab, a button,
+ * the stage over it), and from the moment it can (a drag begun while the line still types takes
+ * it on from where it is then, with no jump); lifted moving, it flings on and slows to rest
+ * (DRAG). With more than one finger down, the first to move past the slop scrolls it (a thumb
+ * resting on the screen's edge holds nothing up), and if it lifts first another still down takes
+ * it on. A drag that scrolled never presses what it started on (its click goes nowhere;
+ * `onDrag()` as it starts scrolling: the press showing let go of), nor does a touch on a fling;
+ * one that scrolled nothing (a tap rolled a little, the line still typing or short) leaves the
+ * browser to say whether it was a tap. The browser's own pan isn't used (the screen's
+ * touch-action is none, dialogue.css): it took a finger only on the line itself, and only one
+ * begun once it was typed. The mouse keeps the wheel and the keys. `skip(target)`: a press that
+ * isn't the screen's (the Log, the question).
+ * @param {HTMLElement} root
+ * @param {HTMLElement} scroller
+ * @param {{canScroll(): boolean, skip(target: Element|null): boolean, onDrag?(): void}} o
+ * @returns {{stop(): void, dispose(): void}}  stop: the fling stopped and a drag under way
+ *   taking the view on from where it is (a new line); dispose: no more
+ */
+export function dragScroll(root, scroller, { canScroll, skip, onDrag = () => {} }) {
+  const win = /** @type {Window} */ (root.ownerDocument.defaultView);
+  const now = () => win.performance.now();
+  /** The fingers (and pens) down on the screen: where each went down and where it is, client px. */
+  const downs = /** @type {Map<number, {x0: number, y0: number, x: number, y: number}>} */ (new Map());
+  /**
+   * The one scrolling the line: its pointerId (-1: none yet, till one goes past the slop), its
+   * last y, its moves (when, ms, and where); and whether this gesture has scrolled the line.
+   */
+  const drag = { id: -1, lastY: 0, moves: /** @type {{t: number, y: number}[]} */ ([]), scrolled: false };
+  /** Where the drag has the view, px (NaN: read it from the view at the next move). */
+  let pos = NaN;
+  /** This gesture's click goes nowhere (it scrolled, or stopped a fling); until when, once it's over. */
+  let swallow = false;
+  let swallowBy = 0;
+  /** The fling: its speed as it began (px/ms), when (ms) and from where (px), its frame (0: none). */
+  const fling = { v: 0, at: 0, from: 0, raf: 0 };
+
+  const most = () => scroller.scrollHeight - scroller.clientHeight;
+  const stopFling = () => {
+    if (fling.raf) win.cancelAnimationFrame(fling.raf);
+    fling.raf = 0;
+  };
+  const step = () => {
+    fling.raf = 0;
+    if (!canScroll()) return;
+    const t = now() - fling.at;
+    const want = fling.from + flingBy(fling.v, t);
+    const to = Math.min(Math.max(0, want), most());
+    scroller.scrollTop = to;
+    // (Till it's at rest, or at the line's end.)
+    if (to === want && Math.abs(flingSpeed(fling.v, t)) >= DRAG.rest) fling.raf = win.requestAnimationFrame(step);
+  };
+
+  /** @param {PointerEvent} e */
+  const down = (e) => {
+    // (Any press stops a fling, and is no drag's click; a touch on a fling only stops it.)
+    const flinging = fling.raf !== 0;
+    stopFling();
+    swallowBy = 0;
+    if (e.pointerType === 'mouse' || skip(/** @type {Element|null} */ (e.target))) return;
+    // (The first touch of a gesture: no finger before it is down any more, whatever was missed.)
+    if (e.isPrimary) {
+      downs.clear();
+      Object.assign(drag, { id: -1, moves: [], scrolled: false });
+      pos = NaN;
+      swallow = flinging;
+    }
+    downs.set(e.pointerId, { x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY });
+  };
+  /** @param {PointerEvent} e */
+  const move = (e) => {
+    const p = downs.get(e.pointerId);
+    if (!p) return;
+    p.x = e.clientX;
+    p.y = e.clientY;
+    if (drag.id === -1) {
+      const dy = p.y - p.y0;
+      if (Math.hypot(p.x - p.x0, dy) <= DRAG.slop) return;
+      // (This finger's a drag from here: the line moves by what it goes past the slop.)
+      Object.assign(drag, {
+        id: e.pointerId,
+        lastY: p.y0 + Math.sign(dy) * Math.min(Math.abs(dy), DRAG.slop),
+        moves: [],
+      });
+    } else if (drag.id !== e.pointerId) return;
+    // (Each of its samples since the last move the page saw: the browser gives a frame one move,
+    // and a phone's finger can be read several times a frame.)
+    const samples = e.getCoalescedEvents?.() ?? [];
+    for (const c of samples.length ? samples : [e]) drag.moves.push({ t: c.timeStamp, y: c.clientY });
+    if (drag.moves.length > 32) drag.moves.splice(0, drag.moves.length - 32);
+    const by = drag.lastY - p.y;
+    drag.lastY = p.y;
+    // (While the line can't scroll, the finger's moves go by; once it can, on from the view.)
+    if (!canScroll()) {
+      pos = NaN;
+      return;
+    }
+    if (!drag.scrolled) {
+      drag.scrolled = swallow = true;
+      onDrag();
+    }
+    if (Number.isNaN(pos)) pos = scroller.scrollTop;
+    pos = Math.min(Math.max(0, pos + by), most());
+    scroller.scrollTop = pos;
+  };
+  /** @param {PointerEvent} e */
+  const up = (e) => {
+    if (!downs.delete(e.pointerId)) return;
+    const driving = e.pointerId === drag.id;
+    if (driving) {
+      // (Another finger still down takes it on from where it is, with no slop.)
+      const next = [...downs].at(-1);
+      if (next) {
+        Object.assign(drag, { id: next[0], lastY: next[1].y, moves: [] });
+        pos = NaN;
+        return;
+      }
+      drag.id = -1;
+    }
+    if (downs.size) return;
+    // (The gesture's over.)
+    if (swallow) swallowBy = now() + DRAG.click;
+    if (!driving || !drag.scrolled || e.type === 'pointercancel' || !canScroll()) return;
+    const v = liftSpeed(drag.moves, e.timeStamp);
+    if (Math.abs(v) < DRAG.flick) return;
+    Object.assign(fling, { v, at: now(), from: scroller.scrollTop });
+    fling.raf = win.requestAnimationFrame(step);
+  };
+  /** @param {MouseEvent} e */
+  const click = (e) => {
+    // (A tap's or a click's, not Enter's or Space's on a focused button: detail 0.)
+    if (e.detail === 0 || !swallowBy) return;
+    const late = now() > swallowBy;
+    swallowBy = 0;
+    if (late) return;
+    e.stopPropagation();
+    e.preventDefault();
+  };
+  root.addEventListener('pointerdown', down);
+  root.addEventListener('click', click, true);
+  root.addEventListener('wheel', stopFling, { passive: true });
+  win.addEventListener('pointermove', move);
+  win.addEventListener('pointerup', up);
+  win.addEventListener('pointercancel', up);
+  return {
+    stop() {
+      stopFling();
+      pos = NaN;
+    },
+    dispose() {
+      stopFling();
+      root.removeEventListener('pointerdown', down);
+      root.removeEventListener('click', click, true);
+      root.removeEventListener('wheel', stopFling);
+      win.removeEventListener('pointermove', move);
+      win.removeEventListener('pointerup', up);
+      win.removeEventListener('pointercancel', up);
+    },
+  };
+}
+
+/**
  * A press held on a button in `root` (or what else `pressable` names) shows as pressed (`cls`
  * on it, dialogue.css) from its pointerdown until that pointer lifts, is cancelled or slides off
  * it: CSS :active isn't reliable on touch, where a finger held on Next or a reply showed
  * nothing. A finger's press is captured by its target till it lifts (no pointerleave meanwhile,
  * where the browser keeps it), so it's let go of, and its moves off the pressed one's box count
- * as sliding off too. Returns a function that stops it.
+ * as sliding off too. Returns a function that stops it, with `release()`: the press showing let
+ * go of (a drag that scrolls the line: dragScroll's onDrag).
  * @param {HTMLElement} root
  * @param {string} [cls]
  * @param {string} [pressable]  a selector: buttons, or the screen's box too
+ * @returns {(() => void) & {release(): void}}
  */
 export function holdPressed(root, cls = 'is-pressed', pressable = 'button') {
   /** @type {HTMLElement|null} */
@@ -177,13 +372,14 @@ export function holdPressed(root, cls = 'is-pressed', pressable = 'button') {
   win?.addEventListener('pointerup', leave);
   win?.addEventListener('pointercancel', leave);
   win?.addEventListener('pointermove', move);
-  return () => {
+  const stop = () => {
     release();
     root.removeEventListener('pointerdown', down);
     win?.removeEventListener('pointerup', leave);
     win?.removeEventListener('pointercancel', leave);
     win?.removeEventListener('pointermove', move);
   };
+  return Object.assign(stop, { release });
 }
 
 /**
@@ -650,12 +846,21 @@ export function createDialogueUi(
     const page = Math.max(row, text.clientHeight - row);
     const by = { ArrowDown: row, ArrowUp: -row, PageDown: page, PageUp: -page }[key];
     if (!by) return false;
+    drag.stop();
     text.scrollTop += by;
     cues();
     return true;
   }
   text.addEventListener('scroll', cues, { passive: true });
   if (typeof view?.ResizeObserver === 'function') new view.ResizeObserver(() => scrollState()).observe(text);
+  // (A finger's drag anywhere on the screen scrolls a long line once it's all typed, but under the
+  // Log or the question, whose own list scrolls.)
+  const drag = dragScroll(layer, text, {
+    canScroll: () => !layer.hidden && !leaving && !modal() && text.classList.contains('can-scroll'),
+    skip: (el) => modal() || Boolean(el?.closest('.inv-talk-log, .inv-talk-ask')),
+    // (Scrolling, it's no press: the button or the box it started on shows pressed no longer.)
+    onDrag: () => unhold.release(),
+  });
 
   /** The Log was opened with a pointer (a click or a tap), not from the keyboard. */
   let logByPointer = false;
@@ -819,6 +1024,7 @@ export function createDialogueUi(
       // (A new line from its top, not scrollable till it's typed.)
       shown.typed = false;
       shown.rowH = 0;
+      drag.stop();
       text.scrollTop = 0;
       text.classList.remove('can-scroll');
       moreUp.hidden = moreDown.hidden = true;
@@ -865,6 +1071,7 @@ export function createDialogueUi(
       leaving?.();
       leaving = null;
       stopFade();
+      drag.stop();
       layer.hidden = false;
       logBox.hidden = true;
       ask.hidden = true;
@@ -883,6 +1090,7 @@ export function createDialogueUi(
       leaving?.();
       leaving = null;
       stopFade();
+      drag.stop();
       live.textContent = '';
       doc.removeEventListener('keydown', onKey);
       if (cut || layer.hidden) {
@@ -949,6 +1157,7 @@ export function createDialogueUi(
       leaving?.();
       stopFade();
       unhold();
+      drag.dispose();
       doc.removeEventListener('keydown', onKey);
       layer.remove();
     },

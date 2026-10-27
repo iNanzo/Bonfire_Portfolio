@@ -192,15 +192,18 @@
   max-height: calc(4 * 1.42em);
   overflow-y: hidden;
   scrollbar-width: none;
+  /* (A finger scrolls it by the screen's own drag, from anywhere on the screen: dialogueUi.js
+     dragScroll. As a scroller it would take the browser's pan back from the layer's none, and
+     that took only a finger begun on the line once it was typed.) */
+  touch-action: none;
 }
 .inv-talk-text::-webkit-scrollbar {
   display: none;
 }
-/* (All typed and longer than the box: the wheel, a finger and the keys scroll it.) */
+/* (All typed and longer than the box: the wheel, the keys and a finger's drag scroll it.) */
 .inv-talk-text.can-scroll {
   overflow-y: auto;
   overscroll-behavior: contain;
-  touch-action: pan-y;
 }
 /* (The pixel cues beside the line where there's more of it: a little stepped triangle over it,
    one under it, just inside the box's right edge.) */
