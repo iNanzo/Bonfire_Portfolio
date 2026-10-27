@@ -146,7 +146,8 @@ test('the right password, deriveBits stubbed: a working state while it checks, t
     },
     [...HASH],
   );
-  await lock(page, []);
+  // Destination checks must use the same test token as the unlock page, even when the admin enables the lock.
+  await lock(page, ['/larp/']);
   await page.goto(`/unlock/?to=${encodeURIComponent('/larp/')}`);
   await expect(state(page)).toHaveAttribute('data-gate', 'ready');
   await page.getByLabel(LOCK.label).fill('anything at all');
@@ -162,7 +163,7 @@ test('the right password, deriveBits stubbed: a working state while it checks, t
 });
 
 test('already unlocked: the lock page goes straight on, and never off the site', async ({ page, context, baseURL }) => {
-  await lock(page, []);
+  await lock(page, ['/', '/larp/']);
   await context.addCookies([{ name: GATE_COOKIE, value: TOKEN, url: baseURL }]);
   for (const to of ['https://evil.example/', '//evil.example/x', '/\\evil.example/', 'javascript:alert(1)']) {
     await page.goto(`/unlock/?to=${encodeURIComponent(to)}`, { waitUntil: 'commit' });
@@ -171,6 +172,7 @@ test('already unlocked: the lock page goes straight on, and never off the site',
   }
   await page.goto(`/unlock/?to=${encodeURIComponent('/larp/')}`, { waitUntil: 'commit' });
   await page.waitForURL((u) => u.pathname === '/larp/');
+  await expect(page.getByRole('region', { name: 'Round and Timer' })).toBeVisible();
 });
 
 test('the admin’s live preview (?preview in a frame) stays open; ?preview on its own goes to the lock', async ({
