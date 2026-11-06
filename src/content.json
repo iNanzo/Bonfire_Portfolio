@@ -1131,9 +1131,9 @@
     "key": {
       "alg": "PBKDF2-SHA256",
       "iter": 600000,
-      "salt": "z7fwz8eQ9TYxidhvFYQedg==",
-      "hash": "jWqsRVa6NbUCeAeOQ/lhGG0QcawAYhh2EAW3BCJ32cc=",
-      "set": "2026-10-27"
+      "salt": "htCLWwz/YAIbsUJi0Ucycw==",
+      "hash": "lTNIcFcGcFP6YbPL+6SmT9M6xdW75Q/NkcyPvpt5hAI=",
+      "set": "2026-11-06"
     }
   },
   "effects": {
