@@ -161,6 +161,104 @@ clip is wanted.
 - Petals are a candidate for the bonfire too (a drop hit), *after* v1: `petals.js` is pure and
   `petalScene.js` draws them instanced.
 
+## Making it NEWT's own, not a second bonfire
+
+The bonfire's show is spectacle: weapons, elements, glitch, cameras, no one to talk to. NEWT's
+should be a *character* at the party: he hears the music, has opinions about it, says so, and
+can still be played with. Nearly all of it reuses the toy's own machinery, which is already
+pure and tested.
+
+**What exists to build on.** His lines are text in a speech bubble (no recorded voice): 19
+triggers in `speech.js` (`TRIGGERS`, `PRIORITY`, a chance and cooldown each from content.json
+`invitation.speech`), 5–12 lines each in `invitation.lines`, picked at random, never the same
+twice running, edited on the admin's Invitation page. Lines carry text effects (`markup.js`:
+`{red,wave,shake,big,bold|…}`). The intro is a 28-box script (`dialogue.js`), each box with a
+face, an animation and a camera shot (`{"text": "Hi everyone! It's Newton :3", "face": "shy",
+"animation": "Wave", "camera": "medium", "auto": 0, …}`), run on an injected clock.
+
+### 1. Lines for the music (the music's own triggers)
+
+A second trigger set, `LIVE_TRIGGERS`, run by the same `createTalk` logic but stepped by the
+show events instead of the brain:
+
+| Trigger | When | Example tone |
+| --- | --- | --- |
+| `musicStart` | the first beats | "Oh? Oh! We're doing this?" |
+| `build` | build stage 2–3 | "It's building… it's building…" |
+| `blackout` | the 90 ms before the drop (shown just ahead, from stage 4) | "{shake\|wait for it}" |
+| `drop` | a big drop's first beat | "{big,bold,wave\|LET'S GO}" |
+| `smallDrop` | a small drop | "Ooh, nice" |
+| `breakdown` | a breakdown settles | "Okay, breather." |
+| `longGroove` | 64+ bars without a drop | "My legs are tired :3" |
+| `fast` / `slow` | the tempo past 150 / under 90 BPM | "TOO FAST" / "Is this a lullaby" |
+| `quiet` / `stopped` | the music drops out / stops | "…hello?" |
+| `tapped`, `pickedUp`, `dropped`… | the toy's own, when the audience plays with him (below) | "Put me down, this is my favourite part!" |
+
+Content: `invitation.live.lines` and `invitation.live.speech` (chance, cooldown), with their own
+section on the admin's Invitation page, checked by `contentRules.js` like the toy's. Priorities:
+`drop` > `blackout` > `build` > the rest; lines never cover a title card; cooldowns long by
+default (a line every 30–60 s at most outside drops), so it stays charming rather than chatty.
+
+### 2. Text that moves to the beat
+
+- **Typed on the beat.** In the live world the bubble types a word per beat (or per half beat
+  over 140 BPM) instead of `DIALOGUE.cps`, so a line lands like a call-out on the rhythm and
+  its last word on the downbeat. `lineDuration` and `bubble.js` take a `beatClock`.
+- **Effects in time.** `markup.css`'s wave and shake read a `--beat` custom property the world
+  sets each frame: waves crest on the beat, shakes hit on kicks, `big` letters pulse.
+
+### 3. Scripted moments: an MC script on the music's clock
+
+The intro's dialogue format, run on bars instead of taps: a **set script**, boxes with `at`
+(a bar number, `drop:N`, `breakdown:N`) instead of `next`. Each box already carries a face, an
+animation and a camera shot, so a script is a cue sheet for the whole world: "bar 1: Wave,
+medium, *Welcome to the party*", "drop 1: Cheer, close, *{big|HERE WE GO}*". It comes in the
+Uma Musume box (`dialogueUi.js`) for the opening and the big moments and in the bubble for the
+rest. The visualizer's *Title Cards* become, in this world, the opening box's text, so the
+DJ's name and the night's title are said by NEWT rather than stamped on screen.
+
+### 4. He DJs on his tablet
+
+Screen Time's tablet (`device.js`, held by `DeviceSit`/`DeviceLie`) becomes his deck: in
+breakdowns he sits with it, its screen showing the analyser's bands as a small pixel
+spectrum (a canvas texture from `analyser.js`), tapping along; at the build he stands, and on
+the drop he flings it up (a petal burst where it goes). No new model, no new clip.
+
+### 5. The audience can still play with him
+
+Unlike the bonfire, which nobody touches, the NEWT world keeps the toy's gestures (`gesture.js`,
+the brain's react / held / fall / land) under a *Hands On* setting (on for a phone or a stream
+where viewers can reach it, off for a projector). A tap gets a wave on the beat, a grab picks
+him up and he keeps dancing in the air (the dance layer over `Held`), a drop on the drop gets
+the biggest dust ring and a line. The brain gains one state, `dance`, which the show events drive
+and any gesture interrupts.
+
+### 6. Moods instead of glitch
+
+- **Faces** follow the energy: `neutral` → `happy` in the groove, `surprised` on the blackout,
+  `smug` after a drop, `shy` when it goes quiet, `sad` when the music stops; the blink rate
+  speeds up with the tempo (`faces.js` `normal`/`slow`).
+- **Looks:** the toy's own presets (Default, DS, Soft) take the turns the bonfire's looks do, a
+  new one on phrase lines; the screen effects (mirror, flash) come only on drops, sparingly.
+- **Petals:** the colors follow the visualizer's palette; the swirl's speed is the tempo; a drop
+  is a burst ring at his feet; a breakdown is a slow fall over the whole screen.
+- **The envelope as a request card:** a key (or MIDI pad) sends an envelope in with a
+  shout-out; it floats, bobbing on the beat, and opens on the next drop, NEWT reading it out.
+
+### 7. Live MC control
+
+A *Say* field and key in the HUD: the DJ types a line (text effects and all) and NEWT says it on
+the next beat. MIDI pads can each fire a trigger's line (`drop`, `build`…) or a fixed line,
+learned like the existing actions (`midi.js`).
+
+**Kept out:** a spoken voice. A babble (syllable blips, Animal Crossing-style) suits the toy,
+but in the visualizer it would play over the DJ's own mix; if it's wanted, it's the toy's, off
+by default.
+
+**Back the other way:** the toy can take the live triggers in a small way too: with a *Listen*
+toggle (the visualizer's microphone source, `sources.js`), NEWT dances to the room's music and
+says the music's lines.
+
 ## Phases and who does what
 
 Each task is one pull request, small enough to review on a phone. Codex gets the work that has
@@ -182,10 +280,18 @@ Newton, or for Claude in a cloud session, which can run the app in Chromium and 
 | 9 | *World* setting, start-screen choice, `supports`-based hiding, settings migration | Codex | `test/vizSettings.test.mjs` extended; e2e |
 | 10 | Screen FX in `retro.js` for the NEWT world | Codex, then Claude | screenshots |
 | 11 | Feel pass: dance picks per section, petal amounts, camera cuts, face timing | Claude + Newton | Newton's sign-off |
+| 13 | `LIVE_TRIGGERS` in `speech.js` driven by show events; `invitation.live` content, rules and the admin's section | Codex | unit tests per trigger (priority, cooldown, no repeats); admin tests |
+| 14 | Beat-locked typing and `--beat` text effects (`bubble.js`, `markup.css`) | Codex, then Claude | `invitationBubble` tests extended; a screenshot at the beat |
+| 15 | The set script: `at` boxes on the music clock in `dialogue.js`; title cards as the opening box | Codex | dialogue tests on a fake bar clock |
+| 16 | The tablet as a deck: the spectrum texture on `device.js`'s screen | Codex, then Claude | screenshot |
+| 17 | *Hands On*: the toy's gestures in the world; the brain's `dance` state | Codex | brain tests for every interruption |
+| 18 | Faces, looks, petals and the envelope card on show events | Codex (wiring), Claude (feel) | e2e + screenshots |
+| 19 | *Say* field and MIDI line pads | Codex | `midi` tests; e2e |
+| 20 | Writing the lines and the first set script | **Newton** | his voice: nobody else should write NEWT's jokes |
 | 12 | Docs: `docs/bonfire-live.md` and `docs/invitation.md` updated; this file's status | Codex | merged |
 
 Tasks 1, 2 and 6 can run in parallel; 3 → 4 in order; 5 is independent; 7 needs 2; 8 needs 4,
-6 and 7; 9 needs 4; 10 needs 5 and 8.
+6 and 7; 9 needs 4; 10 needs 5 and 8; 13–19 need 8 (13, 15 and 17 can start on fake show events once 3 lands); 20 can start any time. Docs (12) go last.
 
 ### Briefing Codex
 
