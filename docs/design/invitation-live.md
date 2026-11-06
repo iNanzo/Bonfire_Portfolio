@@ -1,319 +1,152 @@
-# NEWT in Bonfire Live: the invitation as a world of its own (design plan)
+# NEWT in Bonfire Live (design plan, simple version)
 
-Status: **plan, nothing built** (2026-11-06). Source: Newton's ask to bring the invitation into
-the visualizer "as its own separate visual option" (not a preset scene), sharing scripts and
-assets both ways so the codebase gets sturdier and cleaner, reusing animations where possible,
-with as much of the work as practical handed to Codex while he's away.
+Status: **plan, nothing built** (2026-11-06, revised the same day: the first draft's refactors,
+new triggers, scripts and retargeting were cut for this smaller one). Source: Newton's ask to
+bring the invitation into the visualizer as its own visual option, reusing what's there (the
+lines with the behavior they already go with, the glitch effects), kept simple to build while
+still looking and feeling different from the bonfire.
 
-## Where things stand
+## The idea in one line
 
-- **The invitation is an island.** No module in `src/invitation/` imports anything from outside
-  it, and nothing outside imports it (only `contentRules.js` names it). It has its own seeded
-  randomness (`rng.js`), frame governor (`governor.js`), pixel grid (`pixels.js`), retro pass
-  (`retro.js`), stage (`stage.js`), camera (`camera.js`) and look presets (`look.js`, `looks/`).
-- **Bonfire Live drives one world, the bonfire.** `src/visualizer/` reads the music (`analyser.js`,
-  `tempo.js`, `sections.js`) and the director turns it into calls on the bonfire: about 45
-  members of `fire.*` (`knights` ×22, `holding` ×17, `weapon` ×15, `forging` ×14, `scenery`,
-  `equip`, `flame`, `fireflies`, `pulse`, `ring`, `glitch`, `setRender`, `setPalette` …). Scenes
-  (`src/scenes.js`) are presets of that world, so the invitation doesn't fit in as a scene.
-- **The knights' dances are pure maths.** `knightGestures.js` `dance(p, move, beat, {period,
-  energy, seed, seated})` writes one of 13 moves into a 44-channel pose (`knightRig.js` `POSE`);
-  `knightSolve.js` `createSolver(rig)` turns a pose into bone turns for a measured rig. Nothing
-  in a move knows about the knight's mesh.
-- **NEWT's animations are baked clips.** 23 clips in `newt.glb` (`clips.js`), made by
-  `tools/newt.py`, on 17 bones, blended by hand (`blend.js`). `character.js` already does work on
-  the bones after `mixer.update` (look-at, limp limbs), so a procedural layer has a place to go.
-  There is no dance among the clips.
-- **Weight.** `newt.glb` is 754 KB (`bonfire.glb` is 221 KB). It must load only when the
-  invitation world is picked.
+Pick **NEWT** instead of **Bonfire** on the start screen and the show plays NEWT's toy instead
+of the fire. The music presses his buttons the way a visitor would, so his own clips, faces,
+lines, dust and petals happen as they already do in the toy. The visualizer's glitch layer
+runs over the top.
 
-## The shape of it
+## What makes it different from the bonfire
 
-```
-src/core/          shared, world-agnostic, mostly pure (moved here when a 2nd user appears)
-  rng.js             seeded mulberry32 (from invitation/rng.js; bonfire's pure modules can use it)
-  governor.js        frame-time governor (from invitation/governor.js)
-  pose/              the pose format + dance library + solver (from bonfire/knight*.js)
-  screenFx/          screen-space effects as GLSL chunks (from pixelPass.js): mirror, RGB split,
-                     torn rows, scanlines, negative flash, grain, cinema bars, chroma split
-src/visualizer/
-  show.js            NEW: music → show events (beat, bar, phrase, build stage, blackout, drop,
-                     breakdown, energy, budget), split out of director.js
-  worlds/
-    index.js         NEW: the World contract + registry ({ bonfire, newt }), lazy imports
-    bonfire.js       NEW: the director's existing fire.* code, behind the contract
-    newt.js          NEW: the invitation world (below)
-src/invitation/    the toy, now importing from src/core/ instead of keeping its own copies
-```
+- **The world:** the toy's white page, NEWT, his shadow, rose petals. No fire, no blade, no
+  knights, no ruins.
+- **A character who reacts:** he waves when the music starts, sits out the breakdowns, gets
+  dropped on the drop ("Wheee!" … "Oof.") and talks in his speech bubble. The bonfire never
+  speaks.
+- **The same rave layer:** the glitch effects, drop flashes, tempo, HUD, title cards, recording
+  and the output window all stay, so it's still Bonfire Live.
 
-### The World contract
+## How it works
 
-A world is what Bonfire Live points the show at. Keep it small and event-shaped, so the
-bonfire's 45-member surface stays *inside* `worlds/bonfire.js` rather than becoming the
-contract:
+### 1. NEWT stands in for the fire (no director rewrite)
 
-```js
-/** @typedef {object} World
- * @property {string} key                         'bonfire' | 'newt'
- * @property {(canvas, opts) => Promise<void>} mount
- * @property {(dt: number, music: MusicFrame) => void} frame   energy, bands, beat phase, budget
- * @property {(e: ShowEvent) => void} cue           beat | bar | phrase | build(stage) | blackout | drop(size) | breakdown | groove
- * @property {(colors: PaletteColors) => void} setPalette
- * @property {(r: RenderSettings) => void} setRender  pixel size, dither, outlines … (what it supports)
- * @property {Set<string>} supports                 'scenes', 'knights', 'weapons', 'screenFx', 'record', …
- * @property {() => HTMLCanvasElement} canvas       for record.js and output.js (captureStream)
- * @property {() => void} dispose
- */
-```
+The director talks to the bonfire through `fire.*` (about 45 members). Instead of refactoring
+the director, the NEWT world is an object with the **same members**:
+`src/visualizer/newtWorld.js`.
 
-UI parts (settings tabs, HUD rows, the pack, MIDI actions) ask `world.supports` and hide what
-doesn't apply. Record, the output window, title cards, the HUD, tempo, Link and MIDI work for
-any world because they only need a canvas and the show events.
+- The few that mean something to NEWT do something (below): `pulse`, `ring`, `puff`, `shake`,
+  `glitch`, `drive`, `knights` (the dance and gesture calls), `setPalette`, `setRender`'s pixel
+  size, `captureThumb`, the frame-rate members.
+- The rest are harmless stubs that report "nothing there": no weapon held, nothing forging, no
+  scenery change, no fireflies.
+- A test lists every `fire.` member the visualizer's modules use (a grep in node) and checks the
+  NEWT world has each one, so a later director change can't break it silently.
 
-**The rule for the refactor:** the bonfire world must behave identically after it. Step one moves
-code without changing it (director → `show.js` + `worlds/bonfire.js`), checked by the existing
-unit tests, `e2e/scenes.spec.mjs`, `e2e/live-settings.spec.mjs` and a `npm run bench:compare`
-before/after.
+It's built from the toy's own modules, imported, never copied: `stage.js` (the paper, the shadow
+floor, the retro pass, the governor), `character.js`, `brain.js`, `blend.js`, `steer.js`,
+`carry.js`, `faces.js`, `speech.js` + `bubble.js` (with `content.js`'s lines and settings),
+`dust.js` + `dustLayer.js`, `petalLayer.js`, `camera.js`. `src/invitation/main.js` already shows
+the order they run in each frame; the world follows it, without the envelope, intro, toolbar
+and Look sheet. It loads only when picked (a dynamic `import()`, `newt.glb` with it).
 
-### The NEWT world (`worlds/newt.js`)
+### 2. The music presses his buttons
 
-Built from the invitation's own parts: `stage.js` (paper, shadow floor, retro pass, governor),
-`character.js` (NEWT, faces, earrings), `petals.js` + `petalScene.js`, `dust.js` + `dustLayer.js`,
-`camera.js`. None of the toy's interaction (tap, drag, carry, brain, dialogue) comes along.
+The brain already takes buttons (`Wave`, `Spook`, `Sit`, `Device`, `Run`, `Wander`) and gesture
+events (`tap`, `grab`, `release`). The world sends them at the show's moments, and the toy's
+existing triggers then say the matching existing lines, at their existing chances and cooldowns
+(content.json `invitation.lines` / `invitation.speech`, still edited in the admin):
 
-| Show event | NEWT world |
-| --- | --- |
-| groove | dances: knight moves retargeted (below), a new move every *New Move Every* bars |
-| beat | head bob / step on the beat; petals pulse in the swirl |
-| build (1–4) | stage 1 Idle with a nod, 2 bouncing, 3 Run in place, 4 double time; the petal helix tightens and climbs |
-| blackout | the face goes `surprised`; petals freeze |
-| drop | Cheer (or a jump move) on the first beat, face `happy`, a petal burst ring + dust ring, screen shake, a camera cut |
-| breakdown | sits (SitDown → Sit), face `neutral`/`shy`, a slow petal swirl, wide camera |
-| intro | the envelope as the intro title card: it opens on the first drop (or on the music's start) |
+| Show moment (what the director already calls) | What the world sends | What happens (all existing) | Lines it brings |
+| --- | --- | --- | --- |
+| music starts | `Wave` | he waves at the camera | `wave` |
+| groove, beat | Idle/Walk sped to the tempo; every few bars `Wander` | he steps about in time | `wander`, `walkTo` |
+| build, stage 3–4 | `Run` | he runs about, faster at stage 4 | `flee` ("Nope, nope, nope!") |
+| blackout before the drop | `Spook` | he jumps, arms up | `spook` ("Eep!") |
+| drop | a `grab`, lifted, then `release` on the strike | he dangles, falls, lands in a dust ring; a big drop lifts him higher, so the toy's own screen shake comes too | `pickedUp`, `dropped`, `landed` |
+| a small drop | a `tap` | a wave or a startle | `wave` / `spook` |
+| breakdown | `Sit` | he sits down and stays sat | `sitDown`, `sitting` |
+| long breakdown, or the music quiet | `Device` | Screen Time: the tablet, then lying down with it | `device`, `lieDown` |
+| breakdown ends | any other button gets him up | StandUp / GetUp | `standUp` |
+| camera orbit shots / close shots | (the camera does it) | | `spin`, `zoom` |
+| nothing for a while | (the brain's own idle clock) | | `idle` |
 
-Optional extras once the base works: two or three NEWTs (clones via `SkeletonUtils.clone`,
-watch the frame budget), the invitation's look presets (`looks/default`, `ds`, `soft`) as the
-world's *Look* setting, music-colored petals from `colors.js`.
+The invisible hand on the drop is the toy's `carry.js`: the world moves the anchor up and lets
+go, as a finger would. How high it lifts him follows the drop's size, so only big drops shake
+the screen.
 
-**Effects.** The bonfire's looks live in `pixelPass.js` and lean on the bonfire's buffers
-(depth, normals, particle layers, palette snapping), so they can't all run on NEWT's world. The
-screen-space ones can: pull them into `src/core/screenFx/` as GLSL chunks with their uniforms,
-include them from both `pixelPass.js` (no visual change) and `retro.js` (a new final step that
-leaves the paper texels alone unless a mirror or flash is on). V1 of the NEWT world gets
-mirror, RGB split, torn rows, scanlines, negative flash, grain, cinema bars and chroma split; the
-buffer-hungry ones (x-ray, painterly, motion blur, glow) stay bonfire-only and are hidden by
-`supports`.
+Petals: a burst ring at his feet on each drop and ring (`petalLayer.js`'s click burst, placed
+at his feet on screen), and the cursor trail stays on. With Low Flash or reduced motion, no
+petals (as in the toy).
 
-**Camera.** The visualizer's shots are framed around the clearing. The NEWT world gets its own
-short list built on the invitation camera's orbit (front, low, high, three-quarter, close on
-the face, wide), cut on the same rhythm the director uses (every 2 bars, every bar after a
-drop) and eased with `cameraEase.js` (already pure, so it's shared as is).
+### 3. The glitch layer, shared
 
-**Picking it.** A *World* setting at the top of the *Show* tab and a choice on the start screen
-(Bonfire / NEWT), `?world=newt` in the URL. Switching happens only at a hidden moment, as
-scenes do: on a blackout, or at once while stopped. Scenes and the scene loop stay bonfire-only
-(`supports` has no `'scenes'` for NEWT); a scene can't name the NEWT world in v1.
+The glitch layer (torn rows, RGB split, crunch, wave, scanlines, static, mirror, the negative
+flash) is screen-space: it only needs the finished picture. Move its GLSL out of `pixelPass.js`
+into `src/bonfire/glitchChunk.js` (the shader code and its uniform list), include it from
+`pixelPass.js` (no change to the bonfire) and at the end of the toy's retro pass
+(`retro.js`), off unless the world turns it on, so the toy itself is unchanged. The NEWT world's
+`glitch` is the same uniform bag the director already fills, so every glitch roll, drop hit and
+setting works as it does on the bonfire.
 
-## Reusing animations
+**Kept bonfire-only** (they need the bonfire's extra buffers): x-ray, motion blur, ghosting,
+glow, painterly, watercolor, echo, outlines, the palette and fog render options. In the NEWT
+world those settings are hidden and the looks that need them play as Glitch.
 
-**Knight dances on NEWT: yes, and this is the best reuse in the plan.** The 13 dance moves
-(`nod`, `stepTouch`, `fistPump`, `headbang`, `swayArms`, `march`, `spin`, `jump`, `jumpingJack`,
-`clap`, `stomp`, `praise`, `defaultDance`) are pure functions of the beat writing into the pose
-format. What's needed:
+### 4. The settings
 
-1. **Move the pose format out of the knight.** `knightRig.js` `POSE`/`newPose`, `knightBody.js`
-   helpers and `knightGestures.js` `dance`/`MOVES` into `src/core/pose/` (re-exported from the old
-   paths so nothing else changes). `test/knightPose.test.mjs` must pass unchanged.
-2. **A NEWT rig.** `measureRig`-style measurements for NEWT's 17 bones (`clips.js` `BONES`,
-   `BLENDER_BONES`): arm and leg lengths, shoulder and hip places, read from the glb in node
-   (`test/invitationModel.test.mjs` already loads it).
-3. **A retarget.** `newtPose.js`: a pose → NEWT's bone turns, via `createSolver(newtRig)`. NEWT has
-   no hand, finger, tasset or pauldron bones, so those channels are dropped (the palm is the
-   ForeArm's tip, `clips.js` `PALM`); the head is huge, so moves that bring the hands near the
-   head (`clap` overhead, `headbang`, `praise`) need clamps from the head's bounds, the way the
-   knight's helmets keep out of the arms.
-4. **A layer in `character.js`.** After `mixer.update`, blend the procedural pose over the clip
-   pose with a weight (0 = clips only), the way look-at and the limp limbs already work, so
-   Idle/Walk can sit underneath and a dance fades in and out without a pop.
+- A _World_ choice (Bonfire / NEWT) on the start screen and at the top of the _Show_ tab, and
+  `?world=newt`. Switching only while stopped (or it reloads the page while playing), kept with
+  the settings.
+- In the NEWT world the tabs and rows that can't apply are hidden: Blade, Knights, Fireflies,
+  Scenes, the bonfire-only render rows and effects, the pack. A list in `settingsControls.js`
+  (`BONFIRE_ONLY`) says which.
+- His look (Default, DS, Soft), Rose Petals and Pixel Size come from the toy's saved look, so
+  what's set in the toy carries over.
 
-Done that way the toy can use it too: a *Dance* option in the invitation (round-trip reuse), and
-any move added later dances for both.
+## What gets shared
 
-**NEWT's clips on the knights: possible, low value.** They're baked keyframes on a different
-skeleton; playing them on a knight means sampling each clip into the pose format (an inverse
-of the retarget, lossy) or a bone-name retarget with rest-pose fixes. Wave, Cheer and Spook
-already have knight equivalents (`wave`, `hurrah`, the flinch). Leave it out unless a specific
-clip is wanted.
+- `glitchChunk.js`: one glitch shader for both renderers.
+- The toy's modules, imported by the visualizer as they are (nothing duplicated). Where a toy
+  module reaches into the DOM or the toy's page in a way the world can't use, split the pure part
+  out rather than copying it.
 
-**New NEWT clips** (a real dance, a bow) belong in `tools/newt.py` with their entry in
-`clips.js`, checked by `test/invitationModel.test.mjs`. That's Blender work and needs a person
-(or Claude with Blender) at the end to look at it; Codex shouldn't try it.
+That's all. No `src/core/`, no World interface, no director split; they can come later if a
+third world ever does.
 
-## Other sharing worth doing (cleanup)
+## Tasks
 
-- `src/core/rng.js` (from `invitation/rng.js`) for the bonfire's pure schedulers that take a
-  seed; `math.js` `pick`/`shuffle` keep `Math.random` for the impure callers.
-- `src/core/governor.js`: the invitation's governor, compared against the bonfire's own frame
-  gating (`frameGate.js`, `setMaxFps`). Merge only if they really do the same job; otherwise
-  leave both and say why in each header.
-- Palettes: the NEWT world takes `colors.js`/`paletteGen.js` colors for the petals and an accent,
-  never for the paper or NEWT himself (his look stays his).
-- Petals are a candidate for the bonfire too (a drop hit), *after* v1: `petals.js` is pure and
-  `petalScene.js` draws them instanced.
-
-## Making it NEWT's own, not a second bonfire
-
-The bonfire's show is spectacle: weapons, elements, glitch, cameras, no one to talk to. NEWT's
-should be a *character* at the party: he hears the music, has opinions about it, says so, and
-can still be played with. Nearly all of it reuses the toy's own machinery, which is already
-pure and tested.
-
-**What exists to build on.** His lines are text in a speech bubble (no recorded voice): 19
-triggers in `speech.js` (`TRIGGERS`, `PRIORITY`, a chance and cooldown each from content.json
-`invitation.speech`), 5–12 lines each in `invitation.lines`, picked at random, never the same
-twice running, edited on the admin's Invitation page. Lines carry text effects (`markup.js`:
-`{red,wave,shake,big,bold|…}`). The intro is a 28-box script (`dialogue.js`), each box with a
-face, an animation and a camera shot (`{"text": "Hi everyone! It's Newton :3", "face": "shy",
-"animation": "Wave", "camera": "medium", "auto": 0, …}`), run on an injected clock.
-
-### 1. Lines for the music (the music's own triggers)
-
-A second trigger set, `LIVE_TRIGGERS`, run by the same `createTalk` logic but stepped by the
-show events instead of the brain:
-
-| Trigger | When | Example tone |
-| --- | --- | --- |
-| `musicStart` | the first beats | "Oh? Oh! We're doing this?" |
-| `build` | build stage 2–3 | "It's building… it's building…" |
-| `blackout` | the 90 ms before the drop (shown just ahead, from stage 4) | "{shake\|wait for it}" |
-| `drop` | a big drop's first beat | "{big,bold,wave\|LET'S GO}" |
-| `smallDrop` | a small drop | "Ooh, nice" |
-| `breakdown` | a breakdown settles | "Okay, breather." |
-| `longGroove` | 64+ bars without a drop | "My legs are tired :3" |
-| `fast` / `slow` | the tempo past 150 / under 90 BPM | "TOO FAST" / "Is this a lullaby" |
-| `quiet` / `stopped` | the music drops out / stops | "…hello?" |
-| `tapped`, `pickedUp`, `dropped`… | the toy's own, when the audience plays with him (below) | "Put me down, this is my favourite part!" |
-
-Content: `invitation.live.lines` and `invitation.live.speech` (chance, cooldown), with their own
-section on the admin's Invitation page, checked by `contentRules.js` like the toy's. Priorities:
-`drop` > `blackout` > `build` > the rest; lines never cover a title card; cooldowns long by
-default (a line every 30–60 s at most outside drops), so it stays charming rather than chatty.
-
-### 2. Text that moves to the beat
-
-- **Typed on the beat.** In the live world the bubble types a word per beat (or per half beat
-  over 140 BPM) instead of `DIALOGUE.cps`, so a line lands like a call-out on the rhythm and
-  its last word on the downbeat. `lineDuration` and `bubble.js` take a `beatClock`.
-- **Effects in time.** `markup.css`'s wave and shake read a `--beat` custom property the world
-  sets each frame: waves crest on the beat, shakes hit on kicks, `big` letters pulse.
-
-### 3. Scripted moments: an MC script on the music's clock
-
-The intro's dialogue format, run on bars instead of taps: a **set script**, boxes with `at`
-(a bar number, `drop:N`, `breakdown:N`) instead of `next`. Each box already carries a face, an
-animation and a camera shot, so a script is a cue sheet for the whole world: "bar 1: Wave,
-medium, *Welcome to the party*", "drop 1: Cheer, close, *{big|HERE WE GO}*". It comes in the
-Uma Musume box (`dialogueUi.js`) for the opening and the big moments and in the bubble for the
-rest. The visualizer's *Title Cards* become, in this world, the opening box's text, so the
-DJ's name and the night's title are said by NEWT rather than stamped on screen.
-
-### 4. He DJs on his tablet
-
-Screen Time's tablet (`device.js`, held by `DeviceSit`/`DeviceLie`) becomes his deck: in
-breakdowns he sits with it, its screen showing the analyser's bands as a small pixel
-spectrum (a canvas texture from `analyser.js`), tapping along; at the build he stands, and on
-the drop he flings it up (a petal burst where it goes). No new model, no new clip.
-
-### 5. The audience can still play with him
-
-Unlike the bonfire, which nobody touches, the NEWT world keeps the toy's gestures (`gesture.js`,
-the brain's react / held / fall / land) under a *Hands On* setting (on for a phone or a stream
-where viewers can reach it, off for a projector). A tap gets a wave on the beat, a grab picks
-him up and he keeps dancing in the air (the dance layer over `Held`), a drop on the drop gets
-the biggest dust ring and a line. The brain gains one state, `dance`, which the show events drive
-and any gesture interrupts.
-
-### 6. Moods instead of glitch
-
-- **Faces** follow the energy: `neutral` → `happy` in the groove, `surprised` on the blackout,
-  `smug` after a drop, `shy` when it goes quiet, `sad` when the music stops; the blink rate
-  speeds up with the tempo (`faces.js` `normal`/`slow`).
-- **Looks:** the toy's own presets (Default, DS, Soft) take the turns the bonfire's looks do, a
-  new one on phrase lines; the screen effects (mirror, flash) come only on drops, sparingly.
-- **Petals:** the colors follow the visualizer's palette; the swirl's speed is the tempo; a drop
-  is a burst ring at his feet; a breakdown is a slow fall over the whole screen.
-- **The envelope as a request card:** a key (or MIDI pad) sends an envelope in with a
-  shout-out; it floats, bobbing on the beat, and opens on the next drop, NEWT reading it out.
-
-### 7. Live MC control
-
-A *Say* field and key in the HUD: the DJ types a line (text effects and all) and NEWT says it on
-the next beat. MIDI pads can each fire a trigger's line (`drop`, `build`…) or a fixed line,
-learned like the existing actions (`midi.js`).
-
-**Kept out:** a spoken voice. A babble (syllable blips, Animal Crossing-style) suits the toy,
-but in the visualizer it would play over the DJ's own mix; if it's wanted, it's the toy's, off
-by default.
-
-**Back the other way:** the toy can take the live triggers in a small way too: with a *Listen*
-toggle (the visualizer's microphone source, `sources.js`), NEWT dances to the room's music and
-says the music's lines.
-
-## Phases and who does what
-
-Each task is one pull request, small enough to review on a phone. Codex gets the work that has
-a clear, testable finish line (moves, contracts, pure maths, plumbing, tests). The work that
-has to be *looked at* (feel, timing, camera framing, how a dance reads on a chibi) is for
-Newton, or for Claude in a cloud session, which can run the app in Chromium and screenshot it.
+Each is one pull request. Codex can take 1–5; the feel (6) needs someone to look at it.
 
 | # | Task | Who | Finish line |
 | --- | --- | --- | --- |
-| 0 | `AGENTS.md` at the root: the CONTRIBUTING rules in brief, the commands, the comment style, "no behavior change" for refactors | Claude | merged |
-| 1 | `src/core/rng.js`, `src/core/governor.js`: move, re-export from the old paths | Codex | `npm run check` green, no other diffs |
-| 2 | `src/core/pose/`: move the pose format, body helpers and dance library; re-export | Codex | `check` green; `knightPose`/`knightShow` tests unchanged |
-| 3 | `show.js` split out of `director.js`: show events as data; director consumes them | Codex | `check` + `e2e/live-settings`, `e2e/scenes` green; bench within noise |
-| 4 | `worlds/index.js` + `worlds/bonfire.js`: the contract, the bonfire behind it; `supports` drives UI hiding | Codex | as 3; `test/worlds.test.mjs` for the contract |
-| 5 | `src/core/screenFx/`: screen-space effects as GLSL chunks used by `pixelPass.js` | Codex, then a visual check by Claude | `check` + e2e green; before/after screenshots match |
-| 6 | NEWT rig measurements + `newtPose.js` retarget, node tests (every move, every beat: no NaNs, bones inside limits, hands out of the head) | Codex | new tests green |
-| 7 | The procedural layer in `character.js` (weight 0 by default: the toy unchanged) | Codex | invitation tests and e2e unchanged |
-| 8 | `worlds/newt.js` v1: mount the stage and NEWT, the show-event table above, lazy load | Codex (scaffold), Claude (tuning) | `?world=newt` plays the demo track; `e2e/newt-world.spec.mjs` |
-| 9 | *World* setting, start-screen choice, `supports`-based hiding, settings migration | Codex | `test/vizSettings.test.mjs` extended; e2e |
-| 10 | Screen FX in `retro.js` for the NEWT world | Codex, then Claude | screenshots |
-| 11 | Feel pass: dance picks per section, petal amounts, camera cuts, face timing | Claude + Newton | Newton's sign-off |
-| 13 | `LIVE_TRIGGERS` in `speech.js` driven by show events; `invitation.live` content, rules and the admin's section | Codex | unit tests per trigger (priority, cooldown, no repeats); admin tests |
-| 14 | Beat-locked typing and `--beat` text effects (`bubble.js`, `markup.css`) | Codex, then Claude | `invitationBubble` tests extended; a screenshot at the beat |
-| 15 | The set script: `at` boxes on the music clock in `dialogue.js`; title cards as the opening box | Codex | dialogue tests on a fake bar clock |
-| 16 | The tablet as a deck: the spectrum texture on `device.js`'s screen | Codex, then Claude | screenshot |
-| 17 | *Hands On*: the toy's gestures in the world; the brain's `dance` state | Codex | brain tests for every interruption |
-| 18 | Faces, looks, petals and the envelope card on show events | Codex (wiring), Claude (feel) | e2e + screenshots |
-| 19 | *Say* field and MIDI line pads | Codex | `midi` tests; e2e |
-| 20 | Writing the lines and the first set script | **Newton** | his voice: nobody else should write NEWT's jokes |
-| 12 | Docs: `docs/bonfire-live.md` and `docs/invitation.md` updated; this file's status | Codex | merged |
+| 0 | `AGENTS.md`: the CONTRIBUTING rules in brief, the commands, "import the toy's modules, never copy them" | Claude | merged |
+| 1 | `glitchChunk.js` out of `pixelPass.js`, included by `pixelPass.js` and (off) by `retro.js` | Codex | `npm run check` + `npm run e2e` green; bonfire screenshots unchanged |
+| 2 | `newtWorld.js`: the toy's stage and NEWT behind the `fire.*` members, stubs for the rest, the coverage test | Codex | `check` green; `?world=newt` shows NEWT idling with the HUD working |
+| 3 | The button table above, the drop's lift and drop, tempo-synced gait, petal bursts | Codex | unit tests on a fake show (each moment sends what the table says); `check` green |
+| 4 | The _World_ setting, start-screen choice, hidden tabs and rows, the glitch uniforms wired | Codex | `test/vizSettings.test.mjs` extended; a new `e2e/newt-world.spec.mjs` (it loads, a drop drops him, a line shows) |
+| 5 | Docs: `docs/bonfire-live.md`, `docs/invitation.md`, this file's status | Codex | merged |
+| 6 | Feel pass: lift heights, how often he wanders, line chances in this world, glitch strength over white | Claude (screenshots, recordings) + Newton | Newton's sign-off |
 
-Tasks 1, 2 and 6 can run in parallel; 3 → 4 in order; 5 is independent; 7 needs 2; 8 needs 4,
-6 and 7; 9 needs 4; 10 needs 5 and 8; 13–19 need 8 (13, 15 and 17 can start on fake show events once 3 lands); 20 can start any time. Docs (12) go last.
+1 and 2 can run side by side; 3 and 4 need 2; 4's glitch wiring needs 1.
 
 ### Briefing Codex
 
-- Give it one task row per run, this file's path, and the finish line. Say "move, don't change"
-  outright for tasks 1–5.
-- Tell it the checks: `npm run check` always; `npm run e2e` (or the named spec) for anything that
-  touches a page. If its container can't run Playwright, CI does (`.github/workflows/checks.yml`);
-  the PR isn't done until CI is green.
-- Ask for the PR description to list every moved symbol with old → new path, so the review on
-  a phone is a skim.
-- Claude in this cloud session can watch the PRs (`subscribe_pr_activity`), review them, fix
-  CI, and do the visual checks (5, 8, 10, 11) with screenshots, so the parts that need eyes don't
-  wait for Newton to get back.
+- One task per run, this file's path, its row's finish line.
+- The checks: `npm run check` always, `npm run e2e` for anything that touches a page. If its
+  container can't run Playwright, CI (`.github/workflows/checks.yml`) does; the PR isn't done
+  until CI is green.
+- Claude in a cloud session can watch the PRs, fix CI and do task 6's screenshots and clips.
 
 ## Risks
 
-- **Task 3 is the big one.** `director.js` is 1,274 lines and timing-sensitive (build stages, the
-  90 ms blackout, hit-stop repaying its time). Mitigation: move code as is, add a test that runs a
-  recorded analyser trace through the old and new director and compares the `fire.*` call log.
-- **Proportions.** Knight moves were tuned for a tall armored body; on a chibi some will read
-  badly. Expect to drop or retune two or three moves (that's task 11, not a blocker).
-- **Two WebGL pipelines on one page.** Only one world is mounted at a time; switching disposes the
-  old one's renderer (the envelope already handles a refused second context).
-- **Payload.** The NEWT world's chunk plus `newt.glb` load only on demand; check the
-  visualizer's first load in `docs/performance.md` terms before and after.
+- **The director assumes a bonfire.** Stubs that report "nothing held, nothing forging" should
+  keep it on its plain paths, but some call may expect a real object back. The coverage test
+  catches missing members; task 2 also runs the demo track through a full groove → breakdown →
+  drop cycle with the NEWT world and checks there are no errors in the console.
+- **Glitch over white.** Effects tuned on a dark scene may look harsh on paper (the negative
+  flash turns the page black). Task 6 may tone some down for this world.
+- **Two pages' worth of code on one.** The toy's modules come with the NEWT world's chunk only;
+  check the visualizer's first load is unchanged.
+
+## Later, if wanted
+
+Not part of this plan: knight dance moves retargeted onto NEWT, lines written for the music,
+beat-typed text, scripted sets, the tablet as a deck, the envelope as a request card, letting
+viewers play with him during the show. Each could build on this without changing it.
