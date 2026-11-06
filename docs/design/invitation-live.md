@@ -24,24 +24,54 @@ The **NEWT** option is then a few settings pinned together: the *Paper* scenery,
 dancers, petals on, his lines on. It sits beside Bonfire on the start screen and as *World* at
 the top of the *Show* tab (`?world=newt`), and a scene can choose it like any other scenery.
 
-## 1. The paper world: a new scenery
+## 1. The paper world: a new scenery, no campfire
 
-`scenery.js` gains `paper` (`SCENERIES.paper: 'The Page'`): no ruins, an off-white void and
-floor, the fire as a small campfire on it, NEWT's shadow on the floor.
+`scenery.js` gains `paper` (`SCENERIES.paper: 'The Page'`): no ruins and **no campfire**, a plain
+page for the void and floor, NEWT's shadow on it.
 
-**The one real technical question:** the bonfire is drawn on a dark void, and its fire, sparks
-and fireflies are *added* to the picture (the fx pass is additive). Added onto white they
-vanish. Two ways out, decided by a one-day spike (task 1) with screenshots:
+**No campfire.** The engine is built round the fire: it's the light, the place the knights sit
+round, where the rings burst from, what the fireflies are leashed to and the cameras frame. So
+the fire's *spot* stays, as an invisible centre everything still works round; only what's drawn
+there goes:
 
-- **A.** In the paper world the fx layer is composited with a normal or multiply blend instead
-  of add (`pixelPass.js` already has twelve blend modes for its layers), so flames read as ink
-  and color on paper.
-- **B.** A *dusk paper* palette (a deep blue-grey page rather than white) where adding still
-  works, keeping the toy's paper look in the UI and NEWT himself.
+- the flame and its embers and smoke aren't drawn (the flame's simulation idles);
+- the fire's point light gives way to one soft key light from above, like the toy's (`camera.js`
+  `lightDir`), still casting NEWT's shadow;
+- what the director gives the flame (its size with the music, the sub-bass breathing, the beat
+  pulses) goes to the petal swirl at the centre instead (section 4), so the middle still moves
+  with the music;
+- the forge and the planted blade's home are at the centre as before, so the living blade still
+  rises, swings and plunges there;
+- fire stays as an **element effect**: the fire ring, debris, swing trails and a fire weapon's
+  flames, just no campfire.
 
-Either way the scene's palette rules (`scenes.js` `normalizeScene`: the void darkest) get a
-paper exception, and the palette tools keep NEWT's own colors off the snapping where they'd go
-wrong (as `setSteel` already does for the knights' armor).
+**Page colors.** The page is a setting, *Page*, with presets (the hex values to be picked in
+task 1):
+
+| Page | Kind |
+| --- | --- |
+| White (the toy's own, the default) | light |
+| Cream | light |
+| Rose | light |
+| Sky | light |
+| Mint | light |
+| Dusk (deep blue-grey) | dark |
+| Night (near-black) | dark |
+| From the palette: a page color rolled from the visualizer's palette tools (`colors.js`), new on drops like the scenery colors | either |
+
+plus *In the mix* (a new page on scenery changes) and a custom color. A scene stores its page
+color like its other colors.
+
+**Effects on any page.** The fire, sparks, fireflies and lightning are *added* to the picture
+(the fx pass is additive): that glows on a dark page and vanishes on a light one. So the fx
+layer's blend follows the page's brightness: added on dark pages, painted (a normal or
+multiply blend, which `pixelPass.js`'s blend modes already have) on light ones, so flames read as
+color and ink on paper. Task 1's spike checks both on White, Rose, Dusk and Night, with
+screenshots.
+
+The scene's palette rules (`scenes.js` `normalizeScene`: the void darkest) get a page exception,
+and NEWT's own colors stay off the palette snapping where they'd go wrong (as `setSteel` already
+does for the knights' armor).
 
 ## 2. Reusing the knights' animations: NEWT as a knight model
 
@@ -107,9 +137,10 @@ like every effect:
 - **The pack:** a Petals action in the Spell Tome.
 
 **Fireflies, fire, lightning and ice need nothing:** they're the engine's. In the paper world
-the campfire burns, the fireflies dance and swirl round the blade, the rings of fire, lightning
-and ice burst across the page, ice crystals sprout from the floor, and NEWT flinches from the
-living blade like the knights do. What remains is making them read on paper (section 1's spike).
+the fireflies dance round the centre and swirl round the blade, the rings of fire, lightning and
+ice burst across the page, ice crystals sprout from the floor, and NEWT flinches from the living
+blade like the knights do. With no campfire, the petal swirl is the centrepiece: it takes the
+flame's share of the music (its size, breathing and beat pulses).
 
 ## 5. Consolidation: what's duplicated, and what to do about it
 
@@ -144,7 +175,7 @@ to Claude (screenshots and clips in a cloud session) and Newton.
 | # | Task | Who | Finish line |
 | --- | --- | --- | --- |
 | 0 | `AGENTS.md`: CONTRIBUTING in brief, the commands, the sharing rule | Claude | merged |
-| 1 | Spike: the paper scenery, fx compositing A vs B | Claude | screenshots; Newton picks |
+| 1 | Spike: the paper scenery without the campfire, the fx blend on White, Rose, Dusk and Night | Claude | screenshots and clips; Newton picks the page colors |
 | 2 | Consolidation moves: `src/rng.js`, `src/fx/petals/`, `src/speech/`, NEWT's model/face split, `src/dither.js`; the lint boundaries; jscpd's baseline in CI | Codex | `npm run check` + e2e green; no behavior change; the toy's e2e untouched |
 | 3 | `paper` scenery, built from the spike's choice; its palette and the scene rules' exception | Codex | scenery and scene tests; `e2e/scenes.spec.mjs` |
 | 4 | NEWT as a knight model: the bone map, his rig, skipping helmets and plates, head clearance | Codex | `knightPose`/`knights` tests extended: every move and gesture on his rig, no NaNs, hands out of his head |
