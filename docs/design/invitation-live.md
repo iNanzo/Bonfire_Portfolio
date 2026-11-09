@@ -19,6 +19,33 @@ Source: Newton's brief (2026-11-07), eight points:
    phone; Claude does the visual checks and reviews; Newton signs off on feel.
 8. One design plan, this file, in this folder's form.
 
+## On one page
+
+- **What:** a second world in Bonfire Live, picked with *World* in the Show tab or
+  `?world=newt`: NEWT on a page, no campfire, blade or ruins.
+- **The envelope runs the show.** A letter floats in at the start; a sealed one arrives for
+  each breakdown, cracks through the build, hangs open at the top of it and burns on the
+  drop, turning the page to a new color behind the burn; quick letters land at his feet on
+  phrase lines; a sealed one waits at the end. Petals come out of every letter.
+- **NEWT is the toy's own NEWT**: his brain, clips and lines. The show presses his buttons,
+  so his existing lines fire from the same behaviors as in the toy: he walks in (`walkTo`),
+  waves as the first letter burns (`wave`), sits for a breakdown (`sitDown`), runs in the
+  build (`flee`), is lifted by the open letter (`pickedUp`) and dropped on the drop
+  (`dropped` or `landed`). No new lines.
+- **Shared with the bonfire:** the director whole, every render effect, the element rings and
+  scorch marks, the fireflies (dark pages). A stand-in for the fire (`fireDuck.js`) answers
+  the director, so `director.js` barely changes.
+- **Pages:** White, Cream, Dusk, Night. Glowing effects read on dark pages; S1 tests what
+  reads on light ones.
+- **Knight dances:** later. 11 of 13 moves push his hands through his big head; two (stomp,
+  beckon) fit and come after the feel pass.
+- **Consolidation:** only real duplicates (the seeded rng, `toLinear`); the rest is imported
+  where it lives, since the toy may import nothing from outside its folder.
+- **Delivery:** two spikes by Claude first (S1: how it looks; S2: can the show lift and drop
+  him), then Codex PRs. The first clip you judge comes after W2b: about six working days on the
+  longest chain (S1 → W1a → W2a → W2b), with the other tasks beside it; settings, rings,
+  bubble and lines follow, then a feel pass you sign off.
+
 Read in this order: Summary and Words, Key decisions, Architecture (Drawing, The music), the
 show and the roles, then the Delivery plan, whose task blocks point back at those sections.
 
@@ -134,7 +161,7 @@ dissolve-chunk and `math.js` merges are deferred.
 - **K8. The letter machine has one owner.** `newtMoments.js` owns every `createEnvelope`,
   decides open/ready/skip and says when a letter is gone; `fireDuck.js` only translates
   (`equip`/`release`/`holding`/`forging`/`swapTime`/`blade` become moment inputs and read
-  moment outputs; it calls the Live UI's `onImpact`). W1 ships the duck with a letterless
+  moment outputs; it calls the Live UI's `onImpact`). W1a ships the duck with a letterless
   stub (an impact timer); W2a replaces it. Why: two Codex PRs would otherwise both build it.
 - **K9. The drop's lines come from a grab at build stage 4 and a release at the strike;
   Spook only when nothing is held.** The grab `GestureEvent` with `bodyStep`'s
@@ -610,8 +637,8 @@ in CI. `math.js` has no seeded rng; the rng's twin is in `bolts.js`.
 | `invitation/rng.js createRng` ↔ `bonfire/bolts.js seeded()` (identical mulberry32) | `bolts.js` imports `createRng`, re-exports `seeded = (seed = 0) => createRng(seed)` and keeps `hashSeed` (K12)                                                                                                                                                                                 | `src/bonfire/bolts.js`            | small  | low: `test/rng.test.mjs` proves the same sequence bit for bit; `scenery.js:76-83` and `summonSign.js:285` keep their LCGs (different sequences) | `bolts.js:21-31`; `rng.js:9-18`; `plasma.js`, `swingTrail.js`, `lightningRing.js`, `forgeRun.js`, `ice.js` import from `bolts.js` |
 | JS sRGB → linear (`paletteGen.js toLinear`, `ruleBasics.js`)                       | export `toLinear`/`toGamma` from `paletteGen.js`; `pages.js` imports it                                                                                                                                                                                                                        | `src/paletteGen.js`               | small  | none                                                                                                                                           | `paletteGen.js:27-28`; `ruleBasics.js:60`                                                                                         |
 | The envelope's picture would be copied into the world                              | extract the actor: the Group, `piece`, `buildEnvelope`, `buildSpecks` and the envelope half of `frame()`/`placeSeal()`; it imports `buildSeal`/`sealOnScreen` from `envelopeSeal.js` as the scene does; the scene keeps the DOM, `buildCompose`, the ink, the drag, cues, backdrop and input | `src/invitation/envelopeActor.js` | medium | low: the toy's envelope unit tests and `e2e/invitationEnvelope.spec.mjs` unchanged                                                              | `envelopeScene.js:123-213,713-775,815-872`; `envelopeSeal.js:341,413`                                                             |
-| The pass's per-frame writes in `sceneUpdate.js`                                    | after W1: split the glitch-to-uniform table, `uTime`, ripple, `uCenter` from a point; W1's copy is the oracle                                                                                                                                                                                   | `src/bonfire/passWrites.js`       | small  | low: `test/passWrites.test.mjs` on a fake pass                                                                                                  | `sceneUpdate.js:69-125,376-386`                                                                                                   |
-| The frame loop, gate, stats, capture and teardown in `scene.js`                    | after W1: split; `scene.js` and `world.js` call it                                                                                                                                                                                                                                             | `src/bonfire/frameLoop.js`        | small  | low-medium: `test/frameLoop.test.mjs` on a fake loop; the `smoke` and `scenes` e2e shards judge it                                               | `scene.js:104-139,549-626,735-779`                                                                                                |
+| The pass's per-frame writes in `sceneUpdate.js`                                    | after W1a: split the glitch-to-uniform table, `uTime`, ripple, `uCenter` from a point; W1a's copy is the oracle                                                                                                                                                                                    | `src/bonfire/passWrites.js`       | small  | low: `test/passWrites.test.mjs` on a fake pass                                                                                                  | `sceneUpdate.js:69-125,376-386`                                                                                                   |
+| The frame loop, gate, stats, capture and teardown in `scene.js`                    | after W1a: split; `scene.js` and `world.js` call it                                                                                                                                                                                                                                            | `src/bonfire/frameLoop.js`        | small  | low-medium: `test/frameLoop.test.mjs` on a fake loop; the `smoke` and `scenes` e2e shards judge it                                               | `scene.js:104-139,549-626,735-779`                                                                                                |
 | Not duplicates, left alone, headers say so                                         | `dust.js` ↔ the impact puff (closed-form seeded vs stepped random); `governor.js` ↔ `frameGate.js` (+ `record.js frameEvery`); `retro.js` ↔ `pixelPass.js` (different rules, 17 tests); `invitation/camera.js` ↔ `ui/orbit.js`; the shake sines in `camera.js` and `view.js`; both `markup.js` and both `render.js` (name clashes: tasks spell full paths); the world's `setRender` copy of `applyRender` |                                   | none   | none                                                                                                                                           | the accepted-copy pattern: a test holding two copies together, `test/invitationLink.test.mjs:1-10`                                 |
 | Deferred                                                                           | Bayer (seven definition sites in two conventions 1/32 apart, no test catches a dither shift); the dissolve GLSL chunk (same noise family, different sums and rims, a JS twin pinned by e2e); the toy's one-liners (`clamp`, `clamp01`, `smooth`, `lerp`, `TAU`, `wrap`: 20 definitions in 11 files; an in-toy `src/invitation/math.js` with a bit-for-bit test like `test/math.test.mjs:1-24` when a PR touches them) and a `worldPerPixel` (nine sites; `invitationRing.test.mjs:97` first); jscpd; `no-restricted-imports` |                                   |        |                                                                                                                                                |                                                                                                                                   |
 
@@ -650,18 +677,19 @@ scope is the section its block names; its finish line is what Codex pastes.
 | S2  | Carry spike (N5)                                                  | Claude         | 0.5  |             |
 | R1  | The rng and `toLinear` (no behavior change) (N7)                  | Codex          | 0.5  |             |
 | R2  | `envelopeActor.js` and the look seam (no behavior change) (N7)    | Codex          | 2    |             |
-| R3  | `passWrites.js` and `frameLoop.js` (no behavior change) (N7)      | Codex          | 1    | W1          |
+| R3  | `passWrites.js` and `frameLoop.js` (no behavior change) (N7)      | Codex          | 1    | W1a         |
 | R4  | `character.js` `dress` (no behavior change) (N7)                  | Codex          | 0.5  |             |
 | R5  | Petal seams (no behavior change in the toy) (N7)                  | Codex          | 1    |             |
 | R6  | Firefly and lightning seams (no behavior change) (N7)             | Codex          | 0.5  |             |
-| W1  | The world scaffold (N1, N6)                                       | Codex          | 2    | S1, R4      |
-| W2a | The letters (N2)                                                  | Codex          | 2    | W1, R2, R5  |
-| W2b | NEWT's reactions (N5)                                             | Codex          | 1.5  | W2a, S2     |
-| W3  | Settings, start screen, HUD (N1, N6)                              | Codex          | 1.5  | W1          |
-| W4a | Element rings and marks (N3)                                      | Codex          | 1    | W1, R6      |
+| W1a | The page and the duck (N1, N6)                                    | Codex          | 1.5  | S1          |
+| W1b | NEWT stands on the page (N1)                                      | Codex          | 1    | W1a, R4     |
+| W2a | The letters (N2)                                                  | Codex          | 2    | W1a, R2, R5 |
+| W2b | NEWT's reactions (N5)                                             | Codex          | 1.5  | W1b, W2a, S2 |
+| W3  | Settings, start screen, HUD (N1, N6)                              | Codex          | 1.5  | W1a         |
+| W4a | Element rings and marks (N3)                                      | Codex          | 1    | W1a, R6     |
 | W4b | Fireflies on dark pages (N3)                                      | Codex          | 1    | W4a         |
 | W5  | The bubble and the lines (N5)                                     | Codex          | 1    | W2b         |
-| G1  | The guards (N7)                                                   | Codex          | 0.5  | W1          |
+| G1  | The guards (N7)                                                   | Codex          | 0.5  | W1a         |
 | D1  | NEWT's rest map and the retarget harness (N4)                     | Codex          | 1    |             |
 | D2  | The pose layer (no behavior change at weight 0) (N4)              | Codex          | 1    | D1          |
 | D3  | `newtDance.js`: the three that clear (N4)                         | Codex          | 1    | W2b, D2     |
@@ -700,7 +728,7 @@ unchanged, which `e2e/invitationEnvelope.spec.mjs` waits on; `npm run check`; `n
 coverage`; `npm run e2e -- invitationEnvelope invitationPetals`; every moved symbol listed
 old → new in the PR.
 
-**R3** (after W1, whose copies are the oracle; the two split rows of the Consolidation table;
+**R3** (after W1a, whose copies are the oracle; the two split rows of the Consolidation table;
 `sceneRender.js` is not split). Finish line: `test/passWrites.test.mjs` (new): on a fake pass
 (`{ uniforms }`) a recorded `glitch` object and `size` write the same uniform values the copy
 did; `test/frameLoop.test.mjs` (new): on a fake animation loop the gate (`frameGate.js`)
@@ -732,16 +760,22 @@ starts at `(origin.x, effects.lightning.height, origin.z)`, with `source: () => 
 that point, default sequences bit for bit on a fixed rng; `npm run check`; `npm run e2e --
 smoke`.
 
-**W1** (after S1, R4; `world.js` and `pages.js` as Drawing and Page colors say; `fireDuck.js`
+**W1a** (after S1; the page and the duck, no NEWT, no letters, no petals, no bubble; about 9
+files, ~400 lines). In: `world.js` with the renderer, scene, camera, `createView`,
+`createFrame` + `createPixelPass`, the two copies (pass writes, frame loop) under headers
+naming the source, the lights and the Lambert page, the render setters, `snapshot()` and
+`dispose`; `pages.js` as Page colors says; `fireDuck.js`
 with every member The music lists and a letterless stub: `equip` resolves and calls the
 four-argument `onImpact` after `swapTime`, at once for a same-weapon or `instant` equip,
-`release` returns `holding`; `main.js` and `dialogs.js` (`REBUILD` + `world`) as Choosing
-and loading says; `world`, `page`,
+`release` returns `holding`, `swing` resolves false; `main.js` and `dialogs.js` (`REBUILD` +
+`world`) as Choosing and loading says; `world`, `page`,
 `pageTurns` in `DEFAULT_SETTINGS` (`director.js:111-204`) and `CHOICES` (`settings.js:110-120`),
 `world` in `LOCAL` (`:122`)). Finish line: `test/newtWorld.test.mjs` (new): `fireDuck.js`
 imports no three.js (its specifiers read as `invitationContent.test.mjs:88-90` does); every
 member reached as `fire.`, `ctx.fire?.` or `candidate.` across `src/visualizer/*.js` (not
-`newt/`), found by regex at run time, plus `canvas` and `onRendered`, exists on the duck;
+`newt/`), found at run time by a regex that allows whitespace and newlines around the dot
+(`/\bfire\s*\??\.\s*(\w+)/g`: `director.js` writes `fire\n      .swing(`), plus `canvas` and
+`onRendered`, exists on the duck, and the found set includes `swing`;
 `createDirector(duck, { settings: settingsWith({ world: 'newt' }), scenes: () => [], onEvent
 })` then `bars(director, 64, …)` from `test/lib/fakeScene.mjs`, `bars(…, { state:
 'breakdown' })`, `bars(…, { state: 'build' })` and one `director.update({ ...FRAME, events:
@@ -757,7 +791,15 @@ reads `?test` in `src/visualizer`); wait on `[data-stage].is-ready`; click
 (`smoke.spec.mjs`'s `watch()`). `npm run check`; `npm run coverage` (lower a threshold by hand
 for `world.js` if it must, and say why).
 
-**W2a** (after W1, R2, R5; `newtMoments.js` owns the letters as The envelope's roles says,
+**W1b** (after W1a, R4; NEWT stands on the page, nothing else). In: `loadCharacter`/
+`createCharacter` with `pixel: false` and the default `dress`, `blend`, `play` and
+`setWeights` wired as `src/invitation/main.js` step 4 and `finish()` do, `applyLook` mode
+`'camera'`, Idle with no brain yet (W2b adds it), `uCenter` at his chest; `snapshot().newt`.
+Not in: the brain, talk, bubble, letters, petals. Finish line: `e2e/newt-world.spec.mjs`
+extended: `snapshot().newt.clip === 'Idle'` once `ready`; the toy's `invitationCharacter*`
+and `invitationModel` green; `npm run check`; `npm run coverage`.
+
+**W2a** (after W1a, R2, R5; `newtMoments.js` owns the letters as The envelope's roles says,
 with the petal emits and the four-argument `onImpact` when a letter is gone; `fireDuck.js`
 loses its stub; `world.js` binds the actor and the petal scene). Finish line:
 `test/newtMoments.test.mjs` (new) on a fake clock: start opens on the first downbeat and
@@ -765,27 +807,31 @@ after 4 s unlocked; a breakdown holds a letter; stages lift and crack it; stage 
 the strike burns on its frame and the page turns when `pageTurns` is on, never on an un-held
 drop; `return` skips it (after stage 2 as well); silence leaves a sealed one; a phrase-line
 letter in the groove opens on the timed beat and never comes while one is `forging`; two
-letters, two pours. `e2e/newt-world.spec.mjs` extended: two frames of a floating letter one
-tick apart, the seal's texels identical (the 5028c51 check). `npm run check`; `npm run
-coverage`.
+letters, two pours. `e2e/newt-world.spec.mjs` extended: over 20 polled `snapshot()`s of a
+floating letter, every `letter.seal` value (`x`, `y`, `axes`, as `sealOnScreen` returned them,
+`envelopeSeal.js:341-353`) is on a half texel (`Number.isInteger(v * 2)`) and `placedAt`
+equals them (the 5028c51 check is about placement; the texel-level proof is Claude's, in S1
+and F1's captures). `npm run check`; `npm run coverage`.
 
-**W2b** (after W2a, S2; the real brain and talk in `world.js`; `newtMoments.js` emits the
+**W2b** (after W1b, W2a, S2; the real brain and talk in `world.js`; `newtMoments.js` emits the
 buttons and gestures of moments 2–3, 6–9, 12–14, 16–17 and the blackout freeze). Finish
 line: `test/newtMoments.test.mjs` scenarios: each press and event on the right frame;
-`return` after stage 2 presses nothing; the blackout freezes; the strike's grab and release
-drive the brain held → fall → land (`brain.js:703-713`) with `bodyStep` given
-`collar`/`target` and `released` a short toss. Fallback written in, if S2 shows even that
+`return` after stage 2 presses nothing; the blackout freezes; the grab at build stage 4 and
+the release at the strike drive the brain held → fall → land (`brain.js:703-713`) with
+`bodyStep` given `collar`/`target` and `released` a short toss (K9). Fallback written in, if S2 shows even that
 does not hold: the drop has no line in v1 and this block says so (a Land clip restarted
 without the brain passing `fall` fires nothing: `landed` needs `land` after `fall`,
 `speech.js:313-314`). `npm run check`; `npm run coverage`. This is the first clip (below).
 
-**W3** (after W1, rebasing on it: both touch `main.js`, `settings.js`, `dialogs.js`).
+**W3** (after W1a, rebasing on it: both touch `main.js`, `settings.js`, `dialogs.js`).
 `src/settingsMap.js` (imports nothing: page and world names are literals there): the `world`,
 `page` and `pageTurns` rows in Show (Title Case labels, hints 12–160 chars); a `worlds?:
 ('bonfire'|'newt')[]` field on entries (default both); `blockedBy` (`:1696`) returns
 "Bonfire only" when the entry's `worlds` excludes `settings.world`, before the entry's own
 `needs` (one `Need` per entry, `:30-34`); bonfire-only: the Weapons group (with one weapon
-enabled `nextWeapon()` has nothing to draw, `director.js:330`), the Cast and Scenes tabs'
+enabled `nextWeapon()` has nothing to draw, `director.js:330`), the Living Weapon rows
+(`combos`, `comboBars`, `moves`, `rhythm`, `swingCam`, `swingEase`; `combos` is forced to −1,
+"never", in this world so the director asks the duck for no swing), the Cast and Scenes tabs'
 rows, Scenery, Fog, Edge Glow; the Auto Drops hint says letters need it. `start.js`: the
 World switch beside the presets (`:97-104`). A `data-world` attribute on `<html>`; CSS hides
 the Living Weapon button, the Dance button (until D3) and the pack in the newt world
@@ -797,7 +843,7 @@ key named above carries `worlds: ['bonfire']`); `npm run e2e -- tips-live live-s
 nine tab ids unchanged); `e2e/newt-world.spec.mjs` extended: no `.viz-scene-chip`, the pack
 hidden; `npm run check`.
 
-**W4a** (after W1, R6; the `page` key exists since W1, so W3 is not needed for the Night
+**W4a** (after W1a, R6; the `page` key exists since W1a, so W3 is not needed for the Night
 e2e). `newt/elementRings.js`: the N3 factories (`createLightningRing` with `source` the
 letter's frame; `createGroundMarks` on the Lambert page), each with an owned origin Vector3
 at his feet, `reach = () => pageHalf`, lights 0 on light pages; `ring()`/`scar()` bodies
@@ -829,13 +875,14 @@ real brain and talk on a fixed seed over W2b's scripted show, with a fixture `sp
 every chance is 1, every cooldown 0 and the quiet spell 0, lines two per trigger from the
 fixture (never `content.json`), the expected order asserted as a subsequence in the order
 W2b's script produces them (`walkTo`, `wave`, `sitDown`, `device`, `standUp`, `flee`,
-`pickedUp` or `dropped`, `landed`, `spook` on an un-held drop, `lieDown`), `sitting` and
+`pickedUp` at stage 4, then one of `dropped` or `landed` at the strike (equal priority: the
+first up blocks the other; the test accepts either), `spook` on an un-held drop, `lieDown`), `sitting` and
 `idle` excluded (they ride the 20–40 s clock); `invitationBubble` green with a
 `getComputedStyle` test that scale 1 leaves the toy's sizes; `e2e/newt-world.spec.mjs`
 extended: open the output window and see `[data-mirror="bubble"]` appear on a line and go;
 `npm run check`.
 
-**G1** (after W1; Consolidation › Guards). Finish line: `test/newtImports.test.mjs` and
+**G1** (after W1a; Consolidation › Guards). Finish line: `test/newtImports.test.mjs` and
 `test/newtChunk.test.mjs` (both new, both in `npm run check`) each failing on a planted
 import; a planted static import of `src/invitation/content.js` from `main.js` fails `npm run
 build`; `npm run check`.
@@ -868,7 +915,8 @@ collar from stage 4, swings him, drops him on the strike. Finish line: `newtMome
 extended; `caught`/`shaken`/`thrash` reachable in `newtLines`; a clip from Claude. **P1**
 (optional, on Newton's call after S1; after W4a): a page-sized quad in the toon FLAT
 material, `uToLetter` over the page (`envelopeLook.js:232-243`), in place of the crossfade.
-Finish line: a shader-text test; `newt-world.spec.mjs` two-frame comparison; a clip. **L1**
+Finish line: a shader-text test; `newt-world.spec.mjs`: `snapshot().page.name` changes on
+the burn's frame; a clip. **L1**
 (optional, if Newton wants the world unlisted; after W3): a `?world` gate on the lock page
 (`vite.config.js:195-201`). Finish line: `e2e/gate.spec.mjs` and `test/gate.test.mjs`
 extended: `/visualizer/?world=newt` locked while the invitation's switch is on,
@@ -894,9 +942,9 @@ turning under a held burn; no settings UI beyond `?world=newt` and the `page` ke
 the demo track and on `painter/beat.js`'s loop before W3–W5 and the D track start, so the
 feel is judged before the polish is built. The table's Depends on column is the order; rows
 with no shared dependency run side by side (S1, S2, R1, R2, R4, R5, R6 and D1 first; W3,
-W4a, G1 and R3 once W1 is in); C1, P1 and L1 only on Newton's word. PRs merge one at a time
+W4a, G1 and R3 once W1a is in; W1b beside them); C1, P1 and L1 only on Newton's word. PRs merge one at a time
 in that order; a PR that touches `main.js`, `settings.js`, `settingsMap.js` or `dialogs.js`
-rebases on what merged before it (W3 on W1; W2a on W3 if W3 merged first). Claude merges
+rebases on what merged before it (W3 on W1a; W2a on W3 if W3 merged first). Claude merges
 after review; Newton merges F1.
 
 ### Briefing Codex
@@ -947,7 +995,7 @@ template is filled, with a capture for anything visible.
   draws it at `:322,598,602,622-624,906-907,1024`; `looks.js` and `colors.js` draw it too);
   `newtMoments.js` runs on a fake clock; the lines test runs the real brain and talk on a
   fixed seed with a fixture speech. Node tests never import `world.js`.
-- **Browser**: `e2e/newt-world.spec.mjs` grows with W1, W2a, W3, W4a, W4b and W5 as their
+- **Browser**: `e2e/newt-world.spec.mjs` grows with W1a, W1b, W2a, W3, W4a, W4b and W5 as their
   blocks say, always on states through `window.__viz.fire.snapshot()`, never on durations;
   the toy's `invitation*` specs stay green on every PR.
 - **Visual**: Claude records with V (`record.js`) on the demo track and on `painter/beat.js`'s
@@ -962,7 +1010,7 @@ template is filled, with a capture for anything visible.
 - **The 16-color budget** is exactly full. S1 counts; the cel path and the mark branch are
   the fallbacks (K3).
 - **The duck lies to the director** in paths nobody traced (`pending` scenes, `recolor`, the
-  rigs' `fire.blade`, the HUD's weapon label). W1's contract and trace tests, `scenes: () =>
+  rigs' `fire.blade`, the HUD's weapon label). W1a's contract and trace tests, `scenes: () =>
   []`, the W3 hides and the e2e cover the known ones; unknown ones show as console errors.
 - **The grab and release** needs `bodyStep` to hold him with no pointer. S2 answers; W2b's
   fallback is a drop with no line, said in its block.
@@ -974,7 +1022,7 @@ template is filled, with a capture for anything visible.
   (`petals.js:336-347`): the held letter has it in a breakdown, NEWT in the groove; POOL 120
   caps every scene. The pour needs R5's reset or every letter after the first pours nothing.
 - **The seal off the texel grid shimmers** (the 5028c51 bug). The actor takes the pass's
-  `size.w/h`; W2a's e2e compares two frames.
+  `size.w/h`; W2a's e2e checks every seal value sits on a half texel.
 - **Head clearance**: clap, hurrah, fistPump, swayArms and jump are 22–32 cm inside; praise
   is unmeasured. The head pass (Later) may drop moves from his list rather than force them;
   Newton decides which stay.
@@ -993,7 +1041,7 @@ template is filled, with a capture for anything visible.
   whether a page turn on every big drop is too much. F1, on the demo track, Newton's call.
 - **`world` as a LOCAL key** (so a setup never switches worlds) and the precedence of
   `?world=`, `?scene=`, the Painter's Play and the saved setting (`?world` wins the session;
-  `?scene=` implies the bonfire): W1 writes the rule in `settings.js`; Newton confirms.
+  `?scene=` implies the bonfire): W1a writes the rule in `settings.js`; Newton confirms.
 - **The Dance button in this world** is hidden until D3 ships; the Living Weapon button and
   the pack stay hidden (nothing answers them).
 - **Codex and Playwright**: every PR that touches the Live UI is one CI round trip; the seams
@@ -1005,7 +1053,7 @@ template is filled, with a capture for anything visible.
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | The world (new)          | `src/visualizer/newt/world.js`, `fireDuck.js`, `newtMoments.js`, `elementRings.js`, `pages.js`, `newtDance.js`, `newtRig.js`, `fireflyModel.js`                                                                                                                                                                                                                                                                                                                                        |
 | Live UI                  | `src/visualizer/main.js` (the import switch, `hear`, the `onEvent` relay, `loopLibrary` in this world), `director.js` (`DEFAULT_SETTINGS` keys only), `settings.js` (`CHOICES`, `LOCAL`), `dialogs.js` (`REBUILD` + `world`), `src/settingsMap.js` (rows, `worlds`), `src/visualizer/markup.js` (`data-world`), `packUi.js`, `output.js` (`mirror` on `ctx`), `start.js` (the World switch), `visualizer.css` (the hides)                                                             |
-| Bonfire seams and splits | `src/bonfire/bolts.js` (imports the toy's rng), `fireflies.js` (`pois`), `lightningRing.js` (`source`); after W1: `passWrites.js` (new), `frameLoop.js` (new), `sceneUpdate.js`, `scene.js`                                                                                                                                                                                                                                                                                            |
+| Bonfire seams and splits | `src/bonfire/bolts.js` (imports the toy's rng), `fireflies.js` (`pois`), `lightningRing.js` (`source`); after W1a: `passWrites.js` (new), `frameLoop.js` (new), `sceneUpdate.js`, `scene.js`                                                                                                                                                                                                                                                                                            |
 | Invitation seams         | `src/invitation/envelopeActor.js` (new), `envelopeScene.js` (uses the actor), `envelopeLook.js` (`mark`, `linear`), `character.js` (`dress`, the pose layer), `petalScene.js` (`tones`, `mark`, `linear`), `petals.js` (the pour reset, the swirl scale), `bubble.js` and `bubble.css` (`--bubble-scale`)                                                                                                                                                                             |
 | Shared                   | `src/paletteGen.js` (`toLinear`/`toGamma` exported)                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Build                    | `vite.config.js` (`liveLoad` in `firstLoadGuard`; the `?world` gate, L1)                                                                                                                                                                                                                                                                                                                                                                                                               |
@@ -1018,7 +1066,8 @@ template is filled, with a capture for anything visible.
 - [ ] S1 pipeline spike, the K3 branch and the default page picked · [ ] S2 carry spike
 - [ ] R1 rng and `toLinear` · [ ] R2 envelope actor and look seam · [ ] R4 character dress ·
       [ ] R5 petal seams · [ ] R6 firefly and lightning seams
-- [ ] W1 the world loads and survives a breakdown → drop · [ ] W2a the letters · [ ] W2b
+- [ ] W1a the page and the duck survive a breakdown → drop · [ ] W1b NEWT on the page ·
+      [ ] W2a the letters · [ ] W2b
       NEWT's reactions (the first clip) · [ ] W3 settings, start screen, HUD · [ ] W4a element
       rings and marks · [ ] W4b fireflies · [ ] W5 bubble and lines · [ ] G1 guards · [ ] R3
       pass writes and frame loop
