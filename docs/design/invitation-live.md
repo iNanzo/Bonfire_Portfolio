@@ -1,6 +1,8 @@
 # NEWT in Bonfire Live: the envelope's show
 
-Status: **plan, nothing built** (2026-11-07; the checklist at the end tracks the tasks).
+Status: **plan, nothing built; spikes S1 and S2 done** (2026-11-09: findings and captures in
+[captures/newt-live-s1/](captures/newt-live-s1/README.md); the checklist at the end tracks
+the tasks).
 Source: Newton's brief (2026-11-07), eight points:
 
 1. The invitation as its own world in Bonfire Live: no campfire, blade, weapons or sceneries;
@@ -35,16 +37,17 @@ Source: Newton's brief (2026-11-07), eight points:
 - **Shared with the bonfire:** the director whole, every render effect, the element rings and
   scorch marks, the fireflies (dark pages). A stand-in for the fire (`fireDuck.js`) answers
   the director, so `director.js` barely changes.
-- **Pages:** White, Cream, Dusk, Night. Glowing effects read on dark pages; S1 tests what
-  reads on light ones.
+- **Pages:** White, Cream, Dusk, Night. S1 showed fire and lightning vanish on light pages
+  while ice, petals, letters and NEWT read; **Dusk is the recommended default**, and light
+  pages play every element as ice.
 - **Knight dances:** later. 11 of 13 moves push his hands through his big head; two (stomp,
   beckon) fit and come after the feel pass.
 - **Consolidation:** only real duplicates (the seeded rng, `toLinear`); the rest is imported
   where it lives, since the toy may import nothing from outside its folder.
-- **Delivery:** two spikes by Claude first (S1: how it looks; S2: can the show lift and drop
-  him), then Codex PRs. The first clip you judge comes after W2b: about six working days on the
-  longest chain (S1 → W1a → W2a → W2b), with the other tasks beside it; settings, rings,
-  bubble and lines follow, then a feel pass you sign off.
+- **Delivery:** the two spikes are done (S1: how it looks; S2: the show can lift and drop
+  him with no finger). Next, Codex PRs. The first clip you judge comes after W2b: about six
+  working days on the longest chain (W1a → W2a → W2b), with the other tasks beside it;
+  settings, rings, bubble and lines follow, then a feel pass you sign off.
 
 Read in this order: Summary and Words, Key decisions, Architecture (Drawing, The music), the
 show and the roles, then the Delivery plan, whose task blocks point back at those sections.
@@ -171,8 +174,11 @@ dissolve-chunk and `math.js` merges are deferred.
   a line up blocks its equals (`speech.js:82-86,428`), `lineDuration` keeps even a short line
   up ~2 s (`:182-184`), so a grab and a release a frame apart play one line over a lift
   nobody saw, and a Spook at the blackout would silence the fall's lines; `onButton` returns
-  while he is held or falling (`brain.js:735`). S2 shows whether `bodyStep` holds him with no
-  pointer; if not, the drop has no line in v1 (W2b says so). C1 shrinks to the swing.
+  while he is held or falling (`brain.js:735`). S2 confirmed it with no pointer: the real
+  brain, body and talk go held → fall → land on all 2,000 seeded drops, lifting him 0.65 m;
+  the hold that gives the drop a line most often is about two bars (`dropped` or `landed` on
+  54 % of drops at content.json's chances, `thrash` on 11 %); one bar gives 35 %, four bars
+  38 % with `thrash` on 70 %. C1 shrinks to the swing.
 - **K10. He dances with his own clips first; the knights' moves follow F1.** `clips.js:19-47`
   has Nod, Cheer, Shrug, Point, Wave and Think; W2b restarts them through the wiring it
   installs anyway. The knights' solver on his body (D1–D3) ships stomp and beckon after the
@@ -289,16 +295,23 @@ bonfire-side (the flame palette machine, scene fog, fire light, flow view).
 
 Light and page: a hemisphere plus a fitted directional with a shadow over a
 `MeshLambertMaterial` plane (`fitShadow` imported from `src/invitation/floor.js`, which
-imports only three and `area.js`: the allowed direction); the plane takes `marks.patch`
+imports only three and `area.js`: the allowed direction). The plane is on the ghost layer, so
+it stays out of the normals pass and its far edge draws no outline, and the scene has **no
+fog**: S1 found a 14 m plane on the solid layer outlines the horizon in ink, and fog on this
+pass draws a band of the ink across dark pages; on the ghost layer with no fog the page meets
+the void with no seam on all four pages, and NEWT is outlined as on the void. The plane takes `marks.patch`
 (`marks.js:252-259`) so scorches darken the paper, with `createGroundMarks({ center:
 pageCenter, half: pageHalf })` (`:28`; marks outside `half` are dropped). Shadows on on
 desktop, off on touch as the bonfire does (`scene.js:118`; on touch NEWT stands on the toy's
 blob shadow); `frame.warm` pre-builds point-light shadow materials only (`frame.js:245-262`),
 so the world renders one shadow frame before `ready`. The fx composite stays additive and
-unchanged in v1 (`pixelPass.js:485-492`): on light pages the world leans on what is
-normal-blended (petals, scorch marks, crystals, ring smoke and ash, chill mist); the glowing
-effects (ring flames, embers, bolts, sparks, firefly halos) are for Dusk and Night. S1 shows
-whether anything additive reads on White; the ink mode (`uFxMode`, one uniform, bonfire
+unchanged in v1 (`pixelPass.js:485-492`). S1 confirmed it: on White and Cream the fire
+ring's flames and the lightning ring vanish, leaving grey smoke and ash that read as dust;
+the ice ring's crystals (solid, outlined) read well; on Dusk and Night all three read, the
+lightning best. So on light pages the world leans on what is normal-blended (petals, scorch
+marks, crystals, chill mist) and the duck plays every element as ice (Page colors); the
+glowing effects (ring flames, embers, bolts, sparks, firefly halos) are for Dusk and Night.
+The ink mode (`uFxMode`, one uniform, bonfire
 unchanged at 0) is Later, not a dependency. The page, NEWT and the letters are laid out
 inside the camera's clearing (`keepInClearing`, `camera.js:448`; `CLEARING` in
 `clearing.js:23-31`: 6.5 m round the origin, in front of it), where every shot is clamped.
@@ -335,9 +348,12 @@ exposes today only as `ctx.mirrorCard` (`cards.js:54`) and W5 exposes as `ctx.mi
 wrapper, on every `say` and when it hides).
 
 Looks on paper: the looks stay the VJ's, as in the bonfire. S1 screenshots every look on
-White and Night and Newton strikes names; the recommended set for this world is ink,
-painterly, grain, echo and mirror In the Mix, with negative, glitch and color cycling Off on
-light pages (negative is a page turn by accident). The first clip is recorded with that set
+White and Night and Newton strikes names. S1 tried five: glitch (RGB split), mirror,
+painterly and glow read on both; **ink floods a light page** with the core's gold (it dithers
+to "void and the flame's core", built for a dark void), so ink is Off on light pages and In
+the Mix on dark ones. The recommended set for this world is painterly, grain, echo, mirror
+and glitch In the Mix, ink on dark pages only, with negative and color cycling Off on light
+pages (negative is a page turn by accident). The first clip is recorded with that set
 seeded; W3 writes it into the Looks hints; a per-world default set is Later if F1 wants it.
 
 ### The music
@@ -578,26 +594,35 @@ behavior.
 
 `page`: White (the toy's), Cream, Dusk, Night; Rose, Sky and Mint are Later, each a row in
 `pages.js`. `pageTurns`: Off / On Big Drops, default On Big Drops (`'drops'`). The shipped
-default page is S1's call among White, Cream and Dusk (White if anything additive reads on
-it, else Cream, else Dusk); Night is a wall choice, where the glowing effects and the
-fireflies live. Each entry in `newt/pages.js` gives the page color, the ink for palette[0]
+default page is Newton's call after S1: nothing additive reads on White or Cream, so the
+recommendation is **Dusk** (it still reads as paper, and the fire, lightning and fireflies
+read on it); White and Cream stay as choices with ice for every element; Night is a wall
+choice. Each entry in `newt/pages.js` gives the page color, the ink for palette[0]
 (`INK` 0x3a332d on light pages, a pale ink on Dusk and Night: it is the outline color,
 `pixelPass.js:387`) and the 16 slots, laid out on the bonfire's meaning so the looks keep
 theirs (`render.js:29-43`; Color Cycling rotates slots 5–8, `pixelPass.js:193-197`;
 `quantizeSteel` and the few-color rolls read 5–8 as the ramp and 9 as its shade): [0] ink,
 [1] page, [2–4] `PAPER`, [5–8] a four-step red ramp (the three `WAX` plus `PETAL[0]`, `uCore`
-the lightest), [9] the reds' shade (`PETAL[2]`), [10–15] NEWT's tones (S1 picks them); the
-element's accents come from the fx layer. The Cycle look then turns the wax, never him; the
+the lightest), [9] the reds' shade (`PETAL[2]`), [10–15] NEWT's tones; the element's
+accents come from the fx layer. S1 measured his tones (k-means over his texels in a plain
+render: mean error 21.6 at four tones, 13.6 at six, 11.2 at eight, 9.9 at ten): six keep him
+recognizable, with a dither speckle on his face; `#1f1f1f`, `#393839`, `#656360`,
+`#928e89`, `#e1b895` (skin), `#bebebc` on White. **No slot may sit near the page's color**:
+the pass dithers ±0.08 before it snaps (`pixelPass.js:723-724`), so a tone close to the page
+makes the whole page shimmer (S1 saw it on White with a near-white tone and on Dusk and Night
+with his darkest greys). `pages.js` drops any of his tones within that distance of the page
+and gives its slot to the next cluster. The Cycle look then turns the wax, never him; the
 few-color rolls read as ink, red and paper; the gradient tables index slots 1–9. The palette
 goes to `setPalette` as sRGB hexes, as the bonfire's does (`pixelPass.js:932-937` converts;
 quantization is in sRGB, `:364`; it takes up to `MAX_COLORS` 16, where the bonfire writes
 10). Phone budget, in one place: POOL 120 petals; effect `lights` 0 on light pages (31 point
 lights buy nothing on a Lambert page); shadows off on touch; fireflies only on Dusk and
 Night; `newt.glb` and the world's chunk behind the dynamic import. On light pages the duck
-substitutes the element: `equip(w, flame, { element: 'lightning' })` becomes fire or ice
-(lightning has no normal-blended part, `bolts.js:126`); lightning returns on Dusk and Night,
-or with the ink mode (Later). S1 counts whether he reads in the spare slots; if not, K3's
-next choices.
+substitutes the element: `equip(w, flame, { element })` with `fire` or `lightning` becomes
+ice (S1: neither reads on a light page; lightning has no normal-blended part,
+`bolts.js:126`); fire and lightning return on Dusk and Night, or with the ink mode (Later).
+He reads in the spare slots (S1), so K3's first branch holds; the face speckle is F1's to
+judge, and the cel path is the next step if it bothers.
 
 ### Lines
 
@@ -620,7 +645,8 @@ All 19 triggers stay in `invitation.lines`, with their chances and cooldowns in
 | `idle` | the clock in the groove | nothing to do |
 | `zoom` | within 0.62 of home | `camera.zoom` = the view's distance to his chest over the Wide shot's; most cuts to a close shot reach it, every 20 s at most |
 | `spin` | 1.25 turns in 3 s | unreachable from the show's cameras and cuts (moment 18); left out |
-| `caught`, `shaken`, `thrash` | a pointer's hold | only if the carrier (C1) ships |
+| `thrash` | Thrash while held, every few seconds | the stage-4 hold, when it lasts: S2 measured 0 % at a one-bar hold, 11 % at two bars, 70 % at four |
+| `caught`, `shaken` | a pointer's hold | only if the carrier (C1) ships |
 
 ## Consolidation
 
@@ -818,10 +844,10 @@ buttons and gestures of moments 2–3, 6–9, 12–14, 16–17 and the blackout 
 line: `test/newtMoments.test.mjs` scenarios: each press and event on the right frame;
 `return` after stage 2 presses nothing; the blackout freezes; the grab at build stage 4 and
 the release at the strike drive the brain held → fall → land (`brain.js:703-713`) with
-`bodyStep` given `collar`/`target` and `released` a short toss (K9). Fallback written in, if S2 shows even that
-does not hold: the drop has no line in v1 and this block says so (a Land clip restarted
-without the brain passing `fall` fires nothing: `landed` needs `land` after `fall`,
-`speech.js:313-314`). `npm run check`; `npm run coverage`. This is the first clip (below).
+`bodyStep` given `collar`/`target` and `released` a short toss (K9; S2's
+`docs/design/captures/newt-live-s1/s2-carry.mjs` is the harness to start from: the root
+follows the hold's anchor less the collar's height, as the toy's `main.js` moves it). `npm
+run check`; `npm run coverage`. This is the first clip (below).
 
 **W3** (after W1a, rebasing on it: both touch `main.js`, `settings.js`, `dialogs.js`).
 `src/settingsMap.js` (imports nothing: page and world names are literals there): the `world`,
@@ -984,12 +1010,13 @@ template is filled, with a capture for anything visible.
 
 ## Verification
 
-- **Spikes**: S1 settles the K3 branch, whether anything additive reads on White or the
-  default page is Cream or Dusk, whether the pass's depth edges ink the envelope's fans (they
-  sit 0.004–0.05 apart) and whether they crease at alpha 1.0 (the look seam, R2), the slot
-  count per page and the tablet under the pass; S2 settles whether `bodyStep` holds and drops
-  him with no pointer and fires `pickedUp`, `dropped`, `landed`, deciding W2b's drop path and
-  whether C1 is offered.
+- **Spikes** (done, 2026-11-09; [findings](captures/newt-live-s1/README.md)): S1 settled
+  K3's first branch (six spare slots), that nothing additive reads on a light page (Dusk
+  recommended), the page on the ghost layer with no fog, and that ink floods light pages; the
+  letter reads with its outline and no stray creases, washed out as R2's seam predicts. Not
+  covered by S1, left to W2a and W1b's captures: the seal placed on the texel grid and the
+  tablet under the pass. S2 settled the drop's path (held → fall → land with no pointer;
+  about a two-bar hold) and that `thrash` comes with a long hold.
 - **Unit**: `test/lib/fakeScene.mjs` (`createDirector`, `bars()`, `FRAME`) drives the real
   director over the duck; `Math.random` is replaced globally for the trace (the director
   draws it at `:322,598,602,622-624,906-907,1024`; `looks.js` and `colors.js` draw it too);
@@ -1004,16 +1031,16 @@ template is filled, with a capture for anything visible.
 
 ## Risks and open questions
 
-- **The fx composite on light pages** reads two ways (a pastel wash, or nothing). S1 on White
-  first; the fallback is a Cream or Dusk default and the glowing effects on dark pages only;
-  lightning is substituted on light pages either way.
-- **The 16-color budget** is exactly full. S1 counts; the cel path and the mark branch are
-  the fallbacks (K3).
+- **The fx composite on light pages** (settled by S1): fire and lightning do not read on
+  White or Cream, ice does. Dusk is the recommended default; light pages play every element
+  as ice; the ink mode (Later) is what would bring fire and lightning back to white paper.
+- **The 16-color budget** is exactly full. S1: six tones keep him recognizable with a face
+  speckle; the cel path and the mark branch are the fallbacks (K3).
 - **The duck lies to the director** in paths nobody traced (`pending` scenes, `recolor`, the
   rigs' `fire.blade`, the HUD's weapon label). W1a's contract and trace tests, `scenes: () =>
   []`, the W3 hides and the e2e cover the known ones; unknown ones show as console errors.
-- **The grab and release** needs `bodyStep` to hold him with no pointer. S2 answers; W2b's
-  fallback is a drop with no line, said in its block.
+- **The grab and release** with no pointer: settled by S2. Open: how long stage 4 lasts in
+  real tracks (one to four bars) and so how often the drop gets its line; F1 hears it.
 - **A build that never reaches stage 4** leaves the held letter sealed at the strike:
   `release` opens it and the burn lands 0.85 s late. Accepted for v1; F1 judges it.
 - **The 90 ms blackout as a freeze** of petals and his mixer is new behavior on an existing
@@ -1063,7 +1090,7 @@ template is filled, with a capture for anything visible.
 
 ## Checklist
 
-- [ ] S1 pipeline spike, the K3 branch and the default page picked · [ ] S2 carry spike
+- [x] S1 pipeline spike (Newton picks the default page: Dusk recommended) · [x] S2 carry spike
 - [ ] R1 rng and `toLinear` · [ ] R2 envelope actor and look seam · [ ] R4 character dress ·
       [ ] R5 petal seams · [ ] R6 firefly and lightning seams
 - [ ] W1a the page and the duck survive a breakdown → drop · [ ] W1b NEWT on the page ·
