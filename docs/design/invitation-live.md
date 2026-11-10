@@ -38,7 +38,7 @@ Source: Newton's brief (2026-11-07), eight points:
   scorch marks, the fireflies (dark pages). A stand-in for the fire (`fireDuck.js`) answers
   the director, so `director.js` barely changes.
 - **Pages:** White, Cream, Dusk, Night. S1 showed fire and lightning vanish on light pages
-  while ice, petals, letters and NEWT read; **Dusk is the recommended default**, and light
+  while ice, petals, letters and NEWT read; **Dusk is the default** (Newton, 2026-11-10), and light
   pages play every element as ice.
 - **Knight dances:** later. 11 of 13 moves push his hands through his big head; two (stomp,
   beckon) fit and come after the feel pass.
@@ -593,11 +593,11 @@ behavior.
 ### Page colors
 
 `page`: White (the toy's), Cream, Dusk, Night; Rose, Sky and Mint are Later, each a row in
-`pages.js`. `pageTurns`: Off / On Big Drops, default On Big Drops (`'drops'`). The shipped
-default page is Newton's call after S1: nothing additive reads on White or Cream, so the
-recommendation is **Dusk** (it still reads as paper, and the fire, lightning and fireflies
-read on it); White and Cream stay as choices with ice for every element; Night is a wall
-choice. Each entry in `newt/pages.js` gives the page color, the ink for palette[0]
+`pages.js`. `pageTurns`: Off / On Big Drops, default On Big Drops (`'drops'`). The default
+page is **Dusk** (`'dusk'`, Newton's pick on 2026-11-10 after S1): it still reads as paper,
+and the fire, lightning and fireflies read on it, where nothing additive reads on White or
+Cream. White and Cream stay as choices, with ice for every element; Night is a wall choice.
+`DEFAULT_SETTINGS.page` is `'dusk'` from W1a. Each entry in `newt/pages.js` gives the page color, the ink for palette[0]
 (`INK` 0x3a332d on light pages, a pale ink on Dusk and Night: it is the outline color,
 `pixelPass.js:387`) and the 16 slots, laid out on the bonfire's meaning so the looks keep
 theirs (`render.js:29-43`; Color Cycling rotates slots 5–8, `pixelPass.js:193-197`;
@@ -794,8 +794,8 @@ naming the source, the lights and the Lambert page, the render setters, `snapsho
 with every member The music lists and a letterless stub: `equip` resolves and calls the
 four-argument `onImpact` after `swapTime`, at once for a same-weapon or `instant` equip,
 `release` returns `holding`, `swing` resolves false; `main.js` and `dialogs.js` (`REBUILD` +
-`world`) as Choosing and loading says; `world`, `page`,
-`pageTurns` in `DEFAULT_SETTINGS` (`director.js:111-204`) and `CHOICES` (`settings.js:110-120`),
+`world`) as Choosing and loading says; `world` (`'bonfire'`), `page` (`'dusk'`),
+`pageTurns` (`'drops'`) in `DEFAULT_SETTINGS` (`director.js:111-204`) and `CHOICES` (`settings.js:110-120`),
 `world` in `LOCAL` (`:122`)). Finish line: `test/newtWorld.test.mjs` (new): `fireDuck.js`
 imports no three.js (its specifiers read as `invitationContent.test.mjs:88-90` does); every
 member reached as `fire.`, `ctx.fire?.` or `candidate.` across `src/visualizer/*.js` (not
@@ -948,7 +948,7 @@ the burn's frame; a clip. **L1**
 extended: `/visualizer/?world=newt` locked while the invitation's switch is on,
 `/visualizer/` open.
 
-**F1** (Claude, then Newton; after W3, W4a, W5): the default page, petal amounts, the
+**F1** (Claude, then Newton; after W3, W4a, W5): petal amounts on Dusk, the
 letter's size against NEWT on the Wide shot, letter cadence (`phraseBars` for this world),
 line chances, the pour's size, Run across the view or from the letter. Finish line: Newton's
 sign-off on a demo-track clip and a `painter/beat.js` loop clip, before and after side by
@@ -1011,8 +1011,8 @@ template is filled, with a capture for anything visible.
 ## Verification
 
 - **Spikes** (done, 2026-11-09; [findings](captures/newt-live-s1/README.md)): S1 settled
-  K3's first branch (six spare slots), that nothing additive reads on a light page (Dusk
-  recommended), the page on the ghost layer with no fog, and that ink floods light pages; the
+  K3's first branch (six spare slots), that nothing additive reads on a light page (Dusk is
+  the default), the page on the ghost layer with no fog, and that ink floods light pages; the
   letter reads with its outline and no stray creases, washed out as R2's seam predicts. Not
   covered by S1, left to W2a and W1b's captures: the seal placed on the texel grid and the
   tablet under the pass. S2 settled the drop's path (held → fall → land with no pointer;
@@ -1032,7 +1032,7 @@ template is filled, with a capture for anything visible.
 ## Risks and open questions
 
 - **The fx composite on light pages** (settled by S1): fire and lightning do not read on
-  White or Cream, ice does. Dusk is the recommended default; light pages play every element
+  White or Cream, ice does. Dusk is the default; light pages play every element
   as ice; the ink mode (Later) is what would bring fire and lightning back to white paper.
 - **The 16-color budget** is exactly full. S1: six tones keep him recognizable with a face
   speckle; the cel path and the mark branch are the fallbacks (K3).
@@ -1090,7 +1090,7 @@ template is filled, with a capture for anything visible.
 
 ## Checklist
 
-- [x] S1 pipeline spike (Newton picks the default page: Dusk recommended) · [x] S2 carry spike
+- [x] S1 pipeline spike (the default page: Dusk, Newton's pick) · [x] S2 carry spike
 - [ ] R1 rng and `toLinear` · [ ] R2 envelope actor and look seam · [ ] R4 character dress ·
       [ ] R5 petal seams · [ ] R6 firefly and lightning seams
 - [ ] W1a the page and the duck survive a breakdown → drop · [ ] W1b NEWT on the page ·
