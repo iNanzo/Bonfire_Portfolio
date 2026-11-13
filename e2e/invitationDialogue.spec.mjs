@@ -362,11 +362,17 @@ const crowding = (page, sel) =>
 /** A shaken word reads: no letter in the bubble or the box ever runs more than a pixel into the next. */
 async function movesStayLegible(page, tap) {
   const errors = watch(page);
+  await page.clock.install();
   await calm(page);
+  // The bubble types on the toy's capped simulation clock. Step real animation frames so
+  // slow software WebGL cannot spend the assertion's wall-clock budget still typing.
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 60_000));
   // (Both on one letter: the wave on its translate, the shake on its transform, two animations.)
   const all = ['inv-fx-shake', 'inv-fx-wave'];
   await page.evaluate((line) => window.__invitation.say(line), MOVING.bubble);
+  await page.clock.runFor(2_000); // The fixture's 36 letters take less than two simulation seconds.
   await expect(page.locator('.inv-bubble')).toBeVisible();
+  await expect(page.locator('.inv-bubble-typed')).toHaveText('Hi! I’m NEWT, and I really like you.');
   await expect(page.locator('.inv-bubble-typed .inv-fx')).not.toHaveCount(0);
   await expect(page.locator('.inv-bubble-typed .inv-fx.is-unseen')).toHaveCount(0);
   const inBubble = await crowding(page, '.inv-bubble-typed');
@@ -374,6 +380,7 @@ async function movesStayLegible(page, tap) {
   expect(inBubble.moving).toBe(Array.from('Hi!reallyyou').length);
   expect(inBubble.both, 'the bubble: “you” waves and shakes').toBe(3);
   expect(inBubble.worst.px, `the bubble: ${JSON.stringify(inBubble.worst)}`).toBeLessThanOrEqual(1);
+  await page.clock.resume();
   const intro = structuredClone(behaviorIntro);
   intro.boxes.find((b) => b.id === intro.start).text = MOVING.box;
   await page.evaluate((i) => window.__invitation.setIntro(i), intro);
