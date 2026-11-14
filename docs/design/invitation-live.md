@@ -101,7 +101,7 @@ director rewrite (no `newtDirector.js`, `showClock.js` or World interface); no n
 tabs, no start-screen World switch; the toy's intro dialogue (`invitation.intro`, its boxes,
 `endTalk`) is not wired, only `invitation.lines` and `invitation.speech`; no formations or
 several NEWTs (`character.js` has no clone path), no `src/visualizer/knightShow.js` adapter,
-no change to `camera.js` (NEWT's framings are a remap in the world, K15), no title card
+no new shots in `camera.js` (NEWT's framings ride one optional hook, K15), no title card
 written on the letter, no bolts to petals,
 no edge glow (an armor shader), no petals on the fireflies' moves, no page from the show's
 palette; scene files, the Painter and the admin's Scenes page stay bonfire-side; the Bayer,
@@ -120,7 +120,7 @@ dissolve-chunk and `math.js` merges are deferred.
 | N7 | Consolidate without breaking either app | real duplicates only: the rng, `toLinear`, the glitch table's export; the rest imported in place or copied with a header naming the source ([Consolidation](#consolidation)); the toy's tests stay green with no assertion loosened: tests are only added (R2, R4, R5, D2) or their helpers moved with a shim (D1), as Files touched lists | R1, R2, R4, R5, G1 |
 | N8 | Simple, one PR a task, crisp finish lines, Codex-ready | [Delivery plan](#delivery-plan): seams first, named tests and specs, "no behavior change" marked, Briefing Codex | X0, all |
 | N9 | Impressive in the invitation's own terms | [The show, moment by moment](#the-show-moment-by-moment); S1 and F1 judge it at real speed from the show's own cameras, as CONTRIBUTING asks | S1, F1 |
-| N10 | Camera angles that frame NEWT and the letters | `newt/shots.js` remaps each of `camera.js`'s 14 shots onto NEWT, the letter or both; the duck's `blade` is the held letter, so the Orbit and Vertigo hold cameras circle it ([Camera](#camera)) | W6 |
+| N10 | Camera angles that frame NEWT and the letters | `newt/shots.js` re-aims each of `camera.js`'s 14 shots at NEWT, the letter or both through a `fire.frameShot` hook; the duck's `blade` is the held letter, so the Orbit and Vertigo hold cameras circle it ([Camera](#camera)) | W6 |
 
 (The N ids group the asks by where they land, not by the brief's numbering.)
 
@@ -144,16 +144,17 @@ dissolve-chunk and `math.js` merges are deferred.
   does). Last: a NEWT-mark branch in `pixelPass.js` (per-channel quantize where the mark is
   his, ~20–30 lines under `#ifdef FX`). Why: no shader branch until S1 shows he is not
   himself in the spare slots; `setSteel` is a ramp redirect, not an exemption.
-- **K4. The envelope is drawn by the world's renderer** from the toy's own builders:
-  `envelopeScene.js` exports `piece`, `buildEnvelope` and `buildSpecks` (R2), `world.js`
-  builds the letter from them and `envelopeSeal.js buildSeal`, and places it from
-  `createEnvelope.pose()` in ~40 lines copied from the envelope half of `envelopeScene.js
-  frame()` (W2a; a header names the source). Why: that scene is a modal DOM layer with a
+- **K4. The envelope is drawn by the world's renderer** through the toy's own actor:
+  R2 moves the letter's picture out of `envelopeScene.js` into `src/invitation/envelopeActor.js`
+  (the Group, `piece`, `buildEnvelope`, `buildSpecks`, and the envelope half of `frame()` and
+  `placeSeal()`, with `buildSeal`/`sealOnScreen` from `envelopeSeal.js`); the toy's scene and
+  `world.js` both build and place letters with it, driven by `createEnvelope.pose()`, so
+  nothing is copied. Why the actor and not the whole scene: that scene is a modal DOM layer with a
   white backdrop, document-level key capture (colliding with `actions.js:149`) and a WebGL
   context per appearance (`envelopeScene.js:343-374,538-657,898-920`); DOM reaches neither
   the recorder nor the projector window's stream; its `frame()` is mostly drag, follow, turn,
-  backdrop and DOM opacity the world never needs (`:713-775`). An actor module is Later, with
-  W2a's copy as the oracle (K13).
+  backdrop and DOM opacity the world never needs (`:713-775`), all of which stays in the
+  scene.
 - **K5. The page is `voidColor` plus a Lambert plane, never palette[0]**, which is the
   outline color, the clear color, the fog and the few-color palettes' first slot
   (`pixelPass.js:387`; `render.js:27-33`; `scene.js:142-143`): a white slot 0 draws white
@@ -206,8 +207,9 @@ dissolve-chunk and `math.js` merges are deferred.
 - **K13. Imports in place, moves only with shims; copies stay copies until a third caller
   appears or a bug has to be fixed twice.** Petals, speech, character and the pose modules
   are imported from where they live; W1a copies the bonfire's frame loop and per-frame pass
-  writes (~80 + ~20 lines, headers naming the source), W2a the envelope's placement (~40);
-  the glitch table alone is exported (R1) because the copy would be a 50-line constant. Why:
+  writes (~80 + ~20 lines, headers naming the source); the envelope is shared through R2's
+  actor rather than copied, since the toy and the world would otherwise carry the same
+  placement code (Newton's consolidation ask); the glitch table alone is exported (R1) because the copy would be a 50-line constant. Why:
   the toy may import nothing outside `src/invitation/` (`test/invitationContent.test.mjs:92-117`),
   tests pin symbols by path and identity, 34 files import the pose modules, and a split of
   the bonfire's core (`scene.js`, `sceneUpdate.js`, `sceneRender.js`: 1,662 lines together)
@@ -215,12 +217,16 @@ dissolve-chunk and `math.js` merges are deferred.
 - **K14. `world` is LOCAL** (a setup never switches worlds, `settings.js:122`); `?world=` wins
   the session, `?scene=` and the Painter's Play imply the bonfire. Newton may overturn it
   before W3 merges.
-- **K15. NEWT's framings are a remap in the world, not new shots in `camera.js`.**
-  Alternatives: a `shots` option on `createCamera`, or the single `lens` factor of an earlier
-  draft. Why: the camera's choreography (when it cuts, the drift, the moves, the feels, the
-  hold cameras) is what is worth keeping, and all of it is in the pose the world already
-  receives each frame; a remap leaves `camera.js` and its tests untouched, where one factor
-  left every shot aimed at the fire's empty spot while he wandered.
+- **K15. NEWT's framings ride one optional hook in `camera.js`, not new shots.** `shotPose()`
+  ends with `fire.frameShot?.(o, shot)` (the shot's key); the bonfire's `fire` has no
+  `frameShot`, so nothing changes there. Alternatives: remapping the finished pose in the
+  duck's `setPose` (an earlier draft of this plan), or a shots table per world. Why: inside
+  `shotPose` the framed pose is what the transitions blend (`begin()` copies `shown`,
+  `camera.js:185-197`), so a whip or glide between two NEWT shots never jumps; the current key
+  is known on every frame, including the first shot and `setShot()`, which never call `onShot`
+  (`:145,540`); and the rigs, which already aim at `fire.blade` in world space, are not
+  touched. Remapping after the fact had none of those: rig names collide with shot names
+  ("Vertigo" is both), and a transition blends poses before they are re-aimed.
 
 ## Architecture
 
@@ -327,8 +333,8 @@ The ink mode (`uFxMode`, one uniform, bonfire
 unchanged at 0) is Later, not a dependency. The page, NEWT and the letters are laid out
 inside the camera's clearing (`keepInClearing`, `camera.js:448`; `CLEARING` in
 `clearing.js:23-31`: 6.5 m round the origin, in front of it), where every shot is clamped.
-What each shot looks at is [Camera](#camera)'s: the duck's `setPose` remaps every pose onto
-NEWT, the letter or both (W6; until W6 lands the poses pass through as they are).
+What each shot looks at is [Camera](#camera)'s: the duck's `frameShot` re-aims each shot at
+NEWT, the letter or both (W6; until W6 lands the shots frame the page's middle as they are).
 
 NEWT is `loadCharacter`/`createCharacter` with `pixel: false` (the snap-off that exists,
 `character.js:270,602-609`; the snap breaks outlines under the normals pass, `:594-619`),
@@ -339,15 +345,15 @@ use. His tones go into palette slots 10–15 (K3; S1 picks them). `markId` write
 id/16, uIdOn)` (`retro.js:244`); `ID_ON` is initialised 1 (`:77`) and flipped only by the
 toy's retro pass (`:735`), which Live never runs, so he and the tablet (`device.js:200,218`)
 write alpha 0.0625, below every band of the pass (`pixelPass.js:84-91`), with no crease
-lines; R4's default `dress` says so in its header. The letter is built from `buildEnvelope`,
-`buildSpecks` and `buildSeal` and placed by `createEnvelope.pose()` (K4); petals are
+lines; R4's default `dress` says so in its header. The letter is R2's `envelopeActor.js`,
+placed from `createEnvelope.pose()` (K4); petals are
 `createPetalScene({ scene, unit, seed, tones, mark, linear })`. Under this pass the material
 tones written into the color buffer must be linear (it reads the buffer as linear and
 applies `toSRGB`, `pixelPass.js:364`; the toy's `rgb()` writes sRGB as is,
 `envelopeLook.js:23`) and the alpha a mark below `STEEL_MARK` 0.285 (alpha 1.0 today, which
 the pass reads as scenery and creases, `:392-402`): R5 gives the petals `tones` (linear) and
 `mark`, R2 gives `toon()`/`shared()` and `buildSpecks` the same (`envelopeLook.js:300` writes
-alpha 1.0 too). `pages.js` converts with `toLinear` exported from `src/ruleBasics.js` (R1).
+alpha 1.0 too). `pages.js` converts with `toLinear` exported from `src/paletteGen.js` (R1).
 
 The bubble is `bubble.js` mounted in a wrapper over the canvas, fed `screenShape` each frame
 in the wrapper's unscaled px; the wrapper is sized canvas/k and scaled with `transform:
@@ -475,14 +481,14 @@ stance (`DEFAULT_RIG.pos.footL.x`, `knightGestures.js:665`), formations.
 
 ### Camera
 
-`camera.js` is untouched: when to cut (every `cutBars`, on phrases, one a bar after a drop),
-each shot's drift, push, spin, roll and crane, the cut, whip and glide moves, the camera
-feels and the hold cameras all play as on the bonfire. What changes is what each shot looks
-at. Every shot is a position and a target round the fire's spot (`SHOTS`, `camera.js:77-92`);
-`cut()` names the shot it picked through `onShot` (`:227`, relayed as `onEvent('shot', {
-name })`, `director.js:265`); every frame `fire.setPose(out)` hands the world the finished
-pose (`camera.js:491`). `newt/shots.js` (pure, no three.js, ~60 lines) gives each of the 14
-shots an anchor and a scale:
+`camera.js`'s choreography stays: when to cut (every `cutBars`, on phrases, one a bar after a
+drop), each shot's drift, push, spin, roll and crane, the cut, whip and glide moves, the
+camera feels and the hold cameras play as on the bonfire. What changes is what each shot
+looks at. Every shot is a position and a target round the fire's spot (`SHOTS`,
+`camera.js:77-92`), turned into a pose each frame by `shotPose()` (`:398-440`); W6 adds one
+line at its end, `fire.frameShot?.(o, shot)` (K15), and the duck's `frameShot` re-aims the
+pose with `newt/shots.js` (pure, no three.js, ~60 lines), which gives each of the 14 shots an
+anchor and a scale:
 
 | Bonfire shot | NEWT shot | Looks at | Scale | For |
 | --- | --- | --- | --- | --- |
@@ -496,18 +502,20 @@ shots an anchor and a scale:
 | `above` | Above | the page's middle | 0.7 | the element ring across the paper, the page turn |
 | `circle`, `dutch`, `crane`, `tele`, `embers` | Circling, Dutch, Crane, Long Lens, Petals Low | NEWT | 0.6 | the groove |
 
-`world.js` maps the name back to its key through `SHOTS` and remaps each pose: `pos' = A +
-(pos − T)·s` and `target' = A + (target − T)·s`, with T the bonfire shot's own target, A the
-anchor (his chest, the letter's middle, their midpoint or the page's middle) and s the
-scale, so a shot's drift, push and spin carry over at his size. The anchor eases toward where
-he and the letter are (~0.3 s), so the camera follows him as he wanders and settles after a
-cut instead of jumping. The shots that look at both widen the lens to keep the pair in frame,
+`frameShot(o, key)` re-aims the pose in place: `pos' = A + (pos − T)·s` and `target' = A +
+(target − T)·s`, with T the shot's own target in `SHOTS`, A the anchor (his chest, the
+letter's middle, their midpoint or the page's middle) and s the scale, so a shot's drift,
+push and spin carry over at his size. The anchor eases toward where he and the letter are
+(~0.3 s), so the camera follows him as he wanders; a cut between shots blends their framed
+poses as the camera's transitions already do. The shots that look at both widen the lens to keep the pair in frame,
 the rule the knights' shots use on a tall screen (`camera.js:431-439`: the pair's spread plus
 a margin across the picture at the screen's aspect), so a phone held upright keeps both. The
-rigs need no table: the duck's `blade` is the held letter (its middle, its corners as tip and
-grip, its turn and normal, `free: false`), so the Orbit and Vertigo hold cameras circle the
-letter as they circled the blade (`camera.js:166-176,231`; nothing else reads `fire.blade`
-with combos off); with no letter up, `blade` is NEWT's chest. The knights' and combo shots
+rigs are not re-aimed (`frameShot` runs only in `shotPose`): the duck's `blade` is the held
+letter (its middle, its corners as tip and grip, its turn and normal, `free: false`), so the
+Vertigo rig looks at the letter wherever it is, and the Orbit rig, which circles the fire's
+spot while it looks at the blade (`camera.js:319-338`), circles the held letter because the
+held letter floats at the page's middle, the fire's spot (moment 6); nothing else reads
+`fire.blade` with combos off; with no letter up, `blade` is NEWT's chest. The knights' and combo shots
 are never asked for here (no knights; `combos` −1).
 
 His `zoom` line: `talk.step` gets `zoom` = the view's distance to his chest over The Page's
@@ -740,9 +748,11 @@ real check runs in CI's build job on every PR (`npm run check` never builds).
 One PR each, at most ~12 files and ~400 changed lines with tests. On every PR: `npm run
 check`; `npm run coverage` (CI runs it on Node 22 and 24 over every file, `.c8rc.json` `all:
 true`: lines and statements 70.4 %, functions 85.8 %, branches 90.2 %; PR #41 failed at
-70.27 %; a PR adding a module no unit test can load, `world.js`, lowers a threshold by hand
-in the same commit and says why, `tools/coverage-ratchet.mjs:1-4`; when coverage rises,
-`npm run coverage:ratchet` and commit); no new `@ts-nocheck` (45 of 45 used); the named spec
+70.27 %; thresholds are never lowered: `world.js`, which node cannot load (WebGL, the Vite
+content module), stays a thin binding whose logic lives in node-tested modules
+(`fireDuck.js`, `newtMoments.js`, `shots.js`, `pages.js`, `elementRings.js`), and a PR whose
+total would fall under a threshold moves more out of `world.js` into tested modules until it
+doesn't; when coverage rises, `npm run coverage:ratchet` and commit); no new `@ts-nocheck` (45 of 45 used); the named spec
 where the Live UI changes; "no behavior change" where marked, as
 [Consolidation](#consolidation) defines it. Codex cannot run Playwright (PRs #37, #25): CI's
 five shards are the e2e signal, one 30–40 min round trip per PR, so the seams are small; until
@@ -764,7 +774,7 @@ scope is the section its block names; its finish line is what Codex pastes.
 | W1b | NEWT stands on the page (N1)                                      | Codex          | 1    | W1a, R4     |
 | W2a | The letters (N2)                                                  | Codex          | 2    | W1a, R2, R5 |
 | W2b | NEWT's reactions (N5)                                             | Codex          | 1.5  | W1b, W2a, S2 |
-| W3  | Settings, start screen, HUD (N1, N6)                              | Codex          | 1.5  | W1a         |
+| W3  | Settings and HUD (N1, N6)                                         | Codex          | 1.5  | W1a         |
 | W4a | Element rings and marks (N3)                                      | Codex          | 1    | W1a, R6     |
 | W4b | Fireflies on dark pages (N3)                                      | Codex          | 1    | W4a         |
 | W5  | The bubble and the lines (N5)                                     | Codex          | 1    | W2b         |
@@ -772,7 +782,7 @@ scope is the section its block names; its finish line is what Codex pastes.
 | G1  | The guards (N7)                                                   | Codex          | 0.5  | W1a         |
 | D1  | NEWT's rest map and the retarget harness (N4)                     | Codex          | 1    |             |
 | D2  | The pose layer (no behavior change at weight 0) (N4)              | Codex          | 1    | D1          |
-| D3  | `newtDance.js`: the three that clear (N4)                         | Codex          | 1    | W2b, D2     |
+| D3  | `newtDance.js`: stomp and beckon (N4)                             | Codex          | 1    | W2b, D2     |
 | C1  | Optional: the carrier (N2)                                        | Codex          | 2    | W2b, S2     |
 | P1  | Optional: the page burn (N6)                                      | Codex          | 1    | W4a         |
 | L1  | Optional: the lock gate                                           | Codex          | 0.5  | W3          |
@@ -868,8 +878,8 @@ reads `?test` in `src/visualizer`); wait on `[data-stage].is-ready`; click
 `[data-source="demo"]`; press `A` then `Space`; poll `window.__viz.fire.snapshot()` with
 `expect.poll` for `holding` true then false (states, never durations);
 `document.documentElement.dataset.flame` set; no `pageerror`/console errors
-(`smoke.spec.mjs`'s `watch()`). `npm run check`; `npm run coverage` (lower a threshold by hand
-for `world.js` if it must, and say why).
+(`smoke.spec.mjs`'s `watch()`). `npm run check`; `npm run coverage` with no threshold
+lowered (Delivery plan).
 
 **W1b** (after W1a, R4; NEWT stands on the page, nothing else). In: `loadCharacter`/
 `createCharacter` with `pixel: false` and the default `dress`, `blend`, `play` and
@@ -894,9 +904,9 @@ equals them (the 5028c51 check is about placement; the texel-level proof is Clau
 and F1's captures). `npm run check`; `npm run coverage`.
 
 **W2b** (after W1b, W2a, S2; the real brain and talk in `world.js`; `newtMoments.js` emits the
-buttons and gestures of moments 2–3, 6–9, 12–14, 16–17 and the blackout freeze). Finish
+buttons and gestures of moments 2–3, 6–9, 12–14 and 16–17). Finish
 line: `test/newtMoments.test.mjs` scenarios: each press and event on the right frame;
-`return` after stage 2 presses nothing; the blackout freezes; the grab at build stage 4 and
+`return` after stage 2 presses nothing; the blackout presses nothing; the grab at build stage 4 and
 the release at the strike drive the brain held → fall → land (`brain.js:703-713`) with
 `bodyStep` given `collar`/`target` and `released` a short toss (K9; S2's
 `docs/design/captures/newt-live-s1/s2-carry.mjs` is the harness to start from: the root
@@ -912,8 +922,8 @@ run check`; `npm run coverage`. This is the first clip (below).
 enabled `nextWeapon()` has nothing to draw, `director.js:330`), the Living Weapon rows
 (`combos`, `comboBars`, `moves`, `rhythm`, `swingCam`, `swingEase`; `combos` is forced to −1,
 "never", in this world so the director asks the duck for no swing), the Cast and Scenes tabs'
-rows, Scenery, Fog, Edge Glow; the Auto Drops hint says letters need it. `start.js`: the
-World switch beside the presets (`:97-104`). A `data-world` attribute on `<html>`; CSS hides
+rows, Scenery, Fog, Edge Glow; the Auto Drops hint says letters need it. No start-screen
+switch (Later, Choosing and loading). A `data-world` attribute on `<html>`; CSS hides
 the Living Weapon button, the Dance button (until D3) and the pack in the newt world
 (`markup.js:137-153`; `packUi.js:18-30,64`); no relabels, no keys variant (A floats a letter,
 Space strikes it; the weapon label shows the letter's name). `main.js`: `ctx.loopLibrary`
@@ -962,20 +972,25 @@ first up blocks the other; the test accepts either), `spook` on an un-held drop,
 extended: open the output window and see `[data-mirror="bubble"]` appear on a line and go;
 `npm run check`.
 
-**W6** (after W1b, W2a; [Camera](#camera)). `newt/shots.js` (pure: the table, the remap,
-the pair's lens widening, the anchor's ease); the duck's `setPose` remaps and its `blade`
-becomes the held letter or his chest; `snapshot().shot`. Finish line: `test/newtShots.test.mjs`
-(new): every key of `camera.js`'s `SHOTS` has an entry (imported, so a new bonfire shot
-fails the test until it is given one); for each shot over its move (yaw at both ends of its
-sway, push and crane at the end, spin over 16 beats), with NEWT at the page's middle and at
-the edge of his wander bounds and the held letter at the middle, his head and feet and the
-letter's four corners project inside the frame at 16:9 and at 9:16; the remap of a pose at
-the shot's own target is the anchor; the anchor moves at most its ease per frame; `zoom`
-for The Page is 1 and for Low under 0.62; with a held letter `blade.mid` is the letter's
-middle, and `createCamera` over the duck in node, cut to `orbit`, keeps the target within
-0.05 m of it. `e2e/newt-world.spec.mjs` extended: `snapshot().shot.key` changes after a cut
-and names a key with an entry. Claude then captures every shot on Dusk into
-`docs/design/captures/newt-live-shots/` for Newton. `npm run check`; `npm run coverage`.
+**W6** (after W1b, W2a; [Camera](#camera)). `camera.js`: `shotPose()` ends with
+`fire.frameShot?.(o, shot)` (one line, K15). `newt/shots.js` (pure: the table, the re-aim,
+the pair's lens widening, the anchor's ease); the duck's `frameShot`, and its `blade`
+becoming the held letter or his chest; `snapshot().shot` from the key `frameShot` last saw.
+Finish line: `test/cameraFrame.test.mjs` (new, `camera.js` over a fake `fire` in node): with
+no `frameShot` every shot's poses over 64 bars are the same as with an identity `frameShot`
+(the bonfire untouched); with a `frameShot` the first shot (from `settings.shot`) and a
+`setShot()` are framed on their first frame; a glide from one framed shot to another moves
+the target continuously (no frame-to-frame step over 0.2 m); rigs never reach `frameShot`.
+`test/newtShots.test.mjs` (new): every key of `SHOTS` has an entry (imported, so a new
+bonfire shot fails the test until it is given one); for each shot over its move (yaw at both
+ends of its sway, push and crane at the end, spin over 16 beats), with NEWT at the page's
+middle and at the edge of his wander bounds and the held letter at the middle, his head and
+feet and the letter's four corners project inside the frame at 16:9 and at 9:16; re-aiming a
+pose at the shot's own target gives the anchor; `zoom` for The Page is 1 and for Low under
+0.62; with a held letter `blade.mid` is the letter's middle. `e2e/newt-world.spec.mjs`
+extended: `snapshot().shot.key` changes after a cut and has an entry. Claude then captures
+every shot on Dusk into `docs/design/captures/newt-live-shots/` for Newton. `npm run check`;
+`npm run coverage`.
 
 **G1** (after W1a; Consolidation › Guards). Finish line: `test/newtImports.test.mjs` and
 `test/newtChunk.test.mjs` (both new, both in `npm run check`) each failing on a planted
@@ -1074,7 +1089,7 @@ Run `npm run check` and `npm run coverage` before opening the PR; fill
 
 Claude's review of each PR: the scope matches the block and nothing more; the moved-symbol
 list is complete and the shims are there; no new `@ts-nocheck`; the coverage output is in
-the PR and no threshold was lowered without a reason; the named spec is green in CI; the PR
+the PR and no threshold was lowered; the named spec is green in CI; the PR
 template is filled, with a capture for anything visible.
 
 ## Verification
@@ -1112,8 +1127,6 @@ template is filled, with a capture for anything visible.
   real tracks (one to four bars) and so how often the drop gets its line; F1 hears it.
 - **A build that never reaches stage 4** leaves the held letter sealed at the strike:
   `release` opens it and the burn lands 0.85 s late. Accepted for v1; F1 judges it.
-- **The 90 ms blackout as a freeze** of petals and his mixer is new behavior on an existing
-  flag (`director.js:689-695` only sets `g.blackout`), not reuse.
 - **The swirl is the only petal formation** and follows one frame at a time
   (`petals.js:336-347`): the held letter has it in a breakdown, NEWT in the groove; POOL 120
   caps every scene. The pour needs R5's reset or every letter after the first pours nothing.
@@ -1148,12 +1161,12 @@ template is filled, with a capture for anything visible.
 | Area                     | Files                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | The world (new)          | `src/visualizer/newt/world.js`, `fireDuck.js`, `newtMoments.js`, `elementRings.js`, `pages.js`, `newtDance.js`, `newtRig.js`, `fireflyModel.js`, `shots.js`                                                                                                                                                                                                                                                                                                                                        |
-| Live UI                  | `src/visualizer/main.js` (the import switch, `hear`, the `onEvent` relay, `loopLibrary` in this world), `director.js` (`DEFAULT_SETTINGS` keys only), `settings.js` (`CHOICES`, `LOCAL`), `dialogs.js` (`REBUILD` + `world`), `src/settingsMap.js` (rows, `worlds`), `src/visualizer/markup.js` (`data-world`), `packUi.js`, `output.js` (`mirror` on `ctx`), `start.js` (the World switch), `visualizer.css` (the hides)                                                             |
+| Live UI                  | `src/visualizer/main.js` (the import switch, `hear`, the `onEvent` relay, `loopLibrary` in this world), `director.js` (`DEFAULT_SETTINGS` keys only), `settings.js` (`CHOICES`, `LOCAL`), `dialogs.js` (`REBUILD` + `world`), `src/settingsMap.js` (rows, `worlds`), `camera.js` (the `frameShot` hook, W6), `src/visualizer/markup.js` (`data-world`), `packUi.js`, `output.js` (`mirror` on `ctx`), `visualizer.css` (the hides)                                                             |
 | Bonfire seams and splits | `src/bonfire/bolts.js` (imports the toy's rng), `fireflies.js` (`pois`), `lightningRing.js` (`source`); after W1a: `passWrites.js` (new), `frameLoop.js` (new), `sceneUpdate.js`, `scene.js`                                                                                                                                                                                                                                                                                            |
-| Invitation seams         | `src/invitation/envelopeActor.js` (new), `envelopeScene.js` (uses the actor), `envelopeLook.js` (`mark`, `linear`), `character.js` (`dress`, the pose layer), `petalScene.js` (`tones`, `mark`, `linear`), `petals.js` (the pour reset, the swirl scale), `bubble.js` and `bubble.css` (`--bubble-scale`)                                                                                                                                                                             |
+| Invitation seams         | `src/invitation/envelopeActor.js` (new), `envelopeScene.js` (uses the actor), `envelopeLook.js` (`mark`, `linear`), `character.js` (`dress`, the pose layer), `petalScene.js` (`tones`, `mark`, `linear`), `petals.js` (the pour reset, the swirl scale)                                                                                                                                                                             |
 | Shared                   | `src/paletteGen.js` (`toLinear`/`toGamma` exported)                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Build                    | `vite.config.js` (`liveLoad` in `firstLoadGuard`; the `?world` gate, L1)                                                                                                                                                                                                                                                                                                                                                                                                               |
-| Tests                    | `test/newtWorld.test.mjs`, `newtMoments.test.mjs`, `newtShots.test.mjs`, `newtLines.test.mjs`, `newtRings.test.mjs`, `newtRig.test.mjs`, `newtDance.test.mjs`, `rng.test.mjs`, `lightningRing.test.mjs`, `passWrites.test.mjs`, `frameLoop.test.mjs`, `invitationEnvelopeActor.test.mjs`, `newtImports.test.mjs`, `newtChunk.test.mjs` (new); `test/lib/poseChecks.mjs` (new, moved helpers); `fireflyInstances.test.mjs`, `vizSettings.test.mjs`, `settingsMap.test.mjs`, `invitationPetals.test.mjs`, `invitationCharacter.test.mjs`, `invitationBubble.test.mjs`, `knightPose.test.mjs` and `invitationModel.test.mjs` (helpers moved), `gate.test.mjs` (L1) |
+| Tests                    | `test/newtWorld.test.mjs`, `newtMoments.test.mjs`, `newtShots.test.mjs`, `cameraFrame.test.mjs`, `newtLines.test.mjs`, `newtRings.test.mjs`, `newtRig.test.mjs`, `newtDance.test.mjs`, `rng.test.mjs`, `lightningRing.test.mjs`, `passWrites.test.mjs`, `frameLoop.test.mjs`, `invitationEnvelopeActor.test.mjs`, `newtImports.test.mjs`, `newtChunk.test.mjs` (new); `test/lib/poseChecks.mjs` (new, moved helpers); `fireflyInstances.test.mjs`, `vizSettings.test.mjs`, `settingsMap.test.mjs`, `invitationPetals.test.mjs`, `invitationCharacter.test.mjs`, `invitationBubble.test.mjs`, `knightPose.test.mjs` and `invitationModel.test.mjs` (helpers moved), `gate.test.mjs` (L1) |
 | Browser tests            | `e2e/newt-world.spec.mjs` (new); `tips-live.spec.mjs` and `live-settings.spec.mjs` for the new rows; `gate.spec.mjs` (L1)                                                                                                                                                                                                                                                                                                                                                             |
 | Docs                     | `docs/bonfire-live.md`, `docs/invitation.md`, this file; `docs/design/captures/newt-live-s1/` (the spikes), `newt-live-shots/` (W6's captures)                                                                                                                                                                                                                                                                                                                                                                     |
 
@@ -1164,10 +1177,10 @@ template is filled, with a capture for anything visible.
       [ ] R5 petal seams · [ ] R6 firefly and lightning seams
 - [ ] W1a the page and the duck survive a breakdown → drop · [ ] W1b NEWT on the page ·
       [ ] W2a the letters · [ ] W2b
-      NEWT's reactions (the first clip) · [ ] W3 settings, start screen, HUD · [ ] W4a element
+      NEWT's reactions (the first clip) · [ ] W3 settings and HUD · [ ] W4a element
       rings and marks · [ ] W4b fireflies · [ ] W5 bubble and lines · [ ] W6 NEWT's shots · [ ] G1 guards · [ ] R3
       pass writes and frame loop
-- [ ] D1 rest map and harness · [ ] D2 pose layer · [ ] D3 three moves
+- [ ] D1 rest map and harness · [ ] D2 pose layer · [ ] D3 stomp and beckon
 - [ ] C1, P1, L1 as Newton decides · [ ] F1 feel pass signed off · [ ] X1 docs
 
 ## Later, if wanted
