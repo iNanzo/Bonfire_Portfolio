@@ -40,6 +40,10 @@ Source: Newton's brief (2026-11-07), eight points:
 - **Pages:** White, Cream, Dusk, Night. S1 showed fire and lightning vanish on light pages
   while ice, petals, letters and NEWT read; **Dusk is the default** (Newton, 2026-11-10), and light
   pages play every element as ice.
+- **Cameras:** the bonfire's camera work as it is (cuts on phrases, the drift, whip pans and
+  glides, the hold cameras), each of its 14 shots re-aimed at NEWT, the letter or both and
+  sized to him: The Page, Two-Shot, The Letter, Low, Above, Circling and more (task W6). The
+  camera follows him as he wanders, and a phone held upright keeps him and the letter in frame.
 - **Knight dances:** later. 11 of 13 moves push his hands through his big head; two (stomp,
   beckon) fit and come after the feel pass.
 - **Consolidation:** only real duplicates (the seeded rng, `toLinear`); the rest is imported
@@ -97,7 +101,8 @@ director rewrite (no `newtDirector.js`, `showClock.js` or World interface); no n
 tabs, no start-screen World switch; the toy's intro dialogue (`invitation.intro`, its boxes,
 `endTalk`) is not wired, only `invitation.lines` and `invitation.speech`; no formations or
 several NEWTs (`character.js` has no clone path), no `src/visualizer/knightShow.js` adapter,
-no NEWT shots table in `camera.js`, no title card written on the letter, no bolts to petals,
+no change to `camera.js` (NEWT's framings are a remap in the world, K15), no title card
+written on the letter, no bolts to petals,
 no edge glow (an armor shader), no petals on the fireflies' moves, no page from the show's
 palette; scene files, the Painter and the admin's Scenes page stay bonfire-side; the Bayer,
 dissolve-chunk and `math.js` merges are deferred.
@@ -115,6 +120,7 @@ dissolve-chunk and `math.js` merges are deferred.
 | N7 | Consolidate without breaking either app | real duplicates only: the rng, `toLinear`, the glitch table's export; the rest imported in place or copied with a header naming the source ([Consolidation](#consolidation)); the toy's tests stay green with no assertion loosened: tests are only added (R2, R4, R5, D2) or their helpers moved with a shim (D1), as Files touched lists | R1, R2, R4, R5, G1 |
 | N8 | Simple, one PR a task, crisp finish lines, Codex-ready | [Delivery plan](#delivery-plan): seams first, named tests and specs, "no behavior change" marked, Briefing Codex | X0, all |
 | N9 | Impressive in the invitation's own terms | [The show, moment by moment](#the-show-moment-by-moment); S1 and F1 judge it at real speed from the show's own cameras, as CONTRIBUTING asks | S1, F1 |
+| N10 | Camera angles that frame NEWT and the letters | `newt/shots.js` remaps each of `camera.js`'s 14 shots onto NEWT, the letter or both; the duck's `blade` is the held letter, so the Orbit and Vertigo hold cameras circle it ([Camera](#camera)) | W6 |
 
 (The N ids group the asks by where they land, not by the brief's numbering.)
 
@@ -209,6 +215,12 @@ dissolve-chunk and `math.js` merges are deferred.
 - **K14. `world` is LOCAL** (a setup never switches worlds, `settings.js:122`); `?world=` wins
   the session, `?scene=` and the Painter's Play imply the bonfire. Newton may overturn it
   before W3 merges.
+- **K15. NEWT's framings are a remap in the world, not new shots in `camera.js`.**
+  Alternatives: a `shots` option on `createCamera`, or the single `lens` factor of an earlier
+  draft. Why: the camera's choreography (when it cuts, the drift, the moves, the feels, the
+  hold cameras) is what is worth keeping, and all of it is in the pose the world already
+  receives each frame; a remap leaves `camera.js` and its tests untouched, where one factor
+  left every shot aimed at the fire's empty spot while he wandered.
 
 ## Architecture
 
@@ -225,7 +237,7 @@ model, lights, fire, render setters, sceneries, terrain, weapons, forge, blade, 
 steel and knight-body modules), `src/visualizer/knightShow.js`, the scene files and loop, the
 Painter, the admin's Scenes page. **NEWT only**: `src/visualizer/newt/world.js`,
 `fireDuck.js`, `newtMoments.js`, `elementRings.js` (named apart from `src/bonfire/rings.js`),
-`pages.js`, `newtDance.js`, `newtRig.js`, `fireflyModel.js`, and the toy's envelope, petal,
+`pages.js`, `newtDance.js`, `newtRig.js`, `fireflyModel.js`, `shots.js`, and the toy's envelope, petal,
 character, brain, speech, bubble, blend, play, lookAt and content modules, imported in place
 and given seams by R2, R4, R5 and D2 (Files touched › Invitation seams).
 
@@ -315,9 +327,8 @@ The ink mode (`uFxMode`, one uniform, bonfire
 unchanged at 0) is Later, not a dependency. The page, NEWT and the letters are laid out
 inside the camera's clearing (`keepInClearing`, `camera.js:448`; `CLEARING` in
 `clearing.js:23-31`: 6.5 m round the origin, in front of it), where every shot is clamped.
-The duck's `setPose` pulls every shot in by one `lens` factor (the camera moved toward its
-target by ~0.6; same target, same fov), so framings built for a 1.72 m knight fit a 1 m
-character; F1 tunes the number, `snapshot().lens` reports it; no shots table.
+What each shot looks at is [Camera](#camera)'s: the duck's `setPose` remaps every pose onto
+NEWT, the letter or both (W6; until W6 lands the poses pass through as they are).
 
 NEWT is `loadCharacter`/`createCharacter` with `pixel: false` (the snap-off that exists,
 `character.js:270,602-609`; the snap breaks outlines under the normals pass, `:594-619`),
@@ -369,14 +380,14 @@ never turns the page), `setRender`/`setPalette`/`setFog`/`setShadows`/`setXray`,
 director and the pack optional-chain it, `director.js:810,917`, `packUi.js:27-29,62`; W3
 hides the pack because its items have nothing to act on here, not for safety), `fireflies`
 (dark pages, else null), `glitch` (read by the world for the blackout), `drive` (read for
-`exposure`), `blade: null` (`camera.js:166-176,231` falls back to its own blade; a
-letter-shaped blade for the rigs is Later), `alive` and `charge` as writable properties
+`exposure`), `blade` (the held letter, or NEWT's chest with none up: [Camera](#camera);
+`null` until W6, when `camera.js:166-176,231` falls back to its own blade), `alive` and `charge` as writable properties
 (`director.js:687,887`), `canvas` (inside the stage element), `onRendered(fn) → unsubscribe`
 (the recorder copies `scene().canvas` on it, `record.js:49,67,83`), `ready` (a Promise),
 `dispose`, `setMaxFps`/`maxFps`, `setStats`/`statsShown`, `fps`, `capture`/`captureThumb`
 (`scenesUi.js` reaches the thumb), `hear`, `onEvent` and `snapshot()` for the specs:
 `{ letter: { state, seal: { x, y, axes, placedAt } } | null, newt: { state, clip, grounded },
-page: { name }, holding, fireflies, lens }`. `weapon` is a bonfire weapon id (`nextWeapon()`
+page: { name }, holding, fireflies, shot: { key, name, anchor } }`. `weapon` is a bonfire weapon id (`nextWeapon()`
 draws from `weaponKeys`, `director.js:315,330`), so the HUD's `wieldLabel` reads a bonfire
 weapon's name in this world (`hud.js:14-16`); a relabel is Later. `test/lib/fakeScene.mjs
 fakeFire` (`:212-266`) is the shape to copy. No-ops: `setFog`, `echo`, `refreshScene`,
@@ -462,6 +473,49 @@ feel pass over the eleven intruding moves and nine gestures, with leave to drop 
 seated paths, `helm`, the praise wind-up (they use `DEFAULT_RIG` through defaults), `spin`'s
 stance (`DEFAULT_RIG.pos.footL.x`, `knightGestures.js:665`), formations.
 
+### Camera
+
+`camera.js` is untouched: when to cut (every `cutBars`, on phrases, one a bar after a drop),
+each shot's drift, push, spin, roll and crane, the cut, whip and glide moves, the camera
+feels and the hold cameras all play as on the bonfire. What changes is what each shot looks
+at. Every shot is a position and a target round the fire's spot (`SHOTS`, `camera.js:77-92`);
+`cut()` names the shot it picked through `onShot` (`:227`, relayed as `onEvent('shot', {
+name })`, `director.js:265`); every frame `fire.setPose(out)` hands the world the finished
+pose (`camera.js:491`). `newt/shots.js` (pure, no three.js, ~60 lines) gives each of the 14
+shots an anchor and a scale:
+
+| Bonfire shot | NEWT shot | Looks at | Scale | For |
+| --- | --- | --- | --- | --- |
+| `clearing` | The Page | the page's middle | 0.75 | openings, after drops; his `zoom` home |
+| `hearth` | Two-Shot | NEWT and the letter | 0.6 | breakdowns, the build (a hold camera) |
+| `pillar`, `wall` | Left Two-Shot, Right Two-Shot | NEWT and the letter | 0.6 | variety |
+| `sweep` | Sweep | NEWT and the letter | 0.65 | variety |
+| `blade` | The Letter | the letter | 0.55 | the held letter cracking and opening (a hold camera) |
+| `vertigo` | Vertigo | the letter | 0.6 | the top of the build |
+| `low` | Low | NEWT | 0.55 | him hanging under the open letter (a hold camera) |
+| `above` | Above | the page's middle | 0.7 | the element ring across the paper, the page turn |
+| `circle`, `dutch`, `crane`, `tele`, `embers` | Circling, Dutch, Crane, Long Lens, Petals Low | NEWT | 0.6 | the groove |
+
+`world.js` maps the name back to its key through `SHOTS` and remaps each pose: `pos' = A +
+(pos − T)·s` and `target' = A + (target − T)·s`, with T the bonfire shot's own target, A the
+anchor (his chest, the letter's middle, their midpoint or the page's middle) and s the
+scale, so a shot's drift, push and spin carry over at his size. The anchor eases toward where
+he and the letter are (~0.3 s), so the camera follows him as he wanders and settles after a
+cut instead of jumping. The shots that look at both widen the lens to keep the pair in frame,
+the rule the knights' shots use on a tall screen (`camera.js:431-439`: the pair's spread plus
+a margin across the picture at the screen's aspect), so a phone held upright keeps both. The
+rigs need no table: the duck's `blade` is the held letter (its middle, its corners as tip and
+grip, its turn and normal, `free: false`), so the Orbit and Vertigo hold cameras circle the
+letter as they circled the blade (`camera.js:166-176,231`; nothing else reads `fire.blade`
+with combos off); with no letter up, `blade` is NEWT's chest. The knights' and combo shots
+are never asked for here (no knights; `combos` −1).
+
+His `zoom` line: `talk.step` gets `zoom` = the view's distance to his chest over The Page's
+(4.74 m). It arms at 0.8 or more and fires at 0.62 or less (`speech.js:157-161,358-361`), so
+it plays on a cut from The Page or Above (1.0, 0.89) to a close shot on him (Petals Low 0.34,
+Dutch 0.39, Low 0.42, Crane 0.44, Circling 0.59), at its 0.9 chance and 20 s cooldown: the
+camera rushing in on him, the behavior it goes with in the toy.
+
 ## The show, moment by moment
 
 `start`, `silence`, `breakdown`, `build`, `return` and `drop` are in `f.events`
@@ -543,12 +597,11 @@ roles below; here, what you see, the line it fires, and what carries the moment 
     line on arrival, `brain.js:394-410`), Device again once `deviceSit` is reached and the
     bubble is down (`lieDown` shares priority 2 with `device`, `speech.js:91-92`); a sealed
     letter floats in and stays for the next track's `start`. Line: `device`, `lieDown`.
-18. **Camera.** The bonfire's shots, rigs and transitions as they are, pulled in by the
-    `lens` factor (Drawing); the rigs use their fallback blade (`camera.js:166-176`); close
-    shots make him talk (`talk.step({ camera: { yaw, zoom } })` from the view). Line: `zoom`
-    on most cuts to a close shot (0.36–0.54 of the Wide shot's distance against `zoomClose`
-    0.62, `speech.js:160`; chance 0.9, cooldown 20 s: the show's commonest line, and a true
-    one). `spin` is unreachable: the shots turn 0.035–0.05 rad a beat (`camera.js:81-106`)
+18. **Camera.** The bonfire's choreography with NEWT's framings ([Camera](#camera)): The
+    Page and Above in the open and after drops, the Two-Shots and The Letter on the held
+    letter through a breakdown and build, Low on him hanging under it, Vertigo at the top of
+    the build, the close shots on him in the groove. Line: `zoom` on a cut from a wide shot
+    to a close one on him (at most every 20 s). `spin` is unreachable: the shots turn 0.035–0.05 rad a beat (`camera.js:81-106`)
     and the post-drop cuts (one a bar, `director.js:1022`) jump ~1 rad at most; the 3 s leaky
     sum peaks near 2 rad against the 7.85 rad `spin` needs (`speech.js:157,347-355`).
 
@@ -715,6 +768,7 @@ scope is the section its block names; its finish line is what Codex pastes.
 | W4a | Element rings and marks (N3)                                      | Codex          | 1    | W1a, R6     |
 | W4b | Fireflies on dark pages (N3)                                      | Codex          | 1    | W4a         |
 | W5  | The bubble and the lines (N5)                                     | Codex          | 1    | W2b         |
+| W6  | NEWT's shots (N10)                                                | Codex          | 1    | W1b, W2a    |
 | G1  | The guards (N7)                                                   | Codex          | 0.5  | W1a         |
 | D1  | NEWT's rest map and the retarget harness (N4)                     | Codex          | 1    |             |
 | D2  | The pose layer (no behavior change at weight 0) (N4)              | Codex          | 1    | D1          |
@@ -722,7 +776,7 @@ scope is the section its block names; its finish line is what Codex pastes.
 | C1  | Optional: the carrier (N2)                                        | Codex          | 2    | W2b, S2     |
 | P1  | Optional: the page burn (N6)                                      | Codex          | 1    | W4a         |
 | L1  | Optional: the lock gate                                           | Codex          | 0.5  | W3          |
-| F1  | Feel pass (N9)                                                    | Claude, Newton | 1    | W3, W4a, W5 |
+| F1  | Feel pass (N9)                                                    | Claude, Newton | 1    | W3, W4a, W5, W6 |
 | X1  | Docs (N8: this section's form is the ask; X1 closes it)           | Codex          | 0.5  | F1          |
 
 **S1** (Claude; it copies `buildEnvelope`/`buildSeal` into a scratch script, so R2 is no
@@ -908,6 +962,21 @@ first up blocks the other; the test accepts either), `spook` on an un-held drop,
 extended: open the output window and see `[data-mirror="bubble"]` appear on a line and go;
 `npm run check`.
 
+**W6** (after W1b, W2a; [Camera](#camera)). `newt/shots.js` (pure: the table, the remap,
+the pair's lens widening, the anchor's ease); the duck's `setPose` remaps and its `blade`
+becomes the held letter or his chest; `snapshot().shot`. Finish line: `test/newtShots.test.mjs`
+(new): every key of `camera.js`'s `SHOTS` has an entry (imported, so a new bonfire shot
+fails the test until it is given one); for each shot over its move (yaw at both ends of its
+sway, push and crane at the end, spin over 16 beats), with NEWT at the page's middle and at
+the edge of his wander bounds and the held letter at the middle, his head and feet and the
+letter's four corners project inside the frame at 16:9 and at 9:16; the remap of a pose at
+the shot's own target is the anchor; the anchor moves at most its ease per frame; `zoom`
+for The Page is 1 and for Low under 0.62; with a held letter `blade.mid` is the letter's
+middle, and `createCamera` over the duck in node, cut to `orbit`, keeps the target within
+0.05 m of it. `e2e/newt-world.spec.mjs` extended: `snapshot().shot.key` changes after a cut
+and names a key with an entry. Claude then captures every shot on Dusk into
+`docs/design/captures/newt-live-shots/` for Newton. `npm run check`; `npm run coverage`.
+
 **G1** (after W1a; Consolidation › Guards). Finish line: `test/newtImports.test.mjs` and
 `test/newtChunk.test.mjs` (both new, both in `npm run check`) each failing on a planted
 import; a planted static import of `src/invitation/content.js` from `main.js` fails `npm run
@@ -968,7 +1037,7 @@ turning under a held burn; no settings UI beyond `?world=newt` and the `page` ke
 the demo track and on `painter/beat.js`'s loop before W3–W5 and the D track start, so the
 feel is judged before the polish is built. The table's Depends on column is the order; rows
 with no shared dependency run side by side (S1, S2, R1, R2, R4, R5, R6 and D1 first; W3,
-W4a, G1 and R3 once W1a is in; W1b beside them); C1, P1 and L1 only on Newton's word. PRs merge one at a time
+W4a, G1 and R3 once W1a is in; W1b beside them; W6 once W1b and W2a are in); C1, P1 and L1 only on Newton's word. PRs merge one at a time
 in that order; a PR that touches `main.js`, `settings.js`, `settingsMap.js` or `dialogs.js`
 rebases on what merged before it (W3 on W1a; W2a on W3 if W3 merged first). Claude merges
 after review; Newton merges F1.
@@ -1078,15 +1147,15 @@ template is filled, with a capture for anything visible.
 
 | Area                     | Files                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The world (new)          | `src/visualizer/newt/world.js`, `fireDuck.js`, `newtMoments.js`, `elementRings.js`, `pages.js`, `newtDance.js`, `newtRig.js`, `fireflyModel.js`                                                                                                                                                                                                                                                                                                                                        |
+| The world (new)          | `src/visualizer/newt/world.js`, `fireDuck.js`, `newtMoments.js`, `elementRings.js`, `pages.js`, `newtDance.js`, `newtRig.js`, `fireflyModel.js`, `shots.js`                                                                                                                                                                                                                                                                                                                                        |
 | Live UI                  | `src/visualizer/main.js` (the import switch, `hear`, the `onEvent` relay, `loopLibrary` in this world), `director.js` (`DEFAULT_SETTINGS` keys only), `settings.js` (`CHOICES`, `LOCAL`), `dialogs.js` (`REBUILD` + `world`), `src/settingsMap.js` (rows, `worlds`), `src/visualizer/markup.js` (`data-world`), `packUi.js`, `output.js` (`mirror` on `ctx`), `start.js` (the World switch), `visualizer.css` (the hides)                                                             |
 | Bonfire seams and splits | `src/bonfire/bolts.js` (imports the toy's rng), `fireflies.js` (`pois`), `lightningRing.js` (`source`); after W1a: `passWrites.js` (new), `frameLoop.js` (new), `sceneUpdate.js`, `scene.js`                                                                                                                                                                                                                                                                                            |
 | Invitation seams         | `src/invitation/envelopeActor.js` (new), `envelopeScene.js` (uses the actor), `envelopeLook.js` (`mark`, `linear`), `character.js` (`dress`, the pose layer), `petalScene.js` (`tones`, `mark`, `linear`), `petals.js` (the pour reset, the swirl scale), `bubble.js` and `bubble.css` (`--bubble-scale`)                                                                                                                                                                             |
 | Shared                   | `src/paletteGen.js` (`toLinear`/`toGamma` exported)                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Build                    | `vite.config.js` (`liveLoad` in `firstLoadGuard`; the `?world` gate, L1)                                                                                                                                                                                                                                                                                                                                                                                                               |
-| Tests                    | `test/newtWorld.test.mjs`, `newtMoments.test.mjs`, `newtLines.test.mjs`, `newtRings.test.mjs`, `newtRig.test.mjs`, `newtDance.test.mjs`, `rng.test.mjs`, `lightningRing.test.mjs`, `passWrites.test.mjs`, `frameLoop.test.mjs`, `invitationEnvelopeActor.test.mjs`, `newtImports.test.mjs`, `newtChunk.test.mjs` (new); `test/lib/poseChecks.mjs` (new, moved helpers); `fireflyInstances.test.mjs`, `vizSettings.test.mjs`, `settingsMap.test.mjs`, `invitationPetals.test.mjs`, `invitationCharacter.test.mjs`, `invitationBubble.test.mjs`, `knightPose.test.mjs` and `invitationModel.test.mjs` (helpers moved), `gate.test.mjs` (L1) |
+| Tests                    | `test/newtWorld.test.mjs`, `newtMoments.test.mjs`, `newtShots.test.mjs`, `newtLines.test.mjs`, `newtRings.test.mjs`, `newtRig.test.mjs`, `newtDance.test.mjs`, `rng.test.mjs`, `lightningRing.test.mjs`, `passWrites.test.mjs`, `frameLoop.test.mjs`, `invitationEnvelopeActor.test.mjs`, `newtImports.test.mjs`, `newtChunk.test.mjs` (new); `test/lib/poseChecks.mjs` (new, moved helpers); `fireflyInstances.test.mjs`, `vizSettings.test.mjs`, `settingsMap.test.mjs`, `invitationPetals.test.mjs`, `invitationCharacter.test.mjs`, `invitationBubble.test.mjs`, `knightPose.test.mjs` and `invitationModel.test.mjs` (helpers moved), `gate.test.mjs` (L1) |
 | Browser tests            | `e2e/newt-world.spec.mjs` (new); `tips-live.spec.mjs` and `live-settings.spec.mjs` for the new rows; `gate.spec.mjs` (L1)                                                                                                                                                                                                                                                                                                                                                             |
-| Docs                     | `docs/bonfire-live.md`, `docs/invitation.md`, this file; `docs/design/captures/newt-live-s1/` (S1's screenshots)                                                                                                                                                                                                                                                                                                                                                                     |
+| Docs                     | `docs/bonfire-live.md`, `docs/invitation.md`, this file; `docs/design/captures/newt-live-s1/` (the spikes), `newt-live-shots/` (W6's captures)                                                                                                                                                                                                                                                                                                                                                                     |
 
 ## Checklist
 
@@ -1096,7 +1165,7 @@ template is filled, with a capture for anything visible.
 - [ ] W1a the page and the duck survive a breakdown → drop · [ ] W1b NEWT on the page ·
       [ ] W2a the letters · [ ] W2b
       NEWT's reactions (the first clip) · [ ] W3 settings, start screen, HUD · [ ] W4a element
-      rings and marks · [ ] W4b fireflies · [ ] W5 bubble and lines · [ ] G1 guards · [ ] R3
+      rings and marks · [ ] W4b fireflies · [ ] W5 bubble and lines · [ ] W6 NEWT's shots · [ ] G1 guards · [ ] R3
       pass writes and frame loop
 - [ ] D1 rest map and harness · [ ] D2 pose layer · [ ] D3 three moves
 - [ ] C1, P1, L1 as Newton decides · [ ] F1 feel pass signed off · [ ] X1 docs
@@ -1112,8 +1181,8 @@ template is filled, with a capture for anything visible.
 - The page burn (P1) under the quick letters too, if F1 wants page turns on phrase lines; a
   page from the show's palette (`colors.next` for a flame key, its `flames[key].ramp[1]`
   lightened).
-- A `fakeKnights` adapter so `knightShow.js` schedules him; a NEWT shots table in
-  `camera.js`, if the bonfire's framings look wrong in F1.
+- A `fakeKnights` adapter so `knightShow.js` schedules him; NEWT shots of his own beyond the
+  14 remapped ones (a face close-up when he speaks), if F1 wants them.
 - Bolts from the letter to petals (a petal strike on `bolts.js bolt()`, ~40 lines); petals on
   the fireflies' moves (a petal duck over the fixed-step sim).
 - The Bayer, dissolve-chunk, in-toy `math.js` and `worldPerPixel` merges, with bit-for-bit
