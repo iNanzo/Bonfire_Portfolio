@@ -1,0 +1,32 @@
+— One drop, every chance 1: grab at 2.00 s (build stage 4), release at 5.75 s (the strike) —
+ 0.00 s  idle     root.y 0.00  clip gait
+ 2.02 s  held     root.y 0.02  clip Held
+ 2.02 s    says (pickedUp): "You see how this looks, right?"
+ 5.27 s    says (thrash): "{RED,big,bold,wave,shake|RAHHHHHHH}"
+ 5.77 s  fall     root.y 0.62  clip Fall
+ 6.20 s  land     root.y 0.00  clip Land
+ 6.48 s  idle     root.y 0.00  clip gait
+ 8.70 s  walk     root.y 0.00  clip gait
+ 8.70 s    says (wander): "Just stretching my legs."
+highest root 0.65 (lifted 0.65 off the floor); landing at 6.18 s, speed 4.12
+
+— The same drop with the release a frame after the grab (the old plan) —
+ 0.00 s  idle     root.y 0.00  clip gait
+ 2.02 s  held     root.y 0.02  clip Held
+ 2.02 s    says (pickedUp): "You see how this looks, right?"
+ 2.03 s  fall     root.y 0.04  clip Fall
+ 2.23 s  land     root.y 0.00  clip Land
+ 2.52 s  idle     root.y 0.00  clip gait
+ 6.48 s  walk     root.y 0.00  clip gait
+ 6.48 s    says (wander): "Hmm, I wonder…"
+lines: pickedUp, wander
+
+— 2000 drops at content.json's chances (seeds 1..2000) —
+held → fall → land in 100.0 % of drops
+pickedUp at the lift: 69.7 %; dropped at the strike: 33.7 %; landed: 20.1 %; dropped and landed both: 0.0 %; no line at all: 7.4 %
+
+— Hold length (stage 4 to the strike) against the lines, 2000 drops each at the real chances —
+hold 0.90 s (0.5 bars at 128 BPM): pickedUp 69.7 %, thrash 0.0 %, dropped or landed 25.7 %, none of them 4.7 %
+hold 1.90 s (1.0 bars at 128 BPM): pickedUp 69.7 %, thrash 0.0 %, dropped or landed 34.7 %, none of them 4.7 %
+hold 3.75 s (2.0 bars at 128 BPM): pickedUp 69.7 %, thrash 11.4 %, dropped or landed 53.8 %, none of them 4.0 %
+hold 7.50 s (4.0 bars at 128 BPM): pickedUp 69.7 %, thrash 70.0 %, dropped or landed 37.6 %, none of them 0.9 %
