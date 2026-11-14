@@ -188,8 +188,9 @@ dissolve-chunk and `math.js` merges are deferred.
   38 % with `thrash` on 70 %. C1 shrinks to the swing.
 - **K10. He dances with his own clips first; the knights' moves follow F1.** `clips.js:19-47`
   has Nod, Cheer, Shrug, Point, Wave and Think; W2b restarts them through the wiring it
-  installs anyway. The knights' solver on his body (D1–D3) ships stomp and beckon after the
-  feel pass, on Newton's word; the other eleven moves and nine gestures wait for `headRoom()`
+  installs anyway. The knights' solver on his body ships stomp and beckon after the feel
+  pass, on Newton's word (D2, D3); D1, NEWT's rig and its tests with no visible behavior, may
+  start at once, beside the R tasks; the other eleven moves and nine gestures wait for `headRoom()`
   (Later). Why: measured intrusions in 11 of 13 moves and 9 of 10 gestures, the knights' nod
   duplicates a clip he has, and three Codex days for two moves are not first-clip work.
 - **K11. No new tabs.** `world`, `page` and `pageTurns` join the Show tab; bonfire-only rows
@@ -463,7 +464,8 @@ no hand-vs-head clearance exists in the knight code (`clampPlates` is pauldron-v
 Cheer, Shrug or Point and `world.js` restarts it through `character.restart`/`setWeights`
 (`blend.js`, `play.js`: the wiring W2b installs), ~20 lines, no `character.js` change; in the
 groove `fire.pulse(s)` restarts Nod at a low weight on each beat, so he nods to the music as
-he wanders. The knights' moves follow F1, on Newton's word, in order: (a) a NEWT rest map for
+he wanders. The knights' moves follow F1, on Newton's word (D1 may start at once: it changes nothing
+visible), in order: (a) a NEWT rest map for
 `measureRig` (a virtual spine folded into `Chest`, the hand rest at the forearm tip, K =
 1.72/6.255, the shoulder's 52 % share overridden, `knightSolve.js:159-185`), the world deltas
 applied by the 15-line `knights.js apply()` formula (`:1798-1821`), ~40 lines (D1); (b) a
