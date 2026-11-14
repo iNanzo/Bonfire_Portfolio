@@ -1,0 +1,39 @@
+{
+  "texelsOfNewt": 1940,
+  "meanError": {
+    "4": 21.6,
+    "6": 13.6,
+    "8": 11.2,
+    "10": 9.9
+  },
+  "tones": ["#1f1f1f", "#393839", "#656360", "#928e89", "#e1b895", "#bebebc"],
+  "bytes": {
+    "white-letter": 9223,
+    "white-fire": 17954,
+    "white-lightning": 12919,
+    "white-ice": 18366,
+    "cream-letter": 9740,
+    "cream-fire": 18047,
+    "cream-lightning": 13407,
+    "cream-ice": 17995,
+    "dusk-letter": 10778,
+    "dusk-fire": 27490,
+    "dusk-lightning": 22872,
+    "dusk-ice": 25414,
+    "night-letter": 10523,
+    "night-fire": 27876,
+    "night-lightning": 25935,
+    "night-ice": 27603,
+    "white-look-ink": 5408,
+    "white-look-mirror": 9124,
+    "white-look-glitch": 12609,
+    "white-look-painterly": 7174,
+    "white-look-glow": 7480,
+    "night-look-ink": 7675,
+    "night-look-mirror": 10168,
+    "night-look-glitch": 13942,
+    "night-look-painterly": 8641,
+    "night-look-glow": 10364
+  },
+  "errors": ["Failed to load resource: the server responded with a status of 404 (Not Found)"]
+}
