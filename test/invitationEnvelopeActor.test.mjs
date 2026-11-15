@@ -116,3 +116,24 @@ test('reduced actor poses ignore hover lift and brightening', () => {
   a.dispose();
   b.dispose();
 });
+
+test('Live snap mode passes half-texel projection values into seal.place, rather than only rounding its snapshot', () => {
+  const camera = new THREE.PerspectiveCamera(40, 16 / 9, 0.1, 80);
+  camera.position.set(0, 1, 6);
+  camera.lookAt(0, 0.5, 0);
+  camera.updateMatrixWorld();
+  const actor = createEnvelopeActor({ size: () => ({ tw: 640, th: 360 }), snapSeal: true });
+  const calls = [],
+    place = actor.seal.place;
+  actor.seal.place = (x, y, axes) => {
+    calls.push({ x, y, axes: [...axes] });
+    return place(x, y, axes);
+  };
+  actor.pose(createEnvelope({ born: 0 }).pose(1.23), { view: { h: 4, cssH: 800, scale: 0.8 }, camera });
+  const at = actor.sealAt;
+  assert.ok(at);
+  assert.deepEqual(calls, [{ x: at.x, y: at.y, axes: at.axes }]);
+  for (const value of [at.x, at.y, ...at.axes]) assert.equal(Number.isInteger(value * 2), true);
+  assert.deepEqual(at.placedAt, calls[0]);
+  actor.dispose();
+});
