@@ -946,7 +946,7 @@ export function createPetalFlow({ seed = 7, reduced = false } = {}) {
     },
     /** Scale the swirl ellipse without changing its clock or random draws. */
     setSwirlScale(k) {
-      swirlScale = k;
+      if (Number.isFinite(k) && k > 0) swirlScale = k;
     },
     /** The swirl's spin now, radians (swirlSlot). */
     get swirlSpin() {

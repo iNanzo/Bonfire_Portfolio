@@ -79,3 +79,61 @@ test('look mark and linear seams default to the toy and opt into the Live buffer
   const b = createEnvelopeActor();
   assert.notDeepEqual(a.specks.geo.attributes.color.array, b.specks.geo.attributes.color.array);
 });
+
+test('actor disposal is idempotent and specks share live mark/linear uniforms', () => {
+  const u = shared({ mark: 0.2, linear: true });
+  const actor = createEnvelopeActor({ uniforms: u });
+  assert.equal(actor.specks.points.material.uniforms.uMark, u.uMark);
+  const before = [...actor.specks.geo.attributes.color.array];
+  const geometries = new Set(),
+    materials = new Set();
+  actor.outer.traverse((o) => {
+    if (o.geometry) geometries.add(o.geometry);
+    if (o.material) for (const m of [o.material].flat()) materials.add(m);
+  });
+  let disposed = 0;
+  for (const g of [...geometries, ...materials]) g.addEventListener('dispose', () => disposed++);
+  u.uLinear.value = 0;
+  actor.specks.sync();
+  assert.notDeepEqual([...actor.specks.geo.attributes.color.array], before);
+  actor.dispose();
+  actor.dispose();
+  assert.equal(disposed, geometries.size + materials.size);
+});
+
+test('reduced actor poses ignore hover lift and brightening', () => {
+  const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 80);
+  camera.position.z = 6;
+  camera.updateMatrixWorld();
+  const a = createEnvelopeActor(),
+    b = createEnvelopeActor(),
+    p = createEnvelope({ born: 0, reduced: true }).pose(1);
+  const view = { h: 4, cssH: 800, scale: 0.55 };
+  a.pose(p, { view, camera, reduced: true, lift: hoverLook(1) });
+  b.pose(p, { view, camera, reduced: true, lift: hoverLook(0) });
+  assert.deepEqual(a.outer.matrixWorld.elements, b.outer.matrixWorld.elements);
+  assert.equal(a.uniforms.uBright.value, 0);
+  a.dispose();
+  b.dispose();
+});
+
+test('Live snap mode passes half-texel projection values into seal.place, rather than only rounding its snapshot', () => {
+  const camera = new THREE.PerspectiveCamera(40, 16 / 9, 0.1, 80);
+  camera.position.set(0, 1, 6);
+  camera.lookAt(0, 0.5, 0);
+  camera.updateMatrixWorld();
+  const actor = createEnvelopeActor({ size: () => ({ tw: 640, th: 360 }), snapSeal: true });
+  const calls = [],
+    place = actor.seal.place;
+  actor.seal.place = (x, y, axes) => {
+    calls.push({ x, y, axes: [...axes] });
+    return place(x, y, axes);
+  };
+  actor.pose(createEnvelope({ born: 0 }).pose(1.23), { view: { h: 4, cssH: 800, scale: 0.8 }, camera });
+  const at = actor.sealAt;
+  assert.ok(at);
+  assert.deepEqual(calls, [{ x: at.x, y: at.y, axes: at.axes }]);
+  for (const value of [at.x, at.y, ...at.axes]) assert.equal(Number.isInteger(value * 2), true);
+  assert.deepEqual(at.placedAt, calls[0]);
+  actor.dispose();
+});

@@ -77,6 +77,32 @@ test('page and duck survive a held breakdown and drop', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+test('floating letter seal snapshots equal the half-texel values actually placed', async ({ page }) => {
+  await ready(page);
+  await page.evaluate(() => {
+    void window.__viz.fire.equip('axe', 'ember', { hold: true });
+  });
+  const samples = [];
+  for (let i = 0; i < 20; i++) {
+    await expect.poll(() => page.evaluate(() => window.__viz.fire.snapshot().letter?.seal ?? null)).not.toBeNull();
+    samples.push(
+      await page.evaluate(
+        () =>
+          new Promise((resolve) => {
+            const off = window.__viz.fire.onRendered(() => {
+              off();
+              resolve(window.__viz.fire.snapshot().letter.seal);
+            });
+          }),
+      ),
+    );
+  }
+  for (const seal of samples) {
+    for (const value of [seal.x, seal.y, ...seal.axes]) expect(Number.isInteger(value * 2)).toBe(true);
+    expect(seal.placedAt).toEqual({ x: seal.x, y: seal.y, axes: seal.axes });
+  }
+});
+
 test('NEWT is ready on the page in Idle', async ({ page }) => {
   await ready(page);
   await expect.poll(() => page.evaluate(() => window.__viz.fire.snapshot().newt?.clip)).toBe('Idle');
