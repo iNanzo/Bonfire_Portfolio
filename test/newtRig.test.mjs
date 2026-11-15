@@ -116,6 +116,8 @@ const KNOWN_INTRUDING = new Set([
 
 test('NEWT rest rig solves every move and gesture; clearance stays documented [slow]', () => {
   const observed = new Set();
+  const required = new Set(['nod', 'stomp', 'gesture:beckon']);
+  const clearances = new Map();
   for (const name of [
     ...MOVES,
     ...Array.from(new Set([...GESTURES, ...Object.keys(GESTURE_TIME)]), (g) => `gesture:${g}`),
@@ -131,13 +133,15 @@ test('NEWT rest rig solves every move and gesture; clearance stays documented [s
         } else dance(p, name, beat, { seated: false, seed });
         const solved = assertSound(p, `${name} ${seed}/${beat}`, { solver, rig });
         assertLimits(solved, name, { solver, rig });
-        // Measure every quarter beat until an intrusion is found; every solve still gets checked.
-        if (room >= 0.1) room = Math.min(room, clearanceOf(p));
+        // Measure required clear moves fully; every move and gesture still gets solved and checked.
+        if (room >= 0.1 || required.has(name)) room = Math.min(room, clearanceOf(p));
       }
     console.log(name, room);
     if (room < 0.1) observed.add(name);
-    if (['nod', 'stomp', 'gesture:beckon'].includes(name))
-      assert.ok(room >= 0.1, `${name}: ${room} model units from head`);
+    clearances.set(name, room);
   }
   assert.deepEqual(observed, KNOWN_INTRUDING);
+  // Check the literal acceptance gate after every move/gesture has been measured.
+  for (const name of required)
+    assert.ok(clearances.get(name) >= 0.1, `${name}: ${clearances.get(name)} model units from head`);
 });
