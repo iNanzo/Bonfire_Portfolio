@@ -128,3 +128,49 @@ test('the halos showing, back to front as three.js sorts see-through meshes, eac
   assert.equal(halos.count, 0);
   assert.equal(halos.visible, false);
 });
+
+test('custom points replace the ruins points; omitted points preserve all five and the seeded trace', async () => {
+  const { seeded } = await import('../src/bonfire/bolts.js');
+  const { RUINS } = await import('../src/bonfire/colliders.js');
+  const points = [
+    [RUINS.at[0], 2.05, RUINS.at[1]],
+    [RUINS.at[0] + 0.25, 0.62, RUINS.at[1] + 0.25],
+    [1.9, 1.7, -1.5],
+    [1.15, 0.35, -0.45],
+    [RUINS.drum.at[0], 0.45, RUINS.drum.at[2]],
+  ];
+  function trace(pois) {
+    const random = Math.random;
+    Math.random = seeded(71);
+    try {
+      const flies = createFireflies(template(), {
+        count: 128,
+        litCount: 0,
+        lightCount: 0,
+        center: new THREE.Vector3(),
+        layer: 2,
+        terrain,
+        raycast: () => null,
+        ...(pois ? { pois } : {}),
+      });
+      return flies.flies.map((f) => f.wp.pos.toArray());
+    } finally {
+      Math.random = random;
+    }
+  }
+  const original = trace();
+  assert.deepEqual(original, trace(points));
+  for (const [x, y, z] of points)
+    assert.ok(
+      original.some(([a, b, c]) => Math.abs(a - x) <= 0.3 && b === y && Math.abs(c - z) <= 0.3),
+      `original poi ${x},${y},${z}`,
+    );
+  const custom = trace([[5, 1, 5]]);
+  assert.notDeepEqual(custom, original);
+  assert.ok(custom.some(([x, y, z]) => Math.abs(x - 5) <= 0.3 && y === 1 && Math.abs(z - 5) <= 0.3));
+  for (const [x, y, z] of points)
+    assert.ok(
+      !custom.some(([a, b, c]) => Math.abs(a - x) <= 0.3 && b === y && Math.abs(c - z) <= 0.3),
+      'ruins point replaced',
+    );
+});
