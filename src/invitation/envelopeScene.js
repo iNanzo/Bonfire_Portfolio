@@ -40,7 +40,6 @@
 // disposes its renderer, loses its context and leaves the page. Rose Petals off (Settings): none.
 import * as THREE from 'three';
 import {
-  DISSOLVE,
   ENVELOPE_TEXT,
   FLAP_OPEN,
   GLOSS,
@@ -57,35 +56,14 @@ import {
   pressStep,
   shownPulse,
   turnGoal,
-  turnRoll,
   turnStep,
-  particleAt,
   releaseGesture,
-  sealBloom,
   sealGloss,
-  shedParticles,
 } from './envelope.js';
-import { buildSeal, sealOnScreen } from './envelopeSeal.js';
+import { createEnvelopeActor } from './envelopeActor.js';
 import { createPetalScene } from './petalScene.js';
-import {
-  BAYER,
-  DEPTH,
-  GLOW,
-  HOVER,
-  IDS,
-  INK,
-  LEAN,
-  PAPER,
-  PAPER_LIT,
-  PITCH,
-  SHINE,
-  TILT,
-  WAX,
-  envelopeLayout,
-  rgb,
-  shared,
-  toon,
-} from './envelopeLook.js';
+import { DEPTH, GLOW, HOVER, IDS, INK, SHINE, rgb, shared } from './envelopeLook.js';
+import { BAYER, TILT } from './envelopeLook.js';
 
 /** Where veils looks on each of NEWT's spots: its middle and four points its radius round it. */
 const SPOT_POINTS = [
@@ -104,114 +82,6 @@ const DIST = 6;
 const WHEEL_STEP = 80;
 /** Its last petals may hold it up this long (seconds) once it's done. */
 const PETAL_GRACE = 1.2;
-/** Specks the letter sheds as it dissolves. */
-const SPECKS = 220;
-/** The specks' colours: paper (gold and charred), embers (hot and glowing), wax. */
-const SPECK_TONES = {
-  paper: [0xe4b85d, 0xd3983d, 0x7a4a24, 0x5a3418],
-  ember: [0xffe7a0, 0xf59a32, 0xe8662a],
-  wax: [WAX[1], WAX[2]],
-};
-
-/**
- * A flat polygon as a mesh (a fan from its first point; its points counter-clockwise), at depth
- * `z`.
- * @param {number[][]} pts  [x, y]
- * @param {THREE.Material} mat
- * @param {number} z
- */
-function piece(pts, mat, z) {
-  const v = pts.map(([x, y]) => new THREE.Vector3(x, y, z));
-  const tris = [];
-  for (let i = 1; i < v.length - 1; i++) tris.push(v[0], v[i], v[i + 1]);
-  return new THREE.Mesh(new THREE.BufferGeometry().setFromPoints(tris), mat);
-}
-
-/**
- * The envelope's parts (envelopeLook.js envelopeLayout), built to a width of 2 (the group scales
- * it to the screen), each a flat piece a little in front of the last: the body, the inside of the
- * pocket where the flap opens, the pocket in one piece (a little way in front of the inside, so
- * petals pouring from inside it hide behind it until they rise out of its mouth), and the flap
- * hinged on the top edge. Each is one flat tone of the paper's three (LEAN).
- * @param {ReturnType<typeof shared>} u
- */
-function buildEnvelope(u) {
-  const L = envelopeLayout();
-  const { W, H, T } = L;
-  const h = H / 2;
-  const group = new THREE.Group();
-  const paper = (/** @type {keyof typeof LEAN} */ part) =>
-    toon(PAPER, u, IDS[part], { lean: LEAN[part], lit: PAPER_LIT });
-  group.add(piece(L.parts.body, paper('body'), T / 2));
-  group.add(piece(L.parts.inside, paper('inside'), T / 2 + DEPTH.inside));
-  group.add(piece(L.parts.pocket, paper('pocket'), T / 2 + DEPTH.pocket));
-  // The flap, hinged on the top edge (its points from the hinge).
-  const hinge = new THREE.Group();
-  hinge.position.set(0, h, T / 2 + 0.1);
-  hinge.add(
-    piece(
-      L.parts.flap.map(([x, y]) => [x, y - h]),
-      paper('flap'),
-      0,
-    ),
-  );
-  group.add(hinge);
-  return { group, hinge, W, H, T, tipY: L.tip[1], seal: L.seal };
-}
-
-/**
- * The specks as square points `size` texels across, each shown through a dither as it fades.
- * They're on layer 1, drawn after the letter is put together, with no line round them.
- */
-function buildSpecks() {
-  const specks = shedParticles(SPECKS);
-  const geo = new THREE.BufferGeometry();
-  const pos = new Float32Array(SPECKS * 3);
-  const col = new Float32Array(SPECKS * 3);
-  const size = new Float32Array(SPECKS);
-  const alpha = new Float32Array(SPECKS);
-  specks.forEach((s, i) => {
-    const tones = SPECK_TONES[s.kind];
-    const c = rgb(tones[(i * 7) % tones.length]);
-    col.set([c.x, c.y, c.z], i * 3);
-    size[i] = s.size;
-  });
-  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  geo.setAttribute('aSize', new THREE.BufferAttribute(size, 1));
-  geo.setAttribute('aAlpha', new THREE.BufferAttribute(alpha, 1));
-  const mat = new THREE.ShaderMaterial({
-    vertexShader: /* glsl */ `
-      attribute float aSize;
-      attribute float aAlpha;
-      attribute vec3 color;
-      varying vec3 vColor;
-      varying float vAlpha;
-      void main() {
-        vColor = color;
-        vAlpha = aAlpha;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        gl_PointSize = aAlpha > 0.0 ? aSize : 0.0;
-      }
-    `,
-    fragmentShader: /* glsl */ `
-      varying vec3 vColor;
-      varying float vAlpha;
-      ${BAYER}
-      void main() {
-        if (bayer(gl_FragCoord.xy) >= vAlpha) discard;
-        gl_FragColor = vec4(vColor, 1.0);
-      }
-    `,
-    depthTest: false,
-    depthWrite: false,
-  });
-  const points = new THREE.Points(geo, mat);
-  points.frustumCulled = false;
-  points.layers.set(1);
-  return { points, specks, pos, alpha, geo };
-}
-
 /**
  * The pass that puts it together: the colours, and a line in the ink on each texel that borders
  * a part in front of it (by the parts' order, IDS): round the silhouette, on the paper just
@@ -381,25 +251,11 @@ export function createEnvelopeScene(
   camera.position.set(0, 0, DIST);
   // (Its matrices as it stands, before anything is drawn: the seal's placement reads them.)
   camera.updateMatrixWorld();
-  const outer = new THREE.Group();
-  const inner = new THREE.Group();
-  inner.rotation.z = TILT;
-  inner.rotation.x = PITCH;
-  outer.add(inner);
+  const actor = createEnvelopeActor({ size: () => view, uniforms: u });
+  const { outer, inner, envl, seal, specks, toLetter, sealR } = actor;
   scene.add(outer);
-  const envl = buildEnvelope(u);
-  inner.add(envl.group);
-  const sealR = envl.seal.r;
-  const seal = buildSeal(u, sealR);
-  // (On the flap's tip.)
-  // (On the flap's tip, a hair over it, so it moves with the flap as one: no parallax, and its
-  // middle rounds to the screen's texels with the tip.)
-  seal.group.position.set(envl.seal.x, envl.seal.y - envl.H / 2, 0.01);
-  envl.hinge.add(seal.group);
   // (The petals: in with the letter, so it hides the swirl's back half and its ink runs round them.)
   const petals = createPetalScene({ scene, seed: 16, reduced: reduced || !petalsOn, uniforms: u, id: IDS.petal });
-  const specks = buildSpecks();
-  outer.add(specks.points);
   const compose = buildCompose();
   const flat = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
   const rtOpts = { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: true };
@@ -414,15 +270,10 @@ export function createEnvelopeScene(
   /** The seal has been placed on the screen once (for ?test: it's hidden till then). */
   let sealPlaced = false;
   seal.group.visible = false;
-  const v = new THREE.Vector3();
   /** Where the petals start from, world (kept up to date each frame): the letter's middle, its seal. */
   const spots = { letter: new THREE.Vector3(), seal: new THREE.Vector3() };
   /** A letter's width, world units (petals.js's unit). */
   const letterW = () => envl.W * view.scale;
-  /** The letter's own units (−1…1 across and up its body), from the world. */
-  const toLetter = new THREE.Matrix4();
-  const letterScale = new THREE.Matrix4().makeScale(2 / envl.W, 2 / envl.H, 1);
-
   /** The view's height at the envelope, world units, and the screen's CSS size. */
   const view = { h: 1, w: 1, cssW: 1, cssH: 1, scale: 1, tw: 1, th: 1 };
   function resize() {
@@ -728,40 +579,18 @@ export function createEnvelopeScene(
     follow.y += (target.follow - follow.y) * k;
     follow.lift += (target.lift - follow.lift) * k;
     cues(now, dt);
-    // The envelope.
-    const pxToWorld = view.h / view.cssH;
-    // (Settling in as it arrives: from a touch above, a touch small.)
-    const arrive = (1 - p.arrive) * view.h * 0.04;
-    // (Hovered, it lifts a little toward the camera in time with the pulse: envelope.js hoverLook.)
-    const lift = reduced ? hoverLook(0) : hover.look;
-    outer.position.set(
-      0,
-      p.bob - follow.y * pxToWorld - p.drop * view.h * 0.9 + arrive,
-      p.push * 0.6 + lift.toward * DIST,
-    );
     // (Turned toward the pointer, and further by a sideways drag or a held arrow, while it floats.)
     const goal =
       env.state === 'floating' ? turnGoal({ pointer: pointerX, dx: drag?.dx ?? 0, w: view.cssW, key: keyTurn }) : 0;
     turn = turnStep(turn, goal, dt, reduced);
-    outer.rotation.set(0, p.yaw + turn, -0.5 * p.drop + turnRoll(turn));
-    outer.scale.setScalar(view.scale * (1 + 0.025 * p.pulse) * (0.94 + 0.06 * p.arrive) * lift.scale);
-    envl.hinge.rotation.x = -p.flap;
-    // The seal: whole, starting to open as a finger drags it up, then blooming into petals,
-    // shrinking away to nothing before the flap moves. It leans, turns and narrows with the
-    // letter, its face drawn for that (its stamp upright on the screen).
-    const bloom = sealBloom(Math.max(p.bloom, (follow.lift / 0.45) * 0.14));
-    seal.group.scale.setScalar(bloom.scale);
-    seal.group.rotation.z = bloom.spin;
-    outer.updateMatrixWorld(true);
-    seal.group.visible = bloom.scale > 0 && placeSeal();
+    actor.pose(p, { view, follow, turn, reduced, lift: reduced ? hoverLook(0) : hover.look, camera });
+    const at = actor.sealAt;
+    if (at) {
+      if (!sealPlaced) firstSeal = { frame: frames, ...at };
+      sealPlaced = true;
+      lastSeal = at;
+    }
     petalsAt(dt, p);
-    // The dissolve: the edge across the letter, in its own units.
-    u.uToInner.value.copy(inner.matrixWorld).invert();
-    toLetter.copy(u.uToInner.value).premultiply(letterScale);
-    u.uToLetter.value.copy(toLetter);
-    u.uEdge.value = DISSOLVE.edge(p.dissolve);
-    u.uDissolve.value = p.dissolve;
-    specksAt(p.since);
     // The white page behind: up while it covers the toy, then clearing (a plain fade). Reduced
     // motion fades the whole layer instead.
     paper.style.opacity = p.crossfade ? '' : String(p.backdrop);
@@ -808,20 +637,6 @@ export function createEnvelopeScene(
   }
 
   /**
-   * Where the seal's middle falls on the drawing (texels from its lower left) and its axes there,
-   * from its own matrices (envelopeSeal.js sealOnScreen): its face is drawn for them and put on
-   * texel for texel (seal.place). Whether it shows (not while it's too small to draw).
-   */
-  function placeSeal() {
-    const at = sealOnScreen(seal.group, camera, sealR, view.tw, view.th);
-    if (!seal.place(at.x, at.y, at.axes)) return false;
-    if (!sealPlaced) firstSeal = { frame: frames, x: at.x, y: at.y, axes: at.axes };
-    sealPlaced = true;
-    lastSeal = { x: at.x, y: at.y, axes: at.axes };
-    return true;
-  }
-
-  /**
    * The petals: where they start from now (the letter's middle and its seal, a little in front),
    * the flurry as it first appears, and the letter as it is for the swirl round it while it
    * floats (flung out as it opens), the pour out of it as the flap lifts and its wake as it
@@ -849,26 +664,6 @@ export function createEnvelopeScene(
       pocket: (envl.T / 2 + DEPTH.pocket) / envl.W,
     });
     petals.step(dt);
-  }
-
-  /**
-   * The specks the letter sheds, `since` seconds into the fade: each where the edge reached it
-   * (on the paper, in front of it), drifting from there.
-   * @param {number} since
-   */
-  function specksAt(since) {
-    specks.points.visible = since > 0;
-    if (!(since > 0)) return;
-    for (let i = 0; i < SPECKS; i++) {
-      const s = specks.specks[i];
-      const at = particleAt(s, since);
-      specks.alpha[i] = at.alpha;
-      if (!at.alpha) continue;
-      v.set((s.x * envl.W) / 2, (s.y * envl.H) / 2, envl.T / 2 + 0.12).applyMatrix4(inner.matrix);
-      specks.pos.set([v.x + at.x * envl.W, v.y + at.y * envl.W, v.z + at.z * envl.W], i * 3);
-    }
-    specks.geo.attributes.position.needsUpdate = true;
-    specks.geo.attributes.aAlpha.needsUpdate = true;
   }
 
   /** Its colours, then which part each texel is, then the two put together with the ink; the specks on top. */
