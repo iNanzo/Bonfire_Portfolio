@@ -146,6 +146,8 @@ test('White equip selects the ice facade and attaches no lights or opaque page',
     duck.step(1.41);
     await done;
     assert.equal(rings.element, 'ice');
+    assert.equal(rings.ice.solid.layers.mask, 1);
+    assert.equal(rings.crystals.solid.layers.mask, 1);
     assert.equal(scene.children.filter((o) => o.isPointLight).length, 0);
     assert.equal(rings.surface.material.transparent, true);
     assert.match(rings.surface.material.fragmentShader, /if\(mark\.a<=0\.\) discard/);

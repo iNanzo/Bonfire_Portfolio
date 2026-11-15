@@ -102,6 +102,7 @@ export function createElementRings({
     add(o, 1);
   for (const o of [fire.haze, fire.puff, fire.flecks, chill.points]) add(o, 2);
   crystals.solid.layers.set(0);
+  ice.solid.layers.set(0);
   const pageLightObjects = pageLights(page(), [...fire.lights, ...lightning.lights, ...ice.lights]);
   for (const l of pageLightObjects) scene.add(l);
   // Marks have their own transparent, unlit surface. Unmarked texels draw nothing.
