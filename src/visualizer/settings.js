@@ -224,6 +224,26 @@ export function loadSettings() {
 
 let unsaved = null; // the settings waiting to be written
 let saveTimer = 0;
+// A URL may choose a world for this visit without changing this browser's saved choice. Keep
+// that visit-only value on the live settings object, but remember the value saveSettings must
+// write until the user changes World in Settings.
+const transient = new WeakMap();
+
+/** Put one setting over the live object for this visit, leaving its saved value underneath. */
+export function setTransientSetting(settings, key, value) {
+  const values = transient.get(settings) ?? {};
+  if (!Object.hasOwn(values, key)) values[key] = settings[key];
+  transient.set(settings, values);
+  settings[key] = value;
+}
+
+/** A Settings control made this value the user's choice, so it may be saved normally. */
+export function commitTransientSetting(settings, key) {
+  const values = transient.get(settings);
+  if (!values || !Object.hasOwn(values, key)) return;
+  delete values[key];
+  if (!Object.keys(values).length) transient.delete(settings);
+}
 /**
  * Save the settings: SAVE_MS after the last call (a slider dragged, a burst of keys writes
  * once), or at once with `now`.
@@ -243,7 +263,8 @@ export function flushSettings() {
   const settings = unsaved;
   unsaved = null;
   try {
-    localStorage.setItem(STORE, JSON.stringify(settings));
+    const hidden = transient.get(settings);
+    localStorage.setItem(STORE, JSON.stringify(hidden ? { ...settings, ...hidden } : settings));
   } catch {
     /* private mode */
   }
