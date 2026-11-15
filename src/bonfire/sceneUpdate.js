@@ -17,55 +17,8 @@ const hash = (n) => {
   return s - Math.floor(s);
 };
 
-/**
- * The update and the frame.
- * @param {import('./sceneContext.js').SceneContext} ctx
- */
-export function createSceneUpdate(ctx) {
-  const {
-    reducedMotion,
-    paintedLook,
-    onFrame,
-    renderer,
-    camera,
-    frame,
-    pass,
-    timer,
-    pointer,
-    view,
-    interaction,
-    fire,
-    plasma,
-    crystals,
-    chill,
-    swingTrail,
-    debris,
-    flowView,
-    marks,
-    armor,
-    candleLight,
-    lamps,
-    fireLight,
-    FIRE_LIGHT_AT,
-    ballLightAt,
-    BALL_LIGHT_MIN_Y,
-    drive,
-    glitch,
-    presence,
-    white,
-    lightBase,
-    lightWarm,
-    candleFlames,
-    glows,
-    sceneries,
-    renderOverride,
-    keepPalette,
-    ambient,
-    strikeFirefly,
-    bladeState,
-  } = ctx;
-  const blendTime = () => (reducedMotion ? 0.4 : effects.render.colorChange);
-  // Each of `glitch`'s values (scene.js), and the pass uniform it's written to (renderFrame).
+// Keep the literal's local name and indentation for the source-based stillFx guard.
+export const GLITCH_UNIFORMS = (() => {
   const GLITCH_UNIFORMS = {
     slice: 'uSlice',
     sliceSeed: 'uSliceSeed',
@@ -118,6 +71,58 @@ export function createSceneUpdate(ctx) {
     glowMode: 'uGlowMode',
     gradMode: 'uGradMode',
   };
+  return GLITCH_UNIFORMS;
+})();
+
+/**
+ * The update and the frame.
+ * @param {import('./sceneContext.js').SceneContext} ctx
+ */
+export function createSceneUpdate(ctx) {
+  const {
+    reducedMotion,
+    paintedLook,
+    onFrame,
+    renderer,
+    camera,
+    frame,
+    pass,
+    timer,
+    pointer,
+    view,
+    interaction,
+    fire,
+    plasma,
+    crystals,
+    chill,
+    swingTrail,
+    debris,
+    flowView,
+    marks,
+    armor,
+    candleLight,
+    lamps,
+    fireLight,
+    FIRE_LIGHT_AT,
+    ballLightAt,
+    BALL_LIGHT_MIN_Y,
+    drive,
+    glitch,
+    presence,
+    white,
+    lightBase,
+    lightWarm,
+    candleFlames,
+    glows,
+    sceneries,
+    renderOverride,
+    keepPalette,
+    ambient,
+    strikeFirefly,
+    bladeState,
+  } = ctx;
+  const blendTime = () => (reducedMotion ? 0.4 : effects.render.colorChange);
+  // Each of `glitch`'s values (scene.js), and the pass uniform it's written to (renderFrame).
   const GLITCH_ENTRIES = Object.entries(GLITCH_UNIFORMS);
   // Under reduced motion only the still effects reach the picture; the Painter's
   // (`paintedLook`) lets the look being painted through, all but what flashes or jitters

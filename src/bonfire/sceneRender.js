@@ -20,6 +20,34 @@ export const stepIn = (list, cur, dir) => {
   return next ?? (dir > 0 ? list[0] : list.at(-1));
 };
 
+/** @type {Record<string, [string, string, (number | boolean)?]>} */
+export const WRITE_THROUGH = {
+  flameFps: ['fire', 'fps'],
+  colorChange: ['render', 'colorChange'],
+  hitStop: ['impact', 'hitStop', 0],
+  hitFlash: ['impact', 'flash', 0],
+  debris: ['impact', 'debris', 0],
+  marks: ['impact', 'marks', false],
+};
+
+export function applyRenderTo(pass, effects, override, own) {
+  const r = { ...effects.render, ...override };
+  pass.uniforms.ditherStrength.value = r.dither;
+  pass.uniforms.ditherScale.value = r.ditherMatrix;
+  pass.uniforms.outlines.value = r.outlines ? 1 : 0;
+  pass.uniforms.exposure.value = r.exposure;
+  for (const [key, [section, name]] of Object.entries(WRITE_THROUGH)) {
+    const live = effects[section];
+    if (key in override) {
+      if (live[name] !== override[key]) own[key] = live[name];
+      live[name] = override[key];
+    } else if (key in own) {
+      live[name] = own[key];
+      delete own[key];
+    }
+  }
+}
+
 /**
  * The render options, the size, the P menu's steps and the breakdown.
  * @param {import('./sceneContext.js').SceneContext} ctx
@@ -63,33 +91,8 @@ export function createSceneRender(ctx) {
   // settings' own value back. (A value there that isn't the override's is the settings'
   // own: the admin preview replaced it.) The hit ones take true (the settings' own) or
   // false (none: the value after the name).
-  /** @type {Record<string, [string, string, (number | boolean)?]>} */
-  const WRITE_THROUGH = {
-    flameFps: ['fire', 'fps'],
-    colorChange: ['render', 'colorChange'],
-    hitStop: ['impact', 'hitStop', 0],
-    hitFlash: ['impact', 'flash', 0],
-    debris: ['impact', 'debris', 0],
-    marks: ['impact', 'marks', false],
-  };
   const ownValues = {};
-  function applyRender() {
-    const r = { ...effects.render, ...renderOverride };
-    pass.uniforms.ditherStrength.value = r.dither;
-    pass.uniforms.ditherScale.value = r.ditherMatrix;
-    pass.uniforms.outlines.value = r.outlines ? 1 : 0;
-    pass.uniforms.exposure.value = r.exposure;
-    for (const [key, [section, name]] of Object.entries(WRITE_THROUGH)) {
-      const live = effects[section];
-      if (key in renderOverride) {
-        if (live[name] !== renderOverride[key]) ownValues[key] = live[name];
-        live[name] = renderOverride[key];
-      } else if (key in ownValues) {
-        live[name] = ownValues[key];
-        delete ownValues[key];
-      }
-    }
-  }
+  const applyRender = () => applyRenderTo(pass, effects, renderOverride, ownValues);
   applyRender();
   /**
    * Render options over the settings, as a partial: a value sets one, null clears it back to
