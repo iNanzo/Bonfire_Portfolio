@@ -837,3 +837,19 @@ test('swirl scale one preserves every slot bit for bit and scales its ellipse', 
   }
   assert.deepEqual(a.petals, b.petals);
 });
+
+test('invalid swirl scales leave every simulated petal unchanged', () => {
+  const a = createPetalFlow({ seed: 7 }),
+    b = createPetalFlow({ seed: 7 });
+  const letter = frameAt();
+  for (const invalid of [NaN, Infinity, -Infinity, 0, -1]) {
+    b.setSwirlScale(invalid);
+    for (let i = 0; i < 20; i++) {
+      a.letter(letter);
+      b.letter(letter);
+      a.step(STEP);
+      b.step(STEP);
+    }
+    assert.deepEqual(b.petals, a.petals);
+  }
+});

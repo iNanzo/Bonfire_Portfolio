@@ -77,7 +77,8 @@ function buildEnvelope(u) {
  * The specks as square points `size` texels across, each shown through a dither as it fades.
  * They're on layer 1, drawn after the letter is put together, with no line round them.
  */
-function buildSpecks({ mark = 1, linear = false } = {}) {
+function buildSpecks(u) {
+  let linear = u.uLinear.value > 0.5;
   const specks = shedParticles(SPECKS);
   const geo = new THREE.BufferGeometry();
   const pos = new Float32Array(SPECKS * 3);
@@ -96,7 +97,7 @@ function buildSpecks({ mark = 1, linear = false } = {}) {
   geo.setAttribute('aSize', new THREE.BufferAttribute(size, 1));
   geo.setAttribute('aAlpha', new THREE.BufferAttribute(alpha, 1));
   const mat = new THREE.ShaderMaterial({
-    uniforms: { uMark: { value: mark } },
+    uniforms: { uMark: u.uMark },
     vertexShader: /* glsl */ `
       attribute float aSize;
       attribute float aAlpha;
@@ -126,7 +127,25 @@ function buildSpecks({ mark = 1, linear = false } = {}) {
   const points = new THREE.Points(geo, mat);
   points.frustumCulled = false;
   points.layers.set(1);
-  return { points, specks, pos, alpha, geo };
+  return {
+    points,
+    specks,
+    pos,
+    alpha,
+    geo,
+    sync() {
+      const next = u.uLinear.value > 0.5;
+      if (next === linear) return;
+      linear = next;
+      specks.forEach((s, i) => {
+        const tones = SPECK_TONES[s.kind],
+          hex = tones[(i * 7) % tones.length];
+        const c = linear ? new THREE.Color(hex) : rgb(hex);
+        col.set(linear ? [c.r, c.g, c.b] : [c.x, c.y, c.z], i * 3);
+      });
+      geo.attributes.color.needsUpdate = true;
+    },
+  };
 }
 
 /** size supplies the current pass texels; no renderer or DOM is needed. */
@@ -135,6 +154,7 @@ export function createEnvelopeActor({
   mark = 1,
   linear = false,
   uniforms = shared({ mark, linear }),
+  snapSeal = false,
 } = {}) {
   const u = uniforms;
   const outer = new THREE.Group();
@@ -152,7 +172,7 @@ export function createEnvelopeActor({
   // middle rounds to the screen's texels with the tip.)
   seal.group.position.set(envl.seal.x, envl.seal.y - envl.H / 2, 0.01);
   envl.hinge.add(seal.group);
-  const specks = buildSpecks({ mark, linear });
+  const specks = buildSpecks(u);
   outer.add(specks.points);
   seal.group.visible = false;
   const v = new THREE.Vector3();
@@ -163,12 +183,27 @@ export function createEnvelopeActor({
   let sealAt = null;
   function placeSeal(camera) {
     const view = typeof size === 'function' ? size() : size;
-    const at = sealOnScreen(seal.group, camera, sealR, view.tw ?? view.w, view.th ?? view.h);
+    let at = sealOnScreen(seal.group, camera, sealR, view.tw ?? view.w, view.th ?? view.h);
+    if (snapSeal)
+      at = { ...at, x: Math.round(at.x), y: Math.round(at.y), axes: at.axes.map((v) => Math.round(v * 2) / 2) };
     if (!seal.place(at.x, at.y, at.axes)) {
       sealAt = null;
       return false;
     }
-    sealAt = { x: at.x, y: at.y, axes: at.axes };
+    sealAt = {
+      x: at.x,
+      y: at.y,
+      axes: at.axes,
+      ...(snapSeal
+        ? {
+            placedAt: {
+              x: seal.material.uniforms.uCenter.value.x,
+              y: seal.material.uniforms.uCenter.value.y,
+              axes: [...at.axes],
+            },
+          }
+        : {}),
+    };
     return true;
   }
   /**
@@ -191,7 +226,22 @@ export function createEnvelopeActor({
     specks.geo.attributes.aAlpha.needsUpdate = true;
   }
 
+  let disposed = false;
   return {
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      const geometries = new Set(),
+        materials = new Set();
+      outer.traverse((o) => {
+        if (o.geometry) geometries.add(o.geometry);
+        if (o.material) for (const m of [o.material].flat()) materials.add(m);
+      });
+      for (const g of geometries) g.dispose();
+      for (const m of materials) m.dispose();
+      seal.dispose();
+      outer.removeFromParent();
+    },
     toLetter,
     sealR,
     outer,
@@ -205,6 +255,9 @@ export function createEnvelopeActor({
     },
     pose(p, { view, follow = { y: 0, lift: 0 }, turn = 0, reduced = false, lift = hoverLook(0), camera }) {
       sealAt = null;
+      if (reduced) lift = hoverLook(0);
+      u.uBright.value = reduced ? 0 : lift.bright;
+      specks.sync();
       // The envelope.
       const pxToWorld = view.h / view.cssH;
       // (Settling in as it arrives: from a touch above, a touch small.)
