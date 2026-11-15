@@ -2,11 +2,10 @@
 import * as THREE from 'three';
 import { createFrame } from '../../bonfire/frame.js';
 import { createView } from '../../bonfire/view.js';
-import { createFrameGate } from '../../bonfire/frameGate.js';
+import { createFrameLoop, ownFrameRenderer, attachFrameCanvas, frameCapture } from '../../bonfire/frameLoop.js';
 import { createResourceScope } from '../../bonfire/resources.js';
 import { applyRenderTo, WRITE_THROUGH } from '../../bonfire/sceneRender.js';
-import { GLITCH_UNIFORMS } from '../../bonfire/sceneUpdate.js';
-import { passValue, stillClock } from '../../bonfire/stillFx.js';
+import { createPassWrites } from '../../bonfire/passWrites.js';
 import { effects } from '../../effects.js';
 import { debugPalettes } from '../../palette.js';
 import { loadCharacter } from '../../invitation/character.js';
@@ -24,13 +23,7 @@ export function createWorld(container, options = {}) {
   try {
     // Copied from src/bonfire/scene.js: renderer ownership and context teardown.
     const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, powerPreference: 'high-performance' });
-    scope.own({
-      dispose() {
-        renderer.dispose();
-        if (!renderer.getContext().isContextLost()) renderer.forceContextLoss();
-      },
-    });
-    scope.cleanup(() => renderer.setAnimationLoop(null));
+    ownFrameRenderer(scope, renderer);
     renderer.setPixelRatio(1);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.shadowMap.enabled = !matchMedia('(pointer: coarse)').matches;
@@ -38,22 +31,8 @@ export function createWorld(container, options = {}) {
     renderer.shadowMap.autoUpdate = false;
     renderer.autoClear = false;
     renderer.info.autoReset = false;
-    const canvas = renderer.domElement;
-    canvas.className = 'bonfire-canvas';
-    canvas.setAttribute('aria-hidden', 'true');
-    container.appendChild(canvas);
-    scope.cleanup(() => canvas.remove());
-    const events = new AbortController();
-    scope.cleanup(() => events.abort());
-    canvas.addEventListener(
-      'webglcontextlost',
-      (event) => {
-        event.preventDefault();
-        scope.dispose();
-        onError?.(new Error('WebGL context lost'));
-      },
-      { signal: events.signal },
-    );
+    const canvas = attachFrameCanvas(scope, renderer, container, onError);
+
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 80);
     const view = createView(camera, { reducedMotion, sway: 0 });
@@ -155,49 +134,8 @@ export function createWorld(container, options = {}) {
     }
     setPalette();
     resize();
-    // Copied from src/bonfire/scene.js: optional overlay, frame gate and visibility pause.
-    const gate = createFrameGate();
-    let perf = null;
-    let statsWanted = false;
-    let statsLoading = false;
-    const perfAsked = new URLSearchParams(location.search).has('perf');
-    const statsOn = () => (perfAsked || statsWanted) && !scope.disposed;
-    function syncStats() {
-      if (!statsOn()) {
-        perf?.dispose();
-        perf = null;
-        return;
-      }
-      if (perf || statsLoading) return;
-      statsLoading = true;
-      import('../../ui/perfOverlay.js').then(
-        ({ createPerfOverlay }) => {
-          statsLoading = false;
-          if (!statsOn() || perf) return;
-          perf = createPerfOverlay({
-            info: renderer.info,
-            maxFps: () => gate.maxFps,
-            particles: () => [],
-            page: pageStats,
-            measures: perfAsked,
-            ...(statsParent ? { parent: statsParent } : {}),
-          });
-        },
-        (error) => {
-          statsLoading = false;
-          console.warn('The stats overlay did not load.', error);
-        },
-      );
-    }
-    scope.cleanup(() => {
-      perf?.dispose();
-      perf = null;
-    });
     let ready = false;
-    let lastTick = -1;
-    let elapsed = 0;
     let t = 0;
-    let running = false;
     const center = new THREE.Vector3();
     const chest = { x: 0, y: 0.55, z: 0 };
     const head = { x: 0, y: 0.9, z: 0 };
@@ -208,9 +146,9 @@ export function createWorld(container, options = {}) {
       ...baseSnapshot(),
       newt: character ? { state: 'idle', clip: mix.main, grounded: true } : null,
     });
-    const stillOpts = { reducedMotion, paintedLook: false };
+    const writePass = createPassWrites({ pass, glitch: duck.glitch, reducedMotion });
     function draw(dt) {
-      const t0 = perf ? performance.now() : 0;
+      const t0 = loop.perf ? performance.now() : 0;
       onFrame?.(dt);
       duck.step(dt);
       t += dt;
@@ -232,49 +170,25 @@ export function createWorld(container, options = {}) {
         character.root.updateMatrixWorld(true);
         character.bonePos(BONES.chest, chest);
       }
-      // Copied from src/bonfire/sceneUpdate.js: pass writes before frame.draw.
-      for (const [k, u] of Object.entries(GLITCH_UNIFORMS))
-        pass.uniforms[u].value = passValue(k, duck.glitch[k], stillOpts);
-      pass.uniforms.uTime.value = stillClock(stillOpts) ? 0 : t;
-      pass.uniforms.uRippleR.value = duck.glitch.rippleR * size.h;
-      pass.uniforms.uRippleAmp.value = reducedMotion ? 0 : (duck.glitch.rippleAmp * size.h) / 270;
-      center.set(chest.x, chest.y, chest.z).project(camera);
-      pass.uniforms.uCenter.value.set((center.x * 0.5 + 0.5) * size.w, (center.y * 0.5 + 0.5) * size.h);
+      center.set(chest.x, chest.y, chest.z);
+      writePass(t, size, center, camera);
       pass.uniforms.exposure.value = (renderOverride.exposure ?? effects.render.exposure) * (1 + duck.drive.exposure);
-      const t1 = perf ? performance.now() : 0;
+      const t1 = loop.perf ? performance.now() : 0;
       frame.draw({ shadows: renderer.shadowMap.enabled });
-      perf?.frame(t0, t1, t1, performance.now(), renderer.shadowMap.enabled);
+      loop.perf?.frame(t0, t1, t1, performance.now(), renderer.shadowMap.enabled);
     }
-    function syncRunning() {
-      const should = ready && !scope.disposed && !document.hidden;
-      if (should === running) return;
-      running = should;
-      if (running) {
-        lastTick = -1;
-        elapsed = 0;
-      }
-      renderer.setAnimationLoop(
-        running
-          ? (now) => {
-              const tickMs = lastTick < 0 ? 0 : now - lastTick;
-              lastTick = now;
-              try {
-                const t0 = perf ? performance.now() : 0;
-                onTick?.(Math.min(tickMs / 1000, 0.1));
-                perf?.tick(t0, performance.now());
-                elapsed += tickMs / 1000;
-                if (!gate.due(tickMs)) return;
-                draw(Math.min(elapsed, 0.1));
-                elapsed = 0;
-              } catch (error) {
-                scope.dispose();
-                onError?.(error);
-              }
-            }
-          : null,
-      );
-    }
-    document.addEventListener('visibilitychange', syncRunning, { signal: events.signal });
+    const loop = createFrameLoop({
+      renderer,
+      scope,
+      ready: () => ready,
+      draw,
+      onTick,
+      onError,
+      pageStats,
+      statsParent,
+      measureAbsentTick: true,
+    });
+    const { gate, syncRunning, statsOn } = loop;
     const duckDispose = duck.dispose;
     Object.assign(duck, {
       canvas,
@@ -311,13 +225,10 @@ export function createWorld(container, options = {}) {
       shake: (v) => {
         if (!reducedMotion) view.shake(v);
       },
-      capture: frame.capture,
-      captureThumb: (w = 192, h = 108) => frame.thumb(w, h),
-      onRendered: frame.onRendered,
+      ...frameCapture(frame),
       setMaxFps: gate.setMaxFps,
       setStats(on) {
-        statsWanted = !!on;
-        syncStats();
+        loop.setStats(on);
       },
       dispose() {
         duckDispose();
@@ -325,7 +236,6 @@ export function createWorld(container, options = {}) {
       },
     });
     Object.defineProperties(duck, { maxFps: { get: () => gate.maxFps }, statsShown: { get: statsOn } });
-    syncStats();
     return duck;
   } catch (error) {
     duck.dispose();

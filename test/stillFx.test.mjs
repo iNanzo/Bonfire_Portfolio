@@ -8,7 +8,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { passValue, stillClock, STILL, HELD, OFF } from '../src/bonfire/stillFx.js';
 
-const sceneSrc = readFileSync(new URL('../src/bonfire/sceneUpdate.js', import.meta.url), 'utf8');
+const sceneSrc = ['sceneUpdate.js', 'passWrites.js']
+  .map((name) => readFileSync(new URL(`../src/bonfire/${name}`, import.meta.url), 'utf8'))
+  .join('\n');
 /** The pass's effects (sceneUpdate.js GLITCH_UNIFORMS' keys). */
 const KEYS = Object.keys(
   Object.fromEntries(
