@@ -8,6 +8,9 @@ import { applyRenderTo, WRITE_THROUGH } from '../../bonfire/sceneRender.js';
 import { createPassWrites } from '../../bonfire/passWrites.js';
 import { effects } from '../../effects.js';
 import { debugPalettes } from '../../palette.js';
+import { loadCharacter } from '../../invitation/character.js';
+import { BONES } from '../../invitation/clips.js';
+import { createMix, mixStep, lookAim } from '../../invitation/play.js';
 import { fitShadow } from '../../invitation/floor.js';
 import { createFireDuck } from './fireDuck.js';
 import { pageOf } from './pages.js';
@@ -30,7 +33,7 @@ export function createWorld(container, options = {}) {
     renderer.info.autoReset = false;
     const canvas = attachFrameCanvas(scope, renderer, container, onError);
 
-    const scene = scope.trackTree(new THREE.Scene());
+    const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 80);
     const view = createView(camera, { reducedMotion, sway: 0 });
     const layers = { solid: 0, fx: 1, ghost: 2 };
@@ -65,12 +68,14 @@ export function createWorld(container, options = {}) {
     paper.receiveShadow = true;
     paper.layers.set(layers.ghost);
     scene.add(paper);
+    scope.trackTree(paper);
     scene.add(new THREE.HemisphereLight(0xffffff, 0x817781, 2));
     const sun = new THREE.DirectionalLight(0xffffff, 2);
     sun.position.set(-3, 7, 4);
     sun.castShadow = true;
     fitShadow(sun, { minX: -7, maxX: 7, minZ: -7, maxZ: 7 }, 2);
     scene.add(sun, sun.target);
+    scope.trackTree(sun);
     const settings = { pixelSize: null };
     let size = { w: 1, h: 1, pd: 4 };
     const renderOverride = {};
@@ -132,6 +137,15 @@ export function createWorld(container, options = {}) {
     let ready = false;
     let t = 0;
     const center = new THREE.Vector3();
+    const chest = { x: 0, y: 0.55, z: 0 };
+    const head = { x: 0, y: 0.9, z: 0 };
+    let character = null;
+    const mix = createMix();
+    const baseSnapshot = duck.snapshot;
+    duck.snapshot = () => ({
+      ...baseSnapshot(),
+      newt: character ? { state: 'idle', clip: mix.main, grounded: true } : null,
+    });
     const writePass = createPassWrites({ pass, glitch: duck.glitch, reducedMotion });
     function draw(dt) {
       const t0 = loop.perf ? performance.now() : 0;
@@ -139,7 +153,24 @@ export function createWorld(container, options = {}) {
       duck.step(dt);
       t += dt;
       view.apply(dt, size, { sx: 0, sy: 0 });
-      center.set(0, 0.55, 0);
+      if (character) {
+        mixStep(mix, { clip: 'Idle', speed: 0, dt });
+        character.setWeights(mix.weights, mix.phase);
+        character.update(dt);
+        character.root.updateMatrixWorld(true);
+        character.bonePos(BONES.head, head);
+        head.y += 0.12;
+        const { aim } = lookAim('camera', {
+          head,
+          yaw: character.root.rotation.y,
+          camera: camera.position,
+          pointer: null,
+        });
+        character.applyLook(aim?.yaw ?? 0, aim?.pitch ?? 0, 1);
+        character.root.updateMatrixWorld(true);
+        character.bonePos(BONES.chest, chest);
+      }
+      center.set(chest.x, chest.y, chest.z);
       writePass(t, size, center, camera);
       pass.uniforms.exposure.value = (renderOverride.exposure ?? effects.render.exposure) * (1 + duck.drive.exposure);
       const t1 = loop.perf ? performance.now() : 0;
@@ -161,7 +192,21 @@ export function createWorld(container, options = {}) {
     const duckDispose = duck.dispose;
     Object.assign(duck, {
       canvas,
-      ready: frame.compile().then(() => {
+      ready: loadCharacter(`${import.meta.env.BASE_URL}models/newt.glb`, { pixel: false }).then(async (loaded) => {
+        if (scope.disposed) {
+          loaded.dispose();
+          return;
+        }
+        character = loaded;
+        character.root.rotation.order = 'XZY';
+        character.setWeights(mix.weights, mix.phase);
+        character.update(0);
+        scene.add(character.root);
+        scope.cleanup(() => {
+          character.root.removeFromParent();
+          character.dispose();
+        });
+        await frame.compile();
         if (scope.disposed) return;
         draw(0);
         ready = true;
