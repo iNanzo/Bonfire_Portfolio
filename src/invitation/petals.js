@@ -879,9 +879,6 @@ export function createPetalFlow({ seed = 7, reduced = false } = {}) {
      * lifts; it sheds its wake as it moves.
      * @param {LetterFrame|null} F
      */
-    setSwirlScale(k) {
-      swirlScale = k;
-    },
     letter(F) {
       if (reduced) return;
       if (F?.floating && !L?.floating) {
@@ -946,6 +943,10 @@ export function createPetalFlow({ seed = 7, reduced = false } = {}) {
     /** The flow's clock, seconds. */
     get time() {
       return t;
+    },
+    /** Scale the swirl ellipse without changing its clock or random draws. */
+    setSwirlScale(k) {
+      swirlScale = k;
     },
     /** The swirl's spin now, radians (swirlSlot). */
     get swirlSpin() {

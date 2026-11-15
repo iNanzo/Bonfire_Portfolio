@@ -791,3 +791,49 @@ test('the scene writes each petal’s front into its mesh, and its shader pulls 
   assert.match(mesh.material.vertexShader, /aFront/);
   assert.match(mesh.material.vertexShader, /gl_Position\.z = mix\(-gl_Position\.w, gl_Position\.z/);
 });
+
+test('two floating letters each get a complete pour', () => {
+  const flow = createPetalFlow({ seed: 16 });
+  for (let letter = 0; letter < 2; letter++) {
+    flow.letter(frameAt(ORIGIN, { floating: true, opening: 0, time: flow.time }));
+    assert.equal(flow.emitted.pour, 0);
+    for (let i = 0; i < 180; i++) {
+      flow.letter(frameAt(ORIGIN, { floating: false, opening: 1, time: flow.time }));
+      flow.step(STEP);
+    }
+    assert.equal(flow.emitted.pour, FLOWS.pour.n);
+    flow.letter(null);
+  }
+});
+
+test('swirl scale one preserves every slot bit for bit and scales its ellipse', () => {
+  const L = frameAt();
+  for (let strand = 0; strand < SWIRL.strands; strand++) {
+    for (const s of [0, 0.2, 0.5, 1]) {
+      const slot = { strand, s, r: 1.7 };
+      const spin = 0.37;
+      const a = (strand * 2 * Math.PI) / SWIRL.strands + s * SWIRL.turns * 2 * Math.PI + spin;
+      const r = swirlRadius(s) * slot.r;
+      const across = Math.cos(a) * SWIRL.rx * r;
+      const deep = Math.sin(a) * SWIRL.rz * r;
+      const up = (s - 0.5) * SWIRL.span * L.h - deep * SWIRL.tilt;
+      const old = {
+        x: L.c.x + L.right.x * across + L.up.x * up + L.fwd.x * deep,
+        y: L.c.y + L.right.y * across + L.up.y * up + L.fwd.y * deep,
+        z: L.c.z + L.right.z * across + L.up.z * up + L.fwd.z * deep,
+      };
+      assert.deepEqual(swirlSlot(L, slot, spin, 1), old);
+      assert.notDeepEqual(swirlSlot(L, slot, spin, 0.8), old);
+    }
+  }
+  const a = createPetalFlow({ seed: 7 }),
+    b = createPetalFlow({ seed: 7 });
+  b.setSwirlScale(1);
+  for (let i = 0; i < 180; i++) {
+    a.letter(L);
+    b.letter(L);
+    a.step(STEP);
+    b.step(STEP);
+  }
+  assert.deepEqual(a.petals, b.petals);
+});

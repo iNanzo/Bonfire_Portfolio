@@ -83,7 +83,7 @@ export function petalMaterial(id, shared = {}, { tones = PETAL, mark = 1, linear
  * @param {number} id
  * @param {Partial<PetalUniforms>} [shared]
  */
-function buildPetals(id, shared, options) {
+function buildPetals(id, shared, options = {}) {
   return PETAL_SHAPES.map((shape, i) => {
     const grid = petalGrid(shape);
     const geo = new THREE.BufferGeometry();
