@@ -255,9 +255,24 @@ const EAR_SWING = {
   substep: LIMP.substep,
 };
 
+// The toy's markId toon. Live does not run retro's ID toggle: alpha stays ID.newt/16,
+// below the pixel pass's material bands, so the default has no scenery crease lines.
+export function defaultDress(src, { gradient, snap, bias }) {
+  return markId(
+    new THREE.MeshToonMaterial({
+      name: src?.name ?? '',
+      map: src?.map ?? null,
+      color: src?.color ? src.color.clone() : new THREE.Color(1, 1, 1),
+      gradientMap: gradient,
+    }),
+    ID.newt,
+    { snap, bias },
+  );
+}
+
 /**
  * @param {{scene: any, animations?: any[]}} gltf
- * @param {{preset?: import('./look.js').LookPreset, pixel?: boolean, pixelFace?: any, extraFace?: any, pixelExtraFace?: any}} [opts]
+ * @param {{preset?: import('./look.js').LookPreset, pixel?: boolean, pixelFace?: any, extraFace?: any, pixelExtraFace?: any, dress?: typeof defaultDress}} [opts]
  *   pixelFace: the pixel face sheet (models/newt-face.png), extraFace and pixelExtraFace: the
  *   dialogue faces' smooth and pixel sheets, each a texture (on him at once), a promise of one
  *   (on him when it settles; null: none) or nothing
@@ -336,17 +351,11 @@ export function createCharacter(gltf, opts = {}) {
   const toon = (src, part) => {
     const parts = made.get(src) ?? {};
     if (parts[part]) return parts[part];
-    const m = markId(
-      new THREE.MeshToonMaterial({
-        name: src?.name ?? '',
-        map: src?.map ?? null,
-        color: src?.color ? src.color.clone() : new THREE.Color(1, 1, 1),
-        gradientMap: gradient,
-      }),
-      ID.newt,
-      // (His face: no coarser mip, so the smooth sheet stays sharp where it shows: faceBias.)
-      { snap: snaps[part], bias: src?.name === 'NEWT_Face' ? faceBias : atlasBias },
-    );
+    const m = (opts.dress ?? defaultDress)(src, {
+      gradient,
+      snap: snaps[part],
+      bias: src?.name === 'NEWT_Face' ? faceBias : atlasBias,
+    });
     if (src?.map) textures.add(src.map);
     if (src?.name === 'NEWT_Face') faceMaterial = m;
     parts[part] = m;
