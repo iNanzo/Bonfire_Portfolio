@@ -3,7 +3,7 @@
 // keyboard shortcuts (?, the shared keys overlay). Each gives the focus back to what had it
 // when it opened.
 import { q } from '../ui/shell.js';
-import { saveSettings } from './settings.js';
+import { commitTransientSetting, saveSettings } from './settings.js';
 import { markPreset, bindSettings } from './settingsDialog.js';
 import { modeOf } from './looks.js';
 import { keyList, KEY_GROUPS } from './keys.js';
@@ -41,6 +41,7 @@ export function createDialogs(ctx) {
    */
   function applySettings(key) {
     const keys = [key].flat().filter((k) => typeof k === 'string');
+    if (keys.includes('world')) commitTransientSetting(settings, 'world');
     if (keys.length) ctx.director?.releaseScene(keys.includes('xray') ? [...keys, 'xrayView'] : keys);
     if (builtWith() !== built) {
       built = builtWith();

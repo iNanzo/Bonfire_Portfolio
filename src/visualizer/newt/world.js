@@ -4,65 +4,14 @@ import { createFrame } from '../../bonfire/frame.js';
 import { createView } from '../../bonfire/view.js';
 import { createFrameGate } from '../../bonfire/frameGate.js';
 import { createResourceScope } from '../../bonfire/resources.js';
+import { applyRenderTo, WRITE_THROUGH } from '../../bonfire/sceneRender.js';
+import { GLITCH_UNIFORMS } from '../../bonfire/sceneUpdate.js';
 import { passValue, stillClock } from '../../bonfire/stillFx.js';
 import { effects } from '../../effects.js';
 import { debugPalettes } from '../../palette.js';
 import { fitShadow } from '../../invitation/floor.js';
 import { createFireDuck } from './fireDuck.js';
 import { pageOf } from './pages.js';
-// Copied from src/bonfire/sceneUpdate.js; R1 owns the shared export.
-const GLITCH_UNIFORMS = {
-  slice: 'uSlice',
-  sliceSeed: 'uSliceSeed',
-  split: 'uSplit',
-  block: 'uBlock',
-  wave: 'uWave',
-  mirror: 'uMirror',
-  scan: 'uScan',
-  scanMode: 'uScanMode',
-  noise: 'uNoise',
-  invert: 'uInvert',
-  feedback: 'uFeedback',
-  zoom: 'uZoom',
-  feedRot: 'uFeedRot',
-  kaleido: 'uKaleido',
-  kaleidoRot: 'uKaleidoRot',
-  rippleR: 'uRippleR',
-  rippleAmp: 'uRippleAmp',
-  iris: 'uIris',
-  letterbox: 'uLetterbox',
-  ink: 'uInk',
-  cycle: 'uCycle',
-  temp: 'uTemp',
-  blackout: 'uBlackout',
-  ghost: 'uGhost',
-  ghostKeep: 'uGhostKeep',
-  blur: 'uBlur',
-  glow: 'uGlow',
-  glowSize: 'uGlowSize',
-  glowCut: 'uGlowCut',
-  grad: 'uGrad',
-  gradA: 'uGradA',
-  gradB: 'uGradB',
-  gradC: 'uGradC',
-  style: 'uStyle',
-  styleR: 'uStyleR',
-  styleMix: 'uStyleMix',
-  paintAngle: 'uPaintAngle',
-  paintAspect: 'uPaintAspect',
-  washEdge: 'uWashEdge',
-  flicker: 'uFlicker',
-  flickerMode: 'uFlickerMode',
-  feedMode: 'uFeedMode',
-  ghostMode: 'uGhostMode',
-  warpMode: 'uWarpMode',
-  warpMix: 'uWarpMix',
-  inkMode: 'uInkMode',
-  invertMode: 'uInvertMode',
-  scanBlend: 'uScanBlend',
-  glowMode: 'uGlowMode',
-  gradMode: 'uGradMode',
-};
 /** @param {HTMLElement} container @param {Record<string, any>} [options] */
 export function createWorld(container, options = {}) {
   const { reducedMotion = false, onTick, onFrame, onError, pageStats, statsParent } = options;
@@ -118,7 +67,21 @@ export function createWorld(container, options = {}) {
       track: scope.trackTree,
     });
     const { pass } = frame;
-    const paper = new THREE.Mesh(new THREE.PlaneGeometry(14, 14), new THREE.MeshLambertMaterial({ color: page.color }));
+    const paper = new THREE.Mesh(
+      new THREE.PlaneGeometry(14, 14),
+      new THREE.ShadowMaterial({
+        color: page.ink,
+        opacity: 0.3,
+        transparent: true,
+        depthWrite: false,
+        // Its shadow blends over the void without changing the target's alpha.
+        blending: THREE.CustomBlending,
+        blendSrc: THREE.SrcAlphaFactor,
+        blendDst: THREE.OneMinusSrcAlphaFactor,
+        blendSrcAlpha: THREE.ZeroFactor,
+        blendDstAlpha: THREE.OneFactor,
+      }),
+    );
     paper.rotation.x = -Math.PI / 2;
     paper.receiveShadow = true;
     paper.layers.set(layers.ghost);
@@ -132,34 +95,8 @@ export function createWorld(container, options = {}) {
     const settings = { pixelSize: null };
     let size = { w: 1, h: 1, pd: 4 };
     const renderOverride = {};
-    // Copied from src/bonfire/sceneRender.js: render overrides and write-through.
-    /** @type {Record<string, [string, string, (number | boolean)?]>} */
-    const WRITE_THROUGH = {
-      flameFps: ['fire', 'fps'],
-      colorChange: ['render', 'colorChange'],
-      hitStop: ['impact', 'hitStop', 0],
-      hitFlash: ['impact', 'flash', 0],
-      debris: ['impact', 'debris', 0],
-      marks: ['impact', 'marks', false],
-    };
     const ownValues = {};
-    function applyRender() {
-      const r = { ...effects.render, ...renderOverride };
-      pass.uniforms.ditherStrength.value = r.dither;
-      pass.uniforms.ditherScale.value = r.ditherMatrix;
-      pass.uniforms.outlines.value = r.outlines ? 1 : 0;
-      pass.uniforms.exposure.value = r.exposure;
-      for (const [key, [section, name]] of Object.entries(WRITE_THROUGH)) {
-        const live = effects[section];
-        if (key in renderOverride) {
-          if (live[name] !== renderOverride[key]) ownValues[key] = live[name];
-          live[name] = renderOverride[key];
-        } else if (key in ownValues) {
-          live[name] = ownValues[key];
-          delete ownValues[key];
-        }
-      }
-    }
+    const applyRender = () => applyRenderTo(pass, effects, renderOverride, ownValues);
     applyRender();
     /**
      * Render options over the settings, as a partial: a value sets one, null clears it back to

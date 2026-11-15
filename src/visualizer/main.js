@@ -58,7 +58,7 @@ import { applyFlame, setAccentRamp, setAccentRate } from '../ui/theme.js';
 import { BAND_NAMES } from './analyser.js';
 import { createDirector } from './director.js';
 import { densityCounts } from './density.js';
-import { loadSettings, flushSettings, frameCap } from './settings.js';
+import { loadSettings, flushSettings, frameCap, setTransientSetting } from './settings.js';
 import { markPreset, presetButtons, settingsMarkup } from './settingsDialog.js';
 import { keyList } from './keys.js';
 import { createTickBatch } from './tickBatch.js';
@@ -87,8 +87,8 @@ const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 // --- Settings (this browser only: settings.js) -----------------------------------------------
 const settings = loadSettings();
 const worldQuery = new URLSearchParams(location.search);
-if (worldQuery.get('world') === 'newt') settings.world = 'newt';
-else if (worldQuery.has('scene')) settings.world = 'bonfire';
+if (worldQuery.get('world') === 'newt') setTransientSetting(settings, 'world', 'newt');
+else if (worldQuery.has('scene')) setTransientSetting(settings, 'world', 'bonfire');
 // (Saving waits for changes to settle: what's waiting is written as the page goes or hides.)
 addEventListener('pagehide', flushSettings);
 document.addEventListener('visibilitychange', () => {

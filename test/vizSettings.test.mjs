@@ -20,6 +20,8 @@ import {
   setInLoop,
   saveSettings,
   flushSettings,
+  setTransientSetting,
+  commitTransientSetting,
   SAVE_MS,
   snapshot,
   saveSetup,
@@ -287,6 +289,25 @@ test('saving waits for a burst of changes to settle (one write), and flushSettin
   assert.equal(writes.length, 2, 'and nothing when nothing waits');
   saveSettings(s, { now: true });
   assert.equal(writes.length, 3);
+  store.clear();
+});
+
+test('a transient URL setting stays out of storage until Settings commits it', () => {
+  store.clear();
+  const s = defaults();
+  assert.equal(s.world, 'bonfire');
+  setTransientSetting(s, 'world', 'newt');
+  assert.equal(s.world, 'newt', 'the visit uses the URL world');
+  s.page = 'cream';
+  saveSettings(s, { now: true });
+  assert.deepEqual(
+    JSON.parse(store.get('bonfire-live')),
+    { ...s, world: 'bonfire' },
+    'another change keeps the saved world',
+  );
+  commitTransientSetting(s, 'world');
+  saveSettings(s, { now: true });
+  assert.equal(JSON.parse(store.get('bonfire-live')).world, 'newt', 'the Settings choice is saved');
   store.clear();
 });
 
