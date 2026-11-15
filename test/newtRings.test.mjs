@@ -94,6 +94,7 @@ test('page factories step two seconds on flat ground with finite positions', () 
   }
   assert.equal(fire.lights.length, 0);
   assert.equal(pageLights('white', lightning.lights).length, 0);
+  assert.equal(pageLights('night', lightning.lights), lightning.lights);
   assert.equal(ice.lights.length, 0);
 });
 test('marks patch compiles on Lambert ground', { skip: typeof OffscreenCanvas === 'undefined' }, () => {
@@ -137,7 +138,8 @@ test('White equip selects the ice facade and attaches no lights or opaque page',
       depthTexture: new THREE.DepthTexture(1, 1),
       pass: { uniforms: { resolution: { value: new THREE.Vector2(320, 180) } } },
     };
-    const rings = createElementRings({ scene, frame, scope, page: () => 'white' });
+    let page = 'white';
+    const rings = createElementRings({ scene, frame, scope, page: () => page });
     const duck = createFireDuck({
       page: 'white',
       onImpact: (flame, _old, _instant, selection) => rings.impact(selection.element, flame),
@@ -151,6 +153,18 @@ test('White equip selects the ice facade and attaches no lights or opaque page',
     assert.equal(scene.children.filter((o) => o.isPointLight).length, 0);
     assert.equal(rings.surface.material.transparent, true);
     assert.match(rings.surface.material.fragmentShader, /if\(mark\.a<=0\.\) discard/);
+    const calls = [];
+    for (const kind of ['fire', 'lightning', 'ice']) rings[kind].burst = () => calls.push(kind);
+    page = 'night';
+    for (const kind of ['fire', 'lightning', 'ice']) {
+      rings.setElement(kind, 'ember');
+      rings.ring(0.5);
+    }
+    assert.deepEqual(calls, ['fire', 'lightning', 'ice']);
+    page = 'cream';
+    rings.ring(0.5);
+    assert.equal(calls.at(-1), 'ice');
+    assert.equal(rings.element, 'ice');
     duck.dispose();
   } finally {
     scope.dispose();
