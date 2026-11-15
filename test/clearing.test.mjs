@@ -193,6 +193,24 @@ test('camera: the move plays on the beat and comes round; pause freezes it; fram
     keepInClearingArr(pin.pos),
   );
 });
+
+test('camera: each blade rig has a deterministic start and first pose', () => {
+  const fire = fakeFire();
+  const camera = createCamera(fire, settingsFor());
+  tick(camera);
+  for (const rig of ['ride', 'track', 'vertigo']) {
+    const before = fire.poses.length;
+    assert.equal(camera.cut(rig), rig);
+    tick(camera);
+    assert.equal(camera.rig, rig);
+    assert.equal(fire.poses.length, before + 1);
+    const pose = fire.poses.at(-1);
+    assert.ok(
+      [...pose.pos, ...pose.target, pose.fov, pose.roll].every(Number.isFinite),
+      `${rig}: a finite camera pose`,
+    );
+  }
+});
 const keepInClearingArr = ([x, y, z]) => {
   const p = keepInClearing({ x, y, z });
   return [p.x, p.y, p.z].map((v) => +v.toFixed(4));
