@@ -1,6 +1,6 @@
 // Renderer-free letter picture, extracted from envelopeScene.js. DOM/input stay there.
 import * as THREE from 'three';
-import { DISSOLVE, particleAt, sealBloom, shedParticles, turnRoll } from './envelope.js';
+import { DISSOLVE, hoverLook, particleAt, sealBloom, shedParticles, turnRoll } from './envelope.js';
 import { buildSeal, sealOnScreen } from './envelopeSeal.js';
 import {
   BAYER,
@@ -77,7 +77,7 @@ function buildEnvelope(u) {
  * The specks as square points `size` texels across, each shown through a dither as it fades.
  * They're on layer 1, drawn after the letter is put together, with no line round them.
  */
-function buildSpecks() {
+function buildSpecks({ mark = 1, linear = false } = {}) {
   const specks = shedParticles(SPECKS);
   const geo = new THREE.BufferGeometry();
   const pos = new Float32Array(SPECKS * 3);
@@ -86,8 +86,9 @@ function buildSpecks() {
   const alpha = new Float32Array(SPECKS);
   specks.forEach((s, i) => {
     const tones = SPECK_TONES[s.kind];
-    const c = rgb(tones[(i * 7) % tones.length]);
-    col.set([c.x, c.y, c.z], i * 3);
+    const hex = tones[(i * 7) % tones.length];
+    const c = linear ? new THREE.Color(hex) : rgb(hex);
+    col.set(linear ? [c.r, c.g, c.b] : [c.x, c.y, c.z], i * 3);
     size[i] = s.size;
   });
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
@@ -95,6 +96,7 @@ function buildSpecks() {
   geo.setAttribute('aSize', new THREE.BufferAttribute(size, 1));
   geo.setAttribute('aAlpha', new THREE.BufferAttribute(alpha, 1));
   const mat = new THREE.ShaderMaterial({
+    uniforms: { uMark: { value: mark } },
     vertexShader: /* glsl */ `
       attribute float aSize;
       attribute float aAlpha;
@@ -109,12 +111,13 @@ function buildSpecks() {
       }
     `,
     fragmentShader: /* glsl */ `
+      uniform float uMark;
       varying vec3 vColor;
       varying float vAlpha;
       ${BAYER}
       void main() {
         if (bayer(gl_FragCoord.xy) >= vAlpha) discard;
-        gl_FragColor = vec4(vColor, 1.0);
+        gl_FragColor = vec4(vColor, uMark);
       }
     `,
     depthTest: false,
@@ -127,7 +130,12 @@ function buildSpecks() {
 }
 
 /** size supplies the current pass texels; no renderer or DOM is needed. */
-export function createEnvelopeActor({ size = () => ({ tw: 1, th: 1 }), uniforms = shared() } = {}) {
+export function createEnvelopeActor({
+  size = () => ({ tw: 1, th: 1 }),
+  mark = 1,
+  linear = false,
+  uniforms = shared({ mark, linear }),
+} = {}) {
   const u = uniforms;
   const outer = new THREE.Group();
   const inner = new THREE.Group();
@@ -144,7 +152,7 @@ export function createEnvelopeActor({ size = () => ({ tw: 1, th: 1 }), uniforms 
   // middle rounds to the screen's texels with the tip.)
   seal.group.position.set(envl.seal.x, envl.seal.y - envl.H / 2, 0.01);
   envl.hinge.add(seal.group);
-  const specks = buildSpecks();
+  const specks = buildSpecks({ mark, linear });
   outer.add(specks.points);
   seal.group.visible = false;
   const v = new THREE.Vector3();
@@ -195,7 +203,7 @@ export function createEnvelopeActor({ size = () => ({ tw: 1, th: 1 }), uniforms 
     get sealAt() {
       return sealAt;
     },
-    pose(p, { view, follow = { y: 0, lift: 0 }, turn = 0, reduced = false, lift, camera }) {
+    pose(p, { view, follow = { y: 0, lift: 0 }, turn = 0, reduced = false, lift = hoverLook(0), camera }) {
       sealAt = null;
       // The envelope.
       const pxToWorld = view.h / view.cssH;

@@ -187,7 +187,9 @@ const vec3Of = (hex) => {
  * frame (unscaled: the paper's normals are taken there), and whether this pass draws ids (1) or
  * colours (0).
  */
-export const shared = () => ({
+export const shared = ({ mark = 1, linear = false } = {}) => ({
+  uMark: { value: mark },
+  uLinear: { value: linear ? 1 : 0 },
   uLight: { value: new THREE.Vector3(...LIGHT) },
   uDissolve: { value: 0 },
   uEdge: { value: 0 },
@@ -257,6 +259,8 @@ export function toon(tones, u, id, extra = {}) {
       #endif
       varying vec3 vView;
       varying vec2 vLetter;
+      uniform float uMark;
+      uniform float uLinear;
       ${BAYER}
       ${DISSOLVE_GLSL}
       ${extra.glsl ?? ''}
@@ -299,7 +303,8 @@ export function toon(tones, u, id, extra = {}) {
           else if (e < 0.045) c = ${vec3Of(RIM[1])};
           else if (e < 0.08) c = ${vec3Of(RIM[2])};
         }
-        gl_FragColor = vec4(c, 1.0);
+        if (uLinear > 0.5) c = mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c));
+        gl_FragColor = vec4(c, uMark);
       }
     `,
     side: THREE.DoubleSide,
