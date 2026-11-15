@@ -100,3 +100,19 @@ test('actor disposal is idempotent and specks share live mark/linear uniforms', 
   actor.dispose();
   assert.equal(disposed, geometries.size + materials.size);
 });
+
+test('reduced actor poses ignore hover lift and brightening', () => {
+  const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 80);
+  camera.position.z = 6;
+  camera.updateMatrixWorld();
+  const a = createEnvelopeActor(),
+    b = createEnvelopeActor(),
+    p = createEnvelope({ born: 0, reduced: true }).pose(1);
+  const view = { h: 4, cssH: 800, scale: 0.55 };
+  a.pose(p, { view, camera, reduced: true, lift: hoverLook(1) });
+  b.pose(p, { view, camera, reduced: true, lift: hoverLook(0) });
+  assert.deepEqual(a.outer.matrixWorld.elements, b.outer.matrixWorld.elements);
+  assert.equal(a.uniforms.uBright.value, 0);
+  a.dispose();
+  b.dispose();
+});

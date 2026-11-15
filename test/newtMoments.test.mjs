@@ -55,3 +55,37 @@ test('a locked start opens on its first downbeat and burns on a later downbeat',
   assert.equal(step(1.9).state, 'waiting');
   assert.equal(step(2, [{ beat: 0 }]).state, 'fading');
 });
+
+test('two paced letters overlap and each finishes its own petal pour', async () => {
+  const { createPetalFlow, FLOWS } = await import('../src/invitation/petals.js');
+  const m = createNewtMoments(),
+    flows = new Map();
+  const first = m.equip(selection, { pace: 2 });
+  let second = null,
+    overlap = false;
+  for (let i = 0; i < 180; i++) {
+    const picture = m.step({ t: i / 60 });
+    overlap ||= picture.letters.length === 2;
+    for (const letter of picture.letters) {
+      if (!flows.has(letter.id)) flows.set(letter.id, createPetalFlow({ seed: letter.id }));
+      const flow = flows.get(letter.id);
+      flow.letter({
+        c: { x: letter.x, y: letter.y, z: 0 },
+        right: { x: 1, y: 0, z: 0 },
+        up: { x: 0, y: 1, z: 0 },
+        fwd: { x: 0, y: 0, z: 1 },
+        h: 1,
+        opening: letter.pose.flap / Math.PI,
+        floating: letter.state === 'floating',
+        time: letter.time,
+      });
+    }
+    for (const flow of flows.values()) flow.step(1 / 60);
+    if (!m.forging && !second) second = m.equip({ ...selection, weapon: 'spear' }, { pace: 2 });
+  }
+  assert.deepEqual(await first, { status: 'applied' });
+  assert.deepEqual(await second, { status: 'applied' });
+  assert.equal(overlap, true);
+  assert.equal(flows.size, 2);
+  for (const flow of flows.values()) assert.equal(flow.emitted.pour, FLOWS.pour.n);
+});
