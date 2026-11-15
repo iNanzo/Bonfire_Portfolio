@@ -272,7 +272,7 @@ export function defaultDress(src, { gradient, snap, bias }) {
 
 /**
  * @param {{scene: any, animations?: any[]}} gltf
- * @param {{preset?: import('./look.js').LookPreset, pixel?: boolean, pixelFace?: any, extraFace?: any, pixelExtraFace?: any}} [opts]
+ * @param {{preset?: import('./look.js').LookPreset, pixel?: boolean, pixelFace?: any, extraFace?: any, pixelExtraFace?: any, dress?: typeof defaultDress}} [opts]
  *   pixelFace: the pixel face sheet (models/newt-face.png), extraFace and pixelExtraFace: the
  *   dialogue faces' smooth and pixel sheets, each a texture (on him at once), a promise of one
  *   (on him when it settles; null: none) or nothing
@@ -351,7 +351,7 @@ export function createCharacter(gltf, opts = {}) {
   const toon = (src, part) => {
     const parts = made.get(src) ?? {};
     if (parts[part]) return parts[part];
-    const m = defaultDress(src, {
+    const m = (opts.dress ?? defaultDress)(src, {
       gradient,
       snap: snaps[part],
       bias: src?.name === 'NEWT_Face' ? faceBias : atlasBias,

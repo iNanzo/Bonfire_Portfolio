@@ -656,3 +656,35 @@ test('the texel snap holds his texel while his head wobbles across an edge (no s
   assert.ok(Math.abs(drawnAt(start + 1.4 * texel).at - first - 1) < 1e-3, 'clearly into the next texel: one texel on');
   ch.dispose();
 });
+
+test('default dress preserves the toy materials and accepts a factory', () => {
+  const a = standIn();
+  const b = standIn();
+  const c = standIn();
+  const calls = [];
+  const first = createCharacter(a.gltf);
+  const explicit = createCharacter(b.gltf, { dress: characterModule.defaultDress });
+  const custom = createCharacter(c.gltf, {
+    pixel: false,
+    dress: (src, options) => {
+      calls.push({ src, options });
+      const material = characterModule.defaultDress(src, options);
+      material.name = 'custom dress';
+      return material;
+    },
+  });
+  for (const key of ['type', 'name', 'transparent', 'depthWrite', 'flatShading'])
+    assert.equal(a.mesh.material[key], b.mesh.material[key], key);
+  assert.deepEqual(a.mesh.material.color.toArray(), b.mesh.material.color.toArray());
+  assert.deepEqual(a.mesh.material.gradientMap.image.data, b.mesh.material.gradientMap.image.data);
+  assert.equal(a.mesh.material.map, a.map);
+  assert.equal(b.mesh.material.map, b.map);
+  assert.equal(a.mesh.material.onBeforeCompile.toString(), b.mesh.material.onBeforeCompile.toString());
+  assert.equal(c.mesh.material.name, 'custom dress');
+  assert.equal(calls.length, 1);
+  assert.ok(calls[0].options.snap);
+  assert.ok(calls[0].options.bias);
+  first.dispose();
+  explicit.dispose();
+  custom.dispose();
+});
