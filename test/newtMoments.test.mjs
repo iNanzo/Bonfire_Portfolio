@@ -89,3 +89,52 @@ test('two paced letters overlap and each finishes its own petal pour', async () 
   assert.equal(flows.size, 2);
   for (const flow of flows.values()) assert.equal(flow.emitted.pour, FLOWS.pour.n);
 });
+
+test('the page burn blends every palette channel in linear light and clamps its endpoints', async () => {
+  const { blendPages, PAGES } = await import('../src/visualizer/newt/pages.js');
+  const { Color } = await import('three');
+  for (const [from, to] of [
+    ['white', 'night'],
+    ['dusk', 'cream'],
+  ]) {
+    const a = PAGES[from],
+      b = PAGES[to];
+    for (const k of [0, 0.25, 0.5, 1]) {
+      const blended = blendPages(from, to, k);
+      const expected = (x, y) => new Color(x).lerp(new Color(y), k).getHex();
+      assert.equal(blended.color, expected(a.color, b.color));
+      assert.equal(blended.ink, expected(a.ink, b.ink));
+      assert.deepEqual(
+        blended.palette,
+        a.palette.map((c, i) => expected(c, b.palette[i])),
+      );
+      assert.deepEqual(
+        blended.tones,
+        a.tones.map((c, i) => expected(c, b.tones[i])),
+      );
+    }
+    assert.equal(blendPages(from, to, -1).color, a.color);
+    assert.equal(blendPages(from, to, 2).color, b.color);
+  }
+});
+
+test('an end letter is reused at start; explicit Page changes cancel an in-progress turn', async () => {
+  const m = createNewtMoments();
+  const end = m.step({ t: 0, f: { events: ['silence'] } }).letters[0];
+  const start = m.step({ t: 1, f: { events: ['start'] } }).letters;
+  assert.equal(start.length, 1);
+  assert.equal(start[0].id, end.id);
+  assert.equal(start[0].kind, 'start');
+  const done = m.equip(selection, { hold: true });
+  m.step({ t: 2, events: [{ type: 'stage', data: { stage: 4 } }] });
+  m.release();
+  assert.ok(m.step({ t: 3, f: { events: ['drop'], drop: 'big' } }).page);
+  assert.deepEqual(await done, { status: 'applied' });
+  m.setPage('cream');
+  assert.equal(m.page, 'cream');
+  assert.equal(m.step({ t: 3.1 }).page, null);
+  m.setPage('invalid');
+  assert.equal(m.page, 'dusk');
+  m.dispose();
+  assert.equal(m.step({ t: 4 }).letters.length, 0);
+});
