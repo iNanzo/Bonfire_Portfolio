@@ -864,7 +864,9 @@ four-argument `onImpact` after `swapTime`, at once for a same-weapon or `instant
 `pageTurns` (`'drops'`) in `DEFAULT_SETTINGS` (`director.js:111-204`) and `CHOICES` (`settings.js:110-120`),
 `world` in `LOCAL` (`:122`); their three rows in the Show tab of `src/settingsMap.js`
 (imports nothing: page and world names are literals there; Title Case labels, hints 12–160
-chars), since `test/settingsMap.test.mjs:118-123` holds every setting to exactly one entry).
+chars), since `test/settingsMap.test.mjs:118-123` holds every setting to exactly one entry;
+the matching dropdown choices in `src/visualizer/settingsControls.js:OPTIONS`, so all three
+string settings render as selects rather than falling through to numeric ranges).
 Finish line: `test/newtWorld.test.mjs` (new): `fireDuck.js`
 imports no three.js (its specifiers read as `invitationContent.test.mjs:88-90` does); every
 member reached as `fire.`, `ctx.fire?.` or `candidate.` across `src/visualizer/*.js` (not
