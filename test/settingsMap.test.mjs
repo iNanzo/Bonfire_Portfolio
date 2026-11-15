@@ -27,7 +27,7 @@ import {
   blockedBy,
   statsNote,
 } from '../src/settingsMap.js';
-import { defaults } from '../src/visualizer/settings.js';
+import { CHOICES, defaults } from '../src/visualizer/settings.js';
 import { LOOKS, LAYERS, DROP_FX, MIRRORS, PARAMS } from '../src/visualizer/looks.js';
 import { PALETTES, FOGS, XRAY_VIEWS, PIXEL_SIZES } from '../src/visualizer/render.js';
 import { HELMETS, KNIGHT_MOVES, FORMATIONS, SEAT_POSES, KNIGHT_STYLES } from '../src/visualizer/knightShow.js';
@@ -127,6 +127,16 @@ test('Live: every setting the dialog picks has exactly one entry, bound to a key
   // Every field of the dialog (a group's item too: looks.echo, knightHelmets.armet) finds its entry.
   const html = settingsMarkup(d, [['P', 'Render Settings']]);
   for (const key of new Set(attrs(html, 'data-set'))) assert.ok(conceptOf('live', key), `${key} has an entry`);
+});
+
+test('Live: world and paper choices render as dropdowns in Show with every saved choice', () => {
+  const html = settingsMarkup(defaults());
+  for (const key of ['world', 'page', 'pageTurns']) {
+    assert.equal(SECTIONS.find((s) => s.id === meta('live', key).section).tab, 'show');
+    const select = html.match(new RegExp(`<select data-set="${key}"[^>]*>([\\s\\S]*?)</select>`));
+    assert.ok(select, `${key} is a dropdown, not a numeric range`);
+    assert.deepEqual(attrs(select[1], 'value'), CHOICES[key], `${key}: every saved choice is selectable`);
+  }
 });
 
 test('Painter: every part of a scene the panel edits has an entry, and every binding is a part of a scene', () => {
@@ -426,7 +436,7 @@ test('sections: every entry sits in one, each Live one in a tab, each Painter on
   );
   assert.deepEqual(simple, {
     sound: 4,
-    show: 6,
+    show: 8,
     drops: 4,
     picture: 11,
     effects: 3,
