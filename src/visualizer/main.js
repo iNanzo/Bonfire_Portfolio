@@ -230,6 +230,7 @@ function startScene() {
     .then(async (createScene) => {
       const candidate = createScene(stage, {
         page: settings.page,
+        settings,
         reducedMotion,
         sway: 0,
         lightTrails: settings.trails,
