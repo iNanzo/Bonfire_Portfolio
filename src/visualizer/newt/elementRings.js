@@ -102,7 +102,8 @@ export function createElementRings({
     add(o, 1);
   for (const o of [fire.haze, fire.puff, fire.flecks, chill.points]) add(o, 2);
   crystals.solid.layers.set(0);
-  for (const l of pageLights(page(), [...fire.lights, ...lightning.lights, ...ice.lights])) scene.add(l);
+  const pageLightObjects = pageLights(page(), [...fire.lights, ...lightning.lights, ...ice.lights]);
+  for (const l of pageLightObjects) scene.add(l);
   // Marks have their own transparent, unlit surface. Unmarked texels draw nothing.
   const markMaterial = new THREE.ShaderMaterial({
     uniforms: marks.uniforms,
@@ -145,6 +146,7 @@ export function createElementRings({
   }
   function ring(strength = 1) {
     if (reducedMotion) return;
+    if (pageOf(page()).light) kind = 'ice';
     const s = Math.min(1.5, Math.max(0, strength));
     scar(s, true);
     if (kind === 'lightning') lightning.burst(effects.lightning.height);
@@ -178,6 +180,7 @@ export function createElementRings({
     },
     step(dt) {
       t += dt;
+      for (const light of pageLightObjects) light.visible = !pageOf(page()).light;
       crystalLife = Math.max(0, crystalLife - dt);
       crystals.setActive(crystalLife > 0);
       fire.step(dt, t);

@@ -80,7 +80,7 @@ export function createWorld(container, options = {}) {
       scene,
       frame,
       scope,
-      page: () => options.page ?? 'dusk',
+      page: () => page.name.toLowerCase(),
       letter: () => duck.snapshot().letter?.frame ?? null,
       reducedMotion,
     });
