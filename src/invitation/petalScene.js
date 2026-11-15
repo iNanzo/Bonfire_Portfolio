@@ -24,12 +24,13 @@ import { FRONT_BIAS, PETAL_SHAPES, POOL, createPetalFlow, petalGrid } from './pe
  * @param {number} id
  * @param {Partial<PetalUniforms>} [shared]
  */
-export function petalMaterial(id, shared = {}) {
+export function petalMaterial(id, shared = {}, { tones = PETAL, mark = 1, linear = false } = {}) {
   return new THREE.ShaderMaterial({
     uniforms: {
       uIdPass: shared.uIdPass ?? { value: 0 },
       uLight: shared.uLight ?? { value: new THREE.Vector3(...LIGHT) },
-      uTones: { value: PETAL.map(rgb) },
+      uTones: { value: tones.map((hex) => (linear ? new THREE.Color(hex) : rgb(hex))) },
+      uMark: { value: mark },
       uId: { value: id },
     },
     vertexShader: /* glsl */ `
@@ -56,6 +57,7 @@ export function petalMaterial(id, shared = {}) {
       uniform vec3 uLight;
       uniform float uIdPass;
       uniform float uId;
+      uniform float uMark;
       varying float vShade;
       varying vec3 vView;
       ${BAYER}
@@ -68,7 +70,7 @@ export function petalMaterial(id, shared = {}) {
         float v = dot(n, uLight) + (bayer(gl_FragCoord.xy) - 0.5) * 0.06;
         float band = v > ${SHADES.light.toFixed(4)} ? 0.0 : v > ${SHADES.mid.toFixed(4)} ? 1.0 : 2.0;
         band = clamp(band + vShade, 0.0, 2.0);
-        gl_FragColor = vec4(band < 0.5 ? uTones[0] : band < 1.5 ? uTones[1] : uTones[2], 1.0);
+        gl_FragColor = vec4(band < 0.5 ? uTones[0] : band < 1.5 ? uTones[1] : uTones[2], uMark);
       }
     `,
     side: THREE.DoubleSide,
@@ -81,7 +83,7 @@ export function petalMaterial(id, shared = {}) {
  * @param {number} id
  * @param {Partial<PetalUniforms>} [shared]
  */
-function buildPetals(id, shared) {
+function buildPetals(id, shared, options) {
   return PETAL_SHAPES.map((shape, i) => {
     const grid = petalGrid(shape);
     const geo = new THREE.BufferGeometry();
@@ -91,7 +93,7 @@ function buildPetals(id, shared) {
     geo.setAttribute('aShade', shade);
     const front = new THREE.InstancedBufferAttribute(new Float32Array(POOL), 1);
     geo.setAttribute('aFront', front);
-    const mesh = new THREE.InstancedMesh(geo, petalMaterial(id + i, shared), POOL);
+    const mesh = new THREE.InstancedMesh(geo, petalMaterial(id + i, shared, options), POOL);
     mesh.count = 0;
     mesh.frustumCulled = false;
     return { mesh, shade, front };
@@ -105,6 +107,9 @@ function buildPetals(id, shared) {
  * @property {number} [seed]
  * @property {boolean} [reduced]  reduced motion (or Rose Petals off): no petals at all
  * @property {Partial<PetalUniforms>} [uniforms]  the scene's own (the envelope's id pass)
+ * @property {number[]} [tones]  three color bands
+ * @property {number} [mark]  alpha material mark
+ * @property {boolean} [linear]  convert tones from sRGB to linear
  * @property {number} [id]  the first shape's id (the others follow)
  */
 
@@ -112,9 +117,19 @@ function buildPetals(id, shared) {
  * The petals in a scene: a petals.js flow, in its world units.
  * @param {PetalSceneOpts} o
  */
-export function createPetalScene({ scene, unit = 1, seed = 16, reduced = false, uniforms = {}, id = 1 }) {
+export function createPetalScene({
+  scene,
+  unit = 1,
+  seed = 16,
+  reduced = false,
+  uniforms = {},
+  id = 1,
+  tones = PETAL,
+  mark = 1,
+  linear = false,
+}) {
   const flow = createPetalFlow({ seed, reduced });
-  const meshes = buildPetals(id, uniforms);
+  const meshes = buildPetals(id, uniforms, { tones, mark, linear });
   for (const m of meshes) scene.add(m.mesh);
   let L = unit;
   /** How big each petal is drawn, of its own size in letter widths (the page's: petalLayer.js). */

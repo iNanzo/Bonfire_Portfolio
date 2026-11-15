@@ -333,9 +333,9 @@ export const swirlRadius = (s) => 0.8 + 0.35 * Math.sin(Math.PI * clamp01(s));
  * @param {number} spin
  * @returns {Point}
  */
-export function swirlSlot(L, slot, spin) {
+export function swirlSlot(L, slot, spin, scale = 1) {
   const a = (slot.strand * 2 * Math.PI) / SWIRL.strands + slot.s * SWIRL.turns * 2 * Math.PI + spin;
-  const r = swirlRadius(slot.s) * slot.r;
+  const r = swirlRadius(slot.s) * slot.r * scale;
   const across = Math.cos(a) * SWIRL.rx * r;
   const deep = Math.sin(a) * SWIRL.rz * r;
   const up = (slot.s - 0.5) * SWIRL.span * L.h - deep * SWIRL.tilt;
@@ -421,6 +421,7 @@ export function createPetalFlow({ seed = 7, reduced = false } = {}) {
   /** When the pour started (the flap past FLOWS.pour.from), null before. */
   /** @type {number|null} */
   let pourAt = null;
+  let swirlScale = 1;
   /** The swirl: its spin and how fast, since when it floats, when the next one comes, how many made. */
   let spin = 0;
   const spinRate = r(SWIRL.spin[0], SWIRL.spin[1]);
@@ -695,7 +696,7 @@ export function createPetalFlow({ seed = 7, reduced = false } = {}) {
       outer,
       infall: outer,
     };
-    const at = swirlSlot(F, slot, spin);
+    const at = swirlSlot(F, slot, spin, swirlScale);
     add(make('swirl', t, at, { slot, life: Infinity, fade: 1, drag: 1.5, fall: r(0.08, 0.15) }));
     emitted.swirl++;
   }
@@ -825,7 +826,7 @@ export function createPetalFlow({ seed = 7, reduced = false } = {}) {
       const nz = valueNoise(p.seed + 63.1 + t * 0.6);
       if (p.slot && L) {
         const s = p.slot;
-        const at = swirlSlot(L, s, spin);
+        const at = swirlSlot(L, s, spin, swirlScale);
         s.s += s.climb * h;
         if (s.infall) {
           s.r = Math.max(1, s.r - SWIRL.fall * h);
@@ -838,13 +839,13 @@ export function createPetalFlow({ seed = 7, reduced = false } = {}) {
             s.r = r(SWIRL.outer[0], SWIRL.outer[1]);
             s.infall = true;
           }
-          const back = swirlSlot(L, s, spin);
+          const back = swirlSlot(L, s, spin, swirlScale);
           p.x = back.x;
           p.y = back.y;
           p.z = back.z;
           continue;
         }
-        const next = swirlSlot(L, s, spin + spinRate * h);
+        const next = swirlSlot(L, s, spin + spinRate * h, swirlScale);
         p.vx += ((next.x - at.x) / h + (at.x - p.x) * SWIRL.pull + nx * 0.03 - p.vx) * follow;
         p.vy += ((next.y - at.y) / h + (at.y - p.y) * SWIRL.pull + ny * 0.03 - p.vy) * follow;
         p.vz += ((next.z - at.z) / h + (at.z - p.z) * SWIRL.pull + nz * 0.02 - p.vz) * follow;
@@ -878,8 +879,15 @@ export function createPetalFlow({ seed = 7, reduced = false } = {}) {
      * lifts; it sheds its wake as it moves.
      * @param {LetterFrame|null} F
      */
+    setSwirlScale(k) {
+      swirlScale = k;
+    },
     letter(F) {
       if (reduced) return;
+      if (F?.floating && !L?.floating) {
+        pourAt = null;
+        emitted.pour = 0;
+      }
       if (L?.floating && !F?.floating) fling(F ?? L);
       if (F && prev && t > prevAt && t - prevAt < 0.25) wake(F, prev, t - prevAt);
       if (F && F.opening >= FLOWS.pour.from) {
