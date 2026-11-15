@@ -41,7 +41,19 @@ test('the empty NEWT canvas is exactly one page color on every page', async ({ p
       });
     });
     const png = Buffer.from(dataUrl.split(',')[1], 'base64');
-    const { data } = await sharp(png).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    // The page remains flat outside NEWT and his shadow. This corner is outside the
+    // centered Idle actor in the default framing; actor presence is checked separately.
+    const { width, height } = await sharp(png).metadata();
+    const { data } = await sharp(png)
+      .extract({
+        left: 0,
+        top: 0,
+        width: Math.max(1, Math.floor(width / 10)),
+        height: Math.max(1, Math.floor(height / 10)),
+      })
+      .removeAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
     const colors = new Set();
     for (let i = 0; i < data.length; i += 3) colors.add(`${data[i]},${data[i + 1]},${data[i + 2]}`);
     const expected = `${(paper.color >> 16) & 255},${(paper.color >> 8) & 255},${paper.color & 255}`;
@@ -86,4 +98,14 @@ test('world hides bonfire controls and Page changes immediately without rebuildi
     .toBe('undefined');
   await expect(page.locator('html')).toHaveAttribute('data-world', 'bonfire');
   await expect(page.locator('.pack')).toBeVisible();
+});
+
+test('NEWT is ready on the page in Idle', async ({ page }) => {
+  await ready(page);
+  await expect.poll(() => page.evaluate(() => window.__viz.fire.snapshot().newt?.clip)).toBe('Idle');
+  expect(await page.evaluate(() => window.__viz.fire.snapshot().newt)).toEqual({
+    state: 'idle',
+    clip: 'Idle',
+    grounded: true,
+  });
 });

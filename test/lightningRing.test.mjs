@@ -4,7 +4,8 @@ import { createHash } from 'node:crypto';
 import * as THREE from 'three';
 import { createLightningRing } from '../src/bonfire/lightningRing.js';
 import { seeded } from '../src/bonfire/bolts.js';
-import { effects } from '../src/effects.js';
+import { effects, setEffects } from '../src/effects.js';
+import content from '../src/content.json' with { type: 'json' };
 
 function trace(source) {
   const clock = mock.method(performance, 'now', () => 1000);
@@ -47,16 +48,21 @@ function trace(source) {
 }
 
 test('crackle starts at the default ball height or the supplied live source', () => {
-  const original = trace();
-  assert.deepEqual(original.starts[0].slice(0, 3), [1, effects.lightning.height, 2]);
-  assert.deepEqual(
-    trace(() => new THREE.Vector3(1, effects.lightning.height, 2)),
-    original,
-  );
-  let point = new THREE.Vector3(-3, 4, 5);
-  const custom = trace(() => point);
-  assert.deepEqual(custom.starts[0].slice(0, 3), point.toArray());
-  point = new THREE.Vector3(3, 2, 1);
-  assert.deepEqual(trace(() => point).starts[0].slice(0, 3), point.toArray());
-  assert.equal(original.hash, '25988254fc6e7621d72e9c8eb24567620fe5b7b648b2bf33941c78efe735b1fa');
+  setEffects({});
+  try {
+    const original = trace();
+    assert.deepEqual(original.starts[0].slice(0, 3), [1, effects.lightning.height, 2]);
+    assert.deepEqual(
+      trace(() => new THREE.Vector3(1, effects.lightning.height, 2)),
+      original,
+    );
+    let point = new THREE.Vector3(-3, 4, 5);
+    const custom = trace(() => point);
+    assert.deepEqual(custom.starts[0].slice(0, 3), point.toArray());
+    point = new THREE.Vector3(3, 2, 1);
+    assert.deepEqual(trace(() => point).starts[0].slice(0, 3), point.toArray());
+    assert.equal(original.hash, '27e645af3fd8f8acbea1589bba908540023f58e73fd31be91977e38f6886e2f2');
+  } finally {
+    setEffects(content.effects);
+  }
 });

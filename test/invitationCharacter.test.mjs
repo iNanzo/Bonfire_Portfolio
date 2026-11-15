@@ -26,6 +26,7 @@ import * as characterModule from '../src/invitation/character.js';
 import { FACE_IMAGE, FACE_SIZES, pickFaceSize } from '../src/invitation/faceSheets.js';
 import { LOOKS, lookPreset, validLook } from '../src/invitation/look.js';
 import { TOON_CELLS, toonRamp } from '../src/invitation/shader.js';
+import { ID } from '../src/invitation/retro.js';
 import { TWIN } from '../src/invitation/play.js';
 import { BONES, COLLAR, SCALE } from '../src/invitation/clips.js';
 import { chestShare } from '../src/invitation/lookAt.js';
@@ -659,32 +660,56 @@ test('the texel snap holds his texel while his head wobbles across an edge (no s
 
 test('default dress preserves the toy materials and accepts a factory', () => {
   const a = standIn();
-  const b = standIn();
   const c = standIn();
   const calls = [];
-  const first = createCharacter(a.gltf);
-  const explicit = createCharacter(b.gltf, { dress: characterModule.defaultDress });
+  const preset = { ...LOOKS.ds, texture: { mipBias: 1.5, fineMipBias: 0.75 } };
+  a.mesh.material.color.setRGB(0.2, 0.3, 0.4);
+  const originalColor = a.mesh.material.color.toArray();
+  const first = createCharacter(a.gltf, { preset });
   const custom = createCharacter(c.gltf, {
     pixel: false,
     dress: (src, options) => {
       calls.push({ src, options });
-      const material = characterModule.defaultDress(src, options);
-      material.name = 'custom dress';
-      return material;
+      return new THREE.MeshToonMaterial({ name: 'custom dress', map: src.map, gradientMap: options.gradient });
     },
   });
-  for (const key of ['type', 'name', 'transparent', 'depthWrite', 'flatShading'])
-    assert.equal(a.mesh.material[key], b.mesh.material[key], key);
-  assert.deepEqual(a.mesh.material.color.toArray(), b.mesh.material.color.toArray());
-  assert.deepEqual(a.mesh.material.gradientMap.image.data, b.mesh.material.gradientMap.image.data);
-  assert.equal(a.mesh.material.map, a.map);
-  assert.equal(b.mesh.material.map, b.map);
-  assert.equal(a.mesh.material.onBeforeCompile.toString(), b.mesh.material.onBeforeCompile.toString());
-  assert.equal(c.mesh.material.name, 'custom dress');
-  assert.equal(calls.length, 1);
-  assert.ok(calls[0].options.snap);
-  assert.ok(calls[0].options.bias);
-  first.dispose();
-  explicit.dispose();
-  custom.dispose();
+  try {
+    const material = a.mesh.material;
+    assert.equal(material.type, 'MeshToonMaterial');
+    assert.equal(material.name, 'NEWT_Atlas');
+    assert.equal(material.transparent, false);
+    assert.equal(material.depthWrite, true);
+    assert.equal(material.flatShading, undefined);
+    assert.deepEqual(material.color.toArray(), originalColor);
+    assert.equal(material.map, a.map);
+    const bands = toonRamp(preset.toon);
+    assert.deepEqual(
+      [...material.gradientMap.image.data],
+      bands.flatMap((v) => Array(4).fill(Math.round(Math.min(1, Math.max(0, v)) * 255))),
+    );
+    const shader = {
+      uniforms: {},
+      vertexShader: 'void main() {#include <project_vertex>',
+      fragmentShader: 'void main() {#include <map_fragment>#include <dithering_fragment>',
+    };
+    material.onBeforeCompile(shader, null);
+    assert.equal(shader.uniforms.uSurfaceId.value, ID.newt / 16);
+    assert.equal(shader.uniforms.uTexelSnap.value, first.texelSnap.body);
+    assert.deepEqual(shader.uniforms.uTexelSnap.value.toArray(), [0, 0]);
+    assert.equal(shader.uniforms.uMapBias.value, 0.75);
+    first.setStyle({ ...preset, texture: { fineMipBias: 1.25 } }, true);
+    assert.equal(shader.uniforms.uMapBias.value, 1.25, 'the shader keeps the live bias object');
+    first.texelSnap.body.set(0.125, -0.25);
+    assert.deepEqual(shader.uniforms.uTexelSnap.value.toArray(), [0.125, -0.25], 'the shader keeps the live body snap');
+    assert.match(shader.vertexShader, /gl_Position.xy \+= uTexelSnap \* gl_Position.w/);
+    assert.match(shader.fragmentShader, /gl_FragColor.a = mix\(1.0, uSurfaceId, uIdOn\)/);
+    assert.equal(c.mesh.material.name, 'custom dress');
+    assert.equal(calls.length, 1);
+    assert.equal(c.mesh.material.gradientMap, calls[0].options.gradient);
+    assert.equal(calls[0].options.snap.value, custom.texelSnap.body);
+    assert.equal(calls[0].options.bias.value, 0);
+  } finally {
+    first.dispose();
+    custom.dispose();
+  }
 });
