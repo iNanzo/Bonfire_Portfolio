@@ -182,6 +182,10 @@ export function createWorld(container, options = {}) {
         });
       }
       for (const command of picture.petals) {
+        if (command.kind === 'cut') {
+          for (const petals of petalScenes.values()) petals.cut(0.35);
+          continue;
+        }
         const actor = actors.get(command.id);
         if (actor)
           petalScenes

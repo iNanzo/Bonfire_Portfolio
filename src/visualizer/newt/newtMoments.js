@@ -135,6 +135,7 @@ export function createNewtMoments({
         if (active.released) skip(active);
       }
       if (f.events?.includes('silence')) {
+        commands.push({ kind: 'cut', id: null });
         for (const letter of letters) skip(letter, true);
         make('end');
       }

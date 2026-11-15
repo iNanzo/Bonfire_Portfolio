@@ -7,7 +7,9 @@ test('start waits for a downbeat or four unlocked seconds; silence seals an end 
   assert.equal(m.step({ t: 0, f: { events: ['start'] } }).letters[0].state, 'floating');
   assert.equal(m.step({ t: 3.9 }).letters[0].state, 'floating');
   assert.equal(m.step({ t: 4 }).letters[0].state, 'opening');
-  const end = m.step({ t: 5, f: { events: ['silence'] } }).letters.at(-1);
+  const closing = m.step({ t: 5, f: { events: ['silence'] } });
+  assert.ok(closing.petals.some((command) => command.kind === 'cut'));
+  const end = closing.letters.at(-1);
   assert.equal(end.kind, 'end');
   assert.equal(end.pose.bloom, 0);
 });
