@@ -64,3 +64,55 @@ test('page and duck survive a held breakdown and drop', async ({ page }) => {
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.flame)).toBeTruthy();
   expect(errors).toEqual([]);
 });
+
+test('Night drop builds page effects and Dusk fire leaves a darker scorch', async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.addInitScript(() => {
+    if (!sessionStorage.getItem('seeded-night')) {
+      localStorage.setItem('bonfire-live', JSON.stringify({ page: 'night', pageTurns: 'off' }));
+      sessionStorage.setItem('seeded-night', 'yes');
+    }
+  });
+  await ready(page);
+  await page.click('[data-source="demo"]');
+  await page.keyboard.press('a');
+  await expect.poll(() => page.evaluate(() => window.__viz.fire.snapshot().holding)).toBe(true);
+  await page.keyboard.press('Space');
+  await expect.poll(() => page.evaluate(() => window.__viz.fire.snapshot().rings.marks)).toBeGreaterThan(0);
+  await page.evaluate(() => localStorage.setItem('bonfire-live', JSON.stringify({ page: 'dusk', pageTurns: 'off' })));
+  // A fresh visit avoids carrying the previous ring into the scorch comparison.
+  await page.goto('/visualizer/?world=newt&bench');
+  await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
+  const capture = async () => {
+    const dataUrl = await page.evaluate(async () => {
+      const blob = await window.__viz.fire.capture();
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      });
+    });
+    const { data } = await sharp(Buffer.from(dataUrl.split(',')[1], 'base64'))
+      .removeAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    let dark = 0;
+    for (let i = 0; i < data.length; i += 3)
+      if (
+        data[i] + data[i + 1] + data[i + 2] <
+        PAGES.dusk.color
+          .toString(16)
+          .match(/../g)
+          .reduce((s, v) => s + parseInt(v, 16), 0) -
+          20
+      )
+        dark++;
+    return dark;
+  };
+  const before = await capture();
+  await page.evaluate(() => window.__viz.fire.onEvent('dropfx', { names: ['ring'] }));
+  await expect.poll(capture, { timeout: 15_000 }).toBeGreaterThan(before);
+  expect(errors).toEqual([]);
+});

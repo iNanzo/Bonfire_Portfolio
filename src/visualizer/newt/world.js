@@ -11,13 +11,22 @@ import { effects } from '../../effects.js';
 import { debugPalettes } from '../../palette.js';
 import { fitShadow } from '../../invitation/floor.js';
 import { createFireDuck } from './fireDuck.js';
+import { createElementRings } from './elementRings.js';
 import { pageOf } from './pages.js';
 /** @param {HTMLElement} container @param {Record<string, any>} [options] */
 export function createWorld(container, options = {}) {
   const { reducedMotion = false, onTick, onFrame, onError, pageStats, statsParent } = options;
   const scope = createResourceScope();
   const page = pageOf(options.page);
-  const duck = createFireDuck({ onImpact: options.onImpact, page: options.page });
+  let rings;
+  const duck = createFireDuck({
+    onImpact: (flame, old, stationary, selection) => {
+      if (!stationary) rings?.impact(selection.element, flame);
+      else rings?.setElement(selection.element, flame);
+      options.onImpact?.(flame, old, stationary, selection);
+    },
+    page: options.page,
+  });
   try {
     // Copied from src/bonfire/scene.js: renderer ownership and context teardown.
     const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, powerPreference: 'high-performance' });
@@ -51,7 +60,7 @@ export function createWorld(container, options = {}) {
       },
       { signal: events.signal },
     );
-    const scene = scope.trackTree(new THREE.Scene());
+    const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 80);
     const view = createView(camera, { reducedMotion, sway: 0 });
     const layers = { solid: 0, fx: 1, ghost: 2 };
@@ -67,6 +76,22 @@ export function createWorld(container, options = {}) {
       track: scope.trackTree,
     });
     const { pass } = frame;
+    rings = createElementRings({
+      scene,
+      frame,
+      scope,
+      page: () => options.page ?? 'dusk',
+      letter: () => duck.snapshot().letter?.frame ?? null,
+      reducedMotion,
+    });
+    duck.ring = rings.ring;
+    const onEvent = duck.onEvent;
+    duck.onEvent = (type, data) => {
+      onEvent(type, data);
+      if (type === 'dropfx') rings.ring(data?.strength ?? 1);
+    };
+    const snapshot = duck.snapshot;
+    duck.snapshot = () => ({ ...snapshot(), rings: { element: rings.element, marks: rings.marks.count } });
     const paper = new THREE.Mesh(
       new THREE.PlaneGeometry(14, 14),
       new THREE.ShadowMaterial({
@@ -85,12 +110,14 @@ export function createWorld(container, options = {}) {
     paper.rotation.x = -Math.PI / 2;
     paper.receiveShadow = true;
     paper.layers.set(layers.ghost);
+    scope.trackTree(paper);
     scene.add(paper);
     scene.add(new THREE.HemisphereLight(0xffffff, 0x817781, 2));
     const sun = new THREE.DirectionalLight(0xffffff, 2);
     sun.position.set(-3, 7, 4);
     sun.castShadow = true;
     fitShadow(sun, { minX: -7, maxX: 7, minZ: -7, maxZ: 7 }, 2);
+    scope.trackTree(sun);
     scene.add(sun, sun.target);
     const settings = { pixelSize: null };
     let size = { w: 1, h: 1, pd: 4 };
@@ -199,6 +226,7 @@ export function createWorld(container, options = {}) {
       const t0 = perf ? performance.now() : 0;
       onFrame?.(dt);
       duck.step(dt);
+      rings.step(dt);
       t += dt;
       view.apply(dt, size, { sx: 0, sy: 0 });
       // Copied from src/bonfire/sceneUpdate.js: pass writes before frame.draw.
