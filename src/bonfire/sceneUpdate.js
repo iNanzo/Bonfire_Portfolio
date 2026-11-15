@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { effects } from '../effects.js';
 import { ELEMENT_IDS } from '../effectsDefaults.js';
 import { flames, mixFlame, flameEase } from '../palette.js';
-import { passValue, stillClock } from './stillFx.js';
+import { createPassWrites } from './passWrites.js';
 import { FIRE_ORIGIN, lightMix, boost } from './sceneContext.js';
 
 const LIGHT_FPS = 12;
@@ -18,61 +18,7 @@ const hash = (n) => {
 };
 
 // Keep the literal's local name and indentation for the source-based stillFx guard.
-export const GLITCH_UNIFORMS = (() => {
-  const GLITCH_UNIFORMS = {
-    slice: 'uSlice',
-    sliceSeed: 'uSliceSeed',
-    split: 'uSplit',
-    block: 'uBlock',
-    wave: 'uWave',
-    mirror: 'uMirror',
-    scan: 'uScan',
-    scanMode: 'uScanMode',
-    noise: 'uNoise',
-    invert: 'uInvert',
-    feedback: 'uFeedback',
-    zoom: 'uZoom',
-    feedRot: 'uFeedRot',
-    kaleido: 'uKaleido',
-    kaleidoRot: 'uKaleidoRot',
-    rippleR: 'uRippleR',
-    rippleAmp: 'uRippleAmp',
-    iris: 'uIris',
-    letterbox: 'uLetterbox',
-    ink: 'uInk',
-    cycle: 'uCycle',
-    temp: 'uTemp',
-    blackout: 'uBlackout',
-    ghost: 'uGhost',
-    ghostKeep: 'uGhostKeep',
-    blur: 'uBlur',
-    glow: 'uGlow',
-    glowSize: 'uGlowSize',
-    glowCut: 'uGlowCut',
-    grad: 'uGrad',
-    gradA: 'uGradA',
-    gradB: 'uGradB',
-    gradC: 'uGradC',
-    style: 'uStyle',
-    styleR: 'uStyleR',
-    styleMix: 'uStyleMix',
-    paintAngle: 'uPaintAngle',
-    paintAspect: 'uPaintAspect',
-    washEdge: 'uWashEdge',
-    flicker: 'uFlicker',
-    flickerMode: 'uFlickerMode',
-    feedMode: 'uFeedMode',
-    ghostMode: 'uGhostMode',
-    warpMode: 'uWarpMode',
-    warpMix: 'uWarpMix',
-    inkMode: 'uInkMode',
-    invertMode: 'uInvertMode',
-    scanBlend: 'uScanBlend',
-    glowMode: 'uGlowMode',
-    gradMode: 'uGradMode',
-  };
-  return GLITCH_UNIFORMS;
-})();
+export { GLITCH_UNIFORMS } from './passWrites.js';
 
 /**
  * The update and the frame.
@@ -123,11 +69,11 @@ export function createSceneUpdate(ctx) {
   } = ctx;
   const blendTime = () => (reducedMotion ? 0.4 : effects.render.colorChange);
   // Each of `glitch`'s values (scene.js), and the pass uniform it's written to (renderFrame).
-  const GLITCH_ENTRIES = Object.entries(GLITCH_UNIFORMS);
+
   // Under reduced motion only the still effects reach the picture; the Painter's
   // (`paintedLook`) lets the look being painted through, all but what flashes or jitters
   // (stillFx.js).
-  const stillOpts = { reducedMotion, paintedLook };
+  const writePass = createPassWrites({ pass, glitch, reducedMotion, paintedLook });
 
   // --- Per-frame update
   ctx.flameStep = -1;
@@ -378,17 +324,8 @@ export function createSceneUpdate(ctx) {
     ctx.simT += simDt;
     if (ctx.ready) update(simDt, ctx.simT, dt);
     view.apply(dt, ctx.size, pointer);
-    for (const [k, u] of GLITCH_ENTRIES) pass.uniforms[u].value = passValue(k, glitch[k], stillOpts);
-    pass.uniforms.uTime.value = stillClock(stillOpts) ? 0 : t;
-    // The ripple is sized to the screen: radius as a fraction of the height, push per 270 rows.
-    pass.uniforms.uRippleR.value = glitch.rippleR * ctx.size.h;
-    pass.uniforms.uRippleAmp.value = reducedMotion ? 0 : (glitch.rippleAmp * ctx.size.h) / 270;
-    // Where the fire is on screen (texels): the ripple, the iris and the echoes center on it.
-    fireOnScreen.set(FIRE_ORIGIN.x, 0.55, FIRE_ORIGIN.z).project(camera);
-    pass.uniforms.uCenter.value.set(
-      (fireOnScreen.x * 0.5 + 0.5) * ctx.size.w,
-      (fireOnScreen.y * 0.5 + 0.5) * ctx.size.h,
-    );
+    fireOnScreen.set(FIRE_ORIGIN.x, 0.55, FIRE_ORIGIN.z);
+    writePass(t, ctx.size, fireOnScreen, camera);
 
     const t2 = ctx.perf ? performance.now() : 0;
     const shadows = renderer.shadowMap.enabled && shadowNeedsUpdate();
