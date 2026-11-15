@@ -21,7 +21,7 @@ export const NEWT_NODES = {
   shinR: 'CalfR',
   footR: 'FootR',
 };
-/** Rest world matrix by NEWT node name (the character's rest bones or glbAnim.world). */
+/** Rest matrix by runtime bone name, in unscaled model units (for example glbAnim.world). */
 export function createNewtRig(world) {
   const at = (name) => new THREE.Vector3().setFromMatrixPosition(world(name)).multiplyScalar(K);
   /** @type {any} */
