@@ -24,8 +24,8 @@
 import { contrast, HEX_RE } from './ruleBasics.js';
 
 // ---- color math ---------------------------------------------------------------------------
-const toLinear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-const toGamma = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
+export const toLinear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+export const toGamma = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
 
 /** #rrggbb → { L, C, h } (OKLCH; h in degrees). */
 export function hexToOklch(hex) {

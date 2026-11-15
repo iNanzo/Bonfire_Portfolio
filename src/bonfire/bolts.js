@@ -15,20 +15,12 @@
 // width can taper along the bolt. Quads overlap a little at each joint so the jagged
 // path never shows gaps.
 import * as THREE from 'three';
+import { createRng } from '../invitation/rng.js';
 import { createRingLines } from './rings.js';
 import { DITHER_GLSL } from './flame.js';
 
 /** Small seeded PRNG (mulberry32): returns () => 0..1. */
-export function seeded(seed) {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+export const seeded = (seed = 0) => createRng(seed);
 /** A seed from a few integers (bolt id, crackle step, …). */
 export const hashSeed = (a, b = 0, c = 0) =>
   (Math.imul(a + 1, 73856093) ^ Math.imul(b + 1, 19349663) ^ Math.imul(c + 1, 83492791)) >>> 0;
