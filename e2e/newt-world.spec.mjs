@@ -129,6 +129,32 @@ test('Night drop builds page effects and Dusk fire leaves a darker scorch', asyn
   expect(errors).toEqual([]);
 });
 
+test('floating letter seal snapshots equal the half-texel values actually placed', async ({ page }) => {
+  await ready(page);
+  await page.evaluate(() => {
+    void window.__viz.fire.equip('axe', 'ember', { hold: true });
+  });
+  const samples = [];
+  for (let i = 0; i < 20; i++) {
+    await expect.poll(() => page.evaluate(() => window.__viz.fire.snapshot().letter?.seal ?? null)).not.toBeNull();
+    samples.push(
+      await page.evaluate(
+        () =>
+          new Promise((resolve) => {
+            const off = window.__viz.fire.onRendered(() => {
+              off();
+              resolve(window.__viz.fire.snapshot().letter.seal);
+            });
+          }),
+      ),
+    );
+  }
+  for (const seal of samples) {
+    for (const value of [seal.x, seal.y, ...seal.axes]) expect(Number.isInteger(value * 2)).toBe(true);
+    expect(seal.placedAt).toEqual({ x: seal.x, y: seal.y, axes: seal.axes });
+  }
+});
+
 test('NEWT is ready on the page in Idle', async ({ page }) => {
   await ready(page);
   await expect.poll(() => page.evaluate(() => window.__viz.fire.snapshot().newt?.clip)).toBe('Idle');
@@ -137,4 +163,16 @@ test('NEWT is ready on the page in Idle', async ({ page }) => {
     clip: 'Idle',
     grounded: true,
   });
+});
+
+test('a held letter at stage three emits a ring before release', async ({ page }) => {
+  await ready(page);
+  await page.evaluate(() => {
+    void window.__viz.fire.equip('axe', 'ember', { hold: true });
+  });
+  await expect.poll(() => page.evaluate(() => window.__viz.fire.snapshot().holding)).toBe(true);
+  const before = await page.evaluate(() => window.__viz.fire.snapshot().rings.marks);
+  await page.evaluate(() => window.__viz.fire.onEvent('stage', { stage: 3 }));
+  await expect.poll(() => page.evaluate(() => window.__viz.fire.snapshot().rings.marks)).toBeGreaterThan(before);
+  expect(await page.evaluate(() => window.__viz.fire.snapshot().holding)).toBe(true);
 });

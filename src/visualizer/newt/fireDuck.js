@@ -1,6 +1,12 @@
 // Director protocol without a renderer. W2a replaces the letterless impact clock.
+import { createNewtMoments } from './newtMoments.js';
 import { pageOf } from './pages.js';
-export function createFireDuck({ onImpact = (..._args) => {}, page = 'dusk' } = {}) {
+export function createFireDuck({
+  onImpact = (..._args) => {},
+  page = 'dusk',
+  settings = { page, pageTurns: 'drops' },
+  reduced = false,
+} = {}) {
   // Copied from src/bonfire/scene.js: drive and idle glitch values.
   const drive = {
     level: 0,
@@ -65,18 +71,13 @@ export function createFireDuck({ onImpact = (..._args) => {}, page = 'dusk' } = 
     glowMode: 1,
     gradMode: 0,
   };
-  let pending = null;
-  let remaining = 0;
+  const moments = createNewtMoments({ onImpact, settings, reduced });
+  let clock = 0,
+    heard = {},
+    events = [],
+    picture = { letters: [], petals: [], page: null };
   const calls = [];
   const noop = (..._args) => {};
-  function impact(instant = false) {
-    if (!pending) return;
-    const { selection, resolve, from } = pending;
-    pending = null;
-    Object.assign(duck, selection, { holding: false, forging: false });
-    onImpact(selection.flame, instant ? selection.flame : from, instant, selection);
-    resolve({ status: 'applied' });
-  }
   const duck = {
     calls,
     drive,
@@ -101,37 +102,30 @@ export function createFireDuck({ onImpact = (..._args) => {}, page = 'dusk' } = 
     statsShown: false,
     equip(weapon, flame, options = {}) {
       calls.push(['equip', weapon, flame, { ...options }]);
-      if (pending) {
-        pending.resolve({ status: 'cancelled' });
-        pending = null;
-      }
       const selection = {
         weapon,
         flame,
-        item: null,
-        element: pageOf(page).light ? 'ice' : (options.element ?? duck.element),
+        item: options.item ?? null,
+        element: pageOf(moments.page).light ? 'ice' : (options.element ?? duck.element),
       };
-      const instant = !!options.instant || weapon === duck.weapon;
-      duck.weapon = weapon;
-      duck.element = selection.element;
-      duck.holding = !instant && !!options.hold;
-      duck.forging = !instant;
-      remaining = duck.swapTime / (options.hold ? 1 : (options.pace ?? 1));
-      return new Promise((resolve) => {
-        pending = { selection, from: duck.flame, resolve };
-        if (instant) impact(true);
-      });
+      return moments.equip(selection, options);
     },
     release() {
       calls.push(['release']);
-      const held = duck.holding;
-      duck.holding = false;
-      return held;
+      return moments.release();
     },
     step(dt) {
-      if (!pending || duck.holding) return;
-      remaining -= dt;
-      if (remaining <= 0) impact();
+      clock += dt;
+      picture = moments.step({ t: clock, f: heard, events });
+      heard = {};
+      events = [];
+      return picture;
+    },
+    setPage(key) {
+      moments.setPage(key);
+    },
+    get moments() {
+      return picture;
     },
     swing: () => Promise.resolve(false),
     pulse: noop,
@@ -149,8 +143,12 @@ export function createFireDuck({ onImpact = (..._args) => {}, page = 'dusk' } = 
     setXray: noop,
     setPose: noop,
     setView: noop,
-    hear: noop,
-    onEvent: noop,
+    hear(f) {
+      heard = f;
+    },
+    onEvent(type, data) {
+      events.push({ type, data });
+    },
     onRendered: () => noop,
     capture: () => Promise.resolve(null),
     captureThumb: () => Promise.resolve(null),
@@ -161,17 +159,19 @@ export function createFireDuck({ onImpact = (..._args) => {}, page = 'dusk' } = 
       duck.statsShown = !!on;
     },
     snapshot: () => ({
-      letter: null,
+      letter: picture.letters.at(-1) ?? null,
       newt: null,
-      page: { name: pageOf(page).name },
+      page: { name: pageOf(moments.page).name },
       holding: duck.holding,
       fireflies: false,
       shot: null,
     }),
     dispose() {
-      if (pending) pending.resolve({ status: 'cancelled' });
-      pending = null;
+      moments.dispose();
     },
   };
+  for (const key of ['weapon', 'flame', 'element'])
+    Object.defineProperty(duck, key, { get: () => moments.equipment[key] });
+  Object.defineProperties(duck, { holding: { get: () => moments.holding }, forging: { get: () => moments.forging } });
   return duck;
 }

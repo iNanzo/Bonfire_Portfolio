@@ -145,7 +145,9 @@ test('White equip selects the ice facade and attaches no lights or opaque page',
       onImpact: (flame, _old, _instant, selection) => rings.impact(selection.element, flame),
     });
     const done = duck.equip('axe', 'ember', { element: 'lightning' });
-    duck.step(1.41);
+    // The envelope owns arrival/open/burn timing after W2a; wait for its impact.
+    for (let i = 0; i < 600 && duck.forging; i++) duck.step(1 / 60);
+    assert.equal(duck.forging, false, 'the letter applies its selection within ten seconds');
     await done;
     assert.equal(rings.element, 'ice');
     assert.equal(rings.ice.solid.layers.mask, 1);
