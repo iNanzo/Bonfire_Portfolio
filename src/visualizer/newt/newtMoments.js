@@ -30,6 +30,8 @@ export function createNewtMoments({
       bigDrop: false,
       impacted: false,
       cancelled: false,
+      dismissed: false,
+      skipping: false,
       openedAt: null,
       resolve: null,
       selection: null,
@@ -51,7 +53,7 @@ export function createNewtMoments({
     if (letter.impacted || letter.cancelled || !letter.selection) return;
     letter.impacted = true;
     Object.assign(equipment, letter.selection);
-    if (letter.bigDrop && settings.pageTurns === 'drops') {
+    if (letter.bigDrop && !letter.dismissed && settings.pageTurns === 'drops') {
       const keys = Object.keys(PAGES),
         from = currentPage;
       currentPage = keys[(keys.indexOf(currentPage) + 1) % keys.length];
@@ -60,16 +62,16 @@ export function createNewtMoments({
     if (active === letter) active = null;
     onImpact(letter.selection.flame, letter.from, false, letter.selection);
     letter.resolve?.({ status: 'applied' });
-    if (active === letter) active = null;
   }
   function skip(letter, cancelled = false) {
-    if (!letter || !letter.env.skip(letter.time)) return;
-    emit('spill', letter);
+    if (!letter) return;
+    const skipped = letter.env.skip(letter.time);
+    if (skipped) emit('spill', letter);
     if (cancelled) {
       letter.cancelled = true;
       letter.resolve?.({ status: 'cancelled' });
       if (active === letter) active = null;
-    } else apply(letter);
+    } else if (skipped) letter.skipping = true;
   }
   return {
     equipment,
@@ -109,8 +111,11 @@ export function createNewtMoments({
     release() {
       if (!active?.hold || active.released) return false;
       active.released = true;
-      active.ready = true;
-      open(active);
+      if (active.dismissed) skip(active);
+      else {
+        active.ready = true;
+        open(active);
+      }
       return true;
     },
     /** @param {{t:number, f?:Record<string, any>, events?:any[]}} input */
@@ -125,7 +130,10 @@ export function createNewtMoments({
           waiting.startedAt = t;
         } else make('start', { startedAt: t });
       }
-      if (f.events?.includes('return')) skip(active);
+      if (f.events?.includes('return') && active) {
+        active.dismissed = true;
+        if (active.released) skip(active);
+      }
       if (f.events?.includes('silence')) {
         for (const letter of letters) skip(letter, true);
         make('end');
@@ -158,6 +166,7 @@ export function createNewtMoments({
         const before = letter.env.state;
         const state = letter.env.step(letter.time, letter.ready);
         if (state === 'fading' && before !== 'fading') apply(letter);
+        if (letter.skipping && letter.env.done(letter.time)) apply(letter);
       }
       const views = letters
         .filter((l) => !l.env.done(l.time))

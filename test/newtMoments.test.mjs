@@ -30,21 +30,44 @@ test('held build opens, strike burns once and changes page only on a big held dr
   m.step({ t: 4 });
   assert.equal(hits.length, 1);
 });
-test('return skips a staged letter immediately; two quick letters have separate owners', async () => {
-  const hits = [];
-  const m = createNewtMoments({ onImpact: (...a) => hits.push(a) });
-  const a = m.equip(selection, { hold: true });
-  m.step({ t: 0.7, events: [{ type: 'stage', data: { stage: 2 } }] });
-  m.step({ t: 0.8, f: { events: ['return'] } });
-  assert.deepEqual(await a, { status: 'applied' });
+test('return marks staged letters dismissed; release skips and impact waits until they are gone', async () => {
+  for (const stage of [0, 2, 4]) {
+    const hits = [],
+      m = createNewtMoments({ onImpact: (...args) => hits.push(args) });
+    const done = m.equip(selection, { hold: true });
+    m.step({ t: 1, events: [{ type: 'stage', data: { stage } }] });
+    m.step({ t: 2 });
+    const returned = m.step({ t: 2.1, f: { events: ['return'] } });
+    assert.equal(m.holding, true);
+    assert.equal(returned.letters[0].state, stage === 4 ? 'waiting' : 'floating');
+    assert.equal(hits.length, 0);
+    assert.equal(m.release(), true);
+    assert.equal(m.step({ t: 2.1 }).letters[0].state, 'skipped');
+    m.step({ t: 2.54 });
+    assert.equal(hits.length, 0);
+    assert.equal(m.forging, true);
+    assert.equal(m.step({ t: 2.55 }).letters.length, 0);
+    assert.deepEqual(await done, { status: 'applied' });
+    assert.equal(hits.length, 1);
+    assert.equal(hits[0].length, 4);
+    assert.equal(m.forging, false);
+    assert.equal(m.page, 'dusk');
+  }
+});
+
+test('return and release on the same frame skip an opening letter; instant equip cancels a pending skip', async () => {
+  const hits = [],
+    m = createNewtMoments({ onImpact: (...args) => hits.push(args) });
+  const skipped = m.equip(selection, { hold: true });
+  m.step({ t: 1, events: [{ type: 'stage', data: { stage: 2 } }] });
+  m.release();
+  assert.equal(m.step({ t: 1, f: { events: ['return'] } }).letters[0].state, 'skipped');
+  assert.equal(hits.length, 0);
+  await m.equip({ ...selection, weapon: 'spear' }, { instant: true });
+  assert.deepEqual(await skipped, { status: 'cancelled' });
+  m.step({ t: 2 });
   assert.equal(hits.length, 1);
-  const b = m.equip({ ...selection, weapon: 'spear' }, { pace: 2 });
-  assert.equal(m.step({ t: 0.81 }).letters.length, 2);
-  m.step({ t: 1.51 });
-  assert.deepEqual(await b, { status: 'applied' });
-  assert.equal(hits.length, 2);
-  assert.equal(m.step({ t: 1.52 }).letters.at(-1).state, 'fading');
-  assert.equal(m.page, 'dusk');
+  assert.equal(m.equipment.weapon, 'spear');
 });
 
 test('a locked start opens on its first downbeat and burns on a later downbeat', () => {
