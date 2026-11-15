@@ -70,6 +70,7 @@ export function createFireflies(
     layer,
     terrain,
     raycast,
+    pois = POIS,
     reducedMotion = false,
     trailMaterial = null, // particle material for light trails (the visualizer); none on the site
   },
@@ -102,7 +103,7 @@ export function createFireflies(
 
   function randomXZ() {
     if (Math.random() < 0.35) {
-      const poi = POIS[Math.floor(Math.random() * POIS.length)];
+      const poi = pois[Math.floor(Math.random() * pois.length)];
       return [poi[0] + (Math.random() - 0.5) * 0.6, poi[1], poi[2] + (Math.random() - 0.5) * 0.6];
     }
     const a = Math.random() * TAU;

@@ -35,6 +35,7 @@ export function createLightningRing({
   field,
   reach,
   ground = () => 0,
+  source = null,
   emitters = 96,
   sparks = 260,
   lights: lightCount = 6,
@@ -298,7 +299,8 @@ export function createLightningRing({
         const W = L.boltWidth;
         for (const tg of targets) {
           // A heavy bolt from the ball, tapering as it goes, forking on the way…
-          bolts.bolt(origin.x, ballHeight, origin.z, tg.x, tg.y, tg.z, {
+          const start = source?.() ?? { x: origin.x, y: ballHeight, z: origin.z };
+          bolts.bolt(start.x, start.y, start.z, tg.x, tg.y, tg.z, {
             rng,
             depth: 5,
             jag: 0.14 + 0.18 * L.jag,
