@@ -13,8 +13,10 @@ test('the URL world lasts one visit and another setting change does not save it'
   await page.keyboard.press('s');
   await page.locator('[data-tab="show"]').click();
   await page.locator('[data-set="page"]').selectOption('cream');
-  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('bonfire-live')).page)).toBe('cream');
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('bonfire-live')).world)).toBe('bonfire');
+  await expect
+    .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('bonfire-live') ?? 'null')?.page ?? null))
+    .toBe('cream');
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('bonfire-live') ?? 'null')?.world)).toBe('bonfire');
 
   await ready(page, '/visualizer/?bench');
   await expect.poll(() => page.evaluate(() => window.__viz.settings.world)).toBe('bonfire');
@@ -28,7 +30,17 @@ test('the empty NEWT canvas is exactly one page color on every page', async ({ p
     await page.evaluate((pageKey) => localStorage.setItem('bonfire-live', JSON.stringify({ page: pageKey })), key);
     await page.reload();
     await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
-    const png = await page.locator('.bonfire-canvas').screenshot();
+    await expect.poll(() => page.evaluate(() => window.__viz.settings.world)).toBe('newt');
+    const dataUrl = await page.evaluate(async () => {
+      const blob = await window.__viz.fire.capture();
+      return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(blob);
+      });
+    });
+    const png = Buffer.from(dataUrl.split(',')[1], 'base64');
     const { data } = await sharp(png).removeAlpha().raw().toBuffer({ resolveWithObject: true });
     const colors = new Set();
     for (let i = 0; i < data.length; i += 3) colors.add(`${data[i]},${data[i + 1]},${data[i + 2]}`);
