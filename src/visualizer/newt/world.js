@@ -9,6 +9,9 @@ import { GLITCH_UNIFORMS } from '../../bonfire/sceneUpdate.js';
 import { passValue, stillClock } from '../../bonfire/stillFx.js';
 import { effects } from '../../effects.js';
 import { debugPalettes } from '../../palette.js';
+import { loadCharacter } from '../../invitation/character.js';
+import { BONES } from '../../invitation/clips.js';
+import { createMix, mixStep, lookAim } from '../../invitation/play.js';
 import { fitShadow } from '../../invitation/floor.js';
 import { createFireDuck } from './fireDuck.js';
 import { createElementRings } from './elementRings.js';
@@ -221,6 +224,15 @@ export function createWorld(container, options = {}) {
     let t = 0;
     let running = false;
     const center = new THREE.Vector3();
+    const chest = { x: 0, y: 0.55, z: 0 };
+    const head = { x: 0, y: 0.9, z: 0 };
+    let character = null;
+    const mix = createMix();
+    const baseSnapshot = duck.snapshot;
+    duck.snapshot = () => ({
+      ...baseSnapshot(),
+      newt: character ? { state: 'idle', clip: mix.main, grounded: true } : null,
+    });
     const stillOpts = { reducedMotion, paintedLook: false };
     function draw(dt) {
       const t0 = perf ? performance.now() : 0;
@@ -229,13 +241,30 @@ export function createWorld(container, options = {}) {
       rings.step(dt);
       t += dt;
       view.apply(dt, size, { sx: 0, sy: 0 });
+      if (character) {
+        mixStep(mix, { clip: 'Idle', speed: 0, dt });
+        character.setWeights(mix.weights, mix.phase);
+        character.update(dt);
+        character.root.updateMatrixWorld(true);
+        character.bonePos(BONES.head, head);
+        head.y += 0.12;
+        const { aim } = lookAim('camera', {
+          head,
+          yaw: character.root.rotation.y,
+          camera: camera.position,
+          pointer: null,
+        });
+        character.applyLook(aim?.yaw ?? 0, aim?.pitch ?? 0, 1);
+        character.root.updateMatrixWorld(true);
+        character.bonePos(BONES.chest, chest);
+      }
       // Copied from src/bonfire/sceneUpdate.js: pass writes before frame.draw.
       for (const [k, u] of Object.entries(GLITCH_UNIFORMS))
         pass.uniforms[u].value = passValue(k, duck.glitch[k], stillOpts);
       pass.uniforms.uTime.value = stillClock(stillOpts) ? 0 : t;
       pass.uniforms.uRippleR.value = duck.glitch.rippleR * size.h;
       pass.uniforms.uRippleAmp.value = reducedMotion ? 0 : (duck.glitch.rippleAmp * size.h) / 270;
-      center.set(0, 0.55, 0).project(camera);
+      center.set(chest.x, chest.y, chest.z).project(camera);
       pass.uniforms.uCenter.value.set((center.x * 0.5 + 0.5) * size.w, (center.y * 0.5 + 0.5) * size.h);
       pass.uniforms.exposure.value = (renderOverride.exposure ?? effects.render.exposure) * (1 + duck.drive.exposure);
       const t1 = perf ? performance.now() : 0;
@@ -275,7 +304,21 @@ export function createWorld(container, options = {}) {
     const duckDispose = duck.dispose;
     Object.assign(duck, {
       canvas,
-      ready: frame.compile().then(() => {
+      ready: loadCharacter(`${import.meta.env.BASE_URL}models/newt.glb`, { pixel: false }).then(async (loaded) => {
+        if (scope.disposed) {
+          loaded.dispose();
+          return;
+        }
+        character = loaded;
+        character.root.rotation.order = 'XZY';
+        character.setWeights(mix.weights, mix.phase);
+        character.update(0);
+        scene.add(character.root);
+        scope.cleanup(() => {
+          character.root.removeFromParent();
+          character.dispose();
+        });
+        await frame.compile();
         if (scope.disposed) return;
         draw(0);
         ready = true;
