@@ -109,6 +109,9 @@ const every = (mode, names) => Object.fromEntries(Object.keys(names).map((k) => 
 
 // Effect switches take a mode: 'off' | 'mix' (comes and goes, re-rolled each look) | 'on'.
 export const DEFAULT_SETTINGS = {
+  world: 'bonfire',
+  page: 'dusk',
+  pageTurns: 'drops',
   sensitivity: 1, // onset thresholds (higher catches softer kicks)
   reactivity: 1.2, // how hard the fire answers
   offset: 40, // ms: beats this early, for render/display latency
