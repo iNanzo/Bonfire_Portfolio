@@ -862,7 +862,12 @@ four-argument `onImpact` after `swapTime`, at once for a same-weapon or `instant
 `release` returns `holding`, `swing` resolves false; `main.js` and `dialogs.js` (`REBUILD` +
 `world`) as Choosing and loading says; `world` (`'bonfire'`), `page` (`'dusk'`),
 `pageTurns` (`'drops'`) in `DEFAULT_SETTINGS` (`director.js:111-204`) and `CHOICES` (`settings.js:110-120`),
-`world` in `LOCAL` (`:122`)). Finish line: `test/newtWorld.test.mjs` (new): `fireDuck.js`
+`world` in `LOCAL` (`:122`); their three rows in the Show tab of `src/settingsMap.js`
+(imports nothing: page and world names are literals there; Title Case labels, hints 12–160
+chars), since `test/settingsMap.test.mjs:118-123` holds every setting to exactly one entry;
+the matching dropdown choices in `src/visualizer/settingsControls.js:OPTIONS`, so all three
+string settings render as selects rather than falling through to numeric ranges).
+Finish line: `test/newtWorld.test.mjs` (new): `fireDuck.js`
 imports no three.js (its specifiers read as `invitationContent.test.mjs:88-90` does); every
 member reached as `fire.`, `ctx.fire?.` or `candidate.` across `src/visualizer/*.js` (not
 `newt/`), found at run time by a regex that allows whitespace and newlines around the dot
@@ -916,8 +921,7 @@ follows the hold's anchor less the collar's height, as the toy's `main.js` moves
 run check`; `npm run coverage`. This is the first clip (below).
 
 **W3** (after W1a, rebasing on it: both touch `main.js`, `settings.js`, `dialogs.js`).
-`src/settingsMap.js` (imports nothing: page and world names are literals there): the `world`,
-`page` and `pageTurns` rows in Show (Title Case labels, hints 12–160 chars); a `worlds?:
+`src/settingsMap.js` (the `world`, `page` and `pageTurns` rows came with W1a): a `worlds?:
 ('bonfire'|'newt')[]` field on entries (default both); `blockedBy` (`:1696`) returns
 "Bonfire only" when the entry's `worlds` excludes `settings.world`, before the entry's own
 `needs` (one `Need` per entry, `:30-34`); bonfire-only: the Weapons group (with one weapon
@@ -1008,7 +1012,9 @@ applies the solved world deltas to the stand-in's bones (the `knights.js apply()
 and measures hands and sleeves against the skinned head meshes with
 `skinnedMesh`/`nearestDistance` moved from `invitationModel.test.mjs:238-257` into
 `test/lib/` (its `clearance()` is private and samples glb clips, not poses); every move and
-gesture 0 NaN inside the limits; nod, stomp, beckon ≥ 0.1 model units from the head; the
+gesture 0 NaN inside the limits; nod, stomp and beckon clear his head by the toy's own limits
+for his clips, hands ≥ 0.1 and sleeves ≥ 0.05 model units (`invitationModel.test.mjs:259-268`;
+measured in #64: stomp's sleeve 0.069, beckon's 0.080, their hands 0.67 and 0.35); the
 rest named in a `KNOWN_INTRUDING` set the test asserts against, so the later head pass flips
 them one by one; `npm run check`.
 
