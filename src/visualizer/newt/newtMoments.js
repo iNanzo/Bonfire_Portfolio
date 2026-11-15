@@ -1,5 +1,5 @@
 // The letter machines have one owner. Renderer bindings consume views and petal commands.
-import { createEnvelope, TIMES } from '../../invitation/envelope.js';
+import { createEnvelope, TIMES, BOB } from '../../invitation/envelope.js';
 import { PAGES } from './pages.js';
 export function createNewtMoments({
   onImpact = (..._args) => {},
@@ -10,7 +10,8 @@ export function createNewtMoments({
     nextId = 0,
     active = null,
     currentPage = settings.page ?? 'dusk',
-    turn = null;
+    turn = null,
+    beatAt = null;
   let features = {},
     commands = [];
   const letters = [];
@@ -122,6 +123,8 @@ export function createNewtMoments({
     step({ t: now, f = {}, events = [] }) {
       t = now;
       features = f;
+      const beat = f.beats?.at(-1);
+      if (beat) beatAt = t - (Number.isFinite(f.time) && Number.isFinite(beat.time) ? f.time - beat.time : 0);
       for (const letter of letters) letter.time = letter.born + (t - letter.born) * letter.pace;
       if (f.events?.includes('start')) {
         const waiting = letters.find((l) => l.kind === 'end' && l.env.state === 'floating');
@@ -145,6 +148,7 @@ export function createNewtMoments({
         f.build >= 0.9 ? 4 : 0,
       );
       if (active?.hold) {
+        if (!reduced && active.stage < 3 && stage >= 3) emit('ring', active);
         active.stage = Math.max(active.stage, stage);
         if (active.stage >= 4) open(active);
         if (active.released && f.events?.includes('drop') && f.drop === 'big') active.bigDrop = true;
@@ -174,8 +178,13 @@ export function createNewtMoments({
         .map((l) => {
           const pose = l.env.pose(l.time);
           if (l.kind === 'held' && l.env.state === 'floating') {
-            pose.push += 0.18 * (features.build ?? l.stage / 4);
-            pose.bloom = Math.max(pose.bloom, (features.build ?? l.stage / 4) * 0.3);
+            if (!reduced) {
+              const lift = features.build ?? l.stage / 4;
+              pose.push += 0.18 * lift;
+              if (l.stage >= 3) pose.bloom = Math.max(pose.bloom, (lift * 0.14) / 0.45);
+              if (features.locked && features.bpm > 0 && beatAt !== null)
+                pose.bob = BOB * Math.sin((2 * Math.PI * (t - beatAt)) / (60 / features.bpm));
+            }
           }
           return {
             id: l.id,

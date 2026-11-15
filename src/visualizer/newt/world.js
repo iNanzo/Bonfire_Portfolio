@@ -14,7 +14,7 @@ import { createFireDuck } from './fireDuck.js';
 import { createEnvelopeActor } from '../../invitation/envelopeActor.js';
 import { createPetalScene } from '../../invitation/petalScene.js';
 import { shared } from '../../invitation/envelopeLook.js';
-import { hoverLook } from '../../invitation/envelope.js';
+import { hoverLook, sealGloss } from '../../invitation/envelope.js';
 import { PAGES, pageOf, blendPages } from './pages.js';
 /** @param {HTMLElement} container @param {Record<string, any>} [options] */
 export function createWorld(container, options = {}) {
@@ -112,10 +112,12 @@ export function createWorld(container, options = {}) {
       actors.clear();
     });
     let swirl = 1,
-      pulseLevel = 0;
-    duck.pulse = (k = 1) => {
+      pulseLevel = 0,
+      glossAt = -Infinity;
+    duck.pulse = (k = 1, { accent = false } = {}) => {
       if (!reducedMotion && Number.isFinite(k) && k > 0) {
-        swirl = 1 + k * 0.2;
+        swirl = 1 - Math.min(1, k) * 0.2;
+        if (accent) glossAt = t;
         pulseLevel = Math.min(1, k);
       }
     };
@@ -154,6 +156,7 @@ export function createWorld(container, options = {}) {
             uniforms: shared({ mark: 0.1, linear: true }),
             snapSeal: true,
           });
+          actor.glossAt = -Infinity;
           actor.parent = new THREE.Group();
           actor.parent.add(actor.outer);
           scene.add(actor.parent);
@@ -165,6 +168,7 @@ export function createWorld(container, options = {}) {
             createPetalScene({ scene, unit: 1.1, reduced: reducedMotion, mark: 0.1, linear: true }),
           );
         }
+        if (picture.petals.some((command) => command.id === letter.id && command.kind === 'bloom')) actor.glossAt = t;
         actor.parent.position.set(letter.x, letter.y, 0);
         actor.parent.updateMatrixWorld(true);
         actor.pose(letter.pose, {
@@ -173,6 +177,13 @@ export function createWorld(container, options = {}) {
           reduced: reducedMotion,
           lift: hoverLook(pulseLevel),
         });
+        const gloss = sealGloss(
+          letter.state === 'floating' ? pulseLevel : 0,
+          t,
+          Math.min(t - glossAt, t - actor.glossAt),
+          reducedMotion,
+        );
+        actor.seal.gloss(gloss.at, gloss.width);
         const petals = petalScenes.get(letter.id);
         petals.letter(actor.inner.matrixWorld, {
           h: (actor.envl.H * 0.55 * letter.scale) / 1.1,

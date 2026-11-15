@@ -17,7 +17,18 @@ test('held build opens, strike burns once and changes page only on a big held dr
   const hits = [];
   const m = createNewtMoments({ onImpact: (...a) => hits.push(a) });
   const done = m.equip(selection, { hold: true });
-  m.step({ t: 1, f: { build: 0.5 }, events: [{ type: 'stage', data: { stage: 2 } }] });
+  const lifted = m.step({ t: 1, f: { build: 0.5 }, events: [{ type: 'stage', data: { stage: 2 } }] });
+  assert.ok(lifted.letters[0].pose.push > 0);
+  assert.equal(lifted.letters[0].pose.bloom, 0);
+  const cracked = m.step({ t: 1.5, f: { build: 0.7 }, events: [{ type: 'stage', data: { stage: 3 } }] });
+  assert.ok(cracked.letters[0].pose.bloom > 0);
+  assert.equal(cracked.petals.filter((command) => command.kind === 'ring').length, 1);
+  assert.equal(
+    m
+      .step({ t: 1.6, f: { build: 0.7 }, events: [{ type: 'stage', data: { stage: 3 } }] })
+      .petals.filter((command) => command.kind === 'ring').length,
+    0,
+  );
   assert.equal(m.holding, true);
   assert.equal(m.step({ t: 2, events: [{ type: 'stage', data: { stage: 4 } }] }).letters[0].state, 'opening');
   m.step({ t: 3 });
@@ -162,4 +173,23 @@ test('an end letter is reused at start; explicit Page changes cancel an in-progr
   assert.equal(m.page, 'dusk');
   m.dispose();
   assert.equal(m.step({ t: 4 }).letters.length, 0);
+});
+
+test('held letters bob on the beat grid; reduced motion lifts and cracks nothing', () => {
+  for (const reduced of [false, true]) {
+    const m = createNewtMoments({ reduced });
+    void m.equip(selection, { hold: true });
+    m.step({ t: 1, f: { time: 100, locked: true, bpm: 120, beats: [{ time: 100, beat: 0 }] } });
+    const view = m.step({
+      t: 1.125,
+      f: { time: 100.125, locked: true, bpm: 120, build: 0.7 },
+      events: [{ type: 'stage', data: { stage: 3 } }],
+    }).letters[0];
+    assert.ok(Math.abs(view.pose.bob - (reduced ? 0 : 0.03)) < 1e-12);
+    if (reduced) {
+      assert.equal(view.pose.push, 0);
+      assert.equal(view.pose.bloom, 0);
+    }
+    m.dispose();
+  }
 });
