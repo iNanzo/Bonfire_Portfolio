@@ -76,6 +76,20 @@ const FLAME_FPS_OPTIONS = [...new Set([...FLAME_FPS, DEFAULT_SETTINGS.flameFps])
  * @type {Record<string, string[][]>}
  */
 export const OPTIONS = {
+  world: [
+    ['bonfire', 'Bonfire'],
+    ['newt', 'NEWT'],
+  ],
+  page: [
+    ['white', 'White'],
+    ['cream', 'Cream'],
+    ['dusk', 'Dusk'],
+    ['night', 'Night'],
+  ],
+  pageTurns: [
+    ['off', 'Off'],
+    ['drops', 'On Drops'],
+  ],
   beatFrom: [
     ['music', 'The Music (Heard)'],
     ['link', 'Ableton Link (Helper App)'],

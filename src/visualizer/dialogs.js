@@ -22,7 +22,7 @@ export function createDialogs(ctx) {
   // --- Settings dialog (settingsDialog.js) ---------------------------------------------------------
   // Settings the scene is built with (particle counts size its buffers; the fireflies' trails
   // are made with it): changing one rebuilds it.
-  const REBUILD = ['particles', 'trails'];
+  const REBUILD = ['particles', 'trails', 'world'];
   const builtWith = () => REBUILD.map((k) => String(settings[k])).join();
   let built = builtWith();
   let rebuildTimer = 0;

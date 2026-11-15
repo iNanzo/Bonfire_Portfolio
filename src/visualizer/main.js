@@ -86,6 +86,9 @@ const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // --- Settings (this browser only: settings.js) -----------------------------------------------
 const settings = loadSettings();
+const worldQuery = new URLSearchParams(location.search);
+if (worldQuery.get('world') === 'newt') settings.world = 'newt';
+else if (worldQuery.has('scene')) settings.world = 'bonfire';
 // (Saving waits for changes to settle: what's waiting is written as the page goes or hides.)
 addEventListener('pagehide', flushSettings);
 document.addEventListener('visibilitychange', () => {
@@ -186,6 +189,7 @@ function onFrame(dt) {
   const f = (ctx.engine?.source && ctx.heard.take()) || IDLE;
   ctx.lastFeatures = f;
   ctx.director.update(f, dt);
+  ctx.fire.hear?.(f, dt);
   if (ctx.engine?.source) ctx.drawHud(f, dt);
 }
 /** Frame Rate as the scene's cap (only when it changed: a new cap starts its count again). */
@@ -218,9 +222,14 @@ let sceneGeneration = 0;
 function startScene() {
   const generation = ++sceneGeneration;
   applyDensity();
-  return import('../bonfire/scene.js')
-    .then(async ({ createBonfire }) => {
-      const candidate = createBonfire(stage, {
+  return (
+    settings.world === 'newt'
+      ? import('./newt/world.js').then((m) => m.createWorld)
+      : import('../bonfire/scene.js').then((m) => m.createBonfire)
+  )
+    .then(async (createScene) => {
+      const candidate = createScene(stage, {
+        page: settings.page,
         reducedMotion,
         sway: 0,
         lightTrails: settings.trails,
@@ -239,7 +248,12 @@ function startScene() {
         pageStats: () => (ctx.fire === candidate && ctx.director ? { show: ctx.director.status() } : null),
         statsParent: app,
       });
-      const nextDirector = createDirector(candidate, { settings, reducedMotion, onEvent, scenes: ctx.loopLibrary });
+      const nextDirector = createDirector(candidate, {
+        settings,
+        reducedMotion,
+        onEvent,
+        scenes: settings.world === 'newt' ? () => [] : ctx.loopLibrary,
+      });
       await candidate.ready;
       if (generation !== sceneGeneration) {
         candidate.dispose();
@@ -292,6 +306,7 @@ startScene();
 
 // --- Director events → page ------------------------------------------------------------------
 function onEvent(type, data = {}) {
+  ctx.fire?.onEvent?.(type, data);
   if (type === 'drop') {
     ctx.note('Drop!');
     live.textContent = 'Drop.';

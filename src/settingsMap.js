@@ -63,6 +63,7 @@ export const SECTIONS = [
     intro:
       'Play the moments from a pad controller: connect it, press Learn beside an action, then press the pad. The mapping stays with this computer.',
   },
+  { id: 'world', tab: 'show', label: 'World' },
   { id: 'reaction', tab: 'show', label: 'Reaction' },
   { id: 'weapons', tab: 'show', label: 'Weapons' },
   { id: 'living', tab: 'show', label: 'Living Weapon' },
@@ -187,6 +188,28 @@ export const SETTINGS = {
     hint: 'The port the Link bridge listens on (17001 unless you started it with --port).',
     keywords: ['ableton', 'carabiner', 'network'],
     needs: { live: { key: 'beatFrom', when: (v) => v !== 'link', reason: 'Only with Beat From: Ableton Link' } },
+  },
+
+  // --- Show › World
+  world: {
+    section: 'world',
+    label: 'World',
+    live: 'world',
+    simple: true,
+    hint: 'Choose Bonfire or NEWT. The visualizer rebuilds in that world when you close Settings.',
+  },
+  page: {
+    section: 'world',
+    label: 'Page',
+    live: 'page',
+    simple: true,
+    hint: 'Choose White, Cream, Dusk or Night paper for the next time the NEWT world opens.',
+  },
+  pageTurns: {
+    section: 'world',
+    label: 'Page Turns',
+    live: 'pageTurns',
+    hint: 'Choose whether letters turn on drops or stay on the same page.',
   },
 
   // --- Show › Reaction

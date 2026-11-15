@@ -861,3 +861,11 @@ test('the keyboard shortcuts: Shift+7 is title card 7 in the show even where it 
     globalThis.window = saved.window;
   }
 });
+
+test('old and invalid world saves load as bonfire', () => {
+  for (const saved of [{ world: 'x' }, {}]) {
+    localStorage.setItem('bonfire-live', JSON.stringify(saved));
+    assert.equal(loadSettings().world, 'bonfire');
+  }
+  localStorage.removeItem('bonfire-live');
+});

@@ -108,6 +108,9 @@ export const NUMERIC = new Set([
 // Settings with a fixed set of choices of more than one type (a number or 'random'), or
 // strings read without a fallback: a saved value is kept only if it's one of them.
 export const CHOICES = {
+  world: ['bonfire', 'newt'],
+  page: ['white', 'cream', 'dusk', 'night'],
+  pageTurns: ['off', 'drops'],
   knightCount: [1, 2, 3, 4, RANDOM],
   knightFormation: [...Object.keys(FORMATIONS), 'mix'],
   knightFinish: [...Object.keys(FINISHES), 'mix'],
@@ -119,7 +122,7 @@ export const CHOICES = {
   frameRate: ['display', '60', '30'],
 };
 // What a setup (or a preset) never changes: this computer's own things.
-export const LOCAL = ['deviceId', 'volume', 'view', 'frameRate', 'stats'];
+export const LOCAL = ['deviceId', 'volume', 'view', 'frameRate', 'stats', 'world'];
 export const CARD_SHOWS = {
   drops: 'On Drops (Taking Turns)',
   phrases: 'Every 32 Bars',
