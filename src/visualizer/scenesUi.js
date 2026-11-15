@@ -41,6 +41,7 @@ export function createScenesUi(ctx) {
    */
   let loopCache = { of: null, from: '', list: [] };
   function loopLibrary() {
+    if (settings.world === 'newt') return [];
     const all = library();
     if (loopCache.of !== all || loopCache.from !== settings.sceneFrom)
       loopCache = { of: all, from: settings.sceneFrom, list: scenesFrom(all, settings) };

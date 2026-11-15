@@ -144,6 +144,9 @@ export function createFireDuck({ onImpact = (..._args) => {}, page = 'dusk' } = 
     setScenery: () => false,
     setRender: noop,
     setPalette: noop,
+    setPage(key) {
+      page = key;
+    },
     setFog: noop,
     setShadows: noop,
     setXray: noop,

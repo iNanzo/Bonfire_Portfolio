@@ -30,6 +30,7 @@
  *   section: string, label: string, hint: string, more?: string, keywords?: string[], simple?: boolean,
  *   range?: [number, number, number, string?], live?: string, painter?: string, admin?: string,
  *   labels?: { live?: string, painter?: string, admin?: string }, hints?: { live?: string, painter?: string, admin?: string },
+ *   worlds?: ('bonfire'|'newt')[],
  *   mores?: { live?: string | null, painter?: string | null, admin?: string | null }, needs?: { live?: Need },
  * }} Entry
  */
@@ -203,13 +204,13 @@ export const SETTINGS = {
     label: 'Page',
     live: 'page',
     simple: true,
-    hint: 'Choose White, Cream, Dusk or Night paper for the next time the NEWT world opens.',
+    hint: 'Choose White, Cream, Dusk or Night paper. The NEWT page changes at once.',
   },
   pageTurns: {
     section: 'world',
     label: 'Page Turns',
     live: 'pageTurns',
-    hint: 'Choose whether letters turn on drops or stay on the same page.',
+    hint: 'Turn the page behind a held letter burning on a big drop, or keep the same paper.',
   },
 
   // --- Show › Reaction
@@ -264,7 +265,7 @@ export const SETTINGS = {
     label: 'Forge & Strike On Drops',
     live: 'autoDrops',
     simple: true,
-    hint: 'When the bass drops out, a new weapon is forged over the fire and held; when the drop hits, it slams in.',
+    hint: 'Forge and hold through the breakdown, then strike on the drop. Letters in the NEWT world need this on.',
     keywords: ['breakdown', 'forge', 'strike', 'weapon swap'],
   },
   phraseBars: {
@@ -1617,6 +1618,20 @@ const GROUPS = {
   admin: [],
 };
 /** Per app, binding → entry id. */
+// World availability belongs to each entry; the nine tabs and their bindings stay stable.
+const bonfireSections = new Set(SECTIONS.filter((s) => s.tab === 'cast' || s.tab === 'scenes').map((s) => s.id));
+for (const [id, entry] of Object.entries(SETTINGS)) {
+  if (
+    entry.live !== undefined &&
+    (bonfireSections.has(entry.section) ||
+      ['living'].includes(entry.section) ||
+      ['weapon', 'element', 'weapons', 'scenery', 'fog', 'knightGlow', 'knightRim', 'swingCam', 'swingEase'].includes(
+        id,
+      ))
+  )
+    entry.worlds = ['bonfire'];
+}
+
 const INDEX = Object.fromEntries(
   APPS.map((app) => [
     app,
@@ -1665,6 +1680,7 @@ export function meta(app, binding) {
     more: (e.mores && Object.hasOwn(e.mores, app) ? e.mores[app] : e.more) ?? '',
     adv: app === 'live' && !e.simple,
     needs: e.needs?.[app] ?? null,
+    worlds: e.worlds ?? ['bonfire', 'newt'],
     keywords: e.keywords ?? [],
     section: e.section,
   };
@@ -1716,7 +1732,9 @@ export function sharedRange(id) {
  * @param {Record<string, any>} settings
  */
 export function blockedBy(key, settings) {
-  const need = meta('live', key)?.needs;
+  const entry = meta('live', key);
+  if (entry && !entry.worlds.includes(settings?.world ?? 'bonfire')) return 'Bonfire only';
+  const need = entry?.needs;
   return need && need.when(settings?.[need.key], settings ?? {}) ? need.reason : null;
 }
 

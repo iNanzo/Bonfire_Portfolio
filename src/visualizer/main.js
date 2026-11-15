@@ -218,9 +218,16 @@ function applyDensity() {
   Object.assign(effects.fireflies, counts.fireflies);
 }
 
+// The world suppresses Living Weapon without overwriting the bonfire preference.
+const directorSettings = new Proxy(settings, {
+  get(target, key, receiver) {
+    return key === 'combos' && target.world === 'newt' ? -1 : Reflect.get(target, key, receiver);
+  },
+});
 let sceneGeneration = 0;
 function startScene() {
   const generation = ++sceneGeneration;
+  document.documentElement.dataset.world = settings.world;
   applyDensity();
   return (
     settings.world === 'newt'
@@ -249,7 +256,7 @@ function startScene() {
         statsParent: app,
       });
       const nextDirector = createDirector(candidate, {
-        settings,
+        settings: directorSettings,
         reducedMotion,
         onEvent,
         scenes: settings.world === 'newt' ? () => [] : ctx.loopLibrary,
@@ -295,6 +302,7 @@ function startScene() {
       // (The first build opens on ?scene= or a chip picked while it loaded.)
       const opening = prev ? playing : (playing ?? ctx.firstScene);
       if (opening) ctx.playScene(opening, { instant: true, lock: opening.ref === ctx.solo });
+      ctx.drawChips();
       stage.classList.add('is-ready');
       ctx.streamOutput();
     })
