@@ -1625,9 +1625,7 @@ for (const [id, entry] of Object.entries(SETTINGS)) {
     entry.live !== undefined &&
     (bonfireSections.has(entry.section) ||
       ['living'].includes(entry.section) ||
-      ['weapon', 'element', 'weapons', 'scenery', 'fog', 'knightGlow', 'knightRim', 'swingCam', 'swingEase'].includes(
-        id,
-      ))
+      ['echo', 'scenery', 'fog', 'knightGlow', 'knightRim', 'swingCam', 'swingEase'].includes(id))
   )
     entry.worlds = ['bonfire'];
 }

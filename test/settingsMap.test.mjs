@@ -575,6 +575,7 @@ test('the shared tables name things in Title Case, the same names everywhere', (
 
 test('bonfire-only entries carry world availability before their own need', () => {
   for (const key of [
+    'echo',
     'combos',
     'comboBars',
     'moves',
@@ -594,4 +595,17 @@ test('bonfire-only entries carry world availability before their own need', () =
     assert.deepEqual(entry.worlds, ['bonfire'], entry.id);
   assert.equal(blockedBy('autoDrops', { world: 'newt' }), null, 'letters still use Auto Drops');
   assert.equal(blockedBy('page', { world: 'newt' }), null);
+});
+
+test('NEWT keeps the Weapons rows that drive letters and rings available', () => {
+  const rows = entriesFor('live').filter((entry) => entry.section === 'weapons');
+  assert.ok(rows.length > 1);
+  for (const entry of rows) {
+    assert.deepEqual(
+      meta('live', entry.live).worlds,
+      entry.id === 'echo' ? ['bonfire'] : ['bonfire', 'newt'],
+      entry.id,
+    );
+  }
+  assert.equal(blockedBy('echo', { ...defaults(), world: 'bonfire' }), null);
 });

@@ -40,7 +40,7 @@ import { effects } from '../effects.js';
 import { ELEMENT_IDS } from '../effectsDefaults.js';
 import { elementOr } from '../elements.js';
 import { createFrame } from './frame.js';
-import { createFrameGate } from './frameGate.js';
+import { createFrameLoop, ownFrameRenderer, attachFrameCanvas, frameCapture } from './frameLoop.js';
 import { createFlame, createParticleMaterial, createEffectMaterial, SHAPE } from './flame.js';
 import { createInteraction } from './interaction.js';
 import { createSmokeMaterial } from './impact.js';
@@ -106,13 +106,7 @@ export function createBonfire(
     // given its GL objects back (resources.js). Then its context is let go at once, not whenever
     // the old canvas is collected: Bonfire Live rebuilds the scene when Particles or Trails
     // change, and each rebuild left a context behind (Chrome keeps 16 at most).)
-    scope.own({
-      dispose() {
-        renderer.dispose();
-        if (!renderer.getContext().isContextLost()) renderer.forceContextLoss();
-      },
-    });
-    scope.cleanup(() => renderer.setAnimationLoop(null));
+    ownFrameRenderer(scope, renderer);
     renderer.setPixelRatio(1);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.shadowMap.enabled = !coarse;
@@ -123,20 +117,7 @@ export function createBonfire(
     renderer.shadowMap.autoUpdate = false;
     renderer.autoClear = false;
     renderer.info.autoReset = false; // (counted over the whole frame, all passes: see stats())
-    const canvas = renderer.domElement;
-    canvas.className = 'bonfire-canvas';
-    canvas.setAttribute('aria-hidden', 'true');
-    container.appendChild(canvas);
-    scope.cleanup(() => canvas.remove());
-    canvas.addEventListener(
-      'webglcontextlost',
-      (event) => {
-        event.preventDefault();
-        scope.dispose();
-        onError?.(new Error('WebGL context lost'));
-      },
-      { signal: events.signal },
-    );
+    const canvas = attachFrameCanvas(scope, renderer, container, onError);
 
     const scene = scope.trackTree(new THREE.Scene());
     const voidColor = new THREE.Color(base.void);
@@ -546,85 +527,23 @@ export function createBonfire(
     // variables place it: ui/perfOverlay.js; the body by default). With ?perf, the same times as
     // performance.measure entries for the browser's profiler. Off, nothing is timed or counted,
     // and the overlay's code isn't even loaded.
-    ctx.perf = null;
-    const perfAsked = new URLSearchParams(location.search).has('perf');
-    let statsWanted = false;
-    let statsLoading = false;
-    const statsOn = () => (perfAsked || statsWanted) && !scope.disposed;
-    function syncStats() {
-      if (!statsOn()) {
-        ctx.perf?.dispose();
-        ctx.perf = null;
-        return;
-      }
-      if (ctx.perf || statsLoading) return;
-      statsLoading = true;
-      import('../ui/perfOverlay.js').then(
-        ({ createPerfOverlay }) => {
-          statsLoading = false;
-          if (!statsOn() || ctx.perf) return;
-          ctx.perf = createPerfOverlay({
-            info: renderer.info,
-            maxFps: () => gate.maxFps,
-            particles: () => {
-              const s = stats();
-              return [...s.systems, ...s.extra];
-            },
-            page: pageStats,
-            measures: perfAsked,
-            ...(statsParent ? { parent: statsParent } : {}),
-          });
-        },
-        (error) => {
-          statsLoading = false;
-          console.warn('The stats overlay did not load.', error);
-        },
-      );
-    }
-    scope.cleanup(() => {
-      ctx.perf?.dispose();
-      ctx.perf = null;
+    const loop = createFrameLoop({
+      renderer,
+      scope,
+      ctx,
+      ready: () => ctx.ready,
+      clock: timer,
+      draw: renderFrame,
+      onTick,
+      onError,
+      pageStats,
+      statsParent,
+      particles: () => {
+        const s = stats();
+        return [...s.systems, ...s.extra];
+      },
     });
-    syncStats();
-
-    // The loop runs at the display's rate. With a cap (setMaxFps; none unless asked: every frame
-    // the display shows is drawn), the frames in between are skipped: the scene's clock, the
-    // page's onFrame and everything after it run only on the frames that are drawn, while
-    // onTick(dt) runs on every one (Bonfire Live's audio analysis keeps its time resolution).
-    const gate = createFrameGate();
-    let lastTick = -1;
-    let running = false;
-    function syncRunning() {
-      const should = ctx.ready && !scope.disposed && !document.hidden;
-      if (should === running) return;
-      running = should;
-      if (running) {
-        timer.reset();
-        lastTick = -1;
-      } // (the time it was paused doesn't count)
-      renderer.setAnimationLoop(
-        running
-          ? (now) => {
-              const tickMs = lastTick < 0 ? 0 : now - lastTick;
-              lastTick = now;
-              try {
-                if (onTick) {
-                  const t0 = ctx.perf ? performance.now() : 0;
-                  onTick(Math.min(tickMs / 1000, 0.1));
-                  ctx.perf?.tick(t0, performance.now()); // (outside renderFrame's parts: its own)
-                }
-                if (!gate.due(tickMs)) return;
-                timer.update(); // (performance.now(), like reset(): never a negative step)
-                renderFrame(Math.min(timer.getDelta(), 0.1));
-              } catch (error) {
-                scope.dispose();
-                onError?.(error);
-              }
-            }
-          : null,
-      );
-    }
-    document.addEventListener('visibilitychange', syncRunning, { signal: events.signal });
+    const { gate, syncRunning, statsOn } = loop;
     // Only one readiness promise owns startup failures; callers handle its rejection. The
     // shaders are built before the first frame (frame.compile: in parallel where the browser
     // can), so drawing it doesn't stall on them.
@@ -735,7 +654,7 @@ export function createBonfire(
         return ctx.sceneryKey;
       },
       /** This frame as a PNG (resolves with a Blob), at the screen's size with hard pixel edges. */
-      capture: frame.capture,
+      ...frameCapture(frame),
       setView: view.setView,
       /**
        * The next frame as a small picture (a scene's thumbnail): w×h (192×108 by default), the
@@ -743,7 +662,6 @@ export function createBonfire(
        * URL (the browser's PNG where it can't make WebP; null if it fails). Cheap: no full-size
        * copy, and the encoding is the browser's, off the page's thread.
        */
-      captureThumb: (w = 192, h = 108) => frame.thumb(w, h),
       /**
        * Draw at most `fps` frames a second (0: every frame the display shows, the default). The
        * animation loop keeps the display's rate for onTick; the frames between are skipped.
@@ -758,8 +676,7 @@ export function createBonfire(
        * frames, the particles running and the page's own part (createBonfire's pageStats).
        */
       setStats(on) {
-        statsWanted = !!on;
-        syncStats();
+        loop.setStats(on);
       },
       /** The stats overlay is showing (or on its way). */
       get statsShown() {
@@ -770,7 +687,6 @@ export function createBonfire(
         return canvas;
       },
       /** Call `fn` right after every frame is drawn, while the canvas still holds it (recording a clip). Returns an unsubscribe. */
-      onRendered: frame.onRendered,
       setPose: view.setPose,
       viewAxes: view.axes,
       cycle,
