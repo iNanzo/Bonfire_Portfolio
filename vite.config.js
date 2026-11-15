@@ -36,6 +36,8 @@ function routePages() {
       root = config.root;
     },
     async closeBundle() {
+      // A guard can reject the bundle before its HTML is written; preserve that error.
+      if (!existsSync(resolve(outDir, 'index.html'))) return;
       const template = readFileSync(resolve(outDir, 'index.html'), 'utf8');
       const ids = [featured, ...projects, ...archive.filter((a) => a.images?.length)].map((p) => p.id);
       const routes = [...screens.filter((s) => s.id !== 'home').map((s) => s.id), ...ids.map((id) => `projects/${id}`)];
@@ -159,6 +161,12 @@ export function unlockLoad(bundle) {
   }
   return { stray, gzip };
 }
+/** Modules that must remain behind Bonfire Live's dynamic world import. */
+export function liveLoad(bundle) {
+  return firstLoadModules(bundle, 'visualizer').filter((id) =>
+    /[\\/]src[\\/](invitation[\\/]|visualizer[\\/]newt[\\/])/.test(id),
+  );
+}
 function firstLoadGuard() {
   return {
     name: 'first-load-guard',
@@ -168,6 +176,11 @@ function firstLoadGuard() {
       if (stray.length)
         this.warn(
           `The portfolio's first load carries Bonfire Live / Painter / campfire game / invitation toy / lock page modules: ${stray.map(shortId).join(', ')}. Import what pulls them in lazily (import()) from the site.`,
+        );
+      const live = liveLoad(bundle);
+      if (live.length)
+        this.error(
+          `Bonfire Live first load includes ${live.map(shortId).join(', ')}; load the NEWT world through import().`,
         );
       const lock = unlockLoad(bundle);
       if (lock.stray.length)
