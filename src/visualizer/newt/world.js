@@ -11,13 +11,22 @@ import { effects } from '../../effects.js';
 import { debugPalettes } from '../../palette.js';
 import { fitShadow } from '../../invitation/floor.js';
 import { createFireDuck } from './fireDuck.js';
-import { pageOf } from './pages.js';
+import { createEnvelopeActor } from '../../invitation/envelopeActor.js';
+import { createPetalScene } from '../../invitation/petalScene.js';
+import { shared } from '../../invitation/envelopeLook.js';
+import { hoverLook } from '../../invitation/envelope.js';
+import { PAGES, pageOf, blendPages } from './pages.js';
 /** @param {HTMLElement} container @param {Record<string, any>} [options] */
 export function createWorld(container, options = {}) {
   const { reducedMotion = false, onTick, onFrame, onError, pageStats, statsParent } = options;
   const scope = createResourceScope();
-  const page = pageOf(options.page);
-  const duck = createFireDuck({ onImpact: options.onImpact, page: options.page });
+  let page = pageOf(options.page);
+  const duck = createFireDuck({
+    onImpact: options.onImpact,
+    page: options.page,
+    settings: options.settings,
+    reduced: reducedMotion,
+  });
   try {
     // Copied from src/bonfire/scene.js: renderer ownership and context teardown.
     const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, powerPreference: 'high-performance' });
@@ -51,7 +60,7 @@ export function createWorld(container, options = {}) {
       },
       { signal: events.signal },
     );
-    const scene = scope.trackTree(new THREE.Scene());
+    const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 80);
     const view = createView(camera, { reducedMotion, sway: 0 });
     const layers = { solid: 0, fx: 1, ghost: 2 };
@@ -85,13 +94,121 @@ export function createWorld(container, options = {}) {
     paper.rotation.x = -Math.PI / 2;
     paper.receiveShadow = true;
     paper.layers.set(layers.ghost);
+    scope.trackTree(paper);
     scene.add(paper);
     scene.add(new THREE.HemisphereLight(0xffffff, 0x817781, 2));
     const sun = new THREE.DirectionalLight(0xffffff, 2);
     sun.position.set(-3, 7, 4);
     sun.castShadow = true;
     fitShadow(sun, { minX: -7, maxX: 7, minZ: -7, maxZ: 7 }, 2);
+    scope.trackTree(sun);
     scene.add(sun, sun.target);
+    const actors = new Map();
+    const petalScenes = new Map();
+    scope.cleanup(() => {
+      for (const petals of petalScenes.values()) petals.dispose();
+      petalScenes.clear();
+      for (const actor of actors.values()) actor.dispose();
+      actors.clear();
+    });
+    let swirl = 1,
+      pulseLevel = 0;
+    duck.pulse = (k = 1) => {
+      if (!reducedMotion && Number.isFinite(k) && k > 0) {
+        swirl = 1 + k * 0.2;
+        pulseLevel = Math.min(1, k);
+      }
+    };
+    const baseSnapshot = duck.snapshot;
+    duck.snapshot = () => {
+      const snapshot = baseSnapshot();
+      return {
+        ...snapshot,
+        letter: snapshot.letter
+          ? {
+              ...snapshot.letter,
+              seal: actors.get(snapshot.letter.id)?.sealAt ?? null,
+              frame: actors.has(snapshot.letter.id)
+                ? new THREE.Vector3().setFromMatrixPosition(actors.get(snapshot.letter.id).inner.matrixWorld)
+                : null,
+            }
+          : null,
+        petals: [...petalScenes.values()].reduce((n, petals) => n + petals.live(), 0),
+      };
+    };
+    function letters(dt) {
+      const picture = duck.moments;
+      const alive = new Set(picture.letters.map((l) => l.id));
+      for (const [id, actor] of actors)
+        if (!alive.has(id)) {
+          actor.dispose();
+          petalScenes.get(id)?.letter(null);
+          actor.parent.removeFromParent();
+          actors.delete(id);
+        }
+      for (const letter of picture.letters) {
+        let actor = actors.get(letter.id);
+        if (!actor) {
+          actor = createEnvelopeActor({
+            size: () => ({ tw: size.w, th: size.h }),
+            uniforms: shared({ mark: 0.1, linear: true }),
+            snapSeal: true,
+          });
+          actor.parent = new THREE.Group();
+          actor.parent.add(actor.outer);
+          scene.add(actor.parent);
+          actor.seal.group.traverse((o) => o.layers.set(layers.ghost));
+          actor.specks.points.layers.set(layers.ghost);
+          actors.set(letter.id, actor);
+          petalScenes.set(
+            letter.id,
+            createPetalScene({ scene, unit: 1.1, reduced: reducedMotion, mark: 0.1, linear: true }),
+          );
+        }
+        actor.parent.position.set(letter.x, letter.y, 0);
+        actor.parent.updateMatrixWorld(true);
+        actor.pose(letter.pose, {
+          view: { h: 4, cssH: container.clientHeight || 1, scale: 0.55 * letter.scale },
+          camera,
+          reduced: reducedMotion,
+          lift: hoverLook(pulseLevel),
+        });
+        const petals = petalScenes.get(letter.id);
+        petals.letter(actor.inner.matrixWorld, {
+          h: (actor.envl.H * 0.55 * letter.scale) / 1.1,
+          opening: letter.pose.flap / Math.PI,
+          floating: letter.state === 'floating',
+          time: letter.time,
+        });
+      }
+      for (const command of picture.petals) {
+        const actor = actors.get(command.id);
+        if (actor)
+          petalScenes
+            .get(command.id)
+            ?.emit(command.kind, new THREE.Vector3().setFromMatrixPosition(actor.inner.matrixWorld));
+      }
+      pulseLevel *= Math.exp(-dt * 8);
+      swirl += (1 - swirl) * Math.min(1, dt * 5);
+      for (const [id, petals] of petalScenes) {
+        petals.flow.setSwirlScale(swirl);
+        petals.step(dt);
+        if (!alive.has(id) && !petals.live()) {
+          petals.dispose();
+          petalScenes.delete(id);
+        }
+      }
+      const next = picture.page
+        ? blendPages(picture.page.from, picture.page.to, picture.page.k)
+        : (Object.values(PAGES).find((p) => p.name === baseSnapshot().page.name) ?? PAGES.dusk);
+      if (next !== page) {
+        page = next;
+        voidColor.set(page.color);
+        paper.material.color.set(page.ink);
+        setPalette();
+        frame.reset();
+      }
+    }
     const settings = { pixelSize: null };
     let size = { w: 1, h: 1, pd: 4 };
     const renderOverride = {};
@@ -201,6 +318,7 @@ export function createWorld(container, options = {}) {
       duck.step(dt);
       t += dt;
       view.apply(dt, size, { sx: 0, sy: 0 });
+      letters(dt);
       // Copied from src/bonfire/sceneUpdate.js: pass writes before frame.draw.
       for (const [k, u] of Object.entries(GLITCH_UNIFORMS))
         pass.uniforms[u].value = passValue(k, duck.glitch[k], stillOpts);

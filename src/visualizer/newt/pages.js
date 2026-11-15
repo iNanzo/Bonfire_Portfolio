@@ -21,3 +21,23 @@ export const PAGES = {
   night: entry('Night', 0x14121a, 0xe8dcc8, false),
 };
 export const pageOf = (key) => PAGES[key] ?? PAGES.dusk;
+
+// The page turn blends the void, ink and palette on the same clock in linear light.
+const linear = (v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+const srgb = (v) => (v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055);
+export function blendPages(from, to, amount) {
+  const a = pageOf(from),
+    b = pageOf(to),
+    k = Math.max(0, Math.min(1, amount));
+  const color = (x, y) =>
+    rgb(x)
+      .map((v, i) => Math.round(srgb(linear(v) * (1 - k) + linear(rgb(y)[i]) * k) * 255))
+      .reduce((hex, v) => (hex << 8) | v, 0);
+  return {
+    ...b,
+    color: color(a.color, b.color),
+    ink: color(a.ink, b.ink),
+    palette: a.palette.map((v, i) => color(v, b.palette[i])),
+    tones: a.tones.map((v, i) => color(v, b.tones[i])),
+  };
+}

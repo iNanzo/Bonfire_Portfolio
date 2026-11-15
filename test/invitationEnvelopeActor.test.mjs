@@ -79,3 +79,24 @@ test('look mark and linear seams default to the toy and opt into the Live buffer
   const b = createEnvelopeActor();
   assert.notDeepEqual(a.specks.geo.attributes.color.array, b.specks.geo.attributes.color.array);
 });
+
+test('actor disposal is idempotent and specks share live mark/linear uniforms', () => {
+  const u = shared({ mark: 0.2, linear: true });
+  const actor = createEnvelopeActor({ uniforms: u });
+  assert.equal(actor.specks.points.material.uniforms.uMark, u.uMark);
+  const before = [...actor.specks.geo.attributes.color.array];
+  const geometries = new Set(),
+    materials = new Set();
+  actor.outer.traverse((o) => {
+    if (o.geometry) geometries.add(o.geometry);
+    if (o.material) for (const m of [o.material].flat()) materials.add(m);
+  });
+  let disposed = 0;
+  for (const g of [...geometries, ...materials]) g.addEventListener('dispose', () => disposed++);
+  u.uLinear.value = 0;
+  actor.specks.sync();
+  assert.notDeepEqual([...actor.specks.geo.attributes.color.array], before);
+  actor.dispose();
+  actor.dispose();
+  assert.equal(disposed, geometries.size + materials.size);
+});
