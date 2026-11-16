@@ -924,11 +924,15 @@ run check`; `npm run coverage`. This is the first clip (below).
 `src/settingsMap.js` (the `world`, `page` and `pageTurns` rows came with W1a): a `worlds?:
 ('bonfire'|'newt')[]` field on entries (default both); `blockedBy` (`:1696`) returns
 "Bonfire only" when the entry's `worlds` excludes `settings.world`, before the entry's own
-`needs` (one `Need` per entry, `:30-34`); bonfire-only: the Weapons group (with one weapon
-enabled `nextWeapon()` has nothing to draw, `director.js:330`), the Living Weapon rows
+`needs` (one `Need` per entry, `:30-34`); bonfire-only: Outline Burst (`echo`: it bursts an outline
+of the planted weapon, and there is none here), the Living Weapon rows
 (`combos`, `comboBars`, `moves`, `rhythm`, `swingCam`, `swingEase`; `combos` is forced to −1,
 "never", in this world so the director asks the duck for no swing), the Cast and Scenes tabs'
-rows, Scenery, Fog, Edge Glow; the Auto Drops hint says letters need it. No start-screen
+rows, Scenery, Fog, Edge Glow; the Auto Drops hint says letters need it. The rest of the
+Weapons section stays: Auto Drops, Every N Bars (`phraseBars`), Elements and Extra Ring Every
+drive the letters and the rings; the weapons themselves come from the admin's content
+(`drawnWeapons()`, `director.js:318`), not a Live setting, so there is no weapon list to
+hide. No start-screen
 switch (Later, Choosing and loading). A `data-world` attribute on `<html>`; CSS hides
 the Living Weapon button, the Dance button (until D3) and the pack in the newt world
 (`markup.js:137-153`; `packUi.js:18-30,64`); no relabels, no keys variant (A floats a letter,
