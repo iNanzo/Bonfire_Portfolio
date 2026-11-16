@@ -52,6 +52,7 @@ export function createDialogs(ctx) {
     ctx.applyFrameRate();
     ctx.applyStats();
     ctx.director?.applyRender();
+    if (keys.includes('page')) ctx.fire?.setPage?.(settings.page);
     const held = !!ctx.director?.sceneRef;
     if (settings.scenery !== 'mix' && (!held || keys.includes('scenery'))) ctx.fire?.setScenery(settings.scenery);
     if (!held || keys.includes('shot')) ctx.director?.setShot(settings.shot);
