@@ -1703,3 +1703,10 @@ body.is-recording .viz-record [data-record-label]::before {
     transform: none;
   }
 }
+
+/* These controls belong to the bonfire cast and weapon choreography. */
+html[data-world='newt'] [data-act='combo'],
+html[data-world='newt'] [data-act='dance'],
+html[data-world='newt'] .pack {
+  display: none;
+}
