@@ -13,6 +13,7 @@ import { BONES } from '../../invitation/clips.js';
 import { createMix, mixStep, lookAim } from '../../invitation/play.js';
 import { fitShadow } from '../../invitation/floor.js';
 import { createFireDuck } from './fireDuck.js';
+import { createElementRings } from './elementRings.js';
 import { createEnvelopeActor } from '../../invitation/envelopeActor.js';
 import { createPetalScene } from '../../invitation/petalScene.js';
 import { shared } from '../../invitation/envelopeLook.js';
@@ -23,8 +24,13 @@ export function createWorld(container, options = {}) {
   const { reducedMotion = false, onTick, onFrame, onError, pageStats, statsParent } = options;
   const scope = createResourceScope();
   let page = pageOf(options.page);
+  let rings;
   const duck = createFireDuck({
-    onImpact: options.onImpact,
+    onImpact: (flame, old, stationary, selection) => {
+      if (!stationary) rings?.impact(selection.element, flame);
+      else rings?.setElement(selection.element, flame);
+      options.onImpact?.(flame, old, stationary, selection);
+    },
     page: options.page,
     settings: options.settings,
     reduced: reducedMotion,
@@ -58,6 +64,22 @@ export function createWorld(container, options = {}) {
       track: scope.trackTree,
     });
     const { pass } = frame;
+    rings = createElementRings({
+      scene,
+      frame,
+      scope,
+      page: () => duck.snapshot().page.name.toLowerCase(),
+      letter: () => duck.snapshot().letter?.frame ?? null,
+      reducedMotion,
+    });
+    duck.ring = rings.ring;
+    const onEvent = duck.onEvent;
+    duck.onEvent = (type, data) => {
+      onEvent(type, data);
+      if (type === 'dropfx') rings.ring(data?.strength ?? 1);
+    };
+    const snapshot = duck.snapshot;
+    duck.snapshot = () => ({ ...snapshot(), rings: { element: rings.element, marks: rings.marks.count } });
     const paper = new THREE.Mesh(
       new THREE.PlaneGeometry(14, 14),
       new THREE.ShadowMaterial({
@@ -175,6 +197,10 @@ export function createWorld(container, options = {}) {
         });
       }
       for (const command of picture.petals) {
+        if (command.kind === 'ring') {
+          rings.ring(1);
+          continue;
+        }
         if (command.kind === 'cut') {
           for (const petals of petalScenes.values()) petals.cut(0.35);
           continue;
@@ -292,6 +318,7 @@ export function createWorld(container, options = {}) {
       const t0 = loop.perf ? performance.now() : 0;
       onFrame?.(dt);
       duck.step(dt);
+      rings.step(dt);
       t += dt;
       view.apply(dt, size, { sx: 0, sy: 0 });
       letters(dt);
