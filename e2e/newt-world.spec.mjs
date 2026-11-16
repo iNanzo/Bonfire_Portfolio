@@ -129,6 +129,29 @@ test('Night drop builds page effects and Dusk fire leaves a darker scorch', asyn
   expect(errors).toEqual([]);
 });
 
+test('world hides bonfire controls and Page changes immediately without rebuilding', async ({ page }) => {
+  await ready(page);
+  await expect(page.locator('html')).toHaveAttribute('data-world', 'newt');
+  await expect(page.locator('.viz-scene-chip')).toHaveCount(0);
+  await expect(page.locator('.pack')).toBeHidden();
+  await expect(page.locator('[data-act="combo"]')).toBeHidden();
+  await expect(page.locator('[data-act="dance"]')).toBeHidden();
+  await page.locator('canvas.bonfire-canvas').evaluate((canvas) => {
+    canvas.dataset.sameWorld = 'yes';
+  });
+  await page.keyboard.press('s');
+  await page.locator('[data-tab="show"]').click();
+  await page.locator('[data-set="page"]').selectOption('cream');
+  await expect.poll(() => page.evaluate(() => window.__viz.fire.snapshot().page.name)).toBe('Cream');
+  await expect(page.locator('canvas.bonfire-canvas')).toHaveAttribute('data-same-world', 'yes');
+  await page.locator('[data-set="world"]').selectOption('bonfire');
+  await expect
+    .poll(() => page.evaluate(() => typeof window.__viz.fire.snapshot), { timeout: 30_000 })
+    .toBe('undefined');
+  await expect(page.locator('html')).toHaveAttribute('data-world', 'bonfire');
+  await expect(page.locator('.pack')).toBeVisible();
+});
+
 test('floating letter seal snapshots equal the half-texel values actually placed', async ({ page }) => {
   await ready(page);
   await page.evaluate(() => {

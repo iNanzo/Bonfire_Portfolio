@@ -572,3 +572,40 @@ test('the shared tables name things in Title Case, the same names everywhere', (
   assert.deepEqual(Object.keys(CAMERA_MODES), ['still', 'drift', 'cuts']);
   assert.ok(Object.keys(CAMERA_MODES).includes(defaults().camera));
 });
+
+test('bonfire-only entries carry world availability before their own need', () => {
+  for (const key of [
+    'echo',
+    'combos',
+    'comboBars',
+    'moves',
+    'rhythm',
+    'swingCam',
+    'swingEase',
+    'scenery',
+    'fog',
+    'knightGlow',
+    'knightRim',
+  ]) {
+    assert.deepEqual(meta('live', key).worlds, ['bonfire'], key);
+    assert.equal(blockedBy(key, { world: 'newt', knightGlow: 'off' }), 'Bonfire only', key);
+  }
+  const tabs = new Map(SECTIONS.map((s) => [s.id, s.tab]));
+  for (const entry of entriesFor('live').filter((e) => ['cast', 'scenes'].includes(tabs.get(e.section))))
+    assert.deepEqual(entry.worlds, ['bonfire'], entry.id);
+  assert.equal(blockedBy('autoDrops', { world: 'newt' }), null, 'letters still use Auto Drops');
+  assert.equal(blockedBy('page', { world: 'newt' }), null);
+});
+
+test('NEWT keeps the Weapons rows that drive letters and rings available', () => {
+  const rows = entriesFor('live').filter((entry) => entry.section === 'weapons');
+  assert.ok(rows.length > 1);
+  for (const entry of rows) {
+    assert.deepEqual(
+      meta('live', entry.live).worlds,
+      entry.id === 'echo' ? ['bonfire'] : ['bonfire', 'newt'],
+      entry.id,
+    );
+  }
+  assert.equal(blockedBy('echo', { ...defaults(), world: 'bonfire' }), null);
+});

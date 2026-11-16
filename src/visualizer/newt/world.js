@@ -228,7 +228,7 @@ export function createWorld(container, options = {}) {
         page = next;
         voidColor.set(page.color);
         paper.material.color.set(page.ink);
-        setPalette();
+        setPalette(paletteChoice);
         frame.reset();
       }
     }
@@ -279,7 +279,9 @@ export function createWorld(container, options = {}) {
     const observer = new ResizeObserver(resize);
     observer.observe(container);
     scope.cleanup(() => observer.disconnect());
+    let paletteChoice = null;
     function setPalette(p = null) {
+      paletteChoice = p;
       if (Array.isArray(p)) pass.setPalette(p.map((i) => page.palette[i] ?? page.ink));
       else if (p && p !== 'flame' && debugPalettes[p]) pass.setPalette(debugPalettes[p]);
       else {
@@ -287,6 +289,15 @@ export function createWorld(container, options = {}) {
         pass.setSteel(page.tones);
       }
       pass.uniforms.uCore.value.set(page.palette[8]);
+    }
+    const setDuckPage = duck.setPage;
+    function setPage(key) {
+      page = pageOf(key);
+      setDuckPage(key);
+      voidColor.set(page.color);
+      paper.material.color.set(page.ink);
+      setPalette(paletteChoice);
+      frame.reset();
     }
     setPalette();
     resize();
@@ -372,6 +383,7 @@ export function createWorld(container, options = {}) {
       }),
       setRender,
       setPalette,
+      setPage,
       setXray: (v) => {
         pass.uniforms.uXray.value = { normals: 1, lighting: 2, particles: 3 }[v] ?? 0;
       },
