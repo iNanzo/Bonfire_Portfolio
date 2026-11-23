@@ -776,3 +776,29 @@ test('the HUD stays while the mouse rests on it (its tip with it), and fades whe
   await expect(page.locator('body')).toHaveClass(/is-idle/, { timeout: 8000 });
   expect(errors).toEqual([]);
 });
+
+test('NEWT disables bonfire-only rows and explains why, Bonfire enables them', async ({ page }) => {
+  await open(page, '?bench');
+  await page.keyboard.press('s');
+  await page.locator('[data-view-pick][value="all"]').check();
+  for (const world of ['newt', 'bonfire']) {
+    await page.locator('[data-tab="show"]').click();
+    await page.locator('[data-set="world"]').selectOption(world);
+    for (const [key, tab] of [
+      ['combos', 'show'],
+      ['echo', 'show'],
+      ['fog', 'picture'],
+    ]) {
+      await page.locator('[data-tab="' + tab + '"]').click();
+      const row = page.locator('[data-row="' + key + '"]');
+      await expect(row).toHaveAttribute('data-blocked', String(world === 'newt'));
+      const controls = row.locator('select[data-set], input[data-set]:not(fieldset.tri input), fieldset.tri');
+      for (const control of await controls.all()) {
+        if (world === 'newt') await expect(control).toBeDisabled();
+        else await expect(control).toBeEnabled();
+      }
+      if (world === 'newt') await expect(row.locator('[data-why]')).toHaveText('Bonfire only');
+      else await expect(row.locator('[data-why]')).toBeHidden();
+    }
+  }
+});

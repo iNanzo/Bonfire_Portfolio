@@ -199,3 +199,57 @@ test('a held letter at stage three emits a ring before release', async ({ page }
   await expect.poll(() => page.evaluate(() => window.__viz.fire.snapshot().rings.marks)).toBeGreaterThan(before);
   expect(await page.evaluate(() => window.__viz.fire.snapshot().holding)).toBe(true);
 });
+
+test('switching a playing Bonfire scene to NEWT clears the scene and its chips', async ({ page }) => {
+  await ready(page, '/visualizer/?bench');
+  const chip = page.locator('[data-scene-chip]').first();
+  const ref = await chip.getAttribute('data-scene-chip');
+  await chip.click();
+  await expect.poll(() => page.evaluate(() => window.__viz.director.sceneRef)).toBe(ref);
+  await page.keyboard.press('s');
+  await page.locator('[data-tab="show"]').click();
+  await page.locator('[data-set="world"]').selectOption('newt');
+  await expect.poll(() => page.evaluate(() => typeof window.__viz.fire.snapshot), { timeout: 30_000 }).toBe('function');
+  await expect(page.locator('.viz-scene-chip')).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => window.__viz.director.sceneRef)).toBeNull();
+  await page.locator('[data-tab="scenes"]').click();
+  await page.locator('[data-scene-play]').first().click();
+  await expect(page.locator('[data-settings]')).toBeVisible();
+  expect(await page.evaluate(() => window.__viz.director.sceneRef)).toBeNull();
+  await page.locator('[data-tab="show"]').click();
+  await page.locator('[data-set="world"]').selectOption('bonfire');
+  await expect
+    .poll(() => page.evaluate(() => typeof window.__viz.fire.snapshot), { timeout: 30_000 })
+    .toBe('undefined');
+  expect(await page.evaluate(() => window.__viz.director.sceneRef)).toBeNull();
+});
+
+test('a live Cream page change paints the corner and the whole frame in its palette', async ({ page }) => {
+  await ready(page);
+  await page.keyboard.press('s');
+  await page.locator('[data-tab="show"]').click();
+  await page.locator('[data-set="page"]').selectOption('cream');
+  await expect.poll(() => page.evaluate(() => window.__viz.fire.snapshot().page.name)).toBe('Cream');
+  const url = await page.evaluate(async () => {
+    const blob = await window.__viz.fire.capture();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.readAsDataURL(blob);
+    });
+  });
+  const png = Buffer.from(url.split(',')[1], 'base64');
+  const { data, info } = await sharp(png).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const palette = new Set(PAGES.cream.palette);
+  const unexpected = new Set();
+  const corner = new Set();
+  for (let y = 0; y < info.height; y++)
+    for (let x = 0; x < info.width; x++) {
+      const i = (y * info.width + x) * 3;
+      const color = (data[i] << 16) | (data[i + 1] << 8) | data[i + 2];
+      if (!palette.has(color)) unexpected.add(color);
+      if (x < Math.floor(info.width / 10) && y < Math.floor(info.height / 10)) corner.add(color);
+    }
+  expect([...corner]).toEqual([PAGES.cream.color]);
+  expect([...unexpected]).toEqual([]);
+});
