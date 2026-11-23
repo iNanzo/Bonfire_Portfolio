@@ -792,7 +792,7 @@ test('NEWT disables bonfire-only rows and explains why, Bonfire enables them', a
       await page.locator('[data-tab="' + tab + '"]').click();
       const row = page.locator('[data-row="' + key + '"]');
       await expect(row).toHaveAttribute('data-blocked', String(world === 'newt'));
-      const controls = row.locator('select[data-set], input[data-set]:not(fieldset.tri input), fieldset.tri');
+      const controls = row.locator('select[data-set], input');
       for (const control of await controls.all()) {
         if (world === 'newt') await expect(control).toBeDisabled();
         else await expect(control).toBeEnabled();
