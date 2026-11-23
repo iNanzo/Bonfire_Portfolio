@@ -199,3 +199,21 @@ test('a held letter at stage three emits a ring before release', async ({ page }
   await expect.poll(() => page.evaluate(() => window.__viz.fire.snapshot().rings.marks)).toBeGreaterThan(before);
   expect(await page.evaluate(() => window.__viz.fire.snapshot().holding)).toBe(true);
 });
+
+test('shot snapshots follow cuts and the held letter supplies the rig target', async ({ page }) => {
+  await ready(page);
+  await expect.poll(() => page.evaluate(() => window.__viz.fire.snapshot().shot?.key)).toBe('clearing');
+  const next = await page.evaluate(() => window.__viz.director.cut());
+  await expect.poll(() => page.evaluate(() => window.__viz.fire.snapshot().shot?.key)).toBe(next);
+  expect(await page.evaluate(() => window.__viz.fire.snapshot().shot.name)).toBeTruthy();
+  await page.evaluate(() => {
+    void window.__viz.fire.equip('axe', 'ember', { hold: true });
+  });
+  await expect.poll(() => page.evaluate(() => window.__viz.fire.snapshot().letter?.state)).toBe('floating');
+  const target = await page.evaluate(() => {
+    const f = window.__viz.fire,
+      p = f.snapshot().letter.frame;
+    return { mid: f.blade.mid.toArray(), letter: [p.x, p.y, p.z] };
+  });
+  expect(target.mid).toEqual(target.letter);
+});

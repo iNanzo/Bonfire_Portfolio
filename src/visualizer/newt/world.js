@@ -12,6 +12,7 @@ import { loadCharacter } from '../../invitation/character.js';
 import { BONES } from '../../invitation/clips.js';
 import { createMix, mixStep, lookAim } from '../../invitation/play.js';
 import { fitShadow } from '../../invitation/floor.js';
+import { pickLetter, easeAnchors } from './shots.js';
 import { createFireDuck } from './fireDuck.js';
 import { createElementRings } from './elementRings.js';
 import { createEnvelopeActor } from '../../invitation/envelopeActor.js';
@@ -308,6 +309,42 @@ export function createWorld(container, options = {}) {
     const head = { x: 0, y: 0.9, z: 0 };
     let character = null;
     const mix = createMix();
+    const blade = {
+      mid: new THREE.Vector3(),
+      tip: new THREE.Vector3(),
+      grip: new THREE.Vector3(),
+      quat: new THREE.Quaternion(),
+      normal: new THREE.Vector3(0, 0, 1),
+      free: false,
+      len: 0.76,
+    };
+    duck.blade = blade;
+    function frameSubjects(dt) {
+      const letters = duck.moments.letters
+        .filter((l) => actors.has(l.id))
+        .map((l) => ({
+          kind: l.kind,
+          frame: new THREE.Vector3().setFromMatrixPosition(actors.get(l.id).inner.matrixWorld),
+          id: l.id,
+        }));
+      const mid = pickLetter(letters, chest);
+      blade.mid.copy(mid);
+      const selected = letters.find((l) => l.frame === mid);
+      if (selected) {
+        const actor = actors.get(selected.id);
+        actor.inner.getWorldQuaternion(blade.quat);
+        actor.inner.localToWorld(blade.tip.set(actor.envl.W / 2, actor.envl.H / 2, 0));
+        actor.inner.localToWorld(blade.grip.set(-actor.envl.W / 2, -actor.envl.H / 2, 0));
+      } else {
+        blade.quat.identity();
+        blade.tip.copy(mid);
+        blade.grip.copy(mid);
+      }
+      blade.len = blade.tip.distanceTo(blade.grip);
+      blade.normal.set(0, 0, 1).applyQuaternion(blade.quat);
+      duck.shotFrame.aspect = size.w / size.h;
+      easeAnchors(duck.shotFrame, chest, mid, dt);
+    }
     const characterBaseSnapshot = duck.snapshot;
     duck.snapshot = () => ({
       ...characterBaseSnapshot(),
@@ -339,6 +376,7 @@ export function createWorld(container, options = {}) {
         character.root.updateMatrixWorld(true);
         character.bonePos(BONES.chest, chest);
       }
+      frameSubjects(dt);
       center.set(chest.x, chest.y, chest.z);
       writePass(t, size, center, camera);
       pass.uniforms.exposure.value = (renderOverride.exposure ?? effects.render.exposure) * (1 + duck.drive.exposure);
