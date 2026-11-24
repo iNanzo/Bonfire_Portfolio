@@ -1,4 +1,4 @@
-// A page drawn through Bonfire's pixel pipeline. Actors arrive in later tasks.
+// NEWT, letters and one shared petal flow drawn through Bonfire's pixel pipeline.
 import * as THREE from 'three';
 import { createFrame } from '../../bonfire/frame.js';
 import { createView } from '../../bonfire/view.js';
@@ -14,11 +14,12 @@ import { createMix, mixStep, lookAim } from '../../invitation/play.js';
 import { fitShadow } from '../../invitation/floor.js';
 import { pickLetter, easeAnchors } from './shots.js';
 import { createFireDuck } from './fireDuck.js';
+import { createContactShadow } from './contactShadow.js';
 import { createElementRings } from './elementRings.js';
 import { createEnvelopeActor } from '../../invitation/envelopeActor.js';
 import { createPetalScene } from '../../invitation/petalScene.js';
 import { shared } from '../../invitation/envelopeLook.js';
-import { hoverLook, sealGloss } from '../../invitation/envelope.js';
+import { hoverLook, sealGloss, FLAP_OPEN } from '../../invitation/envelope.js';
 import { PAGES, pageOf, blendPages } from './pages.js';
 /** @param {HTMLElement} container @param {Record<string, any>} [options] */
 export function createWorld(container, options = {}) {
@@ -84,8 +85,8 @@ export function createWorld(container, options = {}) {
     const paper = new THREE.Mesh(
       new THREE.PlaneGeometry(14, 14),
       new THREE.ShadowMaterial({
-        color: page.ink,
-        opacity: 0.3,
+        color: page.shadow,
+        opacity: 0.65,
         transparent: true,
         depthWrite: false,
         // Its shadow blends over the void without changing the target's alpha.
@@ -101,6 +102,7 @@ export function createWorld(container, options = {}) {
     paper.layers.set(layers.ghost);
     scope.trackTree(paper);
     scene.add(paper);
+    const blob = createContactShadow({ scene, scope, color: page.shadow });
     scene.add(new THREE.HemisphereLight(0xffffff, 0x817781, 2));
     const sun = new THREE.DirectionalLight(0xffffff, 2);
     sun.position.set(-3, 7, 4);
@@ -109,10 +111,10 @@ export function createWorld(container, options = {}) {
     scope.trackTree(sun);
     scene.add(sun, sun.target);
     const actors = new Map();
-    const petalScenes = new Map();
+    const petals = createPetalScene({ scene, unit: 1.1, reduced: reducedMotion, mark: 0.1, linear: true });
+    let turnAt = null;
     scope.cleanup(() => {
-      for (const petals of petalScenes.values()) petals.dispose();
-      petalScenes.clear();
+      petals.dispose();
       for (const actor of actors.values()) actor.dispose();
       actors.clear();
     });
@@ -140,7 +142,8 @@ export function createWorld(container, options = {}) {
                 : null,
             }
           : null,
-        petals: [...petalScenes.values()].reduce((n, petals) => n + petals.live(), 0),
+        petals: petals.live(),
+        size: { w: size.w, h: size.h },
       };
     };
     function letters(dt) {
@@ -149,7 +152,6 @@ export function createWorld(container, options = {}) {
       for (const [id, actor] of actors)
         if (!alive.has(id)) {
           actor.dispose();
-          petalScenes.get(id)?.letter(null);
           actor.parent.removeFromParent();
           actors.delete(id);
         }
@@ -168,10 +170,6 @@ export function createWorld(container, options = {}) {
           actor.seal.group.traverse((o) => o.layers.set(layers.ghost));
           actor.specks.points.layers.set(layers.ghost);
           actors.set(letter.id, actor);
-          petalScenes.set(
-            letter.id,
-            createPetalScene({ scene, unit: 1.1, reduced: reducedMotion, mark: 0.1, linear: true }),
-          );
         }
         if (picture.petals.some((command) => command.id === letter.id && command.kind === 'bloom')) actor.glossAt = t;
         actor.parent.position.set(letter.x, letter.y, 0);
@@ -189,48 +187,51 @@ export function createWorld(container, options = {}) {
           reducedMotion,
         );
         actor.seal.gloss(gloss.at, gloss.width);
-        const petals = petalScenes.get(letter.id);
-        petals.letter(actor.inner.matrixWorld, {
-          h: (actor.envl.H * 0.55 * letter.scale) / 1.1,
-          opening: letter.pose.flap / Math.PI,
-          floating: letter.state === 'floating',
-          time: letter.time,
-        });
+        if (letter.pose.dissolve > 0) actor.envl.group.traverse((o) => o.layers.set(layers.ghost));
+        if (letter.id === picture.letters.at(-1)?.id)
+          petals.letter(actor.inner.matrixWorld, {
+            h: (actor.envl.H * 0.55 * letter.scale) / 1.1,
+            opening: letter.pose.flap / FLAP_OPEN,
+            floating: letter.state === 'floating',
+            time: letter.time,
+          });
       }
+      if (!picture.letters.length) petals.letter(null);
       for (const command of picture.petals) {
         if (command.kind === 'ring') {
           rings.ring(1);
           continue;
         }
         if (command.kind === 'cut') {
-          for (const petals of petalScenes.values()) petals.cut(0.35);
+          petals.cut(0.35);
           continue;
         }
         const actor = actors.get(command.id);
-        if (actor)
-          petalScenes
-            .get(command.id)
-            ?.emit(command.kind, new THREE.Vector3().setFromMatrixPosition(actor.inner.matrixWorld));
+        if (actor) {
+          const bloom = command.kind === 'bloom';
+          const matrix = bloom ? actor.seal.group.matrixWorld : actor.inner.matrixWorld;
+          petals.emit(
+            command.kind,
+            new THREE.Vector3().setFromMatrixPosition(matrix),
+            bloom ? { radius: actor.sealR * new THREE.Vector3().setFromMatrixScale(matrix).x } : {},
+          );
+        }
       }
       pulseLevel *= Math.exp(-dt * 8);
       swirl += (1 - swirl) * Math.min(1, dt * 5);
-      for (const [id, petals] of petalScenes) {
-        petals.flow.setSwirlScale(swirl);
-        petals.step(dt);
-        if (!alive.has(id) && !petals.live()) {
-          petals.dispose();
-          petalScenes.delete(id);
-        }
-      }
+      petals.flow.setSwirlScale(swirl);
+      petals.step(dt);
       const next = picture.page
         ? blendPages(picture.page.from, picture.page.to, picture.page.k)
         : (Object.values(PAGES).find((p) => p.name === baseSnapshot().page.name) ?? PAGES.dusk);
       if (next !== page) {
         page = next;
         voidColor.set(page.color);
-        paper.material.color.set(page.ink);
+        paper.material.color.set(page.shadow);
+        blob.material.color.set(page.shadow);
         setPalette(paletteChoice);
-        frame.reset();
+        if (picture.page ? picture.page.at !== turnAt : turnAt === null) frame.reset();
+        turnAt = picture.page?.at ?? null;
       }
     }
     const settings = { pixelSize: null };
@@ -296,7 +297,8 @@ export function createWorld(container, options = {}) {
       page = pageOf(key);
       setDuckPage(key);
       voidColor.set(page.color);
-      paper.material.color.set(page.ink);
+      paper.material.color.set(page.shadow);
+      blob.material.color.set(page.shadow);
       setPalette(paletteChoice);
       frame.reset();
     }
@@ -345,10 +347,33 @@ export function createWorld(container, options = {}) {
       duck.shotFrame.aspect = size.w / size.h;
       easeAnchors(duck.shotFrame, chest, mid, dt);
     }
+    const project = (point) => {
+      const v = new THREE.Vector3(point.x, point.y, point.z).project(camera);
+      return { x: (v.x + 1) / 2, y: (1 - v.y) / 2 };
+    };
     const characterBaseSnapshot = duck.snapshot;
     duck.snapshot = () => ({
       ...characterBaseSnapshot(),
       newt: character ? { state: 'idle', clip: mix.main, grounded: true } : null,
+      projected: {
+        chest: project(chest),
+        hips: project({ x: chest.x, y: 0.3, z: chest.z }),
+        floor: project({ x: chest.x, y: 0, z: chest.z }),
+        paper: (() => {
+          const actor = actors.get(duck.moments.letters.at(-1)?.id);
+          if (!actor) return null;
+          const { W, H, T, group } = actor.envl;
+          return [
+            [-W / 2, -H / 2],
+            [W / 2, -H / 2],
+            [W / 2, H / 2],
+            [-W / 2, H / 2],
+          ].map(([x, y]) => project(group.localToWorld(new THREE.Vector3(x, y, T / 2))));
+        })(),
+        letter: duck.moments.letters.at(-1)
+          ? project({ x: duck.moments.letters.at(-1).x, y: duck.moments.letters.at(-1).y, z: 0 })
+          : null,
+      },
     });
     const writePass = createPassWrites({ pass, glitch: duck.glitch, reducedMotion });
     function draw(dt) {
@@ -377,6 +402,11 @@ export function createWorld(container, options = {}) {
         character.bonePos(BONES.chest, chest);
       }
       frameSubjects(dt);
+      blob.visible = !renderer.shadowMap.enabled || !sun.castShadow;
+      if (character) {
+        blob.position.x = character.root.position.x;
+        blob.position.z = character.root.position.z;
+      }
       center.set(chest.x, chest.y, chest.z);
       writePass(t, size, center, camera);
       pass.uniforms.exposure.value = (renderOverride.exposure ?? effects.render.exposure) * (1 + duck.drive.exposure);
@@ -399,26 +429,31 @@ export function createWorld(container, options = {}) {
     const duckDispose = duck.dispose;
     Object.assign(duck, {
       canvas,
-      ready: loadCharacter(`${import.meta.env.BASE_URL}models/newt.glb`, { pixel: false }).then(async (loaded) => {
-        if (scope.disposed) {
-          loaded.dispose();
-          return;
-        }
-        character = loaded;
-        character.root.rotation.order = 'XZY';
-        character.setWeights(mix.weights, mix.phase);
-        character.update(0);
-        scene.add(character.root);
-        scope.cleanup(() => {
-          character.root.removeFromParent();
-          character.dispose();
-        });
-        await frame.compile();
-        if (scope.disposed) return;
-        draw(0);
-        ready = true;
-        syncRunning();
-      }),
+      ready: loadCharacter(`${import.meta.env.BASE_URL}models/newt.glb`, { pixel: false })
+        .then(async (loaded) => {
+          if (scope.disposed) {
+            loaded.dispose();
+            return;
+          }
+          character = loaded;
+          character.root.rotation.order = 'XZY';
+          character.setWeights(mix.weights, mix.phase);
+          character.update(0);
+          scene.add(character.root);
+          scope.cleanup(() => {
+            character.root.removeFromParent();
+            character.dispose();
+          });
+          await frame.compile();
+          if (scope.disposed) return;
+          draw(0);
+          ready = true;
+          syncRunning();
+        })
+        .catch((error) => {
+          scope.dispose();
+          throw error;
+        }),
       setRender,
       setPalette,
       setPage,

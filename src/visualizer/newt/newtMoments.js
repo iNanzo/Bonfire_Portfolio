@@ -28,6 +28,7 @@ export function createNewtMoments({
       stage: 0,
       ready: false,
       released: false,
+      releasePending: false,
       bigDrop: false,
       impacted: false,
       cancelled: false,
@@ -70,6 +71,7 @@ export function createNewtMoments({
     if (skipped) emit('spill', letter);
     if (cancelled) {
       letter.cancelled = true;
+      letter.bigDrop = false;
       letter.resolve?.({ status: 'cancelled' });
       if (active === letter) active = null;
     } else if (skipped) letter.skipping = true;
@@ -112,6 +114,7 @@ export function createNewtMoments({
     release() {
       if (!active?.hold || active.released) return false;
       active.released = true;
+      active.releasePending = true;
       if (active.dismissed) skip(active);
       else {
         active.ready = true;
@@ -151,14 +154,16 @@ export function createNewtMoments({
         if (!reduced && active.stage < 3 && stage >= 3) emit('ring', active);
         active.stage = Math.max(active.stage, stage);
         if (active.stage >= 4) open(active);
-        if (active.released && f.events?.includes('drop') && f.drop === 'big') active.bigDrop = true;
+        if ((!active.released || active.releasePending) && f.events?.includes('drop') && f.drop === 'big')
+          active.bigDrop = true;
+        active.releasePending = false;
       }
       const downbeat = f.locked && f.beats?.some((b) => b.beat === 0);
       for (const letter of letters) {
         if (letter.kind === 'quick' && letter.openedAt === null && letter.time - letter.born >= TIMES.arrive) {
           open(letter, letter.born + TIMES.arrive);
-          letter.ready = true;
         }
+        if (letter.kind === 'quick' && letter.time - letter.born >= TIMES.arrive + TIMES.opening) letter.ready = true;
         if (letter.kind === 'start') {
           if (letter.openedAt === null && (downbeat || (!f.locked && t - letter.startedAt >= 4))) open(letter);
           else if (
