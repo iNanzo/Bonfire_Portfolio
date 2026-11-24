@@ -193,3 +193,81 @@ test('held letters bob on the beat grid; reduced motion lifts and cracks nothing
     m.dispose();
   }
 });
+
+import { newtShow } from './lib/newtShow.mjs';
+
+test('director blackout preserves the held big drop until its strike and turns once', (t) => {
+  const show = newtShow(t);
+  show.step({ state: 'breakdown', events: ['breakdown'] });
+  assert.equal(show.duck.holding, true);
+  for (const build of [0.5, 0.75, 0.95]) show.advance(1, { state: 'build', build });
+  show.step({ events: ['drop'], drop: 'big' });
+  assert.equal(show.duck.holding, true);
+  assert.equal(show.duck.snapshot().page.name, 'Dusk');
+  show.advance(0.2);
+  assert.equal(show.duck.holding, false);
+  assert.equal(show.duck.snapshot().page.name, 'Night');
+  show.advance(2);
+  assert.equal(show.duck.snapshot().page.name, 'Night');
+  assert.equal(show.impacts.length, 1);
+});
+
+for (const [name, overrides, drop, held] of [
+  ['small held drop', {}, 'small', true],
+  ['page turns off', { pageTurns: 'off' }, 'big', true],
+  ['un-held big drop', {}, 'big', false],
+])
+  test(`director ${name} does not turn the page`, (t) => {
+    const show = newtShow(t, overrides);
+    if (held) {
+      show.step({ state: 'breakdown', events: ['breakdown'] });
+      show.advance(2, { state: 'build', build: 0.95 });
+    }
+    show.step({ events: ['drop'], drop });
+    show.advance(2);
+    assert.equal(show.duck.snapshot().page.name, 'Dusk');
+    if (!held) assert.equal(show.duck.moments.letters.length, 0);
+  });
+
+for (const reduced of [false, true])
+  test(`director phrase lands on its planned beat (reduced=${reduced})`, (t) => {
+    const show = newtShow(t, { reduced, phraseBars: 4 });
+    for (let count = 0; count <= 40; count++) {
+      const time = show.time + 1 / 120;
+      show.step({ beats: [{ time, count, beat: count % 4, bar: Math.floor(count / 4) + 1, strength: 0.7 }] });
+      show.advance(0.5 - 1 / 120);
+    }
+    assert.ok(show.impacts.length > 0);
+    for (const { time } of show.impacts)
+      assert.ok(Math.abs(time - Math.round(time / 0.5) * 0.5) <= 1 / 60, `impact at ${time}`);
+  });
+
+test('director held forge rejects a second equip without another letter', async (t) => {
+  const show = newtShow(t);
+  show.step({ state: 'breakdown', events: ['breakdown'] });
+  const before = show.duck.moments.letters.length;
+  const result = await show.duck.equip(show.duck.weapon === 'axe' ? 'spear' : 'axe', 'ember');
+  show.step({ state: 'breakdown' });
+  assert.deepEqual(result, { status: 'cancelled' });
+  assert.equal(show.duck.moments.letters.length, before);
+});
+
+test('a later un-held drop cannot turn an already released letter', (t) => {
+  const show = newtShow(t, { blackout: 'off' });
+  show.step({ state: 'breakdown', events: ['breakdown'] });
+  show.advance(1, { state: 'build', build: 0.3 });
+  show.duck.release();
+  show.step({ state: 'build', build: 0.3 });
+  show.step({ events: ['drop'], drop: 'big' });
+  show.advance(2);
+  assert.equal(show.duck.snapshot().page.name, 'Dusk');
+});
+
+test('director release on the drop frame still latches a big drop without Blackout', (t) => {
+  const show = newtShow(t, { blackout: 'off' });
+  show.step({ state: 'breakdown', events: ['breakdown'] });
+  show.advance(1, { state: 'build', build: 0.5 });
+  show.step({ events: ['drop'], drop: 'big' });
+  show.advance(2);
+  assert.equal(show.duck.snapshot().page.name, 'Night');
+});

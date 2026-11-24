@@ -134,6 +134,17 @@ test('Live snap mode passes half-texel projection values into seal.place, rather
   assert.ok(at);
   assert.deepEqual(calls, [{ x: at.x, y: at.y, axes: at.axes }]);
   for (const value of [at.x, at.y, ...at.axes]) assert.equal(Number.isInteger(value * 2), true);
-  assert.deepEqual(at.placedAt, calls[0]);
+  assert.deepEqual({ x: at.placedAt.x, y: at.placedAt.y }, { x: calls[0].x, y: calls[0].y });
+  assert.equal(at.placedAt.faceMatches, true);
+  assert.equal(at.placedAt.radius, Math.sqrt(Math.abs(at.axes[0] * at.axes[3] - at.axes[1] * at.axes[2])));
+  // A stale applied raster must not pass merely because the requested axes agree.
+  actor.seal.place = (x, y, axes) =>
+    place(
+      x,
+      y,
+      axes.map((v) => v * 2),
+    );
+  actor.pose(createEnvelope({ born: 0 }).pose(1.23), { view: { h: 4, cssH: 800, scale: 0.8 }, camera });
+  assert.equal(actor.sealAt.placedAt.faceMatches, false);
   actor.dispose();
 });
