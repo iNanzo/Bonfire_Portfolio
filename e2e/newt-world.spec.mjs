@@ -463,3 +463,50 @@ test('a live Cream page change paints the corner and the whole frame in its pale
   expect([...corner]).toEqual([PAGES.cream.color]);
   expect([...unexpected]).toEqual([]);
 });
+
+test('tilted held paper stays inside The Letter and Vertigo throughout their moves', async ({ page }) => {
+  test.setTimeout(90000);
+  for (const viewport of [
+    { width: 1280, height: 720 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await ready(page);
+    await page.evaluate(() => {
+      window.__viz.settings.camera = 'drift';
+      window.__viz.director.frame(0, 0, { instant: true });
+      void window.__viz.fire.equip('axe', 'ember', { hold: true });
+    });
+    await expect.poll(() => page.evaluate(() => window.__viz.fire.snapshot().letter?.state)).toBe('floating');
+    for (const key of ['blade', 'vertigo']) {
+      const samples = await page.evaluate(async (shot) => {
+        const { director, fire } = window.__viz;
+        director.setShot(shot);
+        return new Promise((resolve) => {
+          const start = performance.now(),
+            result = [];
+          let last = 0;
+          const off = fire.onRendered(() => {
+            const elapsed = performance.now() - start;
+            if (!result.length || elapsed - last > 100) {
+              result.push(fire.snapshot().projected.paper);
+              last = elapsed;
+            }
+            if (elapsed >= 8100) {
+              off();
+              resolve(result);
+            }
+          });
+        });
+      }, key);
+      expect(samples.length).toBeGreaterThan(20);
+      for (const corners of samples)
+        for (const corner of corners) {
+          expect(corner.x, `${key} ${viewport.width} paper x`).toBeGreaterThan(0.02);
+          expect(corner.x, `${key} ${viewport.width} paper x`).toBeLessThan(0.98);
+          expect(corner.y, `${key} ${viewport.width} paper y`).toBeGreaterThan(0.02);
+          expect(corner.y, `${key} ${viewport.width} paper y`).toBeLessThan(0.98);
+        }
+    }
+  }
+});

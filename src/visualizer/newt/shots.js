@@ -25,6 +25,7 @@ export const createShotFrame = () => ({
   newt: { x: 0, y: 0.55, z: 0 },
   letter: { x: 0, y: 1.35, z: 0 },
   aspect: 16 / 9,
+  letterCorners: /** @type {Point[]} */ ([]),
 });
 /** The caller supplies actors' world positions, never their input poses. */
 export function pickLetter(letters, chest) {
@@ -86,7 +87,8 @@ export function reframeShot(o, key, state) {
   }
   const points = [];
   if (s.anchor !== 'letter') for (const dy of [-0.55, 0.45]) points.push({ ...state.newt, y: state.newt.y + dy });
-  if (s.anchor !== 'newt')
+  if (s.anchor !== 'newt' && state.letterCorners.length) points.push(...state.letterCorners);
+  else if (s.anchor !== 'newt')
     for (const dx of [-0.55, 0.55])
       for (const dy of [-0.38, 0.38])
         points.push({ x: state.letter.x + dx, y: state.letter.y + dy, z: state.letter.z });

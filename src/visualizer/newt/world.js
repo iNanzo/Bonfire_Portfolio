@@ -321,6 +321,16 @@ export function createWorld(container, options = {}) {
       len: 0.76,
     };
     duck.blade = blade;
+    function paperCorners(actor) {
+      if (!actor) return [];
+      const { W, H, T, group } = actor.envl;
+      return [
+        [-W / 2, -H / 2],
+        [W / 2, -H / 2],
+        [W / 2, H / 2],
+        [-W / 2, H / 2],
+      ].map(([x, y]) => group.localToWorld(new THREE.Vector3(x, y, T / 2)));
+    }
     function frameSubjects(dt) {
       const letters = duck.moments.letters
         .filter((l) => actors.has(l.id))
@@ -332,6 +342,7 @@ export function createWorld(container, options = {}) {
       const mid = pickLetter(letters, chest);
       blade.mid.copy(mid);
       const selected = letters.find((l) => l.frame === mid);
+      duck.shotFrame.letterCorners = paperCorners(selected ? actors.get(selected.id) : null);
       if (selected) {
         const actor = actors.get(selected.id);
         actor.inner.getWorldQuaternion(blade.quat);
@@ -360,15 +371,8 @@ export function createWorld(container, options = {}) {
         hips: project({ x: chest.x, y: 0.3, z: chest.z }),
         floor: project({ x: chest.x, y: 0, z: chest.z }),
         paper: (() => {
-          const actor = actors.get(duck.moments.letters.at(-1)?.id);
-          if (!actor) return null;
-          const { W, H, T, group } = actor.envl;
-          return [
-            [-W / 2, -H / 2],
-            [W / 2, -H / 2],
-            [W / 2, H / 2],
-            [-W / 2, H / 2],
-          ].map(([x, y]) => project(group.localToWorld(new THREE.Vector3(x, y, T / 2))));
+          const corners = paperCorners(actors.get(duck.moments.letters.at(-1)?.id));
+          return corners.length ? corners.map(project) : null;
         })(),
         letter: duck.moments.letters.at(-1)
           ? project({ x: duck.moments.letters.at(-1).x, y: duck.moments.letters.at(-1).y, z: 0 })

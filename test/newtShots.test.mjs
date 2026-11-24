@@ -143,3 +143,46 @@ test('duck records the actual framed key and defaults to the canvas-free aspect'
   duck.frameShot(p, 'not-a-shot');
   assert.deepEqual(structuredClone(p), before);
 });
+
+test('letter shots fit the actual tilted paper corners rather than an upright box', () => {
+  for (const aspect of [16 / 9, 9 / 16])
+    for (const key of ['blade', 'vertigo']) {
+      const state = createShotFrame();
+      state.aspect = aspect;
+      state.letterCorners = [];
+      for (const x of [-0.55, 0.55])
+        for (const y of [-0.38, 0.38]) {
+          const corner = new Vector3(x, y, 0.02);
+          corner.applyAxisAngle(new Vector3(0, 0, 1), -0.36);
+          corner.applyAxisAngle(new Vector3(1, 0, 0), -0.12);
+          corner.add(new Vector3(0, 1.35, 0));
+          state.letterCorners.push(corner);
+        }
+      let pose;
+      const camera = createCamera(
+        {
+          frameShot: (o, k) => reframeShot(o, k, state),
+          setPose: (p) => {
+            pose = structuredClone(p);
+          },
+        },
+        { camera: 'drift', shot: key },
+      );
+      for (let i = 0; i < 480; i++) {
+        camera.update(1 / 60, { period: 0.5, punch: 0, holding: true, build: 0, breath: 0 });
+        if (i % 60 !== 59) continue;
+        const view = new PerspectiveCamera(pose.fov, aspect, 0.1, 80);
+        view.position.fromArray(pose.pos);
+        view.lookAt(new Vector3(...pose.target));
+        view.rotateZ(pose.roll);
+        view.updateMatrixWorld();
+        for (const corner of state.letterCorners) {
+          const p = corner.clone().project(view);
+          assert.ok(
+            Math.abs(p.x) < 0.9 && Math.abs(p.y) < 0.9 && p.z > -1 && p.z < 1,
+            `${key} ${aspect} tilted corner: ${p.toArray()}`,
+          );
+        }
+      }
+    }
+});
