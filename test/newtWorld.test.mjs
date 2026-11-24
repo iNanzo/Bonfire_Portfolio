@@ -120,3 +120,15 @@ test('paper palettes have sixteen slots and light pages substitute ice', async (
     assert.equal(duck.snapshot().page.name, page.name);
   }
 });
+
+test('page tone slots stay aligned through turns and retain dark trouser replacements', () => {
+  const rgb = (hex) => [hex >> 16, (hex >> 8) & 255, hex & 255].map((v) => v / 255);
+  for (const page of Object.values(PAGES)) {
+    assert.equal(page.tones[2], 0x656360);
+    assert.equal(page.tones[3], 0x928e89);
+    assert.equal(page.tones[4], 0xe1b895);
+    assert.ok(page.tones.slice(0, 2).every((tone) => Math.max(...rgb(tone)) < 0.3));
+    assert.ok(page.tones.every((tone) => Math.hypot(...rgb(tone).map((v, i) => v - rgb(page.color)[i])) > 0.08));
+    assert.ok(rgb(page.shadow).every((v, i) => v < rgb(page.color)[i]));
+  }
+});

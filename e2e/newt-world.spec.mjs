@@ -42,7 +42,7 @@ test('the empty NEWT canvas is exactly one page color on every page', async ({ p
     });
     const png = Buffer.from(dataUrl.split(',')[1], 'base64');
     // The page remains flat outside NEWT and his shadow. This corner is outside the
-    // centered Idle actor in the default framing; actor presence is checked separately.
+    // centered Idle actor in the default framing; the projected-chest test below checks presence.
     const { width, height } = await sharp(png).metadata();
     const { data } = await sharp(png)
       .extract({
@@ -166,7 +166,7 @@ test('floating letter seal snapshots equal the half-texel values actually placed
           new Promise((resolve) => {
             const off = window.__viz.fire.onRendered(() => {
               off();
-              resolve(window.__viz.fire.snapshot().letter.seal);
+              resolve({ ...window.__viz.fire.snapshot().letter.seal, size: window.__viz.fire.snapshot().size });
             });
           }),
       ),
@@ -174,7 +174,17 @@ test('floating letter seal snapshots equal the half-texel values actually placed
   }
   for (const seal of samples) {
     for (const value of [seal.x, seal.y, ...seal.axes]) expect(Number.isInteger(value * 2)).toBe(true);
-    expect(seal.placedAt).toEqual({ x: seal.x, y: seal.y, axes: seal.axes });
+    expect(seal.placedAt.x).toBe(seal.x);
+    expect(seal.placedAt.y).toBe(seal.y);
+    expect(seal.placedAt.faceMatches).toBe(true);
+    expect(seal.placedAt.radius).toBeCloseTo(
+      Math.sqrt(Math.abs(seal.axes[0] * seal.axes[3] - seal.axes[1] * seal.axes[2])),
+      5,
+    );
+    expect(seal.x).toBeGreaterThanOrEqual(0);
+    expect(seal.x).toBeLessThan(seal.size.w);
+    expect(seal.y).toBeGreaterThanOrEqual(0);
+    expect(seal.y).toBeLessThan(seal.size.h);
   }
 });
 
@@ -200,6 +210,188 @@ test('a held letter at stage three emits a ring before release', async ({ page }
   expect(await page.evaluate(() => window.__viz.fire.snapshot().holding)).toBe(true);
 });
 
+const pixels = async (page) => {
+  const result = await page.evaluate(async () => {
+    const fire = window.__viz.fire;
+    let snapshot;
+    const off = fire.onRendered(() => {
+      snapshot = fire.snapshot();
+      off();
+    });
+    const blob = await fire.capture();
+    const url = await new Promise((resolve) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.readAsDataURL(blob);
+    });
+    return { url, snapshot };
+  });
+  const png = Buffer.from(result.url.split(',')[1], 'base64');
+  await test.info().attach('render', { body: png, contentType: 'image/png' });
+  return { ...(await sharp(png).removeAlpha().raw().toBuffer({ resolveWithObject: true })), snapshot: result.snapshot };
+};
+const region = ({ data, info }, center, rx, ry, predicate) => {
+  let count = 0,
+    total = 0;
+  for (
+    let y = Math.max(0, Math.floor((center.y - ry) * info.height));
+    y < Math.min(info.height, (center.y + ry) * info.height);
+    y++
+  )
+    for (
+      let x = Math.max(0, Math.floor((center.x - rx) * info.width));
+      x < Math.min(info.width, (center.x + rx) * info.width);
+      x++
+    ) {
+      const i = (y * info.width + x) * 3;
+      count += +predicate(data[i], data[i + 1], data[i + 2]);
+      total++;
+    }
+  return { count, total };
+};
+
+test('NEWT fills his projected chest and trousers on Dusk with outlines off', async ({ page }) => {
+  await ready(page);
+  await page.evaluate(() => window.__viz.fire.setRender({ outlines: false }));
+  const shot = await pixels(page),
+    projected = shot.snapshot.projected;
+  for (const point of [projected.chest, projected.hips]) {
+    const found = region(shot, point, 0.008, 0.012, (r, g, b) => ((r << 16) | (g << 8) | b) !== PAGES.dusk.color);
+    expect(found.count / found.total).toBeGreaterThan(0.6);
+  }
+});
+
+for (const key of ['dusk', 'white', 'cream'])
+  test(`NEWT casts a dark contact shadow on ${key}`, async ({ page }) => {
+    await page.addInitScript((key) => localStorage.setItem('bonfire-live', JSON.stringify({ page: key })), key);
+    await ready(page);
+    const shot = await pixels(page),
+      floor = shot.snapshot.projected.floor;
+    // Only the ground beside the soles, opposite the sun; never his dark clothes.
+    const color = PAGES[key].color,
+      sum = (color >> 16) + ((color >> 8) & 255) + (color & 255);
+    const found = region(
+      shot,
+      { x: floor.x + 0.045, y: floor.y - 0.035 },
+      0.015,
+      0.01,
+      (r, g, b) => r + g + b < sum - 20,
+    );
+    expect(found.count).toBeGreaterThan(12);
+  });
+
+test('failed NEWT model load disposes its candidate canvas', async ({ page }) => {
+  await page.route('**/models/newt.glb', (route) => route.abort());
+  await page.goto('/visualizer/?world=newt&bench');
+  await expect(page.locator('[data-error]')).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('[data-stage] canvas')).toHaveCount(0);
+});
+
+test('burning letter loses its ink box as the paper disappears', async ({ page }) => {
+  await page.addInitScript(() =>
+    localStorage.setItem('bonfire-live', JSON.stringify({ page: 'cream', pageTurns: 'off' })),
+  );
+  await ready(page);
+  await page.evaluate(() => window.__viz.fire.setRender({ outlines: true }));
+  await page.evaluate(() => {
+    void window.__viz.fire.equip('axe', 'ember', { hold: true });
+  });
+  await expect.poll(() => page.evaluate(() => window.__viz.fire.snapshot().letter?.pose.arrive)).toBe(1);
+  await page.evaluate(() => window.__viz.fire.onEvent('stage', { stage: 4 }));
+  await expect.poll(() => page.evaluate(() => window.__viz.fire.snapshot().letter?.state)).toBe('waiting');
+  const ink = PAGES.cream.ink;
+  const count = (shot) => {
+    const { data, info, snapshot } = shot;
+    const points = snapshot.projected.paper.map((p) => ({ x: p.x * info.width, y: p.y * info.height }));
+    const seen = new Set();
+    let inkPixels = 0,
+      perimeter = 0;
+    // The upper half of the left paper edge stays clear of NEWT and the impact ring.
+    // Count only its visible perimeter, including when the phone view crops its top.
+    for (const [a, b] of [[3, 0]]) {
+      const from = points[a],
+        to = points[b];
+      const length = Math.ceil(Math.hypot(to.x - from.x, to.y - from.y));
+      for (let step = 0; step <= length / 2; step++) {
+        const x = Math.round(from.x + ((to.x - from.x) * step) / length);
+        const y = Math.round(from.y + ((to.y - from.y) * step) / length);
+        if (x >= 0 && y >= 0 && x < info.width && y < info.height) perimeter++;
+        for (let dy = -1; dy <= 1; dy++)
+          for (let dx = -1; dx <= 1; dx++) {
+            const px = x + dx,
+              py = y + dy;
+            if (px < 0 || py < 0 || px >= info.width || py >= info.height) continue;
+            const index = py * info.width + px;
+            if (seen.has(index)) continue;
+            seen.add(index);
+            const i = index * 3;
+            inkPixels += +(((data[i] << 16) | (data[i + 1] << 8) | data[i + 2]) === ink);
+          }
+      }
+    }
+    return { inkPixels, perimeter };
+  };
+  const before = count(await pixels(page));
+  expect(before.inkPixels).toBeGreaterThan(20);
+  const captured = await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        const fire = window.__viz.fire;
+        const off = fire.onRendered(() => {
+          const snapshot = fire.snapshot();
+          if (snapshot.letter?.pose.dissolve > 0.9) {
+            off();
+            // Read this rendered frame before WebGL clears it; no host roundtrip can
+            // advance the burn between the predicate, the image and the snapshot.
+            resolve({ url: fire.canvas.toDataURL('image/png'), snapshot });
+          }
+        });
+        fire.release();
+      }),
+  );
+  const png = Buffer.from(captured.url.split(',')[1], 'base64');
+  await test.info().attach('burn', { body: png, contentType: 'image/png' });
+  const burning = {
+    ...(await sharp(png).removeAlpha().raw().toBuffer({ resolveWithObject: true })),
+    snapshot: captured.snapshot,
+  };
+  expect(burning.snapshot.letter.state).toBe('fading');
+  expect(burning.snapshot.letter.pose.dissolve).toBeLessThan(1);
+
+  expect(count(burning).inkPixels).toBeLessThan(before.inkPixels * 0.65);
+  expect(count(burning).inkPixels / count(burning).perimeter).toBeLessThan(0.25);
+});
+
+test.describe('touch contact cue', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
+  test('NEWT has dark ground below his soles without shadow maps', async ({ page }) => {
+    await ready(page);
+    await page.evaluate(() => {
+      window.__viz.fire.setPage('cream');
+      window.__viz.fire.setRender({ outlines: false });
+    });
+    expect(await page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true);
+    const captured = await page.evaluate(
+      () =>
+        new Promise((resolve) => {
+          const fire = window.__viz.fire;
+          const off = fire.onRendered(() => {
+            off();
+            resolve({ url: fire.canvas.toDataURL(), snapshot: fire.snapshot() });
+          });
+        }),
+    );
+    const png = Buffer.from(captured.url.split(',')[1], 'base64');
+    await test.info().attach('touch-ground', { body: png, contentType: 'image/png' });
+    const shot = {
+        ...(await sharp(png).removeAlpha().raw().toBuffer({ resolveWithObject: true })),
+        snapshot: captured.snapshot,
+      },
+      floor = shot.snapshot.projected.floor;
+    const found = region(shot, { x: floor.x, y: floor.y + 0.015 }, 0.08, 0.008, (r, g, b) => r + g + b < 700);
+    expect(found.count).toBeGreaterThan(12);
+  });
+});
 test('switching a playing Bonfire scene to NEWT clears the scene and its chips', async ({ page }) => {
   await ready(page, '/visualizer/?bench');
   const chip = page.locator('[data-scene-chip]').first();

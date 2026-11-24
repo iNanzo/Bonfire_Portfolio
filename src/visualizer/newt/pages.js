@@ -4,12 +4,17 @@ export const NEWT_TONES = [0x1f1f1f, 0x393839, 0x656360, 0x928e89, 0xe1b895, 0xb
 const rgb = (hex) => [hex >> 16, (hex >> 8) & 255, hex & 255].map((v) => v / 255);
 const entry = (name, color, ink, light) => {
   const c = rgb(color);
-  const tones = NEWT_TONES.filter((hex) => Math.hypot(...rgb(hex).map((v, i) => v - c[i])) > 0.08).slice(0, 6);
+  // Keep each cluster in its slot through page turns. This dark replacement stays
+  // distinct from the exposed, dithered Dusk paper without swallowing his trousers.
+  const tones = NEWT_TONES.slice(0, 6).map((hex) =>
+    Math.hypot(...rgb(hex).map((v, i) => v - c[i])) > 0.08 ? hex : 0x333231,
+  );
   return {
     name,
     color,
     ink,
     light,
+    shadow: 0x000000,
     tones,
     palette: [ink, color, 0xf1d786, 0xe4b85d, 0xd3983d, 0x5a0a12, 0x96151f, 0xd24b52, 0xe44544, 0x851d1b, ...tones],
   };
@@ -38,6 +43,7 @@ export function blendPages(from, to, amount) {
     color: color(a.color, b.color),
     ink: color(a.ink, b.ink),
     palette: a.palette.map((v, i) => color(v, b.palette[i])),
+    shadow: color(a.shadow, b.shadow),
     tones: a.tones.map((v, i) => color(v, b.tones[i])),
   };
 }

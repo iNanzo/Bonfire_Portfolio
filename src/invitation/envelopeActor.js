@@ -1,7 +1,7 @@
 // Renderer-free letter picture, extracted from envelopeScene.js. DOM/input stay there.
 import * as THREE from 'three';
 import { DISSOLVE, hoverLook, particleAt, sealBloom, shedParticles, turnRoll } from './envelope.js';
-import { buildSeal, sealOnScreen } from './envelopeSeal.js';
+import { buildSeal, sealOnScreen, sealFace } from './envelopeSeal.js';
 import {
   BAYER,
   DEPTH,
@@ -180,6 +180,30 @@ export function createEnvelopeActor({
   const toLetter = new THREE.Matrix4();
   const letterScale = new THREE.Matrix4().makeScale(2 / envl.W, 2 / envl.H, 1);
 
+  // The applied face is immutable between placements. Verify a texture/axes pair only
+  // once, and do no raster work for the toy's unsnapped actor.
+  const checkedFaces = new WeakMap();
+  const colors = snapSeal
+    ? WAX.map(rgb).map((color) => [color.x, color.y, color.z].map((c) => Math.round(c * 255)))
+    : [];
+  function faceMatches(axes) {
+    const texture = seal.material.uniforms.uFace.value;
+    if (!texture) return false;
+    const key = axes.join(' ');
+    const previous = checkedFaces.get(texture);
+    if (previous?.key === key) return previous.matches;
+    const face = sealFace(axes),
+      image = texture.image;
+    const matches =
+      image.width === face.size &&
+      image.height === face.size &&
+      face.tones.every((tone, i) => {
+        const expected = tone ? [...colors[tone - 1], 255] : [0, 0, 0, 0];
+        return expected.every((value, j) => image.data[i * 4 + j] === value);
+      });
+    checkedFaces.set(texture, { key, matches });
+    return matches;
+  }
   let sealAt = null;
   function placeSeal(camera) {
     const view = typeof size === 'function' ? size() : size;
@@ -190,6 +214,7 @@ export function createEnvelopeActor({
       sealAt = null;
       return false;
     }
+    const matches = snapSeal ? faceMatches(at.axes) : false;
     sealAt = {
       x: at.x,
       y: at.y,
@@ -199,7 +224,8 @@ export function createEnvelopeActor({
             placedAt: {
               x: seal.material.uniforms.uCenter.value.x,
               y: seal.material.uniforms.uCenter.value.y,
-              axes: [...at.axes],
+              faceMatches: !!matches,
+              radius: seal.material.uniforms.uFaceR.value,
             },
           }
         : {}),
