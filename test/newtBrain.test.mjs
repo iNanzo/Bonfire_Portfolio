@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { createNewtBrain } from '../src/visualizer/newt/newtBrain.js';
 import { speechFrom, TRIGGERS } from '../src/invitation/speech.js';
 import { newtShow } from './lib/newtShow.mjs';
+import { WANDER_BOUNDS } from '../src/visualizer/newt/shots.js';
 
 // Short fixture lines exercise speech triggers without an unrelated priority overlap.
 const lines = Object.fromEntries(TRIGGERS.map((k) => [k, [k]]));
@@ -240,4 +241,24 @@ test('a build jumping all thresholds stands and runs before its deferred grab', 
   s.advance(3.5, { state: 'build', build: 0.95 });
   assert.equal(gestures(s, 'grab').length, 1);
   assert.deepEqual(presses(s), ['Sit', 'Sit', 'Run']);
+});
+
+test('NEWT movement uses the same wander disc as shot framing', (t) => {
+  const saved = { ...WANDER_BOUNDS };
+  try {
+    Object.assign(WANDER_BOUNDS, { minX: -0.8, maxX: 0.8, minZ: -0.8, maxZ: 0.8, r: 0.8 });
+    const s = performanceFor(t, { autoDrops: false });
+    s.advance(60);
+    const distances = s.frames.map((p) => Math.hypot(p.newt.root.x, p.newt.root.z));
+    assert.ok(
+      distances.some((d) => d > 0.1),
+      'NEWT really walks within the shared disc',
+    );
+    assert.ok(
+      distances.every((d) => d <= 0.801),
+      `movement exceeded shot framing disc: ${Math.max(...distances)}`,
+    );
+  } finally {
+    Object.assign(WANDER_BOUNDS, saved);
+  }
 });

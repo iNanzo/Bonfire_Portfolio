@@ -18,6 +18,7 @@ import { invitationLines, speechSettings } from '../../invitation/content.js';
 import { createNewtBrain } from './newtBrain.js';
 import { fitShadow } from '../../invitation/floor.js';
 import { createFireDuck, snapshotLetter } from './fireDuck.js';
+import { pickLetter, easeAnchors } from './shots.js';
 import { createContactShadow } from './contactShadow.js';
 import { createElementRings } from './elementRings.js';
 import { createEnvelopeActor } from '../../invitation/envelopeActor.js';
@@ -318,6 +319,53 @@ export function createWorld(container, options = {}) {
     const head = { x: 0, y: 0.9, z: 0 };
     let character = null;
     const mix = createMix();
+    const blade = {
+      mid: new THREE.Vector3(),
+      tip: new THREE.Vector3(),
+      grip: new THREE.Vector3(),
+      quat: new THREE.Quaternion(),
+      normal: new THREE.Vector3(0, 0, 1),
+      free: false,
+      len: 0.76,
+    };
+    duck.blade = blade;
+    function paperCorners(actor) {
+      if (!actor) return [];
+      const { W, H, T, group } = actor.envl;
+      return [
+        [-W / 2, -H / 2],
+        [W / 2, -H / 2],
+        [W / 2, H / 2],
+        [-W / 2, H / 2],
+      ].map(([x, y]) => group.localToWorld(new THREE.Vector3(x, y, T / 2)));
+    }
+    function frameSubjects(dt) {
+      const letters = duck.moments.letters
+        .filter((l) => actors.has(l.id))
+        .map((l) => ({
+          kind: l.kind,
+          frame: new THREE.Vector3().setFromMatrixPosition(actors.get(l.id).inner.matrixWorld),
+          id: l.id,
+        }));
+      const mid = pickLetter(letters, chest);
+      blade.mid.copy(mid);
+      const selected = letters.find((l) => l.frame === mid);
+      duck.shotFrame.letterCorners = paperCorners(selected ? actors.get(selected.id) : null);
+      if (selected) {
+        const actor = actors.get(selected.id);
+        actor.inner.getWorldQuaternion(blade.quat);
+        actor.inner.localToWorld(blade.tip.set(actor.envl.W / 2, actor.envl.H / 2, 0));
+        actor.inner.localToWorld(blade.grip.set(-actor.envl.W / 2, -actor.envl.H / 2, 0));
+      } else {
+        blade.quat.identity();
+        blade.tip.copy(mid);
+        blade.grip.copy(mid);
+      }
+      blade.len = blade.tip.distanceTo(blade.grip);
+      blade.normal.set(0, 0, 1).applyQuaternion(blade.quat);
+      duck.shotFrame.aspect = size.w / size.h;
+      easeAnchors(duck.shotFrame, chest, mid, dt);
+    }
     const gaze = createLook(),
       glance = createGlance(),
       faces = createFaceState(),
@@ -358,15 +406,8 @@ export function createWorld(container, options = {}) {
           });
         },
         paper: (() => {
-          const actor = actors.get(duck.moments.letters.at(-1)?.id);
-          if (!actor) return null;
-          const { W, H, T, group } = actor.envl;
-          return [
-            [-W / 2, -H / 2],
-            [W / 2, -H / 2],
-            [W / 2, H / 2],
-            [-W / 2, H / 2],
-          ].map(([x, y]) => project(group.localToWorld(new THREE.Vector3(x, y, T / 2))));
+          const corners = paperCorners(actors.get(duck.moments.letters.at(-1)?.id));
+          return corners.length ? corners.map(project) : null;
         })(),
         letter: duck.moments.letters.at(-1)
           ? project({
@@ -457,6 +498,7 @@ export function createWorld(container, options = {}) {
         character.bonePos(BONES.chest, chest);
         rings.setOrigin(character.root.position.x, character.root.position.z);
       }
+      frameSubjects(dt);
       blob.visible = !renderer.shadowMap.enabled || !sun.castShadow;
       if (character) {
         blob.position.x = character.root.position.x;

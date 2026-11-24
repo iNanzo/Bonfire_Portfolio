@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>NEWT Dusk Camera Review</title>
+    <style>
+      body {
+        margin: 0;
+        background: #171320;
+        color: #eee7f3;
+        font: 16px/1.5 system-ui;
+      }
+      main {
+        max-width: 1200px;
+        margin: auto;
+        padding: 24px;
+      }
+      h1 {
+        line-height: 1.1;
+      }
+      button,
+      select {
+        font: inherit;
+        padding: 8px;
+        background: #352b41;
+        color: inherit;
+        border: 1px solid #806b91;
+        border-radius: 6px;
+      }
+      .controls {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .pair {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-top: 24px;
+      }
+      video {
+        display: block;
+        width: 100%;
+        max-height: 72vh;
+        object-fit: contain;
+        background: #282131;
+        image-rendering: pixelated;
+      }
+      figure {
+        margin: 0;
+      }
+      figcaption {
+        margin: 8px 0;
+      }
+      .note {
+        color: #cbbbd7;
+      }
+      a {
+        color: #e1b6ff;
+      }
+      img {
+        max-width: 100%;
+        image-rendering: pixelated;
+      }
+      @media (max-width: 650px) {
+        .pair {
+          grid-template-columns: 1fr;
+        }
+        main {
+          padding: 14px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>NEWT’s Dusk Shots</h1>
+      <p>
+        Fourteen existing Bonfire Live cameras, before and after W6. Real-speed canvas recordings with a floating held
+        letter, at desktop and phone widths. Captured by Codex; this is evidence for review, not a claim of Claude or
+        Newton approval.
+      </p>
+      <div class="controls">
+        <label
+          >Shot
+          <select id="shot"></select></label
+        ><label
+          >Viewport
+          <select id="layout">
+            <option value="desktop">Desktop · 1280 × 720</option>
+            <option value="phone">Phone · 390 × 844</option>
+          </select></label
+        ><button id="play">Play Both From Start</button><button id="pause">Pause Both</button>
+      </div>
+      <div class="pair">
+        <figure>
+          <figcaption>Before · main 6c46a54</figcaption>
+          <video id="before" controls muted playsinline preload="metadata"></video>
+        </figure>
+        <figure>
+          <figcaption>After · PR90 6603151</figcaption>
+          <video id="after" controls muted playsinline preload="metadata"></video>
+        </figure>
+      </div>
+      <p class="note">
+        Playback speed is 1×. Each clip runs for 8.2 seconds, covering sixteen beats at the camera’s idle 120 BPM.
+        Videos contain the actual pixel canvas; No virtual clock, frame stepping, debug camera, or app source changes.
+      </p>
+      <p>
+        <a href="README.md">Capture method and limitations</a> · <a href="before.json">Before timing log</a> ·
+        <a href="after.json">After timing log</a>
+      </p>
+      <details>
+        <summary>All-shot overview (row order matches shot selector)</summary>
+        <div class="pair">
+          <img id="beforeOverview" alt="Before all-shot overview" /><img
+            id="afterOverview"
+            alt="After all-shot overview"
+          />
+        </div>
+      </details>
+    </main>
+    <script>
+      const shots = {
+        clearing: 'The Page',
+        hearth: 'Two-Shot',
+        low: 'Low',
+        above: 'Above',
+        pillar: 'Left Two-Shot',
+        wall: 'Right Two-Shot',
+        blade: 'The Letter',
+        embers: 'Petals Low',
+        circle: 'Circling',
+        dutch: 'Dutch',
+        vertigo: 'Vertigo',
+        crane: 'Crane',
+        tele: 'Long Lens',
+        sweep: 'Sweep',
+      };
+      const shot = document.querySelector('#shot'),
+        layout = document.querySelector('#layout');
+      for (const [key, name] of Object.entries(shots)) {
+        const option = document.createElement('option');
+        option.value = key;
+        option.textContent = name;
+        shot.append(option);
+      }
+      const players = ['before', 'after'].map((id) => document.getElementById(id));
+      function load() {
+        for (const video of players) {
+          video.src = `${video.id}-${layout.value}-${shot.value}.webm`;
+          document.getElementById(`${video.id}Overview`).src = `${video.id}-${layout.value}-overview.png`;
+        }
+      }
+      shot.onchange = load;
+      layout.onchange = load;
+      document.querySelector('#play').onclick = () =>
+        players.forEach((video) => {
+          video.currentTime = 0;
+          video.playbackRate = 1;
+          video.play();
+        });
+      document.querySelector('#pause').onclick = () => players.forEach((video) => video.pause());
+      load();
+    </script>
+  </body>
+</html>
