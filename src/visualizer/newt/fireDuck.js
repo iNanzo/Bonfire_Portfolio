@@ -122,9 +122,9 @@ export function createFireDuck({
       calls.push(['release']);
       return moments.release();
     },
-    step(dt) {
+    step(dt, newt = undefined) {
       clock += dt;
-      picture = moments.step({ t: clock, f: heard, events });
+      picture = moments.step({ t: clock, f: heard, events, newt });
       heard = {};
       events = [];
       return picture;
