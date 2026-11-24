@@ -3,7 +3,7 @@ import { createDirector } from '../../src/visualizer/director.js';
 import { createFireDuck } from '../../src/visualizer/newt/fireDuck.js';
 import { FRAME, settingsWith, seeded } from './fakeScene.mjs';
 
-export function newtShow(test, { reduced = false, ...over } = {}) {
+export function newtShow(test, { reduced = false, performer = null, onPicture = () => {}, ...over } = {}) {
   let time = 0;
   test.mock.method(performance, 'now', () => time * 1000);
   test.mock.method(Math, 'random', seeded(83));
@@ -33,7 +33,10 @@ export function newtShow(test, { reduced = false, ...over } = {}) {
     const frame = { ...FRAME, time, locked: true, bpm: 120, ...f };
     director.update(frame, dt);
     duck.hear(frame);
-    return duck.step(dt);
+    const picture = duck.step(dt, performer?.input());
+    if (performer) picture.newt = performer.step({ t: time, dt, moments: picture });
+    onPicture(picture);
+    return picture;
   };
   const advance = (seconds, f = {}) => {
     let picture;
@@ -45,6 +48,7 @@ export function newtShow(test, { reduced = false, ...over } = {}) {
   });
   return {
     duck,
+    settings,
     director,
     impacts,
     events,

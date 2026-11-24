@@ -19,7 +19,7 @@ const invitation = new Set(
     'envelopeActor',
     'envelopeLook',
     'envelopeSeal',
-    'face',
+    'faces',
     'faceSheets',
     'floor',
     'look',
@@ -75,7 +75,7 @@ const shared = new Set([
   'src/visualizer/looks.js',
   'src/ui/perfOverlay.js',
 ]);
-const pure = new Set(['fireDuck.js', 'newtMoments.js', 'pages.js', 'newtDance.js']);
+const pure = new Set(['fireDuck.js', 'newtMoments.js', 'pages.js', 'newtDance.js', 'newtBrain.js']);
 const imports = (code) =>
   [
     ...code.matchAll(
@@ -97,6 +97,11 @@ function violations(files) {
           spec === 'three' ||
           spec === 'three/examples/jsm/loaders/GLTFLoader.js';
         if (!allowed) errors.push(`${file}: forbidden import ${spec}`);
+        if (
+          file === 'src/visualizer/newt/world.js' &&
+          ['src/invitation/brain.js', 'src/invitation/speech.js'].includes(to)
+        )
+          errors.push(`${file}: use the tested newtBrain adapter`);
         if (to === 'src/invitation/content.js' && file !== 'src/visualizer/newt/world.js')
           errors.push(`${file}: content belongs in world.js`);
         if (pure.has(path.posix.basename(file)) && spec.startsWith('three'))
@@ -138,6 +143,9 @@ test('planted forbidden, reverse, eager and pure-module imports each fail the gu
     ['src/visualizer/newt/newtMoments.js', "import * as THREE from 'three';"],
     ['src/visualizer/newt/newtMoments.js', "import '../../invitation/content.js';"],
     ['src/visualizer/newt/world.js', "import './fireflyModel.js';"],
+    ['src/visualizer/newt/world.js', "import '../../invitation/brain.js';"],
+    ['src/visualizer/newt/world.js', "import '../../invitation/speech.js';"],
+    ['src/visualizer/newt/newtBrain.js', "import * as THREE from 'three';"],
     ['src/bonfire/bolts.js', "import '../invitation/character.js';"],
   ];
   for (const [file, code] of plants) {
@@ -146,4 +154,8 @@ test('planted forbidden, reverse, eager and pure-module imports each fail the gu
     assert.ok(violations(planted).length, `${file}: ${code} must fail`);
   }
   assert.deepEqual(violations(new Map([['src/visualizer/newt/world.js', "import('./fireflyModel.js');"]])), []);
+});
+
+test('the renderer uses the tested NEWT adapter', () => {
+  assert.match(files.get('src/visualizer/newt/world.js'), /import \{ createNewtBrain \} from '\.\/newtBrain\.js'/);
 });
