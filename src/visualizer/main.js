@@ -301,7 +301,11 @@ function startScene() {
       await ctx.fire.equip(eq.weapon, eq.flame, { instant: true, element: eq.element });
       ctx.fire.setScenery(settings.scenery === 'mix' ? (prev?.scenery ?? 'ruins') : settings.scenery);
       // (The first build opens on ?scene= or a chip picked while it loaded.)
-      const opening = prev ? playing : (playing ?? ctx.firstScene);
+      if (settings.world === 'newt') {
+        ctx.solo = null;
+        ctx.firstScene = null;
+      }
+      const opening = settings.world === 'newt' ? null : prev ? playing : (playing ?? ctx.firstScene);
       if (opening) ctx.playScene(opening, { instant: true, lock: opening.ref === ctx.solo });
       ctx.drawChips();
       stage.classList.add('is-ready');

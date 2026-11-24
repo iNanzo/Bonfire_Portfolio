@@ -67,7 +67,7 @@ export function createScenesUi(ctx) {
    * solo); any other pick ends a solo. Null: back to the free show. The loop carries on from it.
    */
   function playScene(entry, { instant = false, lock = false } = {}) {
-    if (!ctx.director) return;
+    if (!ctx.director || settings.world === 'newt') return;
     ctx.director.scene(entry, { instant, flash: !instant, onBeat: !instant });
     const next = lock && entry ? entry.ref : null;
     if (next !== ctx.solo || lock) ctx.director.lockScene(next);
@@ -118,7 +118,8 @@ export function createScenesUi(ctx) {
     const ordered = [...list.filter((e) => inLoop(settings, e.ref)), ...list.filter((e) => !inLoop(settings, e.ref))];
     const shown = ordered.slice(0, 8);
     // (The one playing always has its chip: a hidden built-in, say, from ?scene=.)
-    const playing = ctx.director?.sceneRef ? findScene(ctx.director.sceneRef) : ctx.firstScene;
+    const playing =
+      settings.world === 'newt' ? null : ctx.director?.sceneRef ? findScene(ctx.director.sceneRef) : ctx.firstScene;
     if (playing && !shown.some((e) => e.ref === playing.ref)) shown.splice(7, 1, playing);
     chipsEl.hidden = !shown.length;
     chipsEl.innerHTML = shown.length
