@@ -1,10 +1,25 @@
 import { test, expect } from '@playwright/test';
 import sharp from 'sharp';
+import { TUNE } from '../src/invitation/brain.js';
+import { CLIPS } from '../src/invitation/clips.js';
 import { PAGES } from '../src/visualizer/newt/pages.js';
 
 const ready = async (page, path = '/visualizer/?world=newt&bench') => {
   await page.goto(path);
   await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
+};
+
+const awayFromOrigin = async (page) => {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const root = window.__viz.fire.snapshot().newt?.root;
+          return root ? Math.hypot(root.x, root.z) : 0;
+        }),
+      { timeout: 20_000 },
+    )
+    .toBeGreaterThan(0.2);
 };
 
 test('the URL world lasts one visit and another setting change does not save it', async ({ page }) => {
@@ -31,6 +46,7 @@ test('the empty NEWT canvas is exactly one page color on every page', async ({ p
     await page.reload();
     await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
     await expect.poll(() => page.evaluate(() => window.__viz.settings.world)).toBe('newt');
+    await awayFromOrigin(page);
     const dataUrl = await page.evaluate(async () => {
       const blob = await window.__viz.fire.capture();
       return await new Promise((resolve, reject) => {
@@ -42,7 +58,7 @@ test('the empty NEWT canvas is exactly one page color on every page', async ({ p
     });
     const png = Buffer.from(dataUrl.split(',')[1], 'base64');
     // The page remains flat outside NEWT and his shadow. This corner is outside the
-    // centered Idle actor in the default framing; the projected-chest test below checks presence.
+    // actor in the default framing; the projected-chest test below checks presence.
     const { width, height } = await sharp(png).metadata();
     const { data } = await sharp(png)
       .extract({
@@ -191,7 +207,7 @@ test('floating letter seal snapshots equal the half-texel values actually placed
 test('NEWT is ready on the page in Idle', async ({ page }) => {
   await ready(page);
   await expect.poll(() => page.evaluate(() => window.__viz.fire.snapshot().newt?.clip)).toBe('Idle');
-  expect(await page.evaluate(() => window.__viz.fire.snapshot().newt)).toEqual({
+  expect(await page.evaluate(() => window.__viz.fire.snapshot().newt)).toMatchObject({
     state: 'idle',
     clip: 'Idle',
     grounded: true,
@@ -253,6 +269,7 @@ const region = ({ data, info }, center, rx, ry, predicate) => {
 test('NEWT fills his projected chest and trousers on Dusk with outlines off', async ({ page }) => {
   await ready(page);
   await page.evaluate(() => window.__viz.fire.setRender({ outlines: false }));
+  await awayFromOrigin(page);
   const shot = await pixels(page),
     projected = shot.snapshot.projected;
   for (const point of [projected.chest, projected.hips]) {
@@ -265,6 +282,7 @@ for (const key of ['dusk', 'white', 'cream'])
   test(`NEWT casts a dark contact shadow on ${key}`, async ({ page }) => {
     await page.addInitScript((key) => localStorage.setItem('bonfire-live', JSON.stringify({ page: key })), key);
     await ready(page);
+    await awayFromOrigin(page);
     const shot = await pixels(page),
       floor = shot.snapshot.projected.floor;
     // Only the ground beside the soles, opposite the sun; never his dark clothes.
@@ -371,6 +389,7 @@ test.describe('touch contact cue', () => {
       window.__viz.fire.setRender({ outlines: false });
     });
     expect(await page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true);
+    await awayFromOrigin(page);
     const captured = await page.evaluate(
       () =>
         new Promise((resolve) => {
@@ -444,4 +463,88 @@ test('a live Cream page change paints the corner and the whole frame in its pale
     }
   expect([...corner]).toEqual([PAGES.cream.color]);
   expect([...unexpected]).toEqual([]);
+});
+
+test('NEWT actually walks across the page with a moving projected body', async ({ page }) => {
+  await ready(page);
+  const before = await page.evaluate(() => window.__viz.fire.snapshot());
+  await expect
+    .poll(() => page.evaluate(() => window.__viz.fire.snapshot().newt?.clip), { timeout: 20_000 })
+    .toBe('Walk');
+  await expect
+    .poll(
+      () =>
+        page.evaluate((start) => {
+          const now = window.__viz.fire.snapshot();
+          return Math.hypot(now.projected.chest.x - start.x, now.projected.chest.y - start.y);
+        }, before.projected.chest),
+      { timeout: 15_000 },
+    )
+    .toBeGreaterThan(0.02);
+  const after = await page.evaluate(() => window.__viz.fire.snapshot());
+  expect(after.newt.grounded).toBe(true);
+  expect(after.newt.root.y).toBe(0);
+  expect(Math.hypot(after.newt.root.x, after.newt.root.z)).toBeGreaterThan(0.1);
+  expect(Math.hypot(after.newt.root.x, after.newt.root.z)).toBeLessThanOrEqual(2.01);
+});
+
+test('the carried model hangs below the letter over its moving root', async ({ page }) => {
+  await ready(page);
+  await awayFromOrigin(page);
+  await page.evaluate(() => {
+    const fire = window.__viz.fire;
+    const hear = fire.hear;
+    fire.setMaxFps(4);
+    fire.hear = (f) => hear({ ...f, state: 'breakdown', build: 0.95 });
+    void fire.equip('axe', 'ember', { hold: true });
+  });
+  // The frame loop caps simulation steps at 0.1 s. At 4 fps, Run's three seconds
+  // take at least 7.5 wall seconds; judge the transition on the rendered letter clock.
+  const carried = await page.evaluate(
+    (budget) =>
+      new Promise((resolve) => {
+        const fire = window.__viz.fire;
+        let started;
+        const off = fire.onRendered(() => {
+          const s = fire.snapshot();
+          started ??= s.letter.time;
+          if (s.newt.state === 'held' || s.letter.time - started >= budget) {
+            off();
+            resolve(s.newt.state);
+          }
+        });
+      }),
+    TUNE.runFor + 0.3,
+  );
+  expect(carried).toBe('held');
+  await expect
+    .poll(() => page.evaluate(() => window.__viz.fire.snapshot().newt.root.y), { timeout: 10_000 })
+    .toBeGreaterThan(0.4);
+  const samples = await page.evaluate(
+    (cycle) =>
+      new Promise((resolve) => {
+        const fire = window.__viz.fire,
+          started = fire.snapshot().letter.time,
+          samples = [];
+        const off = fire.onRendered(() => {
+          const s = fire.snapshot();
+          samples.push({
+            letter: s.letter.frame,
+            root: s.newt.root,
+            headTop: s.projected.headTop,
+            paper: s.projected.paper,
+          });
+          if (samples.length >= 60 && s.letter.time - started >= cycle) {
+            off();
+            resolve(samples);
+          }
+        });
+      }),
+    CLIPS.Held.length + 0.1,
+  );
+  for (const { letter, root, headTop, paper } of samples) {
+    expect(Math.hypot(letter.x - root.x, letter.z - root.z)).toBeLessThan(0.1);
+    // The rig's projected head bound includes the stylized hair; a collar-height estimate does not.
+    expect(Math.max(...paper.map((p) => p.y))).toBeLessThan(headTop);
+  }
 });
