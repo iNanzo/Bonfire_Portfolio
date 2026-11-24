@@ -9,8 +9,13 @@ import { createPassWrites } from '../../bonfire/passWrites.js';
 import { effects } from '../../effects.js';
 import { debugPalettes } from '../../palette.js';
 import { loadCharacter } from '../../invitation/character.js';
-import { BONES } from '../../invitation/clips.js';
-import { createMix, mixStep, lookAim } from '../../invitation/play.js';
+import { BONES, COLLAR, ANKLE_HEIGHT, SCALE, fadeFor } from '../../invitation/clips.js';
+import { createMix, mixStep, twinWeights, lookAim, lookShare, lookFront, glanceFront } from '../../invitation/play.js';
+import { createLook, createGlance, lookStep, glanceStep, glanceLook, torsoStep } from '../../invitation/lookAt.js';
+import { createFaceState, faceStep } from '../../invitation/faces.js';
+import { createRng } from '../../invitation/rng.js';
+import { invitationLines, speechSettings } from '../../invitation/content.js';
+import { createNewtBrain } from './newtBrain.js';
 import { fitShadow } from '../../invitation/floor.js';
 import { createFireDuck, snapshotLetter } from './fireDuck.js';
 import { createContactShadow } from './contactShadow.js';
@@ -24,6 +29,7 @@ import { PAGES, pageOf, blendPages, elementPalette } from './pages.js';
 export function createWorld(container, options = {}) {
   const { reducedMotion = false, onTick, onFrame, onError, pageStats, statsParent } = options;
   const scope = createResourceScope();
+  const performer = createNewtBrain({ lines: invitationLines(), speech: speechSettings() });
   let page = pageOf(options.page);
   let rings;
   const duck = createFireDuck({
@@ -169,7 +175,7 @@ export function createWorld(container, options = {}) {
           actors.set(letter.id, actor);
         }
         if (picture.petals.some((command) => command.id === letter.id && command.kind === 'bloom')) actor.glossAt = t;
-        actor.parent.position.set(letter.x, letter.y, 0);
+        actor.parent.position.set(letter.x, letter.y, letter.z);
         actor.parent.updateMatrixWorld(true);
         actor.pose(letter.pose, {
           view: { h: 4, cssH: container.clientHeight || 1, scale: 0.55 * letter.scale },
@@ -244,7 +250,7 @@ export function createWorld(container, options = {}) {
      * outlines, exposure, colorChange (seconds), flameFps (the flame's
      * frame rate), pixelSize (CSS px, the same as setPixelSize but redrawn only when it
      * changes), and how hits land: hitStop (seconds of freeze), hitFlash (0..1), debris
-     * (×), marks, each also true (the settings') or false (none).
+     * (Ãƒâ€”), marks, each also true (the settings') or false (none).
      */
     function setRender(partial = {}) {
       for (const [key, value] of Object.entries(partial)) {
@@ -312,6 +318,11 @@ export function createWorld(container, options = {}) {
     const head = { x: 0, y: 0.9, z: 0 };
     let character = null;
     const mix = createMix();
+    const gaze = createLook(),
+      glance = createGlance(),
+      faces = createFaceState(),
+      rng = createRng(89);
+    let torso = 0;
     const project = (point) => {
       const v = new THREE.Vector3(point.x, point.y, point.z).project(camera);
       return { x: (v.x + 1) / 2, y: (1 - v.y) / 2 };
@@ -319,11 +330,19 @@ export function createWorld(container, options = {}) {
     const characterBaseSnapshot = duck.snapshot;
     duck.snapshot = () => ({
       ...characterBaseSnapshot(),
-      newt: character ? { state: 'idle', clip: mix.main, grounded: true } : null,
+      newt: character
+        ? { ...performer.snapshot(), clip: mix.main, collar: character.bonePos(COLLAR, { x: 0, y: 0, z: 0 }) }
+        : null,
       projected: {
+        headTop: character
+          ? (() => {
+              const shape = character.screenShape(camera, { left: 0, top: 0, width: size.w, height: size.h });
+              return (shape.head.y - shape.head.r) / size.h;
+            })()
+          : null,
         chest: project(chest),
         legs: project({ x: chest.x, y: 0.175, z: chest.z }),
-        floor: project({ x: chest.x, y: 0, z: chest.z }),
+        floor: project({ x: performer.body.root.x, y: 0, z: performer.body.root.z }),
         get ringCenter() {
           return project({ ...rings.markRing, y: 0 });
         },
@@ -350,7 +369,11 @@ export function createWorld(container, options = {}) {
           ].map(([x, y]) => project(group.localToWorld(new THREE.Vector3(x, y, T / 2))));
         })(),
         letter: duck.moments.letters.at(-1)
-          ? project({ x: duck.moments.letters.at(-1).x, y: duck.moments.letters.at(-1).y, z: 0 })
+          ? project({
+              x: duck.moments.letters.at(-1).x,
+              y: duck.moments.letters.at(-1).y,
+              z: duck.moments.letters.at(-1).z,
+            })
           : null,
       },
     });
@@ -359,28 +382,80 @@ export function createWorld(container, options = {}) {
       const t0 = loop.perf ? performance.now() : 0;
       if (character) rings.setOrigin(character.root.position.x, character.root.position.z);
       onFrame?.(dt);
-      duck.step(dt);
+      const collar = character?.bonePos(COLLAR, { x: 0, y: 0, z: 0 });
+      duck.step(dt, performer.input(collar));
       rings.step(dt);
       if (paletteElement !== rings.element) setPalette(paletteChoice);
       t += dt;
       view.apply(dt, size, { sx: 0, sy: 0 });
       letters(dt);
       if (character) {
-        mixStep(mix, { clip: 'Idle', speed: 0, dt });
+        const playing = performer.out?.clip;
+        const clip =
+          playing && playing !== 'gait'
+            ? {
+                name: playing,
+                time: character.timeOf(playing),
+                remaining: character.clipLength(playing) - character.timeOf(playing),
+              }
+            : null;
+        // Copied from invitation/main.js: a sole or a dangling toe touches before the root.
+        const sole =
+          Math.min(...[BONES.footL, BONES.footR].map((b) => character.bonePos(b, { x: 0, y: 0, z: 0 }).y)) -
+          ANKLE_HEIGHT * SCALE;
+        const toe =
+          Math.min(...[BONES.footL, BONES.footR].map((b) => character.pointOn(b, 0.8, { x: 0, y: 0, z: 0 }).y)) -
+          0.12 * SCALE;
+        performer.step({
+          t,
+          dt,
+          moments: duck.moments,
+          collar,
+          camera: camera.position,
+          clip,
+          footOffset: Math.min(sole, toe) - character.root.position.y,
+        });
+        const o = performer.out;
+        const body = performer.body;
+        character.root.position.set(body.root.x, body.root.y, body.root.z);
+        character.root.rotation.set(body.tilt.x, body.body.yaw, body.tilt.z);
+        if (o.restart && character.restart(o.clip)) {
+          mix.weights = twinWeights(mix.weights, o.clip);
+          mix.fade = fadeFor(o.clip, o.clip);
+        }
+        mixStep(mix, { clip: o.clip, speed: body.body.speed, dt });
         character.setWeights(mix.weights, mix.phase);
         character.update(dt);
+        character.limp(dt, body.mode !== 'ground');
         character.root.updateMatrixWorld(true);
+        if (body.mode === 'held' && body.carry) {
+          const at = character.bonePos(COLLAR, { x: 0, y: 0, z: 0 });
+          character.root.position.x += body.carry.anchor.x - at.x;
+          character.root.position.y += body.carry.anchor.y - at.y;
+          character.root.position.z += body.carry.anchor.z - at.z;
+          body.root = { x: character.root.position.x, y: character.root.position.y, z: character.root.position.z };
+          character.root.updateMatrixWorld(true);
+        }
         character.bonePos(BONES.head, head);
         head.y += 0.12;
-        const { aim } = lookAim('camera', {
+        const want = { ...o.look, weight: o.look.weight * lookShare(mix.weights) };
+        const { aim, ahead } = lookAim(want.mode, {
           head,
           yaw: character.root.rotation.y,
           camera: camera.position,
           pointer: null,
+          pursuer: want.at ?? null,
         });
-        character.applyLook(aim?.yaw ?? 0, aim?.pitch ?? 0, 1);
+        lookStep(gaze, want.mode, aim, dt, t, rng, want.weight, lookFront(ahead, want), want.ease);
+        glanceStep(glance, want.up, glanceFront(ahead, want), dt, t, rng);
+        const look = glanceLook(gaze, glance, want.upWeight);
+        torso = torsoStep(torso, body.mode === 'ground', dt);
+        character.applyLook(look.yaw, look.pitch, look.weight, torso);
+        character.setFace(faceStep(faces, o.face, o.blink, t, rng));
+        character.accessories(dt, t);
         character.root.updateMatrixWorld(true);
         character.bonePos(BONES.chest, chest);
+        rings.setOrigin(character.root.position.x, character.root.position.z);
       }
       blob.visible = !renderer.shadowMap.enabled || !sun.castShadow;
       if (character) {
