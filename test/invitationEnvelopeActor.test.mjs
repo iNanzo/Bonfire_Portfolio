@@ -148,3 +148,43 @@ test('Live snap mode passes half-texel projection values into seal.place, rather
   assert.equal(actor.sealAt.placedAt.faceMatches, false);
   actor.dispose();
 });
+
+test('Live seal diagnostics read the raster only when a snapshot is requested', () => {
+  const camera = new THREE.PerspectiveCamera(40, 16 / 9, 0.1, 80);
+  camera.position.set(0, 1, 6);
+  camera.lookAt(0, 0.5, 0);
+  camera.updateMatrixWorld();
+  for (const snapSeal of [true, false]) {
+    const actor = createEnvelopeActor({ size: { tw: 640, th: 360 }, snapSeal });
+    const place = actor.seal.place;
+    let reads = 0;
+    actor.seal.place = (...args) => {
+      const placed = place(...args);
+      const texture = actor.seal.material.uniforms.uFace.value;
+      const image = texture.image;
+      Object.defineProperty(texture, 'image', {
+        configurable: true,
+        get() {
+          reads++;
+          return image;
+        },
+      });
+      return placed;
+    };
+    actor.pose(createEnvelope({ born: 0 }).pose(1.23), { view: { h: 4, cssH: 800, scale: 0.8 }, camera });
+    assert.equal(reads, 0, 'posing a seal must not read its texture for diagnostics');
+    const at = actor.sealAt;
+    assert.ok(at);
+    if (snapSeal) {
+      assert.equal(at.placedAt.faceMatches, true);
+      assert.ok(reads > 0, 'the snapshot verifies the actual applied raster');
+      const checked = reads;
+      assert.equal(actor.sealAt.placedAt.faceMatches, true);
+      assert.equal(reads, checked, 'unchanged raster diagnostics are cached');
+    } else {
+      assert.equal(at.placedAt, undefined);
+      assert.equal(reads, 0, 'the toy never verifies a raster');
+    }
+    actor.dispose();
+  }
+});

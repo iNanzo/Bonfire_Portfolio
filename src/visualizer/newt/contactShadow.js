@@ -1,6 +1,6 @@
 // The toy's standing contact cue for Live devices without shadow maps.
 import * as THREE from 'three';
-export function createContactShadow({ scene, scope, color }) {
+export function createContactShadow({ scene, scope, color, ghost }) {
   // Copied from src/invitation/stage.js:92-106,233-238: the standing contact blob.
   // Wider with a firmer falloff so Live's exposed, quantized page retains a cue beyond the boots.
   const blobData = new Uint8Array(32 * 32 * 4);
@@ -29,7 +29,7 @@ export function createContactShadow({ scene, scope, color }) {
   );
   blob.rotation.x = -Math.PI / 2;
   blob.position.y = 0.002;
-  blob.layers.set(2);
+  blob.layers.set(ghost);
   scope.trackTree(blob);
   scene.add(blob);
   return blob;

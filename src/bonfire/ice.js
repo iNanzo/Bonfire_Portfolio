@@ -249,7 +249,7 @@ export function createCrystals({
   let crystals = 0;
   let layoutKey = '';
   function layout(I) {
-    const key = `${I.shards}|${I.spread}|${I.height}|${I.thickness}`;
+    const key = `${I.shards}|${I.spread}|${I.height}|${I.thickness}|${origin.x}|${origin.z}`;
     if (key === layoutKey) return;
     layoutKey = key;
     const rng = seeded(1337);

@@ -183,3 +183,17 @@ export function createFireDuck({
   Object.defineProperties(duck, { holding: { get: () => moments.holding }, forging: { get: () => moments.forging } });
   return duck;
 }
+
+// The renderer supplies the frame reader; inspecting page/position needs no seal pixels.
+export function snapshotLetter(letter, actor, frameOf) {
+  if (!letter) return null;
+  return {
+    ...letter,
+    get seal() {
+      return actor?.sealAt ?? null;
+    },
+    get frame() {
+      return actor ? frameOf(actor) : null;
+    },
+  };
+}

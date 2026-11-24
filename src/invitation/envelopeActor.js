@@ -181,7 +181,7 @@ export function createEnvelopeActor({
   const letterScale = new THREE.Matrix4().makeScale(2 / envl.W, 2 / envl.H, 1);
 
   // The applied face is immutable between placements. Verify a texture/axes pair only
-  // once, and do no raster work for the toy's unsnapped actor.
+  // once when a diagnostic snapshot is read, never during normal posing or for the toy.
   const checkedFaces = new WeakMap();
   const colors = snapSeal
     ? WAX.map(rgb).map((color) => [color.x, color.y, color.z].map((c) => Math.round(c * 255)))
@@ -214,7 +214,6 @@ export function createEnvelopeActor({
       sealAt = null;
       return false;
     }
-    const matches = snapSeal ? faceMatches(at.axes) : false;
     sealAt = {
       x: at.x,
       y: at.y,
@@ -224,7 +223,6 @@ export function createEnvelopeActor({
             placedAt: {
               x: seal.material.uniforms.uCenter.value.x,
               y: seal.material.uniforms.uCenter.value.y,
-              faceMatches: !!matches,
               radius: seal.material.uniforms.uFaceR.value,
             },
           }
@@ -277,7 +275,8 @@ export function createEnvelopeActor({
     specks,
     uniforms: u,
     get sealAt() {
-      return sealAt;
+      if (!sealAt || !snapSeal) return sealAt;
+      return { ...sealAt, placedAt: { ...sealAt.placedAt, faceMatches: faceMatches(sealAt.axes) } };
     },
     pose(p, { view, follow = { y: 0, lift: 0 }, turn = 0, reduced = false, lift = hoverLook(0), camera }) {
       sealAt = null;
