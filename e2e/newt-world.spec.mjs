@@ -176,6 +176,24 @@ test('a held letter at stage three emits a ring before release', async ({ page }
   expect(await page.evaluate(() => window.__viz.fire.snapshot().holding)).toBe(true);
 });
 
+test('shot snapshots follow cuts and the held letter supplies the rig target', async ({ page }) => {
+  await ready(page);
+  await expect.poll(() => page.evaluate(() => window.__viz.fire.snapshot().shot?.key)).toBe('clearing');
+  const next = await page.evaluate(() => window.__viz.director.cut());
+  await expect.poll(() => page.evaluate(() => window.__viz.fire.snapshot().shot?.key)).toBe(next);
+  expect(await page.evaluate(() => window.__viz.fire.snapshot().shot.name)).toBeTruthy();
+  await page.evaluate(() => {
+    void window.__viz.fire.equip('axe', 'ember', { hold: true });
+  });
+  await expect.poll(() => page.evaluate(() => window.__viz.fire.snapshot().letter?.state)).toBe('floating');
+  const target = await page.evaluate(() => {
+    const f = window.__viz.fire,
+      p = f.snapshot().letter.frame;
+    return { mid: f.blade.mid.toArray(), letter: [p.x, p.y, p.z] };
+  });
+  expect(target.mid).toEqual(target.letter);
+});
+
 const pixels = async (page) => {
   const result = await page.evaluate(async () => {
     const fire = window.__viz.fire;
@@ -511,14 +529,23 @@ const ringFrames = async (page, kind, times, scorchPage = null) => {
   );
 };
 const ringBand = (shot, predicate) => {
-  const floor = shot.snapshot.projected.floor;
+  const floor = shot.snapshot.projected.ringCenter;
+  const arc = shot.snapshot.projected.ring;
+  const halfWidth = (Math.max(...arc.map((p) => p.x)) - Math.min(...arc.map((p) => p.x))) / 2;
+  const halfHeight = (Math.max(...arc.map((p) => p.y)) - Math.min(...arc.map((p) => p.y))) / 2;
   let count = 0,
     total = 0;
   for (let y = 0; y < shot.info.height; y++)
     for (let x = 0; x < shot.info.width; x++) {
       const dx = x / shot.info.width - floor.x,
         dy = y / shot.info.height - floor.y;
-      if (Math.abs(dx) < 0.035 || Math.abs(dx) > 0.16 || dy < -0.065 || dy > 0.07) continue;
+      if (
+        Math.abs(dx) < halfWidth * 0.2 ||
+        Math.abs(dx) > halfWidth * 1.25 ||
+        dy < -halfHeight * 1.6 ||
+        dy > halfHeight * 1.25
+      )
+        continue;
       const i = (y * shot.info.width + x) * 3;
       total++;
       count += +predicate(shot.data[i], shot.data[i + 1], shot.data[i + 2], i);
@@ -537,10 +564,13 @@ for (const pageKey of ['dusk', 'night']) {
     const warm = new Set(PAGES[pageKey].palette.slice(2, 10));
     const flame = (r, g, b) => warm.has((r << 16) | (g << 8) | b);
     const before = ringBand(shots[0], flame).count;
-    const peak = Math.max(...shots.slice(1).map((s) => ringBand(s, flame).count));
+    const bands = shots.slice(1).map((s) => ringBand(s, flame));
+    const peak = Math.max(...bands.map((band) => band.count));
+    const coverage = Math.max(...bands.map((band) => (band.count - before) / band.total));
     console.log('fire-band', pageKey, { before, peak, times: shots.map((s) => s.elapsed) });
     expect(shots[1].elapsed).toBeLessThan(0.3);
     expect(peak - before).toBeGreaterThan(60);
+    expect(coverage).toBeGreaterThan(0.02);
   });
   test(`lightning bolts change between real rendered frames on ${pageKey}`, async ({ page }) => {
     await page.addInitScript(
@@ -722,7 +752,12 @@ for (const [pageKey, width] of [
         pageKey,
       );
       await ready(page);
-      const shots = await ringFrames(page, 'ice', width === 390 ? [0.3, 0.6, 1] : [0.6]);
+      const batches = [await ringFrames(page, 'ice', width === 390 ? [0.3, 0.6, 1] : [0.6])];
+      if (width === 390) {
+        await ready(page);
+        await awayFromOrigin(page);
+        batches.push(await ringFrames(page, 'ice', [0.3, 0.6, 1]));
+      }
       const cold = new Set(elementPalette(PAGES[pageKey], 'ice').slice(5, 8));
       const bounds = (shot) => {
         let count = 0,
@@ -738,13 +773,15 @@ for (const [pageKey, width] of [
           }
         return { count, minX, maxX };
       };
-      const before = bounds(shots[0]);
-      for (const shot of shots.slice(1)) {
-        const after = bounds(shot);
-        console.log('ice-band', pageKey, width, shot.elapsed, { before, after });
-        expect(after.count - before.count).toBeGreaterThan(20);
-        expect(after.minX).toBeGreaterThan(0);
-        expect(after.maxX).toBeLessThan(shot.info.width - 1);
+      for (const shots of batches) {
+        const before = bounds(shots[0]);
+        for (const shot of shots.slice(1)) {
+          const after = bounds(shot);
+          console.log('ice-band', pageKey, width, shot.elapsed, { before, after });
+          expect(after.count - before.count).toBeGreaterThan(20);
+          expect(after.minX).toBeGreaterThan(0);
+          expect(after.maxX).toBeLessThan(shot.info.width - 1);
+        }
       }
     } finally {
       await context.close();
@@ -803,6 +840,53 @@ test('rendering and page/frame snapshot reads do not verify seal rasters', async
       WeakMap.prototype.set = window.__sealMapSet;
       delete window.__sealMapSet;
     });
+  }
+});
+
+test('tilted held paper stays inside The Letter and Vertigo throughout their moves', async ({ page }) => {
+  test.setTimeout(90000);
+  for (const viewport of [
+    { width: 1280, height: 720 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await ready(page);
+    await page.evaluate(() => {
+      window.__viz.settings.camera = 'drift';
+      window.__viz.director.frame(0, 0, { instant: true });
+      void window.__viz.fire.equip('axe', 'ember', { hold: true });
+    });
+    await expect.poll(() => page.evaluate(() => window.__viz.fire.snapshot().letter?.state)).toBe('floating');
+    for (const key of ['blade', 'vertigo']) {
+      const samples = await page.evaluate(async (shot) => {
+        const { director, fire } = window.__viz;
+        director.setShot(shot);
+        return new Promise((resolve) => {
+          const start = performance.now(),
+            result = [];
+          let last = 0;
+          const off = fire.onRendered(() => {
+            const elapsed = performance.now() - start;
+            if (!result.length || elapsed - last > 100) {
+              result.push(fire.snapshot().projected.paper);
+              last = elapsed;
+            }
+            if (elapsed >= 8100) {
+              off();
+              resolve(result);
+            }
+          });
+        });
+      }, key);
+      expect(samples.length).toBeGreaterThan(20);
+      for (const corners of samples)
+        for (const corner of corners) {
+          expect(corner.x, `${key} ${viewport.width} paper x`).toBeGreaterThan(0.02);
+          expect(corner.x, `${key} ${viewport.width} paper x`).toBeLessThan(0.98);
+          expect(corner.y, `${key} ${viewport.width} paper y`).toBeGreaterThan(0.02);
+          expect(corner.y, `${key} ${viewport.width} paper y`).toBeLessThan(0.98);
+        }
+    }
   }
 });
 

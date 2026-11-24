@@ -4,11 +4,11 @@ import { createBody, bodyStep } from '../../invitation/play.js';
 import { createTalk } from '../../invitation/speech.js';
 import { createRng } from '../../invitation/rng.js';
 import { CLIPS } from '../../invitation/clips.js';
-import { playArea } from '../../invitation/area.js';
+import { WANDER_BOUNDS } from './shots.js';
 
 /** @param {{lines: import('../../invitation/speech.js').Lines, speech: import('../../invitation/speech.js').SpeechSettings, seed?:number}} options */
 export function createNewtBrain({ lines, speech, seed = 87 }) {
-  const bounds = playArea(2);
+  const bounds = WANDER_BOUNDS;
   const brain = createBrain({ seed, bounds, middle: { x: 0, z: 0 }, tune: { sitAfter: Infinity } });
   const body = createBody();
   const talk = createTalk({ lines, speech, rng: createRng(seed + 2) });

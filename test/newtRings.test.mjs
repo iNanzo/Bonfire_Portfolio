@@ -360,6 +360,6 @@ test('phone cold mist shares the ring compression around a moved origin', (t) =>
   const point = new THREE.Vector3()
     .fromBufferAttribute(rings.chill.points.geometry.attributes.position, 0)
     .applyMatrix4(rings.chill.points.matrixWorld);
-  assert.equal(point.x, 3.5);
+  assert.equal(point.x, 3.4);
   assert.equal(point.z, -2);
 });

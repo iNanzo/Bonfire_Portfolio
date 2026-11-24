@@ -437,6 +437,7 @@ export function createCamera(fire, settings, { reducedMotion = false, onShot = (
       o.fov = Math.min(80, Math.max(o.fov, (2 * Math.atan(across / aspect) * 180) / Math.PI));
     }
     o.roll = moving ? (s.roll ?? 0) + Math.sin(driftT * 0.7) * 0.02 : 0;
+    fire.frameShot?.(o, shot);
   }
 
   /** This frame's framing (no move between shots): a rig's or the shot's. */

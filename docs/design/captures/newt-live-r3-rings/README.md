@@ -22,3 +22,13 @@ The ice field stays below NEWT's upper body, fits the phone frame, and uses cold
 | Reduced-motion Cream fade | ![](before-reduced-fade.png) | ![](after-reduced-fade.png) |
 
 The reduced-motion captures use the actual fading state with fade greater than 0.45, dissolve zero, and outlines enabled. The regression tests additionally sample scorch darkness at 5.2, 5.5, 10, and 14 real seconds on Dusk, White, and Cream; these short clips do not claim to cover that full interval. PR validation records the rendered assertions and demonstrated reverted-fix failures.
+
+## Camera integration supplement
+
+These three additional native-canvas stills use the final integration of camera main `15484cc` with the ring/movement fixes, including the coarse-pointer ice width of 0.4. They match the source in the merge commit containing these files. They are not replacements for the earlier `7c758a7` before/after clips above. Normal render passes, the default Page camera, and ordinary animation time are retained; fire is sampled around 0.2 seconds and ice around 0.65 seconds after the ring action.
+
+| Integrated Dusk fire, desktop | Integrated White ice, phone | Integrated White ice, walking phone |
+| --- | --- | --- |
+| ![](integrated-dusk-fire-1280.png) | ![](integrated-white-ice-390.png) | ![](integrated-white-ice-390-walking.png) |
+
+The walking capture uses the actual root at approximately `(0.124, 0, -0.615)`, after waiting for normal movement away from the origin. The phone regression checks both a fresh page and this moving setup. The final combined-main real-speed show is reviewed separately; these stills specifically document the camera integration and phone field clearance.

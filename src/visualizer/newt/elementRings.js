@@ -122,7 +122,7 @@ export function createElementRings({
   // Their source geometry is bonfire-sized. Compress only height on the outer ring,
   // and the central cluster around its moving origin; the figure remains clear above his knees.
   ice.solid.scale.y = 0.3;
-  const iceWidth = coarse ? 0.5 : 1;
+  const iceWidth = coarse ? 0.4 : 1;
   // Frost spokes extend to 1.8 times their stamp radius; keep the entire mark
   // within the shard field, including the narrow phone shot.
   const ringRadius = () => (kind === 'ice' ? (iceReach() * iceWidth) / 1.8 : 1.5);
