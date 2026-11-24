@@ -315,13 +315,16 @@ export const CONTROLS = Object.fromEntries(
  * why it does nothing as things stand (needs; filled in by the dialog), and the badge a
  * search shows on a row from All Settings in the Simple view.
  * @param {string} key
- * @param {{ adv: boolean, more: string, needs: any }} m
+ * @param {{ adv: boolean, more: string, needs: any, worlds?: string[] }} m
  * @param {string} inner the control
  */
 export function row(key, m, inner) {
   const wide = kindOf(key) === 'grid' ? ' viz-setting-wide' : '';
   const badge = m.adv ? '<span class="viz-adv-badge">All Settings</span>' : '';
-  const why = m.needs ? `<p class="viz-why" id="viz-why-${esc(key)}" data-why hidden></p>` : '';
+  const why =
+    m.needs || (m.worlds && m.worlds.length < 2)
+      ? `<p class="viz-why" id="viz-why-${esc(key)}" data-why hidden></p>`
+      : '';
   const folded = m.more ? more(m.more.split('\n')) : '';
   const extra = key === 'volume' ? ' data-volume-row' : '';
   return `<div class="viz-setting${wide}" data-row="${esc(key)}"${m.adv ? ' data-adv' : ''}${extra}>${badge}${inner}${folded}${why}</div>`;
