@@ -75,7 +75,7 @@ const shared = new Set([
   'src/visualizer/looks.js',
   'src/ui/perfOverlay.js',
 ]);
-const pure = new Set(['fireDuck.js', 'newtMoments.js', 'pages.js', 'newtDance.js', 'newtBrain.js']);
+const pure = new Set(['fireDuck.js', 'newtMoments.js', 'pages.js', 'newtDance.js', 'shots.js', 'newtBrain.js']);
 const imports = (code) =>
   [
     ...code.matchAll(

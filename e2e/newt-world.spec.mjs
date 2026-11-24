@@ -226,6 +226,24 @@ test('a held letter at stage three emits a ring before release', async ({ page }
   expect(await page.evaluate(() => window.__viz.fire.snapshot().holding)).toBe(true);
 });
 
+test('shot snapshots follow cuts and the held letter supplies the rig target', async ({ page }) => {
+  await ready(page);
+  await expect.poll(() => page.evaluate(() => window.__viz.fire.snapshot().shot?.key)).toBe('clearing');
+  const next = await page.evaluate(() => window.__viz.director.cut());
+  await expect.poll(() => page.evaluate(() => window.__viz.fire.snapshot().shot?.key)).toBe(next);
+  expect(await page.evaluate(() => window.__viz.fire.snapshot().shot.name)).toBeTruthy();
+  await page.evaluate(() => {
+    void window.__viz.fire.equip('axe', 'ember', { hold: true });
+  });
+  await expect.poll(() => page.evaluate(() => window.__viz.fire.snapshot().letter?.state)).toBe('floating');
+  const target = await page.evaluate(() => {
+    const f = window.__viz.fire,
+      p = f.snapshot().letter.frame;
+    return { mid: f.blade.mid.toArray(), letter: [p.x, p.y, p.z] };
+  });
+  expect(target.mid).toEqual(target.letter);
+});
+
 const pixels = async (page) => {
   const result = await page.evaluate(async () => {
     const fire = window.__viz.fire;
@@ -463,6 +481,53 @@ test('a live Cream page change paints the corner and the whole frame in its pale
     }
   expect([...corner]).toEqual([PAGES.cream.color]);
   expect([...unexpected]).toEqual([]);
+});
+
+test('tilted held paper stays inside The Letter and Vertigo throughout their moves', async ({ page }) => {
+  test.setTimeout(90000);
+  for (const viewport of [
+    { width: 1280, height: 720 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await ready(page);
+    await page.evaluate(() => {
+      window.__viz.settings.camera = 'drift';
+      window.__viz.director.frame(0, 0, { instant: true });
+      void window.__viz.fire.equip('axe', 'ember', { hold: true });
+    });
+    await expect.poll(() => page.evaluate(() => window.__viz.fire.snapshot().letter?.state)).toBe('floating');
+    for (const key of ['blade', 'vertigo']) {
+      const samples = await page.evaluate(async (shot) => {
+        const { director, fire } = window.__viz;
+        director.setShot(shot);
+        return new Promise((resolve) => {
+          const start = performance.now(),
+            result = [];
+          let last = 0;
+          const off = fire.onRendered(() => {
+            const elapsed = performance.now() - start;
+            if (!result.length || elapsed - last > 100) {
+              result.push(fire.snapshot().projected.paper);
+              last = elapsed;
+            }
+            if (elapsed >= 8100) {
+              off();
+              resolve(result);
+            }
+          });
+        });
+      }, key);
+      expect(samples.length).toBeGreaterThan(20);
+      for (const corners of samples)
+        for (const corner of corners) {
+          expect(corner.x, `${key} ${viewport.width} paper x`).toBeGreaterThan(0.02);
+          expect(corner.x, `${key} ${viewport.width} paper x`).toBeLessThan(0.98);
+          expect(corner.y, `${key} ${viewport.width} paper y`).toBeGreaterThan(0.02);
+          expect(corner.y, `${key} ${viewport.width} paper y`).toBeLessThan(0.98);
+        }
+    }
+  }
 });
 
 test('NEWT actually walks across the page with a moving projected body', async ({ page }) => {

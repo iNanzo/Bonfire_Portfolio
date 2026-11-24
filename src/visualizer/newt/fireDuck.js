@@ -1,5 +1,6 @@
 // Director protocol without a renderer. W2a replaces the letterless impact clock.
 import { createNewtMoments } from './newtMoments.js';
+import { createShotFrame, reframeShot, NEWT_SHOTS } from './shots.js';
 import { pageOf } from './pages.js';
 export function createFireDuck({
   onImpact = (..._args) => {},
@@ -76,6 +77,8 @@ export function createFireDuck({
     heard = {},
     events = [],
     picture = { letters: [], petals: [], page: null };
+  const shotFrame = createShotFrame();
+  let shot = null;
   const calls = [];
   const noop = (..._args) => {};
   const duck = {
@@ -94,6 +97,11 @@ export function createFireDuck({
     knights: null,
     fireflies: null,
     blade: null,
+    shotFrame,
+    frameShot(o, key) {
+      const anchor = reframeShot(o, key, shotFrame);
+      if (anchor) shot = { key, name: NEWT_SHOTS[key].name, anchor };
+    },
     swapTime: 1.4,
     canvas: null,
     ready: Promise.resolve(),
@@ -164,7 +172,7 @@ export function createFireDuck({
       page: { name: pageOf(moments.page).name },
       holding: duck.holding,
       fireflies: false,
-      shot: null,
+      shot,
     }),
     dispose() {
       moments.dispose();
