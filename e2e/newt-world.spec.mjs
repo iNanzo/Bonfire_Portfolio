@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 import sharp from 'sharp';
+import { TUNE } from '../src/invitation/brain.js';
+import { CLIPS } from '../src/invitation/clips.js';
 import { PAGES } from '../src/visualizer/newt/pages.js';
 
 const ready = async (page, path = '/visualizer/?world=newt&bench') => {
@@ -492,18 +494,37 @@ test('the carried model hangs below the letter over its moving root', async ({ p
   await page.evaluate(() => {
     const fire = window.__viz.fire;
     const hear = fire.hear;
+    fire.setMaxFps(4);
     fire.hear = (f) => hear({ ...f, state: 'breakdown', build: 0.95 });
     void fire.equip('axe', 'ember', { hold: true });
   });
-  await expect.poll(() => page.evaluate(() => window.__viz.fire.snapshot().newt.state)).toBe('held');
+  // The frame loop caps simulation steps at 0.1 s. At 4 fps, Run's three seconds
+  // take at least 7.5 wall seconds; judge the transition on the rendered letter clock.
+  const carried = await page.evaluate(
+    (budget) =>
+      new Promise((resolve) => {
+        const fire = window.__viz.fire;
+        let started;
+        const off = fire.onRendered(() => {
+          const s = fire.snapshot();
+          started ??= s.letter.time;
+          if (s.newt.state === 'held' || s.letter.time - started >= budget) {
+            off();
+            resolve(s.newt.state);
+          }
+        });
+      }),
+    TUNE.runFor + 0.3,
+  );
+  expect(carried).toBe('held');
   await expect
     .poll(() => page.evaluate(() => window.__viz.fire.snapshot().newt.root.y), { timeout: 10_000 })
     .toBeGreaterThan(0.4);
   const samples = await page.evaluate(
-    () =>
+    (cycle) =>
       new Promise((resolve) => {
         const fire = window.__viz.fire,
-          started = performance.now(),
+          started = fire.snapshot().letter.time,
           samples = [];
         const off = fire.onRendered(() => {
           const s = fire.snapshot();
@@ -513,12 +534,13 @@ test('the carried model hangs below the letter over its moving root', async ({ p
             headTop: s.projected.headTop,
             paper: s.projected.paper,
           });
-          if (samples.length >= 60 && performance.now() - started >= 1600) {
+          if (samples.length >= 60 && s.letter.time - started >= cycle) {
             off();
             resolve(samples);
           }
         });
       }),
+    CLIPS.Held.length + 0.1,
   );
   for (const { letter, root, headTop, paper } of samples) {
     expect(Math.hypot(letter.x - root.x, letter.z - root.z)).toBeLessThan(0.1);
