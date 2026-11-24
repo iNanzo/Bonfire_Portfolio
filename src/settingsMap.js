@@ -197,7 +197,7 @@ export const SETTINGS = {
     label: 'World',
     live: 'world',
     simple: true,
-    hint: 'Choose Bonfire or NEWT. The visualizer rebuilds in that world when you close Settings.',
+    hint: 'Choose Bonfire or NEWT. The visualizer rebuilds in that world at once.',
   },
   page: {
     section: 'world',
@@ -805,6 +805,9 @@ export const SETTINGS = {
     labels: { painter: 'Look' },
     hints: {
       painter: 'The picture’s style for this scene. Hover a look to see it on the stage, click to paint with it.',
+    },
+    mores: {
+      live: 'For NEWT, try Painterly, Grain, Echo, Mirror and Glitch In the Mix. Use Ink on dark pages only; keep Negative and Color Cycling Off on light pages.',
     },
     keywords: ['style', 'effects', 'visuals'],
   },

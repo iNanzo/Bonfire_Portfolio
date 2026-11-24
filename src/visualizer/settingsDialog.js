@@ -290,7 +290,7 @@ export function bindSettings(
 
   // --- needs: a setting that does nothing as things stand is off, saying why
   const needs = entriesFor('live')
-    .filter((e) => e.needs?.live)
+    .filter((e) => e.needs?.live || (e.worlds && e.worlds.length < 2))
     .map((e) => ({ key: e.live, row: q(`[data-row="${e.live}"]`), why: q(`#viz-why-${e.live}`) }))
     .filter((n) => n.row && n.why);
   const describedBy = (el) => (el.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean);
@@ -598,6 +598,7 @@ export function bindSettings(
         }),
       ),
     '[data-scene-play]': (/** @type {HTMLElement} */ b) => {
+      if (settings.world === 'newt') return;
       dialog.close();
       onPlayScene(b.dataset.scenePlay);
     },
