@@ -12,14 +12,14 @@ import { loadCharacter } from '../../invitation/character.js';
 import { BONES } from '../../invitation/clips.js';
 import { createMix, mixStep, lookAim } from '../../invitation/play.js';
 import { fitShadow } from '../../invitation/floor.js';
-import { createFireDuck } from './fireDuck.js';
+import { createFireDuck, snapshotLetter } from './fireDuck.js';
 import { createContactShadow } from './contactShadow.js';
 import { createElementRings } from './elementRings.js';
 import { createEnvelopeActor } from '../../invitation/envelopeActor.js';
 import { createPetalScene } from '../../invitation/petalScene.js';
 import { shared } from '../../invitation/envelopeLook.js';
 import { hoverLook, sealGloss, FLAP_OPEN } from '../../invitation/envelope.js';
-import { PAGES, pageOf, blendPages } from './pages.js';
+import { PAGES, pageOf, blendPages, elementPalette } from './pages.js';
 /** @param {HTMLElement} container @param {Record<string, any>} [options] */
 export function createWorld(container, options = {}) {
   const { reducedMotion = false, onTick, onFrame, onError, pageStats, statsParent } = options;
@@ -42,7 +42,8 @@ export function createWorld(container, options = {}) {
     ownFrameRenderer(scope, renderer);
     renderer.setPixelRatio(1);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.shadowMap.enabled = !matchMedia('(pointer: coarse)').matches;
+    const coarse = matchMedia('(pointer: coarse)').matches;
+    renderer.shadowMap.enabled = !coarse;
     renderer.shadowMap.type = THREE.BasicShadowMap;
     renderer.shadowMap.autoUpdate = false;
     renderer.autoClear = false;
@@ -71,16 +72,20 @@ export function createWorld(container, options = {}) {
       scope,
       page: () => duck.snapshot().page.name.toLowerCase(),
       letter: () => duck.snapshot().letter?.frame ?? null,
+      coarse,
       reducedMotion,
     });
     duck.ring = rings.ring;
     const onEvent = duck.onEvent;
     duck.onEvent = (type, data) => {
       onEvent(type, data);
-      if (type === 'dropfx') rings.ring(data?.strength ?? 1);
+      if (type === 'dropfx') rings.drop(duck.element, duck.flame, duck.forging, data?.strength ?? 1);
     };
     const snapshot = duck.snapshot;
-    duck.snapshot = () => ({ ...snapshot(), rings: { element: rings.element, marks: rings.marks.count } });
+    duck.snapshot = () => ({
+      ...snapshot(),
+      rings: { element: rings.element, marks: rings.marks.count, time: rings.time },
+    });
     const paper = new THREE.Mesh(
       new THREE.PlaneGeometry(14, 14),
       new THREE.ShadowMaterial({
@@ -101,7 +106,7 @@ export function createWorld(container, options = {}) {
     paper.layers.set(layers.ghost);
     scope.trackTree(paper);
     scene.add(paper);
-    const blob = createContactShadow({ scene, scope, color: page.shadow });
+    const blob = createContactShadow({ scene, scope, color: page.shadow, ghost: layers.ghost });
     scene.add(new THREE.HemisphereLight(0xffffff, 0x817781, 2));
     const sun = new THREE.DirectionalLight(0xffffff, 2);
     sun.position.set(-3, 7, 4);
@@ -128,19 +133,12 @@ export function createWorld(container, options = {}) {
       }
     };
     const baseSnapshot = duck.snapshot;
+    const letterFrame = (actor) => new THREE.Vector3().setFromMatrixPosition(actor.inner.matrixWorld);
     duck.snapshot = () => {
       const snapshot = baseSnapshot();
       return {
         ...snapshot,
-        letter: snapshot.letter
-          ? {
-              ...snapshot.letter,
-              seal: actors.get(snapshot.letter.id)?.sealAt ?? null,
-              frame: actors.has(snapshot.letter.id)
-                ? new THREE.Vector3().setFromMatrixPosition(actors.get(snapshot.letter.id).inner.matrixWorld)
-                : null,
-            }
-          : null,
+        letter: snapshotLetter(snapshot.letter, actors.get(snapshot.letter?.id), letterFrame),
         petals: petals.live(),
         size: { w: size.w, h: size.h },
       };
@@ -186,7 +184,8 @@ export function createWorld(container, options = {}) {
           reducedMotion,
         );
         actor.seal.gloss(gloss.at, gloss.width);
-        if (letter.pose.dissolve > 0) actor.envl.group.traverse((o) => o.layers.set(layers.ghost));
+        if (letter.state === 'fading' || letter.pose.dissolve > 0)
+          actor.envl.group.traverse((o) => o.layers.set(layers.ghost));
         if (letter.id === picture.letters.at(-1)?.id)
           petals.letter(actor.inner.matrixWorld, {
             h: (actor.envl.H * 0.55 * letter.scale) / 1.1,
@@ -272,6 +271,7 @@ export function createWorld(container, options = {}) {
       const h = Math.max(1, Math.ceil((container.clientHeight * dpr) / pd));
       size = { w, h, pd };
       frame.setSize(w, h, pd);
+      rings.setDepth(frame.depthTexture);
       canvas.style.width = `${(w * pd) / dpr}px`;
       canvas.style.height = `${(h * pd) / dpr}px`;
       camera.aspect = w / h;
@@ -280,13 +280,15 @@ export function createWorld(container, options = {}) {
     const observer = new ResizeObserver(resize);
     observer.observe(container);
     scope.cleanup(() => observer.disconnect());
-    let paletteChoice = null;
+    let paletteChoice = null,
+      paletteElement = null;
     function setPalette(p = null) {
       paletteChoice = p;
+      paletteElement = rings.element;
       if (Array.isArray(p)) pass.setPalette(p.map((i) => page.palette[i] ?? page.ink));
       else if (p && p !== 'flame' && debugPalettes[p]) pass.setPalette(debugPalettes[p]);
       else {
-        pass.setPalette(page.palette, { steel: true });
+        pass.setPalette(elementPalette(page, rings.element), { steel: true });
         pass.setSteel(page.tones);
       }
       pass.uniforms.uCore.value.set(page.palette[8]);
@@ -320,8 +322,22 @@ export function createWorld(container, options = {}) {
       newt: character ? { state: 'idle', clip: mix.main, grounded: true } : null,
       projected: {
         chest: project(chest),
-        hips: project({ x: chest.x, y: 0.3, z: chest.z }),
+        legs: project({ x: chest.x, y: 0.175, z: chest.z }),
         floor: project({ x: chest.x, y: 0, z: chest.z }),
+        get ringCenter() {
+          return project({ ...rings.markRing, y: 0 });
+        },
+        get ring() {
+          return Array.from({ length: 32 }, (_, i) => {
+            const angle = (i / 32) * Math.PI * 2;
+            const stamp = rings.markRing;
+            return project({
+              x: stamp.x + Math.cos(angle) * stamp.radius,
+              y: 0,
+              z: stamp.z + Math.sin(angle) * stamp.radius,
+            });
+          });
+        },
         paper: (() => {
           const actor = actors.get(duck.moments.letters.at(-1)?.id);
           if (!actor) return null;
@@ -341,9 +357,11 @@ export function createWorld(container, options = {}) {
     const writePass = createPassWrites({ pass, glitch: duck.glitch, reducedMotion });
     function draw(dt) {
       const t0 = loop.perf ? performance.now() : 0;
+      if (character) rings.setOrigin(character.root.position.x, character.root.position.z);
       onFrame?.(dt);
       duck.step(dt);
       rings.step(dt);
+      if (paletteElement !== rings.element) setPalette(paletteChoice);
       t += dt;
       view.apply(dt, size, { sx: 0, sy: 0 });
       letters(dt);

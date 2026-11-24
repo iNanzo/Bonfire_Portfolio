@@ -7,13 +7,14 @@ import { createGroundMarks } from '../../bonfire/marks.js';
 import { createDebris } from '../../bonfire/debris.js';
 import { createChill } from '../../bonfire/chill.js';
 import { createCurlField } from '../../bonfire/curl.js';
-import { createParticleMaterial, createEffectMaterial, SHAPE } from '../../bonfire/flame.js';
+import { createParticleMaterial, createEffectMaterial, SHAPE, DITHER_GLSL } from '../../bonfire/flame.js';
 import { effects } from '../../effects.js';
 import { flames } from '../../palette.js';
 import { pageOf } from './pages.js';
 
 export const pageLights = (page, lights) => (pageOf(page).light ? [] : lights);
 
+// Copied from src/bonfire/sceneFire.js:49-61,183-207: scar/ring facade, adapted to paper.
 export function createElementRings({
   scene,
   frame,
@@ -22,6 +23,7 @@ export function createElementRings({
   letter = () => null,
   reducedMotion = false,
   pageHalf = 7,
+  coarse = false,
 }) {
   const origin = new THREE.Vector3(0, 0, 0);
   const field = createCurlField();
@@ -31,14 +33,23 @@ export function createElementRings({
   const glintMaterial = scope.own(createEffectMaterial(particle, { shape: SHAPE.diamond }));
   const smokeMaterial = scope.own(createSmokeMaterial());
   const reach = () => pageHalf;
-  // Light pages use no point lights; the void supplies the paper's exact color.
-  const lights = pageOf(page()).light ? 0 : 6;
-  const chill = createChill({ material: smokeMaterial, field, origin: origin.clone(), reducedMotion });
+  const iceReach = () => 1.1;
+  const impactCount = (n) =>
+    Math.max(1, Math.round(n * effects.particles.impact * (coarse ? effects.particles.touchScale : 1)));
+  // Allocate both page tiers once; their intensities follow the current page after each step.
+  const lights = coarse ? 4 : 6;
+  const chill = createChill({ material: smokeMaterial, field, origin, count: impactCount(1400), reducedMotion });
   chill.setGround(() => 0);
   const fire = /** @type {(options: any) => any} */ (createImpactFx)({
+    emitters: coarse ? 90 : 144,
+    flames: impactCount(3200),
+    haze: impactCount(1500),
+    smoke: impactCount(520),
+    ash: impactCount(220),
+    embers: impactCount(160),
     fireMaterial: fxMaterial,
     smokeMaterial,
-    origin: origin.clone(),
+    origin,
     field,
     reach,
     lights,
@@ -47,19 +58,22 @@ export function createElementRings({
   const lightning = /** @type {(options: any) => any} */ (createLightningRing)({
     fxMaterial,
     sparkMaterial,
-    origin: origin.clone(),
+    origin,
     field,
     reach,
     source: letter,
+    emitters: coarse ? 72 : 96,
+    sparks: impactCount(260),
     lights,
     reducedMotion,
   });
   const ice = /** @type {(options: any) => any} */ (createIceRing)({
     fxMaterial,
     glintMaterial,
-    origin: origin.clone(),
+    origin,
     field,
-    reach,
+    reach: iceReach,
+    chips: impactCount(320),
     chill,
     lights,
     reducedMotion,
@@ -67,7 +81,7 @@ export function createElementRings({
   const crystals = /** @type {(options: any) => any} */ (createCrystals)({
     fxMaterial,
     glintMaterial,
-    origin: origin.clone(),
+    origin,
     field,
     chill,
     reducedMotion,
@@ -79,6 +93,7 @@ export function createElementRings({
       kind,
       /** @type {(options: any) => any} */ (createDebris)({
         kind,
+        count: impactCount(120),
         material: kind === 'ice' ? glintMaterial : kind === 'lightning' ? sparkMaterial : fxMaterial,
         reducedMotion,
       }),
@@ -103,13 +118,37 @@ export function createElementRings({
   for (const o of [fire.haze, fire.puff, fire.flecks, chill.points]) add(o, 2);
   crystals.solid.layers.set(0);
   ice.solid.layers.set(0);
-  const pageLightObjects = pageLights(page(), [...fire.lights, ...lightning.lights, ...ice.lights]);
+  const pageLightObjects = [...fire.lights, ...lightning.lights, ...ice.lights];
+  // Their source geometry is bonfire-sized. Compress only height on the outer ring,
+  // and the central cluster around its moving origin; the figure remains clear above his knees.
+  ice.solid.scale.y = 0.3;
+  const iceWidth = coarse ? 0.5 : 1;
+  // Frost spokes extend to 1.8 times their stamp radius; keep the entire mark
+  // within the shard field, including the narrow phone shot.
+  const ringRadius = () => (kind === 'ice' ? (iceReach() * iceWidth) / 1.8 : 1.5);
+  const iceSpreadObjects = [...ice.objects, chill.points];
+  for (const object of iceSpreadObjects) {
+    object.scale.x = iceWidth;
+    object.scale.z = iceWidth;
+  }
+  const smallCrystals = crystals.objects.filter((o) => o === crystals.solid || o.isPoints);
+  for (const object of smallCrystals) object.scale.setScalar(0.22);
   for (const l of pageLightObjects) scene.add(l);
   // Marks have their own transparent, unlit surface. Unmarked texels draw nothing.
   const markMaterial = new THREE.ShaderMaterial({
     uniforms: marks.uniforms,
     vertexShader: `uniform vec4 uMarkBox; varying vec2 vMarkUv; void main() { vec4 world = modelMatrix * vec4(position,1.); vMarkUv = (world.xz-uMarkBox.xy)/uMarkBox.zw; gl_Position=projectionMatrix*viewMatrix*world; }`,
-    fragmentShader: `uniform sampler2D tMarks; uniform sampler2D tMarkGlow; varying vec2 vMarkUv; void main() { vec4 mark=texture2D(tMarks,vMarkUv); if(mark.a<=0.) discard; gl_FragColor=vec4(mark.rgb+texture2D(tMarkGlow,vMarkUv).rgb*.7,mark.a); }`,
+    fragmentShader: `${DITHER_GLSL}
+      uniform sampler2D tMarks; uniform sampler2D tMarkGlow; varying vec2 vMarkUv;
+      void main() {
+        vec4 mark=texture2D(tMarks,vMarkUv);
+        vec3 glow=texture2D(tMarkGlow,vMarkUv).rgb;
+        float coverage=max(mark.a,max(glow.r,max(glow.g,glow.b)));
+        if(coverage<=0.) discard;
+        // Fade coverage, not ink brightness: faint marks still quantize darker than paper.
+        if(pBayer4(gl_FragCoord.xy)>=coverage) discard;
+        gl_FragColor=vec4(mark.rgb+glow*.7,1.);
+      }`,
     transparent: true,
     depthWrite: false,
     blending: THREE.CustomBlending,
@@ -125,17 +164,21 @@ export function createElementRings({
   let kind = 'fire',
     ramp = flames.ember.ramp,
     t = 0,
-    crystalLife = 0;
+    crystalLife = 0,
+    lastRing = null;
   function setElement(element, flame = 'ember') {
     kind = pageOf(page()).light ? 'ice' : element;
-    ramp = (flames[flame] ?? flames.ember).ramp;
-    for (const r of [fire, lightning, ice, crystals, chill]) r.setRamp(ramp);
+    const warm = (flames[flame] ?? flames.ember).ramp;
+    ramp = kind === 'ice' ? ['#0f2f66', '#2f7fe0', '#8cc8ff', '#e8f4ff'] : warm;
+    for (const r of [fire, lightning]) r.setRamp(warm);
+    for (const r of [ice, crystals, chill]) r.setRamp(['#0f2f66', '#2f7fe0', '#8cc8ff', '#e8f4ff']);
     crystals.setActive(false);
   }
   // scar/ring retain sceneFire's sizes, strengths and debris power.
   function scar(size = 1, ring = false) {
     const colors = ramp.map((c) => new THREE.Color(c));
-    marks.stamp(kind, origin.x, origin.z, ring ? 1.5 : 0.22 + 0.18 * size, colors, {
+    if (ring) lastRing = { x: origin.x, z: origin.z, radius: ringRadius() };
+    marks.stamp(kind, origin.x, origin.z, ring ? ringRadius() : 0.22 + 0.18 * size, colors, {
       strength: Math.min(1, 0.6 + 0.4 * size),
       ring,
     });
@@ -147,7 +190,7 @@ export function createElementRings({
   }
   function ring(strength = 1) {
     if (reducedMotion) return;
-    if (pageOf(page()).light) kind = 'ice';
+    if (pageOf(page()).light && kind !== 'ice') setElement('ice');
     const s = Math.min(1.5, Math.max(0, strength));
     scar(s, true);
     if (kind === 'lightning') lightning.burst(effects.lightning.height);
@@ -170,6 +213,25 @@ export function createElementRings({
     chill,
     surface,
     setElement,
+    get markRing() {
+      return lastRing ?? { x: origin.x, z: origin.z, radius: ringRadius() };
+    },
+    get time() {
+      return t;
+    },
+    setDepth(depth) {
+      particle.uniforms.tDepth.value = depth;
+    },
+    setOrigin(x, z) {
+      origin.set(x, 0, z);
+      for (const object of iceSpreadObjects) object.position.set(x * (1 - iceWidth), 0, z * (1 - iceWidth));
+      for (const object of smallCrystals) object.position.set(x * 0.78, 0, z * 0.78);
+    },
+    drop(element, flame, pending, strength = 1) {
+      if (pending) return;
+      setElement(element, flame);
+      ring(strength);
+    },
     ring,
     get element() {
       return kind;
@@ -181,7 +243,6 @@ export function createElementRings({
     },
     step(dt) {
       t += dt;
-      for (const light of pageLightObjects) light.visible = !pageOf(page()).light;
       crystalLife = Math.max(0, crystalLife - dt);
       crystals.setActive(crystalLife > 0);
       fire.step(dt, t);
@@ -191,6 +252,11 @@ export function createElementRings({
       chill.step(dt, t);
       marks.step(dt);
       for (const d of Object.values(debris)) d.step(dt);
+      for (const light of ice.lights) {
+        light.position.x = origin.x + (light.position.x - origin.x) * iceWidth;
+        light.position.z = origin.z + (light.position.z - origin.z) * iceWidth;
+      }
+      if (pageOf(page()).light) for (const light of pageLightObjects) light.intensity = 0;
     },
   };
 }

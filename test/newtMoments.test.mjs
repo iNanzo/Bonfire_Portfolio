@@ -232,14 +232,26 @@ for (const [name, overrides, drop, held] of [
 for (const reduced of [false, true])
   test(`director phrase lands on its planned beat (reduced=${reduced})`, (t) => {
     const show = newtShow(t, { reduced, phraseBars: 4 });
+    const targets = [],
+      equip = show.duck.equip;
+    show.duck.equip = (weapon, flame, options = {}) => {
+      if (options.pace) {
+        // This fixture stays inside forgeIn's pace limits, so its duration ends on the requested beat.
+        assert.ok(options.pace > 0.55 && options.pace < 1.8, 'target beat is not pace-clamped');
+        targets.push(show.time + show.duck.swapTime / options.pace);
+      }
+      return equip(weapon, flame, options);
+    };
     for (let count = 0; count <= 40; count++) {
       const time = show.time + 1 / 120;
       show.step({ beats: [{ time, count, beat: count % 4, bar: Math.floor(count / 4) + 1, strength: 0.7 }] });
       show.advance(0.5 - 1 / 120);
     }
     assert.ok(show.impacts.length > 0);
-    for (const { time } of show.impacts)
-      assert.ok(Math.abs(time - Math.round(time / 0.5) * 0.5) <= 1 / 60, `impact at ${time}`);
+    show.advance(3);
+    assert.equal(show.impacts.length, targets.length, 'each requested forge impacts once');
+    for (const [{ time }, target] of show.impacts.map((impact, i) => [impact, targets[i]]))
+      assert.ok(Math.abs(time - target) <= 1 / 120 + 1e-9, `impact at ${time}, target beat ${target}`);
   });
 
 test('director held forge rejects a second equip without another letter', async (t) => {

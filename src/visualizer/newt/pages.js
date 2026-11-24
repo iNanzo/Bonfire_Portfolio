@@ -27,6 +27,13 @@ export const PAGES = {
 };
 export const pageOf = (key) => PAGES[key] ?? PAGES.dusk;
 
+// Keep the paper's gold, red seal, and NEWT slots; three effect slots let the
+// shared quantizer retain ice's cold ramp instead of turning its blue facets gold.
+export const elementPalette = (page, element) =>
+  page.light || element === 'ice'
+    ? page.palette.map((color, slot) => [0x0f2f66, 0x2f7fe0, 0x8cc8ff][slot - 5] ?? color)
+    : page.palette;
+
 // The page turn blends the void, ink and palette on the same clock in linear light.
 const linear = (v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
 const srgb = (v) => (v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055);

@@ -8,9 +8,9 @@ import { createResourceScope } from '../src/bonfire/resources.js';
 test('contact shadow fades to transparent edges without changing the scene surface id', () => {
   const scene = new THREE.Scene(),
     scope = createResourceScope();
-  const blob = createContactShadow({ scene, scope, color: 0 });
+  const blob = createContactShadow({ scene, scope, color: 0, ghost: 7 });
   assert.equal(blob.parent, scene);
-  assert.equal(blob.layers.mask, 1 << 2);
+  assert.equal(blob.layers.mask, 1 << 7);
   const { material } = blob,
     data = material.map.image.data;
   assert.equal(data[3], 0);
